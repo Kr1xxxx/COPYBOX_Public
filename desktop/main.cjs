@@ -32,7 +32,7 @@ const isWindows = process.platform === "win32";
 // Launch-at-login starts Clipbox quietly in the tray.
 const startHidden = process.argv.includes("--hidden");
 const loginItemOptions = isWindows ? { args: ["--hidden"] } : {};
-let closeBehavior = "tray"; // "tray" | "quit"
+let closeBehavior = "tray"; // "tray" | "taskbar" (Windows) | "quit"
 const WINDOW_STATE_SAVE_DELAY = 180;
 const FULL_TRAFFIC_LIGHTS = { x: 14, y: 19 };
 const MINI_TRAFFIC_LIGHTS = { x: 14, y: 14 };
@@ -305,7 +305,9 @@ function createWindow() {
         return;
       }
       event.preventDefault();
-      mainWindow.hide();
+      // "taskbar" keeps the taskbar button, so a click on it brings the window back; "tray" hides it completely.
+      if (closeBehavior === "taskbar" && isWindows) mainWindow.minimize();
+      else mainWindow.hide();
     }
   });
   mainWindow.once("ready-to-show", () => {
@@ -320,6 +322,7 @@ function showWindow(asQuickSearch = false) {
   if (!mainWindow) return;
   if (asQuickSearch) enterMiniMode(true);
   else enterFullMode();
+  if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
   mainWindow.webContents.send("clipbox:focus-search");
@@ -393,7 +396,7 @@ ipcMain.on("clipbox:set-mini-hide-policy", (event, policy) => {
 
 ipcMain.on("clipbox:set-close-behavior", (event, behavior) => {
   if (!mainWindow || mainWindow.webContents !== event.sender) return;
-  if (behavior === "tray" || behavior === "quit") closeBehavior = behavior;
+  if (behavior === "tray" || behavior === "quit" || behavior === "taskbar") closeBehavior = behavior;
 });
 
 ipcMain.on("clipbox:set-theme", (event, theme) => {

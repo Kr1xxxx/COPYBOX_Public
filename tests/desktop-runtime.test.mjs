@@ -59,3 +59,16 @@ test("settings expose trash management, mini hide policy and launch at login", (
   assert.match(main, /clipbox:set-launch-at-login/);
   assert.match(main, /app\.setLoginItemSettings\(\{ openAtLogin: Boolean\(enabled\)/);
 });
+
+test("closing can minimise to the Windows taskbar, and any reopen restores a minimised window", () => {
+  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  assert.match(main, /behavior === "taskbar"/);
+  assert.match(main, /closeBehavior === "taskbar" && isWindows\) mainWindow\.minimize\(\)/);
+  assert.match(main, /if \(mainWindow\.isMinimized\(\)\) mainWindow\.restore\(\)/);
+  // Dock click on macOS and a second launch on Windows both go through showWindow.
+  assert.match(main, /app\.on\("activate"[\s\S]*?showWindow\(false\)/);
+  assert.match(main, /app\.on\("second-instance", \(\) => showWindow\(false\)\)/);
+  assert.match(page, /缩到任务栏/);
+  assert.match(page, /platform === "win32" \? \[\["taskbar"/);
+});

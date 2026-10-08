@@ -28,7 +28,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 4 | Protect the vault's device key with OS encryption (today it sits next to the data, so a copied data folder can be decrypted) | Todo | — | Changes storage — ask the owner first |
 | 5 | Backup/export for the 备注/秘密 section | Todo | — | |
 | 6 | Split `app/page.tsx` into component files | In progress | Claude | One piece at a time, tests green after each. Done: AI client (`app/ai-client.ts`) and AI settings panel (`app/ai-settings.tsx`). Next: backup/import dialogs, settings dialog, item editor. Update the `page.tsx` row in AGENTS.md when the split is finished |
-| 7 | If opening from the tray feels awkward: show the window when the taskbar/Dock icon is clicked | Todo | — | No shortcuts (D-005) |
+| 7 | Alternative to the tray: Windows setting "缩到任务栏" keeps the taskbar button; Dock click already reopens on Mac | Done (PR open, needs Windows test) | Claude | No shortcuts (D-005) |
 
 ## Waiting on the owner
 

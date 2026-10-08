@@ -29,3 +29,24 @@ test("macOS: the second section is still 秘密 with masking and references", as
   await expect(editor).toContainText("被什么引用");
   await expect(editor).toContainText("隐藏内容");
 });
+
+async function closeOptions(page, platform) {
+  await asDesktop(page, platform);
+  await seedSnippets(page);
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  const group = page.getByRole("radiogroup", { name: "点击窗口关闭按钮时" });
+  await group.scrollIntoViewIfNeeded();
+  return group;
+}
+
+test("Windows: closing can shrink to the taskbar", async ({ page }) => {
+  const group = await closeOptions(page, "win32");
+  await expect(group.getByRole("radio")).toHaveText(["收到托盘", "缩到任务栏", "退出"]);
+  await group.getByRole("radio", { name: "缩到任务栏" }).click();
+  await expect(page.locator(".settings-row", { has: group })).toContainText("点任务栏上的图标就能再打开");
+});
+
+test("macOS: no taskbar option (the Dock icon already reopens the window)", async ({ page }) => {
+  const group = await closeOptions(page, "darwin");
+  await expect(group.getByRole("radio")).toHaveText(["收到托盘", "退出"]);
+});
