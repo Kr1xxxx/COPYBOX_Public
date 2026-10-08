@@ -34,8 +34,23 @@ test("keeps the full window at least 680×620 and switches to a fixed, floating 
   assert.match(source, /mainWindow\.setResizable\(false\)/);
   assert.match(source, /mainWindow\.setAlwaysOnTop\(true, "floating"\)/);
   assert.match(source, /mainWindow\.setMinimumSize\(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT\)/);
-  assert.match(source, /if \(quickMode && miniAutoHide\) setTimeout/);
+  assert.match(source, /miniHidePolicy === "always" \|\| miniAutoHide\) setTimeout/);
+  assert.match(source, /miniHidePolicy === "never"\) return/);
   assert.match(source, /mainWindow\.webContents !== event\.sender\) return;/);
   assert.match(preload, /setWindowMode: \(mode\) => ipcRenderer\.send\("clipbox:set-window-mode"/);
   assert.match(preload, /ipcRenderer\.on\("clipbox:window-mode", listener\)/);
+});
+
+test("settings expose trash management, mini hide policy and launch at login", () => {
+  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  assert.match(page, /id="set-trash"/);
+  assert.match(page, /清空回收站/);
+  assert.match(page, /id="set-cli"/);
+  assert.match(page, /迷你窗口复制后/);
+  assert.match(preload, /setMiniHidePolicy/);
+  assert.match(preload, /setLaunchAtLogin/);
+  assert.match(main, /clipbox:set-launch-at-login/);
+  assert.match(main, /app\.setLoginItemSettings\(\{ openAtLogin/);
 });

@@ -32,8 +32,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
 
 contextBridge.exposeInMainWorld("clipboxDesktop", {
-  copyText: (text) => ipcRenderer.invoke("clipbox:copy-text", text),
+  copyText: (text, seconds) => ipcRenderer.invoke("clipbox:copy-text", text, seconds),
   didCopy: () => ipcRenderer.send("clipbox:did-copy"),
+  setMiniHidePolicy: (policy) => ipcRenderer.send("clipbox:set-mini-hide-policy", policy),
+  getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
+  setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),
   getVersion: () => ipcRenderer.invoke("clipbox:get-version"),
   relaunch: () => ipcRenderer.send("clipbox:relaunch"),
   onFocusSearch: (callback) => {

@@ -1,13 +1,16 @@
 function createClipboardWriter(clipboard) {
   let timer;
-  return (text) => {
+  return (text, seconds = 60) => {
     if (typeof text !== "string") throw new TypeError("Clipboard text must be a string");
     clipboard.writeText(text);
     clearTimeout(timer);
+    timer = undefined;
+    const delay = [0, 30, 60, 300].includes(seconds) ? seconds : 60;
+    if (delay === 0) return;
     timer = setTimeout(() => {
       timer = undefined;
       if (clipboard.readText() === text) clipboard.writeText("");
-    }, 60_000);
+    }, delay * 1000);
     timer.unref?.();
   };
 }

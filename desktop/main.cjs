@@ -366,8 +366,27 @@ app.on("before-quit", () => {
   if (serverProcess && !serverProcess.killed) serverProcess.kill("SIGTERM");
 });
 
+let miniHidePolicy = "hotkey"; // "hotkey" | "always" | "never"
+
 ipcMain.on("clipbox:did-copy", () => {
-  if (quickMode && miniAutoHide) setTimeout(() => mainWindow?.hide(), 1200);
+  if (!quickMode || miniHidePolicy === "never") return;
+  if (miniHidePolicy === "always" || miniAutoHide) setTimeout(() => mainWindow?.hide(), 1200);
+});
+
+ipcMain.on("clipbox:set-mini-hide-policy", (event, policy) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return;
+  if (policy === "hotkey" || policy === "always" || policy === "never") miniHidePolicy = policy;
+});
+
+ipcMain.handle("clipbox:get-launch-at-login", (event) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return false;
+  return app.getLoginItemSettings().openAtLogin;
+});
+
+ipcMain.handle("clipbox:set-launch-at-login", (event, enabled) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) throw new Error("Request denied");
+  app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+  return app.getLoginItemSettings().openAtLogin;
 });
 
 ipcMain.on("clipbox:set-window-mode", (event, mode) => {
@@ -377,9 +396,9 @@ ipcMain.on("clipbox:set-window-mode", (event, mode) => {
 });
 
 const writeClipboard = createClipboardWriter(clipboard);
-ipcMain.handle("clipbox:copy-text", (event, text) => {
+ipcMain.handle("clipbox:copy-text", (event, text, seconds) => {
   if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Clipboard request denied");
-  writeClipboard(text);
+  writeClipboard(text, seconds);
 });
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());

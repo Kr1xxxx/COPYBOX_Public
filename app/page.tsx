@@ -1,6 +1,6 @@
 "use client";
 
-import { copyTextWithExpiry } from "./clipboard";
+import { CLIPBOARD_CLEAR_OPTIONS, copyTextWithExpiry, readClipboardClearSeconds, writeClipboardClearSeconds } from "./clipboard";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, UNCATEGORIZED_COLOR } from "./category-colors";
 import {
@@ -26,6 +26,7 @@ import {
   normalizeFolderName,
   normalizeReferenceNote,
   normalizeVaultData,
+  isTrashedItem,
   permanentlyDeleteTrashedItem,
   parseRefreshContext,
   resolveFocusWrapIndex,
@@ -91,12 +92,34 @@ type CopyLanguage = "en" | "zh";
 type SnippetCopyRequest = { item: SecretItem; language: CopyLanguage };
 type DeleteRequest = { item: SecretItem; permanent: boolean };
 type WindowMode = "full" | "mini";
+type MiniHidePolicy = "hotkey" | "always" | "never";
+const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
+const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
+const TRASH_DAY_OPTIONS = [0, 7, 30, 90] as const;
+
+function readStoredChoice<T extends string | number>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    const match = allowed.find((value) => String(value) === raw);
+    if (match !== undefined) return match;
+  } catch {
+    // Storage can be unavailable; use the default.
+  }
+  return fallback;
+}
+
+function writeStoredChoice(key: string, value: string | number) {
+  try { localStorage.setItem(key, String(value)); } catch { /* keep the in-memory choice for this session */ }
+}
 
 declare global {
   interface Window {
     clipboxDesktop?: {
-      copyText: (text: string) => Promise<void>;
+      copyText: (text: string, seconds?: number) => Promise<void>;
       didCopy: () => void;
+      setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
+      getLaunchAtLogin?: () => Promise<boolean>;
+      setLaunchAtLogin?: (enabled: boolean) => Promise<boolean>;
       getVersion: () => Promise<string>;
       relaunch: () => void;
       onFocusSearch: (callback: () => void) => () => void;
@@ -294,7 +317,8 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [copiedId, setCopiedId] = useState("");
   const [copiedReferenceId, setCopiedReferenceId] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [folderDialogKind, setFolderDialogKind] = useState<ItemKind | null>(null);
   const [backupMode, setBackupMode] = useState<BackupMode | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
@@ -416,7 +440,7 @@ export default function Home() {
   }, [items, query, activeKind, activeFolder, productFilter]);
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
-  const auxiliaryDialogOpen = Boolean(snippetImport || copyRequest || deleteRequest);
+  const auxiliaryDialogOpen = Boolean(snippetImport || copyRequest || deleteRequest || settingsOpen);
   const { homeShortcutsEnabled, backgroundInert } = modalInteractionState(modalOpen || auxiliaryDialogOpen, Boolean(folderDialogKind), Boolean(backupMode));
   const cardDragEnabled = activeFolder !== "trash" && canReorderCards(query, productFilter) && !backgroundInert;
 
@@ -801,6 +825,45 @@ export default function Home() {
     window.setTimeout(() => setToast(""), 2200);
   }
 
+  const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
+  const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, 0));
+  useEffect(() => {
+    window.clipboxDesktop?.setMiniHidePolicy?.(miniHidePolicy);
+    // Only tell the desktop shell about the stored choice once on start; later changes go through chooseMiniHidePolicy.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function chooseMiniHidePolicy(policy: MiniHidePolicy) {
+    setMiniHidePolicy(policy);
+    writeStoredChoice(MINI_HIDE_KEY, policy);
+    window.clipboxDesktop?.setMiniHidePolicy?.(policy);
+  }
+
+  function chooseTrashDays(days: number) {
+    setTrashDays(days);
+    writeStoredChoice(TRASH_DAYS_KEY, days);
+  }
+
+  // Items that have sat in the trash longer than the chosen retention are removed for good.
+  useEffect(() => {
+    if (loading || trashDays === 0) return;
+    const cutoff = timestampNow() - trashDays * 86_400_000;
+    const expired = items.filter((item) => isTrashedItem(item) && (item.deletedAt as number) < cutoff);
+    if (expired.length === 0) return;
+    const ids = new Set(expired.map((item) => item.id));
+    void persist((current) => ({ ...current, items: current.items.filter((item) => !(ids.has(item.id) && isTrashedItem(item))) }))
+      .catch(() => setToast("自动清理回收站失败，内容已保留"));
+  }, [loading, trashDays, items, persist]);
+
+  async function emptyTrash() {
+    const count = items.filter((item) => isTrashedItem(item)).length;
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setUndoTrash(null);
+    await persist((current) => ({ ...current, items: current.items.filter((item) => !isTrashedItem(item)) }));
+    setToast(`已永久删除 ${count} 条`);
+    window.setTimeout(() => setToast(""), 2200);
+  }
+
   async function restoreItem(item: SecretItem) {
     try {
       await persist((current) => ({ ...current, items: restoreTrashedItem(current.items, item.id) }));
@@ -1056,16 +1119,7 @@ export default function Home() {
             </div>
             <div className="nav-footer">
               <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length > 0 && <b>{trashedKindItems.length}</b>}</button>
-              <div className="menu-wrap sidebar-menu-wrap">
-                <button type="button" className={`nav-item ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
-                {menuOpen && <div className="dropdown" role="menu">
-                  <button type="button" role="menuitem" onClick={() => { setBackupMode("export"); setMenuOpen(false); }}>导出话术备份</button>
-                  <button type="button" role="menuitem" onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}>导入备份</button>
-                  <button type="button" role="menuitem" onClick={() => { spreadsheetFileRef.current?.click(); setMenuOpen(false); }}>导入话术表格</button>
-                  <button type="button" role="menuitem" className={`refresh-button ${refreshing ? "refreshing" : ""}`} onClick={() => { setMenuOpen(false); void refreshLocalVault(); }} disabled={refreshing}><span aria-hidden="true">↻</span>{refreshing ? "正在重新加载…" : "重新加载"}</button>
-                  <div className="settings-version">{appVersion ? `版本 v${appVersion}` : "开发版本"}</div>
-                </div>}
-              </div>
+              <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
               <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
             </div>
@@ -1167,6 +1221,24 @@ export default function Home() {
         </>}
       </section>
       {modalOpen && <ItemEditor kind={editing?.kind || activeKind} item={editing} folders={activeFolders} defaultFolder={activeFolder.startsWith("folder:") ? activeFolder.slice(7) : ""} onClose={closeEditor} onDelete={editing ? async () => requestTrash(editing) : undefined} onSave={saveItem} onCopy={copyTextWithExpiry} />}
+      {settingsOpen && <SettingsDialog
+        version={appVersion}
+        isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}
+        refreshing={refreshing}
+        trashCount={items.filter((item) => isTrashedItem(item)).length}
+        itemCount={items.filter((item) => !isTrashedItem(item)).length}
+        miniHidePolicy={miniHidePolicy}
+        onMiniHidePolicy={chooseMiniHidePolicy}
+        trashDays={trashDays}
+        onTrashDays={chooseTrashDays}
+        onEmptyTrash={emptyTrash}
+        onClose={() => setSettingsOpen(false)}
+        onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
+        onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
+        onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}
+        onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
+        onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
+      />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}
@@ -1437,6 +1509,105 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
           <p className="backup-note">{mode === "export" ? "请妥善保存密码；Clipbox 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
           <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={mode === "import" && strategy === "replace" ? "danger" : "primary"} disabled={busy}>{busy ? (mode === "export" ? "正在加密…" : "正在验证…") : mode === "export" ? "加密并导出" : strategy === "merge" ? "验证并合并" : "验证并覆盖"}</button></div>
         </form>
+      </section>
+    </div>
+  );
+}
+
+const SHORTCUTS: [string, string][] = [
+  ["⌘K", "搜索"], ["⌘N", "新增条目"], ["⌘E", "编辑当前条目"], ["↑ ↓", "选择条目"], ["↵", "复制当前条目"], ["⌥ Space", "呼出 / 隐藏迷你窗口（桌面版）"], ["Esc", "关闭面板或收起菜单"],
+];
+
+const CLI_COMMANDS: [string, string][] = [
+  ["clipbox list", "列出话术"], ["clipbox get CB-0003", "读取一条"], ["clipbox add --title … --content …", "新增"],
+  ["clipbox update CB-0003 --content …", "修改"], ["clipbox move CB-0003 --folder …", "移动目录"], ["clipbox delete CB-0003 --confirm", "删除"],
+];
+
+function clearLabel(seconds: number) {
+  return seconds === 0 ? "不清除" : seconds < 60 ? `${seconds} 秒` : `${seconds / 60} 分钟`;
+}
+
+function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, trashDays, onTrashDays, onEmptyTrash, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
+  version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
+  miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
+  trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
+  onClose: () => void; onExport: () => void; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
+}) {
+  const [clearSeconds, setClearSeconds] = useState(readClipboardClearSeconds);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    window.clipboxDesktop?.getLaunchAtLogin?.().then((value) => { if (!cancelled) setLaunchAtLogin(value); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  const row = (title: string, hint: string, action: () => void, label: string, disabled = false) => (
+    <div className="settings-row"><div><strong>{title}</strong><small>{hint}</small></div><button type="button" className="secondary-button" onClick={action} disabled={disabled}>{label}</button></div>
+  );
+  return (
+    <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header><h2 id="settings-title">设置</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">×</button></header>
+        <div className="settings-body">
+          <section aria-labelledby="set-data"><h3 id="set-data">数据</h3>
+            {row("导出话术备份", "用独立密码加密，不包含秘密", onExport, "导出…")}
+            {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
+            {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
+            {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
+          </section>
+          <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
+            <div className="settings-row"><div><strong>复制后自动清除剪贴板</strong><small>只在剪贴板内容仍是刚复制的那一条时才清除</small></div>
+              <div className="settings-segment" role="radiogroup" aria-label="自动清除剪贴板">
+                {CLIPBOARD_CLEAR_OPTIONS.map((seconds) => <button key={seconds} type="button" role="radio" aria-checked={clearSeconds === seconds} className={clearSeconds === seconds ? "active" : ""} onClick={() => { setClearSeconds(seconds); writeClipboardClearSeconds(seconds); }}>{clearLabel(seconds)}</button>)}
+              </div>
+            </div>
+            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。秘密不会进入话术备份，复制秘密默认只给出引用。</p>
+          </section>
+          <section aria-labelledby="set-trash"><h3 id="set-trash">回收站</h3>
+            <div className="settings-row"><div><strong>自动清理</strong><small>超过期限的已删除内容会被永久删除</small></div>
+              <div className="settings-segment" role="radiogroup" aria-label="回收站自动清理">
+                {TRASH_DAY_OPTIONS.map((days) => <button key={days} type="button" role="radio" aria-checked={trashDays === days} className={trashDays === days ? "active" : ""} onClick={() => onTrashDays(days)}>{days === 0 ? "不清理" : `${days} 天`}</button>)}
+              </div>
+            </div>
+            <div className="settings-row"><div><strong>清空回收站</strong><small>{trashCount === 0 ? "回收站是空的" : `永久删除 ${trashCount} 条，无法恢复`}</small></div>
+              {confirmEmpty
+                ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmEmpty(false)}>取消</button><button type="button" className="secondary-button danger" onClick={() => { setConfirmEmpty(false); void onEmptyTrash(); }}>确认清空</button></div>
+                : <button type="button" className="secondary-button" disabled={trashCount === 0} onClick={() => setConfirmEmpty(true)}>清空…</button>}
+            </div>
+          </section>
+          <section aria-labelledby="set-window"><h3 id="set-window">窗口</h3>
+            {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}
+            <div className="settings-row"><div><strong>迷你窗口复制后</strong><small>{isDesktop ? "选择复制后是否自动收起迷你窗口" : "仅桌面版生效"}</small></div>
+              <div className="settings-segment" role="radiogroup" aria-label="迷你窗口复制后">
+                {([["hotkey", "⌥Space 呼出时收起"], ["always", "总是收起"], ["never", "不收起"]] as [MiniHidePolicy, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={miniHidePolicy === value} className={miniHidePolicy === value ? "active" : ""} onClick={() => onMiniHidePolicy(value)}>{label}</button>)}
+              </div>
+            </div>
+            {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录 macOS 后自动打开 Clipbox</small></div>
+              <div className="settings-segment" role="radiogroup" aria-label="开机自动启动">
+                {([[false, "关"], [true, "开"]] as [boolean, string][]).map(([value, label]) => <button key={label} type="button" role="radio" aria-checked={launchAtLogin === value} className={launchAtLogin === value ? "active" : ""} onClick={() => { void window.clipboxDesktop?.setLaunchAtLogin?.(value).then(setLaunchAtLogin).catch(() => undefined); }}>{label}</button>)}
+              </div>
+            </div>}
+            <p className="settings-note">完整窗口最小 680×620。{isDesktop ? "⌥Space 可随时呼出迷你窗口，复制后自动收起。" : "全局快捷键 ⌥Space 仅桌面版可用。"}</p>
+          </section>
+          <section aria-labelledby="set-keys"><h3 id="set-keys">快捷键</h3>
+            <dl className="settings-keys">{SHORTCUTS.map(([key, what]) => <div key={key}><dt><kbd>{key}</kbd></dt><dd>{what}</dd></div>)}</dl>
+          </section>
+          <section aria-labelledby="set-cli"><h3 id="set-cli">命令行</h3>
+            <p className="settings-note">打开 Clipbox 后，其他本机任务可用 <code>clipbox</code> 命令直接读写话术，修改会立即出现在窗口里。</p>
+            <dl className="settings-keys settings-cli">{CLI_COMMANDS.map(([cmd, what]) => <div key={cmd}><dt><code>{cmd}</code></dt><dd>{what}</dd></div>)}</dl>
+            <p className="settings-note">秘密不能列表、搜索或通过命令修改，只能按 <code>clipbox://secret/…</code> 引用精确读取。</p>
+          </section>
+          <section aria-labelledby="set-about"><h3 id="set-about">关于</h3>
+            <div className="settings-row static"><div><strong>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div></div>
+          </section>
+        </div>
       </section>
     </div>
   );

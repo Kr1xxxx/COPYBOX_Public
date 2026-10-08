@@ -50,7 +50,7 @@ export async function pageHarness() {
   for (const name of ['bytesToBase64', 'base64ToBytes', 'createDeviceKey', 'deriveKey', 'encryptVault', 'decryptVault', 'readLocalEncryptedVault', 'openVault', 'saveItem', 'submit']) run(functions.get(name));
   for (const name of ['readVault', 'enqueueVaultTask', 'writeVault', 'persist']) if (hooks.has(name)) run(`globalThis.${name} = ${hooks.get(name)}`);
   const clipboard = new URL('../../app/clipboard.ts', import.meta.url);
-  if (fs.existsSync(clipboard)) run(fs.readFileSync(clipboard, 'utf8').replace('export async function', 'async function'));
+  if (fs.existsSync(clipboard)) run(fs.readFileSync(clipboard, 'utf8').replace(/^export /gm, ''));
   run(`(${automationEffect})()`);
   return { c, storage, writes, responses, copyCalls, rejectNextWrite: () => { rejectWrite = true; } };
 }
