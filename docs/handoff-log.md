@@ -3,6 +3,8 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-08 — Claude — Owner said 合并: merged PR #2 (handoff docs + merge policy) into `main`. Rule kept: one
+  change per PR, no batching. Next: PR #1 after Windows testing.
 - 2026-10-08 — Claude — Owner raised the automatic-merge limit to 350 lines of app code (D-011).
 - 2026-10-08 — Claude — Checked the merge policy with a real small PR (this log entry): CI merged it by itself.
 - 2026-10-08 — Claude — Merge policy (D-011): `scripts/classify-pr.mjs` + CI job `merge policy` merge small PRs
