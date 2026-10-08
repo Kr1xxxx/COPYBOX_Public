@@ -1,0 +1,159 @@
+﻿标题,沟通阶段,具体场景,核心动作,产品/业务,英文即时消息,中文对照,使用备注,可替换变量
+首次问候｜自我介绍,询盘接待,首次问候,自我介绍,通用,"Hi [Name], thanks for reaching out to [Company]! How can I help you today?",你好 [Name]，感谢联系 [Company]！今天有什么可以帮您？,,
+询问需求｜睫毛需求确认,询盘接待,询问需求,睫毛需求确认,睫毛,"Thanks for your interest in our lashes! To recommend the best options, could you tell me:
+1. Style (classic / volume / mega volume)?
+2. Length and curl (e.g. [Length], [Curl])?
+3. Estimated order quantity for [Brand]?
+4. Target market: [Country]?
+5. Do you need private label packaging?","感谢关注我们的睫毛！为了给您推荐合适的款式，请问：
+1. 风格（经典/浓密/超浓密）？
+2. 长度和卷度（如 [Length]、[Curl]）？
+3. [Brand] 的预估订单量？
+4. 目标市场：[Country]？
+5. 是否需要自有品牌包装？",先问清楚再报价，不要一上来就发价格表,
+询问需求｜假发规格确认,询盘接待,询问需求,假发规格确认,假发/发束,"Great to hear you're interested in our hair products. Could you share the details below so I can prepare an accurate quote?
+- Hair type: raw / virgin / Remy
+- Texture: straight, body wave, deep wave
+- Length: [Length] inches
+- Lace type: HD / transparent, closure or frontal
+- Density: 150% / 180% / 200%
+- Quantity: [Quantity] pcs
+If you already have reference photos, feel free to send them too.","很高兴您对我们的发制品感兴趣。请提供以下信息，方便我准备准确报价：
+- 发质：原生/未加工/Remy
+- 纹理：直发、身体波、深波
+- 长度：[Length] 英寸
+- 蕾丝类型：HD/透明，闭合或前蕾丝
+- 密度：150%/180%/200%
+- 数量：[Quantity] 件
+如有参考图也可以一起发给我。",,
+非目标客户｜礼貌婉拒,询盘接待,非目标客户,礼貌婉拒,通用,"Thank you for your inquiry. Unfortunately our products are not a good fit for your current needs, but we really appreciate your interest and wish you every success with your business.",感谢您的询盘。很遗憾我们的产品目前不太符合您的需求，但非常感谢您的关注，祝生意顺利。,,
+阿里巴巴站内信｜完整公司介绍,询盘接待,阿里巴巴站内信,完整公司介绍,平台,"Dear [Name],
+
+Thank you for your message on Alibaba.com. We are [Company], a professional manufacturer of eyelash extensions, tweezers and hair products with more than 10 years of experience.
+
+What we offer:
+• Factory direct prices with stable quality control (3 inspections before shipping)
+• Low MOQ for new brands and free design support for private label
+• Worldwide express delivery (DHL / FedEx / UPS) within 3–7 working days
+• Samples available for testing before bulk orders
+
+You can see our latest catalog here: [Catalog Link]
+Our certificates (MSDS, SGS, FDA) are available on request.
+
+If you tell me your target market and estimated quantity, I will send you a detailed quotation within 24 hours.
+
+Looking forward to working with you.
+
+Best regards,
+[Sender]
+[Company] | WhatsApp: [Phone]","亲爱的 [Name]：
+
+感谢您在阿里巴巴上的留言。我们是 [Company]，专业生产睫毛、镊子和发制品，拥有 10 年以上经验。
+
+我们提供：
+• 工厂直销价格，质量稳定（发货前三次检验）
+• 新品牌低起订量，自有品牌免费设计支持
+• 全球快递（DHL/FedEx/UPS）3–7 个工作日送达
+• 大货前可先寄样测试
+
+最新目录：[Catalog Link]
+如需 MSDS、SGS、FDA 证书可提供。
+
+告诉我目标市场和预估数量，我会在 24 小时内发详细报价。
+
+期待合作。
+
+此致
+[Sender]
+[Company] | WhatsApp：[Phone]",长文本，用来测试展开和滚动,
+首次问候｜二次问候,询盘接待,首次问候,二次问候,通用,Hello again [Name]! Just checking whether you had a chance to look at the catalog I sent earlier.,[Name] 你好！想确认下您是否看过我之前发的目录。,,
+样品政策｜说明样品费,产品样品,样品政策,说明样品费,睫毛,We are happy to send samples. The sample fee is [Sample Fee] and it will be fully refunded when you place a bulk order over [MOQ] sets. Shipping is paid by the buyer.,我们很乐意寄样。样品费为 [Sample Fee]，当您下单超过 [MOQ] 套时全额退还。运费由买家承担。,样品费金额和起订量需要先和老板核实,"样品费, 运费, 退款条件"
+样品寄出｜发送运单号,产品样品,样品寄出,发送运单号,物流/清关,"Hi [Name], your samples have been shipped via [Courier]. Tracking number: [Tracking No]. It usually takes 3–5 working days. I will keep you updated, [Name]!",[Name] 你好，您的样品已通过 [Courier] 寄出，运单号：[Tracking No]，通常 3–5 个工作日送达。我会随时同步进度，[Name]！,,
+样品反馈｜收到样品后跟进,产品样品,样品反馈,收到样品后跟进,睫毛,"Hi [Name], did the samples arrive safely? We would love to hear your feedback on the curl, softness and band quality.",[Name] 你好，样品顺利收到了吗？很想听听您对卷度、柔软度和底梗的反馈。,,
+镊子规格｜发送规格参数,产品样品,镊子规格,发送规格参数,镊子,"Our tweezers are made of Japanese stainless steel (SUS304):
+- Tip precision: <0.1mm
+- Models: Straight / 45° / L-shape / ""Isolation"" / 'Volume'
+- Finish: matte & mirror, custom logo laser engraving available
+- Package: single OPP bag, MOQ [MOQ] pcs per model","我们的镊子采用日本不锈钢（SUS304）：
+- 尖端精度：<0.1mm
+- 型号：直头/45°/L 型/隔离/浓密
+- 表面：哑光和镜面，可定制 Logo 激光雕刻
+- 包装：单个 OPP 袋，每款起订量 [MOQ] 件","特殊字符测试：< > & "" '",
+成分说明｜洗发水成分,产品样品,成分说明,洗发水成分,洗发水,"Our shampoo is sulfate-free 🌿 with argan oil, keratin and aloe — gentle on extensions and natural hair ✨. Safe for lace and bonded hair. Free of parabens and silicones.",我们的洗发水不含硫酸盐 🌿，含有摩洛哥坚果油、角蛋白和芦荟，对接发和天然发都很温和 ✨。适用于蕾丝和粘接发，不含防腐剂和硅油。,,
+阶梯报价｜发送价格档位,报价成交,阶梯报价,发送价格档位,睫毛,"Here is our tier pricing for [Product]:
+• 1–49 sets: $[Price1] / set
+• 50–199 sets: $[Price2] / set
+• 200+ sets: $[Price3] / set
+Prices are FOB [Port] and valid for [Days] days.","这是 [Product] 的阶梯价格：
+• 1–49 套：$[Price1]/套
+• 50–199 套：$[Price2]/套
+• 200 套以上：$[Price3]/套
+价格为 FOB [Port]，有效期 [Days] 天。",发送前核实最新金额,"价格, 币种"
+付款方式｜说明付款与账户,报价成交,付款方式,说明付款与账户,通用,"We accept T/T, PayPal, Western Union and Alibaba Trade Assurance. For T/T please transfer to: [Bank Account]. 30% deposit, 70% balance before shipment.",我们接受电汇、PayPal、西联和阿里巴巴信保。电汇请汇入：[Bank Account]。30% 定金，发货前付清 70% 尾款。,账户信息必须核实后再发,
+催付款｜礼貌催款,报价成交,催付款,礼貌催款,通用,"Hi [Name], a friendly reminder that the balance of $[Amount] for order [Order #] is still pending. Could you arrange the payment today so we can ship on time?",[Name] 你好，温馨提醒订单 [Order #] 的尾款 $[Amount] 还未到账。方便今天安排付款吗？这样我们可以按时发货。,金额核实后再发,金额
+订单确认｜确认订单明细,报价成交,订单确认,确认订单明细,假发/发束,"Order confirmation for [Name]:
+Order #: [Order #]
+Product: [Product]
+Quantity: [Quantity]
+Unit price: $[Unit Price]
+Total: $[Total]
+Production time: [Days] days
+Shipping: [Courier] to [Country]
+Please reply ""CONFIRM"" to start production.","[Name] 的订单确认：
+订单号：[Order #]
+产品：[Product]
+数量：[Quantity]
+单价：$[Unit Price]
+总价：$[Total]
+生产周期：[Days] 天
+物流：[Courier] 到 [Country]
+请回复“CONFIRM”开始生产。",,
+客户还价｜保持底价,报价成交,客户还价,保持底价,通用,"I understand your budget. This is already our best factory price, but I can offer free shipping on your next order if you confirm today.",理解您的预算。这已经是我们的最低出厂价，但如果您今天确认，我可以免运费发您下一单。,,
+定制包装｜Logo 包装流程,定制生产,定制包装,Logo 包装流程,包装/Logo,"For custom packaging we need:
+1. Your logo file (AI / PDF / PNG, vector preferred)
+2. Box size and material (kraft / white card / magnetic box)
+3. Pantone colors
+We will send a digital mockup within 2 working days. After you approve it, the physical sample takes about 7 days.","定制包装需要：
+1. Logo 文件（AI/PDF/PNG，优先矢量）
+2. 盒子尺寸和材质（牛皮纸/白卡/磁吸盒）
+3. 潘通色号
+我们会在 2 个工作日内发电子效果图，确认后实物样约 7 天。",,
+生产周期｜告知交期,定制生产,生产周期,告知交期,通用,Production time for your order is [Days] working days after the deposit is received. I will send you photos and a short video before shipment.,订单生产周期为收到定金后 [Days] 个工作日，发货前我会发照片和小视频给您。,,
+打样确认｜确认样品修改,定制生产,打样确认,确认样品修改,包装/Logo,"Please check the attached sample photos and let me know if any changes are needed (color, logo position, size). We cannot modify once bulk production starts.",请查看附件样品照片，如需修改（颜色、Logo 位置、尺寸）请告知。大货开始生产后无法修改。,,
+老客户回访｜回访复购,跟进,老客户回访,回访复购,通用,"Hi [客户名], it's been a while! How are the products selling in your store? We have some new arrivals you might like.",[客户名] 你好，好久不见！产品在您店里卖得怎么样？我们有一些新品您可能会喜欢。,,
+节日问候｜圣诞祝福,客户跟进,节日问候,圣诞祝福,通用,"Merry Christmas 🎄 and Happy New Year! Thank you for your support this year, [Name]. Our factory will be closed from [Start Date] to [End Date].",圣诞快乐 🎄 新年快乐！感谢 [Name] 今年的支持。我们工厂 [Start Date] 至 [End Date] 休假。,,
+三天未回复｜轻推一下,客户跟进,三天未回复,轻推一下,通用,"Hi [Name], just following up on my last message. Any questions I can help with?",[Name] 你好，跟进一下我上一条消息，有什么问题我可以帮忙吗？,,
+新品推送｜发新品目录,客户跟进,新品推送,发新品目录,睫毛,We just launched a new series of premade fans 🔥 Check the details and prices here: https://example.com/catalog/new-series?ref=[Ref]&utm_source=whatsapp,我们刚推出了新系列预制扇 🔥 详情和价格见：https://example.com/catalog/new-series?ref=[Ref]&utm_source=whatsapp,,
+发货通知｜发货并附单号,物流清关,发货通知,发货并附单号,物流/清关,"Your order [Order #] has shipped! Courier: [Courier], tracking: [Tracking No]. Track here: https://www.dhl.com/track?id=[Tracking No]",您的订单 [Order #] 已发货！快递：[Courier]，运单号：[Tracking No]。查询：https://www.dhl.com/track?id=[Tracking No],,
+清关资料｜需要的清关文件,物流清关,清关资料,需要的清关文件,物流/清关,"For customs clearance in [Country], please prepare:
+• Commercial invoice
+• Packing list
+• Importer tax ID / EORI number
+• Product certificates (if required)
+We will provide the first two. Please send me your tax ID.","[Country] 清关需要准备：
+• 商业发票
+• 装箱单
+• 进口商税号/EORI 号
+• 产品证书（如需要）
+前两项由我们提供，请把您的税号发给我。",,
+运费说明｜说明运费方案,物流清关,运费说明,说明运费方案,物流/清关,Shipping cost to [Country] is $[Shipping Cost] by [Courier] (about [Days] working days). Sea freight is cheaper but takes 25–35 days.,寄到 [Country] 运费为 $[Shipping Cost]，走 [Courier]（约 [Days] 个工作日）。海运更便宜但需要 25–35 天。,运费需要先核实再发,"运费, 时效"
+延误致歉｜物流延误说明,物流清关,延误致歉,物流延误说明,通用,I'm sorry for the delay. Your parcel is held at customs in [Country]. I'm in contact with the courier and will update you as soon as it is released.,非常抱歉延误了。您的包裹在 [Country] 海关被扣留，我正在联系快递，一放行就第一时间告诉您。,,
+货物破损｜要求提供照片,售后争议,货物破损,要求提供照片,通用,I'm really sorry to hear that. Could you please send clear photos or a short video of the damaged items and the outer carton? We will arrange a replacement or refund right away.,非常抱歉。请发送破损产品和外箱的清晰照片或短视频，我们会马上安排补发或退款。,,
+退款说明｜确认退款金额,售后争议,退款说明,确认退款金额,通用,We have processed a refund of $[Amount] to your [Payment Method]. It should appear within 3–5 business days.,我们已将 $[Amount] 退回到您的 [Payment Method]，预计 3–5 个工作日到账。,退款金额核实后再发,金额
+差评处理｜安抚差评客户,售后争议,差评处理,安抚差评客户,平台,We are very sorry that your experience did not meet expectations. Your feedback is important to us. May we contact you privately to resolve this? We would love to make it right.,非常抱歉这次体验没有达到您的预期。您的反馈对我们很重要，方便私下联系解决吗？我们一定会妥善处理。,,
+纠纷升级｜平台纠纷回应,售后争议,纠纷升级,平台纠纷回应,平台,"Regarding the dispute opened for order [Order #]: we have provided the tracking record, delivery confirmation and chat history as evidence. We kindly ask the platform to review.",关于订单 [Order #] 发起的纠纷：我们已提供物流记录、签收确认和聊天记录作为证据，恳请平台审核。,,
+需要整理的文本｜凌乱格式测试,询盘接待,需要整理的文本,凌乱格式测试,通用,"Hi  [Name] ,thanks for  your  message!We   will  reply  soon .
+
+
+
+   Best ,
+  [Sender]   ","您好  ，感谢您的留言 ！我们会 尽快 回复 。
+
+
+   此致 ，
+  [Sender]",用来测试 AI 整理,
+这是一个特别特别特别长的具体场景名称用来测试标题过长时列表是否会正确截断而不会撑破布局｜长标题测试,客户跟进,这是一个特别特别特别长的具体场景名称用来测试标题过长时列表是否会正确截断而不会撑破布局,长标题测试,通用,Title overflow test message for [Name].,标题过长测试。,,
+带特殊变量｜变量带空格和符号,物流清关,带特殊变量,变量带空格和符号,物流/清关,"Dear [Customer Name], invoice [INV-2024/001] for [Order #12] is attached. Contact: [E-mail] / [Tel (WhatsApp)].",亲爱的 [Customer Name]，发票 [INV-2024/001]（订单 [Order #12]）见附件。联系方式：[E-mail] / [Tel (WhatsApp)]。,,
+缺少英文｜空内容测试,询盘接待,缺少英文,空内容测试,通用,,这一行英文为空，应该被拒绝,,
+阶段错误｜非法目录测试,未知阶段,阶段错误,非法目录测试,通用,This row has an unknown stage.,这一行沟通阶段不在标准目录里，应该被拒绝,,
+首次问候｜自我介绍,询盘接待,首次问候,自我介绍,通用,"Hi [Name], thanks for reaching out to [Company]! How can I help you today?",你好 [Name]，感谢联系 [Company]！今天有什么可以帮您？,,

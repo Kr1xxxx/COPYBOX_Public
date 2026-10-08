@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    name: lint + tests
+    runs-on: ubuntu-latest
+    env:
+      # Unit tests do not launch Electron, so skip the large binary download.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: browser end-to-end
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The e2e suite only exists once the new UI (PR #1) is merged; skip it before that.
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npm ci
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npx playwright install --with-deps chromium
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  handoff:
+    name: handoff updated
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-handoff.mjs
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
