@@ -41,3 +41,7 @@ yarn-error.log*
 /outputs/
 /work/
 /.worktrees/
+
+# playwright
+/test-results/
+/playwright-report/
