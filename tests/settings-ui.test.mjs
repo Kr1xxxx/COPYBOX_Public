@@ -91,10 +91,17 @@ test("settings → AI offers common-service presets and can list the models of t
   assert.match(page, /list="ai-model-choices"/);
 });
 
-test("platform wording and chrome: Alt on Windows, Option on Mac, no fake title-bar band off Mac", () => {
-  assert.match(page, /const ALT_KEY_WORD = .*platform === "darwin" \? "Option" : "Alt"/);
-  assert.doesNotMatch(page, /按 Option 加方向键/);
+test("no fake title-bar band, drag regions or missing fonts off Mac", () => {
+  assert.doesNotMatch(page, /ALT_KEY_WORD|按 Option|按 Alt/);
   assert.match(css, /\.desktop-app:not\(\.platform-darwin\) \.sidebar-top \.traffic-lights \{ display: none; \}/);
   assert.match(css, /\.desktop-app:not\(\.platform-darwin\) \.drag-region \{ -webkit-app-region: no-drag; \}/);
   assert.match(css, /--font-sans:[^;]*"Segoe UI"[^;]*"Microsoft YaHei UI"/);
+});
+
+test("there are no keyboard-shortcut hints or modifier shortcuts anywhere", () => {
+  assert.doesNotMatch(page, /<kbd|<Keys|function Keys|homeShortcutAction|handleCardSortKey|handleFolderSortKey/);
+  assert.doesNotMatch(page, /event\.(metaKey|ctrlKey)/);
+  assert.doesNotMatch(css, /(^|\n)kbd \{|\.k-mac|\.k-win|\.enter-key/);
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  assert.doesNotMatch(main, /globalShortcut|GLOBAL_HOTKEY|accelerator/);
 });

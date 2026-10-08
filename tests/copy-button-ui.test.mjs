@@ -20,5 +20,5 @@ test("copy feedback stays inside a compact accessible card button", () => {
 
 test("the opened entry offers a labelled primary copy action", () => {
   assert.match(pageSource, /className="primary-button" onClick=\{\(\) => void copy\(item\)\}/);
-  assert.match(pageSource, /\{copiedId === item\.id \? "已复制" : "复制"\}<kbd>↵<\/kbd>/);
+  assert.match(pageSource, /\{copiedId === item\.id \? "已复制" : "复制"\}<\/button>/);
 });

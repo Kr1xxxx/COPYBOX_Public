@@ -6,7 +6,6 @@ import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./
 import {
   canReorderCards,
   moveName,
-  moveVisibleItem,
   reorderNames,
   reorderVisibleItems,
 } from "./clipbox-order";
@@ -18,7 +17,6 @@ import {
   combineSecretSegments,
   DEFAULT_ITEM_KIND,
   EMPTY_FOLDER_REGISTRY,
-  homeShortcutAction,
   itemMatchesActiveFolder,
   limitChars,
   mergeImportedVaultData,
@@ -110,7 +108,6 @@ type ThemeChoice = "system" | "light" | "dark";
 // Windows shows this section as 备注; darwin keeps the original 秘密 wording.
 // Windows has no password-style masking or reference links: 备注 is a plain notes list.
 const PLAIN_NOTES = typeof window === "undefined" || window.clipboxDesktop?.platform !== "darwin";
-const ALT_KEY_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "Option" : "Alt";
 const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "秘密" : "备注";
 type CloseBehavior = "tray" | "quit";
 const DETAIL_CLOSE_MS = 220;
@@ -194,11 +191,6 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   shield: <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3z" />,
   chevron: <path d="m6 9 6 6 6-6" />,
 };
-
-// Shows Ctrl by default and the Command symbol when the desktop shell tags the page as darwin.
-function Keys({ k }: { k: string }) {
-  return <kbd><span className="k-win">Ctrl+{k}</span><span className="k-mac">⌘{k}</span></kbd>;
-}
 
 function Icon({ name, filled = false, className }: { name: keyof typeof ICON_PATHS; filled?: boolean; className?: string }) {
   return (
@@ -666,25 +658,6 @@ export default function Home() {
     cancelFolderDrag();
   }, [activeFolder, activeKind, backupMode, cancelCardDrag, cancelFolderDrag, copyRequest, deleteRequest, newFolder, modalOpen, productFilter, query, snippetImport]);
 
-  function handleCardSortKey(event: React.KeyboardEvent<HTMLButtonElement>, itemId: string) {
-    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-    event.preventDefault();
-    const next = (latest: SecretItem[]) => moveVisibleItem(
-      latest,
-      filtered.map((item) => item.id),
-      itemId,
-      event.key === "ArrowUp" ? -1 : 1,
-    );
-    void persistCardOrder(next, event.key === "ArrowUp" ? "已向上移动" : "已向下移动");
-  }
-
-  function handleFolderSortKey(event: React.KeyboardEvent<HTMLButtonElement>, folder: string) {
-    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-    event.preventDefault();
-    const next = (latest: string[]) => moveName(latest, folder, event.key === "ArrowUp" ? -1 : 1);
-    void persistFolderOrder(next, event.key === "ArrowUp" ? "目录已向上移动" : "目录已向下移动");
-  }
-
   async function refreshLocalVault() {
     if (refreshing) return;
     cancelCardDrag();
@@ -749,30 +722,8 @@ export default function Home() {
   useEffect(() => {
     if (loading) return;
     const shortcut = (event: KeyboardEvent) => {
-      const commandKey = event.metaKey || event.ctrlKey;
-      const homeShortcut = commandKey && ["k", "n", "e"].includes(event.key.toLowerCase());
       if (event.key === "Escape" && newFolder && !auxiliaryDialogOpen) { event.preventDefault(); cancelNewFolder(); return; }
-      if (!homeShortcutsEnabled) {
-        if (homeShortcut) event.preventDefault();
-        return;
-      }
-      const action = homeShortcutAction(event.key, commandKey, inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
-      if (action === "search") {
-        event.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }
-      if (action === "add") {
-        event.preventDefault();
-        if (windowMode === "mini") { setWindowMode("full"); window.clipboxDesktop?.setWindowMode?.("full"); }
-        if (!canAddItemInFolder(activeFolder)) setActiveFolder("all");
-        openEditor(null);
-      }
-      if (action === "edit" && activeFolder !== "trash" && filtered[safeSelected]) {
-        event.preventDefault();
-        if (windowMode === "mini") { setWindowMode("full"); window.clipboxDesktop?.setWindowMode?.("full"); }
-        openEditor(filtered[safeSelected]);
-      }
+      if (!homeShortcutsEnabled) return;
       if (event.key === "Escape" && !inlineEditing && !auxiliaryDialogOpen) {
         if (bulkMode) { setBulkMode(false); setBulkIds([]); setBulkMoveOpen(false); return; }
         setQuery("");
@@ -783,7 +734,7 @@ export default function Home() {
       }
     };
     const removeDesktopListener = window.clipboxDesktop?.onFocusSearch(() => {
-      if (homeShortcutAction("k", true, inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode)) !== "search") return;
+      if (!homeShortcutsEnabled) return;
       setActiveFolder("all");
       setQuery("");
       window.setTimeout(() => searchRef.current?.focus(), 30);
@@ -1492,7 +1443,7 @@ export default function Home() {
             setFolderMenuPos({ top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 270)), left: rect.left });
             setFolderMenu((value) => value === folder ? "" : folder);
           }}><Icon name="more" /></button>}
-        {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title={`拖动排序，或按 ${ALT_KEY_WORD} 加方向键`} onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)} onKeyDown={(event) => handleFolderSortKey(event, folder)}><span aria-hidden="true">⠿</span></button>}
+        {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)}><span aria-hidden="true">⠿</span></button>}
       </div>
     );
   };
@@ -1537,7 +1488,7 @@ export default function Home() {
                       {activeKind === "snippet" && <small className="snippet-preview" lang="en"><Highlight text={item.secret} query={query} /></small>}
                     </span>
                     {item.pinned && <Icon name="star" filled className="row-star" />}
-                    {copiedId === item.id ? <span className="mini-copied">已复制</span> : isSelected && <kbd className="enter-key">↵</kbd>}
+                    {copiedId === item.id && <span className="mini-copied">已复制</span>}
                   </button>
                   {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
                 </article>
@@ -1545,8 +1496,6 @@ export default function Home() {
             })}
           </div>
           <footer className="status-bar">
-            <span><kbd>↵</kbd>复制</span>
-            <span><Keys k="E" />编辑</span>
             <span className="spacer" />
             <span>{filtered.length} 条</span>
           </footer>
@@ -1601,7 +1550,6 @@ export default function Home() {
               <div className="native-search">
                 <Icon name="search" className="search-glyph" />
                 {searchInput}
-                <Keys k="K" />
               </div>
               {canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
@@ -1650,8 +1598,8 @@ export default function Home() {
                     <div className="row-line">
                       {bulkMode
                         ? <button type="button" className={`row-check ${checked ? "on" : ""}`} role="checkbox" aria-checked={checked} aria-label={`选择 ${item.label}`} onClick={() => toggleBulk(item.id)}><Icon name="check" /></button>
-                        : <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? `拖动排序，或按 ${ALT_KEY_WORD} 加方向键` : "清除搜索和筛选后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)} onKeyDown={(event) => handleCardSortKey(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>}
-                      <button type="button" className="row-main" onClick={(event) => { if (bulkMode || event.metaKey || event.ctrlKey || event.shiftKey) { toggleBulk(item.id); return; } selectRow(index); }} onDoubleClick={() => { if (!bulkMode) void copy(item); }} aria-expanded={bulkMode ? undefined : isSelected} aria-label={bulkMode ? `选择 ${item.label}` : `${isSelected ? "已展开" : "展开"} ${item.label}`}>
+                        : <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "拖动排序" : "清除搜索和筛选后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>}
+                      <button type="button" className="row-main" onClick={() => { if (bulkMode) { toggleBulk(item.id); return; } selectRow(index); }} onDoubleClick={() => { if (!bulkMode) void copy(item); }} aria-expanded={bulkMode ? undefined : isSelected} aria-label={bulkMode ? `选择 ${item.label}` : `${isSelected ? "已展开" : "展开"} ${item.label}`}>
                         <span className="row-copy">
                           <span className="row-title">
                             <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
@@ -1677,7 +1625,7 @@ export default function Home() {
                       {fillOpen && copyRequest
                         ? <SnippetFillPanel request={copyRequest} onClose={() => setCopyRequest(null)} onCopy={async (text) => { await finishCopy(copyRequest.item, text); setCopyRequest(null); }} />
                         : <div className="row-actions">
-                          <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : "复制"}<kbd>↵</kbd></button>
+                          <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : "复制"}</button>
                           {isSnippet && hasOptionalSnippetPreparation(item) && <button type="button" className="secondary-button" onClick={() => prepareCopy(item)}>填写变量</button>}
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
@@ -1711,12 +1659,6 @@ export default function Home() {
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>
             </div>}
-            <footer className="status-bar">
-              <span className="spacer" />
-              <span><kbd>↑↓</kbd>选择</span>
-              <span><kbd>↵</kbd>复制</span>
-              <span><Keys k="E" />编辑</span>
-            </footer>
           </section>
         </>}
       </section>
@@ -1864,11 +1806,10 @@ function SnippetFillPanel({ request, onClose, onCopy }: {
   }
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- delegated Esc / ⌘Enter for the form inside
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- delegated Esc for the form inside
     <section className="fill-panel" role="group" aria-label={`填写变量 ${request.item.label}`}
       onKeyDown={(event) => {
         if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); onClose(); }
-        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); formRef.current?.requestSubmit(); }
       }}>
       <form ref={formRef} onSubmit={submit}>
         {meta.chineseText && <div className="copy-language" role="group" aria-label="复制语言"><button type="button" className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>英文</button><button type="button" className={language === "zh" ? "active" : ""} onClick={() => setLanguage("zh")}>中文</button></div>}
@@ -1876,7 +1817,7 @@ function SnippetFillPanel({ request, onClose, onCopy }: {
         {meta.requiredInputs.length > 0 && <fieldset className="copy-checks"><legend>发送前确认</legend>{meta.requiredInputs.map((input) => <label key={input}><input type="checkbox" checked={checkedInputs.includes(input)} onChange={(event) => setCheckedInputs((current) => event.target.checked ? [...current, input] : current.filter((value) => value !== input))} /><span>已确认 {input}</span></label>)}</fieldset>}
         {meta.requiresVerification && <label className="copy-warning"><input type="checkbox" checked={verificationConfirmed} onChange={(event) => setVerificationConfirmed(event.target.checked)} /><span><strong>发送前核实</strong> 金额、库存、地址或时效已按当前情况检查</span></label>}
         <section className="copy-preview"><h3>{language === "en" ? "英文预览" : "中文预览"}</h3><p lang={language === "en" ? "en" : "zh"}>{filled.text}</p></section>
-        <div className="fill-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={busy}>取消</button><button type="submit" className="primary-button" disabled={busy || !readiness.ready || !source}>{busy ? "正在复制…" : `复制${language === "en" ? "英文" : "中文"}`}<Keys k="↵" /></button></div>
+        <div className="fill-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={busy}>取消</button><button type="submit" className="primary-button" disabled={busy || !readiness.ready || !source}>{busy ? "正在复制…" : `复制${language === "en" ? "英文" : "中文"}`}</button></div>
       </form>
     </section>
   );
@@ -2255,7 +2196,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}
             <div className="settings-row"><div><strong>迷你窗口复制后</strong><small>{isDesktop ? "选择复制后是否自动收起迷你窗口" : "仅桌面版生效"}</small></div>
               <div className="settings-segment" role="radiogroup" aria-label="迷你窗口复制后">
-                {([["hotkey", "快捷键呼出时收起"], ["always", "总是收起"], ["never", "不收起"]] as [MiniHidePolicy, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={miniHidePolicy === value} className={miniHidePolicy === value ? "active" : ""} onClick={() => onMiniHidePolicy(value)}>{label}</button>)}
+                {([["hotkey", "从托盘呼出时收起"], ["always", "总是收起"], ["never", "不收起"]] as [MiniHidePolicy, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={miniHidePolicy === value} className={miniHidePolicy === value ? "active" : ""} onClick={() => onMiniHidePolicy(value)}>{label}</button>)}
               </div>
             </div>
             {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录系统后自动启动，并安静地收在托盘里</small></div>
@@ -2378,11 +2319,6 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        event.preventDefault();
-        copyOnSubmitRef.current = event.shiftKey;
-        formRef.current?.requestSubmit();
-      }
       if (event.key === "Escape" && !busy) {
         event.preventDefault();
         onClose();

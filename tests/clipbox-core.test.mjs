@@ -10,7 +10,6 @@ const {
   canHandleHomeShortcuts,
   combineSecretSegments,
   DEFAULT_ITEM_KIND,
-  homeShortcutAction,
   isTrashedItem,
   limitChars,
   mergeFolderRegistries,
@@ -366,16 +365,6 @@ test("disables Home shortcuts while any modal owns interaction", () => {
   assert.equal(canHandleHomeShortcuts(true, false, false), false);
   assert.equal(canHandleHomeShortcuts(false, true, false), false);
   assert.equal(canHandleHomeShortcuts(false, false, true), false);
-});
-
-test("rejects every wired Home command and desktop search while an editor owns interaction", () => {
-  for (const [key, expected] of [["k", "search"], ["n", "add"], ["e", "edit"]]) {
-    assert.equal(homeShortcutAction(key, true, false, false, false), expected);
-    assert.equal(homeShortcutAction(key, true, true, false, false), null);
-  }
-  assert.equal(homeShortcutAction("k", true, false, true, false), null);
-  assert.equal(homeShortcutAction("k", true, false, false, true), null);
-  assert.equal(homeShortcutAction("k", false, false, false, false), null);
 });
 
 test("keeps the background inert for every modal state", () => {

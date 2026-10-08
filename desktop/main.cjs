@@ -1,4 +1,4 @@
-const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
+const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
 const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { createAiStore } = require("./ai.cjs");
 const { spawn } = require("node:child_process");
@@ -33,7 +33,6 @@ const isWindows = process.platform === "win32";
 const startHidden = process.argv.includes("--hidden");
 const loginItemOptions = isWindows ? { args: ["--hidden"] } : {};
 let closeBehavior = "tray"; // "tray" | "quit"
-const GLOBAL_HOTKEY = "Alt+Space";
 const WINDOW_STATE_SAVE_DELAY = 180;
 const FULL_TRAFFIC_LIGHTS = { x: 14, y: 19 };
 const MINI_TRAFFIC_LIGHTS = { x: 14, y: 14 };
@@ -161,7 +160,6 @@ async function relaunchApplication() {
   if (quitting) return;
   saveWindowBounds();
   quitting = true;
-  globalShortcut.unregisterAll();
   await stopAutomation();
   await stopServer();
   app.relaunch();
@@ -316,8 +314,8 @@ function createWindow() {
   void mainWindow.loadURL(appOrigin);
 }
 
-// Alt+Space opens the mini window and hides it again after a copy. Other ways
-// of opening Clipbox return to the full window.
+// A tray click or "快速搜索" opens the mini window and (by setting) hides it again
+// after a copy. Other ways of opening Clipbox return to the full window.
 function showWindow(asQuickSearch = false) {
   if (!mainWindow) return;
   if (asQuickSearch) enterMiniMode(true);
@@ -327,14 +325,14 @@ function showWindow(asQuickSearch = false) {
   mainWindow.webContents.send("clipbox:focus-search");
 }
 
-function createTray(hotkeyRegistered) {
+function createTray() {
   const size = isWindows ? 16 : 18;
   const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "Clipbox.png")).resize({ width: size, height: size });
   if (isMac) icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip(hotkeyRegistered ? `Clipbox · ${GLOBAL_HOTKEY} 快速搜索` : "Clipbox");
+  tray.setToolTip("Clipbox");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "快速搜索", ...(hotkeyRegistered ? { accelerator: GLOBAL_HOTKEY } : {}), click: () => showWindow(true) },
+    { label: "快速搜索", click: () => showWindow(true) },
     { label: "打开 Clipbox", click: () => showWindow(false) },
     { type: "separator" },
     { label: "退出", click: () => { quitting = true; app.quit(); } },
@@ -357,9 +355,7 @@ app.whenReady().then(async () => {
     createWindow();
     // The automation CLI is a macOS/Linux unix-socket helper; Windows does not use it.
     if (!isWindows) await startAutomation();
-    // Another program (PowerToys Run, for one) may already own the hotkey; the tray still works then.
-    const hotkeyRegistered = globalShortcut.register(GLOBAL_HOTKEY, () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
-    createTray(hotkeyRegistered);
+    createTray();
   } catch {
     dialog.showErrorBox("Clipbox 无法启动", "本地服务未能启动，请重新打开应用。");
     app.quit();
@@ -379,7 +375,6 @@ app.on("before-quit", () => {
   saveMiniPosition();
   saveWindowBounds();
   quitting = true;
-  globalShortcut.unregisterAll();
   void stopAutomation();
   if (serverProcess && !serverProcess.killed) serverProcess.kill("SIGTERM");
 });

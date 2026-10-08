@@ -172,19 +172,6 @@ export function modalInteractionState(
   return { homeShortcutsEnabled, backgroundInert: !homeShortcutsEnabled };
 }
 
-export type HomeShortcutAction = "search" | "add" | "edit";
-
-export function homeShortcutAction(
-  key: string,
-  commandKey: boolean,
-  itemEditorOpen: boolean,
-  folderDialogOpen: boolean,
-  backupDialogOpen: boolean,
-): HomeShortcutAction | null {
-  if (!commandKey || !canHandleHomeShortcuts(itemEditorOpen, folderDialogOpen, backupDialogOpen)) return null;
-  return ({ k: "search", n: "add", e: "edit" } as const)[key.toLowerCase() as "k" | "n" | "e"] || null;
-}
-
 export function resolveFocusWrapIndex(currentIndex: number, count: number, backward: boolean) {
   if (count <= 0) return -1;
   if (currentIndex < 0) return backward ? count - 1 : 0;
