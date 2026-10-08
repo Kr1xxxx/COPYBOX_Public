@@ -1,4 +1,4 @@
-const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, Tray } = require("electron");
+const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, Tray } = require("electron");
 const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
@@ -263,7 +263,7 @@ function createWindow() {
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
     show: false,
-    backgroundColor: "#faf9f5",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1c1b19" : "#faf9f5",
     title: "Clipbox",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: FULL_TRAFFIC_LIGHTS,
@@ -376,6 +376,18 @@ ipcMain.on("clipbox:did-copy", () => {
 ipcMain.on("clipbox:set-mini-hide-policy", (event, policy) => {
   if (!mainWindow || mainWindow.webContents !== event.sender) return;
   if (policy === "hotkey" || policy === "always" || policy === "never") miniHidePolicy = policy;
+});
+
+ipcMain.on("clipbox:set-theme", (event, theme) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return;
+  if (theme === "system" || theme === "light" || theme === "dark") nativeTheme.themeSource = theme;
+});
+
+ipcMain.handle("clipbox:open-data-folder", async (event) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) throw new Error("Request denied");
+  const failure = await shell.openPath(app.getPath("userData"));
+  if (failure) throw new Error(failure);
+  return app.getPath("userData");
 });
 
 ipcMain.handle("clipbox:get-launch-at-login", (event) => {

@@ -405,3 +405,171 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .settings-body code{padding:1px 5px;border-radius:5px;background:var(--hover);font:11.5px var(--font-geist-mono),ui-monospace,monospace}
 .settings-keys dt code{background:transparent;padding:0}
 .settings-cli{grid-template-columns:1fr!important}.settings-cli div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.settings-cli dt{min-width:0}.settings-cli code{white-space:nowrap;font-size:11px}.settings-cli dd{flex:none;margin:0;white-space:nowrap}
+:root { --hit: #f6dd8f; --ok: #2f9b62; --ok-bg: #edf8f2; --danger-bg: #fbebe7; --warn: #8b5b37; --warn-bg: #fff4e9; color-scheme: light; }
+
+/* ===== Inline editing, fill panel, folder management, bulk select, search ===== */
+.search-hit { padding: 0 1px; border-radius: 3px; background: var(--hit); color: inherit; }
+.snippet-variable .search-hit { background: transparent; text-decoration: underline; }
+.row-folder { flex: 0 0 auto; padding: 1px 7px; border-radius: 9px; background: var(--fill); color: var(--ink-3); font-size: 11px; font-weight: 500; white-space: nowrap; }
+
+.native-row.editing { opacity: 1; transform: none; animation: detail-in .2s cubic-bezier(.2,.8,.2,1) both; z-index: 6; margin: 2px 0 6px; border: 1px solid var(--accent); border-radius: 12px; background: var(--card); box-shadow: 0 0 0 3px var(--ring), 0 8px 22px rgba(31,30,28,.08); }
+.native-row.editing:hover { background: var(--card); }
+.inline-editor { padding: 11px 14px 12px; display: grid; gap: 10px; }
+.inline-editor-head { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.inline-editor .editor-kind { height: 20px; margin: 0; }
+.inline-editor .editor-kind span, .inline-editor .editor-kind.snippet span { height: 20px; padding: 0 8px; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); font-size: 11px; font-weight: 650; letter-spacing: 0; }
+.inline-editor .editor-snippet-number { height: 20px; color: var(--muted); font: 500 11.5px var(--font-geist-mono); }
+.inline-editor .editor-reference { height: 20px; padding: 0 8px; border-radius: 10px; background: var(--fill); color: var(--ink-2); font-size: 11px; }
+.inline-editor .editor-reference:hover { background: var(--hover); }
+.inline-editor .editor-reference.copied { background: var(--ok-bg); color: var(--ok); }
+.inline-editor-hint { color: var(--muted); font-size: 11.5px; }
+.inline-editor form { display: flex; flex-direction: column; }
+.inline-editor .editor-body { padding: 0; overflow: visible; }
+.inline-editor .editor-body > * { opacity: 1; animation: none; }
+.inline-editor .editor-meta-grid { grid-template-columns: minmax(0, 1.5fr) minmax(130px, .9fr); gap: 10px; }
+.inline-editor .native-field { gap: 5px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.inline-editor .native-field > span small, .inline-editor .native-field > label small { color: var(--muted); font-size: 11px; font-weight: 500; }
+.inline-editor .soft-input, .inline-editor .folder-select, .inline-editor .soft-textarea, .inline-editor .summary-control input { border: 1px solid var(--border); border-radius: 8px; background: var(--content); }
+.inline-editor .soft-input, .inline-editor .folder-select, .inline-editor .summary-control input { height: 34px; }
+.inline-editor .soft-textarea { height: 132px; padding: 9px 11px; }
+.inline-editor .soft-textarea:focus-within, .inline-editor .soft-input:focus-within, .inline-editor .folder-select:focus-within, .inline-editor .summary-control input:focus { border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--ring); }
+.inline-editor .soft-input input, .inline-editor .folder-select select, .inline-editor .folder-select input, .inline-editor .soft-textarea textarea, .inline-editor .summary-control input { color: var(--ink); font-size: 13px; font-weight: 500; }
+.inline-editor .soft-input input::placeholder, .inline-editor .soft-textarea textarea::placeholder, .inline-editor .summary-control input::placeholder { color: var(--muted); font-weight: 400; opacity: .8; }
+.inline-editor .soft-textarea.secret-segmented textarea { border: 1px solid var(--border); background: var(--card); }
+.inline-editor .snippet-content, .inline-editor .summary-field, .inline-editor .reference-note-field { margin-top: 10px; }
+.inline-editor .summary-control button, .inline-editor .segment-toggle { height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--ink-2); font-size: 12px; font-weight: 600; }
+.inline-editor .segment-toggle { height: 22px; top: -4px; font-size: 11px; }
+.inline-editor .summary-control button:hover, .inline-editor .segment-toggle:hover, .inline-editor .segment-toggle.active { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); }
+.inline-editor .segmented { width: 220px; height: 28px; margin: 10px 0; background: var(--fill); }
+.inline-editor .segmented button { color: var(--muted); font-size: 11.5px; }
+.inline-editor .segmented button.active { background: var(--card); color: var(--ink); }
+.inline-editor .structured-details { margin-top: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--content); }
+.inline-editor .structured-details > summary { height: 34px; color: var(--ink-2); font-size: 12px; font-weight: 600; }
+.inline-editor .structured-fields { border-top: 1px solid var(--line); }
+.inline-editor .editor-save-error { margin: 8px 0 0; padding: 7px 10px; border: 0; border-radius: 8px; background: var(--danger-bg); color: var(--danger); font-size: 12px; }
+.inline-editor .editor-footer { min-height: 0; margin-top: 12px; padding: 0; border: 0; background: transparent; }
+.inline-editor .editor-footer button { height: 30px; padding: 0 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600; }
+.inline-editor .editor-footer .delete-entry { padding: 0 8px; background: transparent; color: var(--danger); }
+.inline-editor .editor-footer .delete-entry:hover { background: var(--danger-bg); }
+.inline-editor .editor-cancel { color: var(--ink-3); }
+.inline-editor .editor-cancel:hover { background: var(--hover); }
+.inline-editor .editor-save { background: var(--accent); color: #fff; }
+.inline-editor .editor-save:hover { background: var(--accent-hover); box-shadow: none; }
+.inline-editor .editor-save.secondary { border: 1px solid var(--border); background: var(--card); color: var(--ink-2); }
+.inline-editor .editor-save.secondary:hover { background: var(--hover); }
+
+.fill-panel { display: grid; gap: 10px; animation: detail-in .2s cubic-bezier(.2,.8,.2,1) both; }
+.fill-panel form { display: grid; gap: 10px; }
+.fill-panel .copy-language { height: 28px; background: var(--fill); }
+.fill-panel .copy-language button { color: var(--muted); font-size: 12px; }
+.fill-panel .copy-language button.active { background: var(--card); color: var(--ink); }
+.fill-panel .copy-fields legend, .fill-panel .copy-checks legend { margin-bottom: 6px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.fill-panel .copy-fields label { grid-template-columns: minmax(90px, 140px) minmax(0, 1fr); }
+.fill-panel .copy-fields label > span { color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.fill-panel .copy-fields input { height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--content); color: var(--ink); font-size: 13px; }
+.fill-panel .copy-fields input:focus { border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--ring); }
+.fill-panel .copy-checks label, .fill-panel .copy-warning { color: var(--ink-3); font-size: 12px; }
+.fill-panel .copy-warning { background: var(--warn-bg); color: var(--warn); }
+.fill-panel .copy-warning strong { color: inherit; }
+.fill-panel .copy-preview { padding: 9px 12px; border-radius: 8px; background: var(--content); }
+.fill-panel .copy-preview h3 { margin: 0 0 5px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.fill-panel .copy-preview p { max-height: 120px; color: var(--ink); font-size: 13.5px; line-height: 1.6; scrollbar-width: none; }
+.fill-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.fill-actions .primary-button:disabled { opacity: .45; cursor: default; }
+
+.nav-item .directory-main { width: 100%; }
+.directory-row .folder-more { position: absolute; right: 22px; top: 4px; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); opacity: 0; cursor: pointer; }
+.directory-row.fixed .folder-more { right: 4px; }
+.directory-row .folder-more .icon { width: 14px; height: 14px; }
+.directory-row:hover .folder-more, .folder-more:focus-visible, .folder-more[aria-expanded="true"] { opacity: 1; }
+.folder-more:hover { background: var(--fill); color: var(--ink); }
+.directory-row:hover .directory-main b { opacity: 0; }
+.directory-row.fixed:hover .directory-main b { opacity: 0; }
+.menu-scrim { position: fixed; inset: 0; z-index: 38; background: transparent; }
+.folder-menu { position: fixed; z-index: 40; width: 196px; right: auto; }
+.folder-menu .swatches { margin: 2px 6px 6px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.dropdown .swatches button { width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+.dropdown .swatches button:hover { transform: scale(1.18); background-clip: padding-box; }
+.dropdown .swatches button.on { box-shadow: 0 0 0 1.5px var(--ink); }
+.directory-rename, .directory-new { position: relative; width: 100%; height: 28px; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-radius: 6px; background: var(--card); box-shadow: 0 0 0 1.5px var(--accent); }
+.directory-new { margin-top: 2px; }
+.directory-rename input, .directory-new input { flex: 1 1 auto; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; }
+.directory-new .directory-color-marker { flex: 0 0 auto; }
+.directory-error { position: absolute; left: 0; top: 31px; z-index: 6; padding: 3px 8px; border-radius: 6px; background: var(--danger-bg); color: var(--danger); font-size: 11.5px; white-space: nowrap; }
+
+.scope-switch { display: flex; padding: 2px; border-radius: 7px; background: var(--fill); }
+.scope-switch button { height: 22px; padding: 0 9px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.scope-switch button.active { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(31,30,28,.14); }
+.select-toggle { height: 26px; padding: 0 9px; font-size: 12.5px; color: var(--ink-3); }
+.select-toggle.active { background: var(--accent-tint); color: var(--accent-ink); }
+
+.row-check { width: 26px; height: 100%; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
+.row-check .icon { width: 12px; height: 12px; padding: 0; color: transparent; }
+.row-check::before { content: ""; grid-area: 1 / 1; width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 5px; background: var(--card); transition: background .12s, border-color .12s; }
+.row-check .icon { grid-area: 1 / 1; z-index: 1; }
+.row-check.on::before { border-color: var(--accent); background: var(--accent); }
+.row-check.on .icon { color: #fff; }
+.native-row.checked { background: var(--accent-tint); }
+.native-list.bulk .native-copy, .native-list.bulk .native-pin, .native-list.bulk .native-reference { display: none; }
+.bulk-bar { flex: 0 0 auto; margin: 0 10px 8px; padding: 6px 8px 6px 14px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 11px; background: var(--card); box-shadow: 0 6px 20px rgba(31,30,28,.1); animation: detail-in .18s cubic-bezier(.2,.8,.2,1) both; }
+.bulk-bar > strong { margin-right: 4px; font-size: 13px; font-weight: 600; }
+.bulk-bar .spacer { flex: 1 1 auto; }
+.bulk-menu { top: auto; bottom: 36px; min-width: 170px; max-height: 260px; overflow: auto; scrollbar-width: none; }
+.secondary-button.danger-text { color: var(--danger); }
+.secondary-button:disabled, .ghost-button:disabled { opacity: .45; cursor: default; }
+
+.native-empty.onboarding { height: auto; min-height: 280px; padding: 24px 28px; text-align: center; gap: 9px; }
+.native-empty.onboarding .vault-mark { margin-bottom: 6px; }
+.native-empty.onboarding strong { color: var(--ink); font-family: var(--font-serif); font-size: 19px; }
+.native-empty.onboarding span { max-width: 380px; line-height: 1.6; }
+.native-empty.onboarding small { color: var(--muted); font-size: 11.5px; }
+.onboarding-actions { margin: 8px 0 4px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.settings-body .settings-row .secondary-button { white-space: nowrap; }
+
+/* ===== Dark theme ===== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #1c1b19; --sidebar: #161513; --card: #262521; --content: #201f1c; --fill: #34322c; --hover: #2b2a25; --line: #3a3832; --line-soft: #2f2d28; --border: #433f38; --ink: #f1efe7; --ink-2: #d8d5ca; --ink-3: #b3b0a4; --muted: #96938a; --accent: #c8663f; --accent-hover: #d4744d; --accent-soft: #4b3024; --accent-tint: #3a2b23; --accent-ink: #f1bba3; --star: #e48f6c; --danger: #ec8573; --ring: rgba(228, 143, 108, .28); --hit: #6b5a1c; --ok: #5fcf92; --ok-bg: #1f3a2d; --danger-bg: #442620; --warn: #e7b98c; --warn-bg: #3d2f20; color-scheme: dark; }
+  :root:not([data-theme="light"]) .dropdown, :root:not([data-theme="light"]) .product-filter-menu { background: var(--card); border-color: var(--line); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+  :root:not([data-theme="light"]) .dropdown button.danger:hover, :root:not([data-theme="light"]) .trash-permanent:hover { background: var(--danger-bg); }
+  :root:not([data-theme="light"]) .native-row.selected { border-color: var(--line); }
+  :root:not([data-theme="light"]) .native-row.editing { border-color: var(--accent); }
+  :root:not([data-theme="light"]) .native-search input::placeholder { color: var(--muted); }
+  :root:not([data-theme="light"]) .copied .native-copy, :root:not([data-theme="light"]) .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
+  :root:not([data-theme="light"]) .mini-row.selected .row-copy small { color: var(--ink-3); }
+  :root:not([data-theme="light"]) .mini-copied { color: var(--ok); }
+  :root:not([data-theme="light"]) .toast { background: rgba(48,46,41,.96); box-shadow: 0 13px 35px rgba(0,0,0,.5); }
+  :root:not([data-theme="light"]) .settings-dialog, :root:not([data-theme="light"]) .backup-dialog, :root:not([data-theme="light"]) .delete-confirm-dialog, :root:not([data-theme="light"]) .snippet-import-dialog, :root:not([data-theme="light"]) .snippet-copy-dialog { background: var(--card); border-color: var(--line); color: var(--ink); }
+  :root:not([data-theme="light"]) .settings-backdrop, :root:not([data-theme="light"]) .backup-backdrop, :root:not([data-theme="light"]) .delete-confirm-backdrop, :root:not([data-theme="light"]) .snippet-dialog-backdrop { background: rgba(0,0,0,.6); }
+  :root:not([data-theme="light"]) .backup-head h2, :root:not([data-theme="light"]) .delete-confirm-dialog h2, :root:not([data-theme="light"]) .snippet-dialog-head h2, :root:not([data-theme="light"]) .backup-field, :root:not([data-theme="light"]) .backup-strategy legend, :root:not([data-theme="light"]) .backup-strategy button strong, :root:not([data-theme="light"]) .import-preview-list strong, :root:not([data-theme="light"]) .import-section h3, :root:not([data-theme="light"]) .import-errors h3 { color: var(--ink); }
+  :root:not([data-theme="light"]) .backup-head > button, :root:not([data-theme="light"]) .snippet-dialog-head > button { background: var(--fill); color: var(--ink-3); }
+  :root:not([data-theme="light"]) .snippet-dialog-head, :root:not([data-theme="light"]) .snippet-dialog-actions, :root:not([data-theme="light"]) .delete-confirm-actions { background: var(--sidebar); border-color: var(--line); }
+  :root:not([data-theme="light"]) .backup-intro, :root:not([data-theme="light"]) .backup-note, :root:not([data-theme="light"]) .import-privacy, :root:not([data-theme="light"]) .snippet-dialog-head small, :root:not([data-theme="light"]) .import-preview-list span, :root:not([data-theme="light"]) .delete-confirm-dialog p, :root:not([data-theme="light"]) .delete-confirm-item small, :root:not([data-theme="light"]) .backup-strategy button small { color: var(--muted); }
+  :root:not([data-theme="light"]) .backup-field input, :root:not([data-theme="light"]) .backup-strategy button, :root:not([data-theme="light"]) .import-metrics div, :root:not([data-theme="light"]) .delete-confirm-item, :root:not([data-theme="light"]) .import-preview-list { background: var(--content); border-color: var(--border); color: var(--ink); }
+  :root:not([data-theme="light"]) .backup-actions button, :root:not([data-theme="light"]) .snippet-dialog-actions button, :root:not([data-theme="light"]) .delete-confirm-actions button { background: var(--card); border-color: var(--border); color: var(--ink-2); }
+  :root:not([data-theme="light"]) .backup-actions button.primary, :root:not([data-theme="light"]) .snippet-dialog-actions button.primary, :root:not([data-theme="light"]) .delete-confirm-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :root:not([data-theme="light"]) .backup-error, :root:not([data-theme="light"]) .import-errors, :root:not([data-theme="light"]) .delete-confirm-error { background: var(--danger-bg); }
+  :root:not([data-theme="light"]) .import-folder-list span { background: var(--accent-tint); color: var(--accent-ink); }
+  :root:not([data-theme="light"]) .vault-body { background: var(--card); }
+}
+:root[data-theme="dark"] { --bg: #1c1b19; --sidebar: #161513; --card: #262521; --content: #201f1c; --fill: #34322c; --hover: #2b2a25; --line: #3a3832; --line-soft: #2f2d28; --border: #433f38; --ink: #f1efe7; --ink-2: #d8d5ca; --ink-3: #b3b0a4; --muted: #96938a; --accent: #c8663f; --accent-hover: #d4744d; --accent-soft: #4b3024; --accent-tint: #3a2b23; --accent-ink: #f1bba3; --star: #e48f6c; --danger: #ec8573; --ring: rgba(228, 143, 108, .28); --hit: #6b5a1c; --ok: #5fcf92; --ok-bg: #1f3a2d; --danger-bg: #442620; --warn: #e7b98c; --warn-bg: #3d2f20; color-scheme: dark; }
+:root[data-theme="dark"] .dropdown, :root[data-theme="dark"] .product-filter-menu { background: var(--card); border-color: var(--line); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .dropdown button.danger:hover, :root[data-theme="dark"] .trash-permanent:hover { background: var(--danger-bg); }
+:root[data-theme="dark"] .native-row.selected { border-color: var(--line); }
+:root[data-theme="dark"] .native-row.editing { border-color: var(--accent); }
+:root[data-theme="dark"] .native-search input::placeholder { color: var(--muted); }
+:root[data-theme="dark"] .copied .native-copy, :root[data-theme="dark"] .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
+:root[data-theme="dark"] .mini-row.selected .row-copy small { color: var(--ink-3); }
+:root[data-theme="dark"] .mini-copied { color: var(--ok); }
+:root[data-theme="dark"] .toast { background: rgba(48,46,41,.96); box-shadow: 0 13px 35px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .settings-dialog, :root[data-theme="dark"] .backup-dialog, :root[data-theme="dark"] .delete-confirm-dialog, :root[data-theme="dark"] .snippet-import-dialog, :root[data-theme="dark"] .snippet-copy-dialog { background: var(--card); border-color: var(--line); color: var(--ink); }
+:root[data-theme="dark"] .settings-backdrop, :root[data-theme="dark"] .backup-backdrop, :root[data-theme="dark"] .delete-confirm-backdrop, :root[data-theme="dark"] .snippet-dialog-backdrop { background: rgba(0,0,0,.6); }
+:root[data-theme="dark"] .backup-head h2, :root[data-theme="dark"] .delete-confirm-dialog h2, :root[data-theme="dark"] .snippet-dialog-head h2, :root[data-theme="dark"] .backup-field, :root[data-theme="dark"] .backup-strategy legend, :root[data-theme="dark"] .backup-strategy button strong, :root[data-theme="dark"] .import-preview-list strong, :root[data-theme="dark"] .import-section h3, :root[data-theme="dark"] .import-errors h3 { color: var(--ink); }
+:root[data-theme="dark"] .backup-head > button, :root[data-theme="dark"] .snippet-dialog-head > button { background: var(--fill); color: var(--ink-3); }
+:root[data-theme="dark"] .snippet-dialog-head, :root[data-theme="dark"] .snippet-dialog-actions, :root[data-theme="dark"] .delete-confirm-actions { background: var(--sidebar); border-color: var(--line); }
+:root[data-theme="dark"] .backup-intro, :root[data-theme="dark"] .backup-note, :root[data-theme="dark"] .import-privacy, :root[data-theme="dark"] .snippet-dialog-head small, :root[data-theme="dark"] .import-preview-list span, :root[data-theme="dark"] .delete-confirm-dialog p, :root[data-theme="dark"] .delete-confirm-item small, :root[data-theme="dark"] .backup-strategy button small { color: var(--muted); }
+:root[data-theme="dark"] .backup-field input, :root[data-theme="dark"] .backup-strategy button, :root[data-theme="dark"] .import-metrics div, :root[data-theme="dark"] .delete-confirm-item, :root[data-theme="dark"] .import-preview-list { background: var(--content); border-color: var(--border); color: var(--ink); }
+:root[data-theme="dark"] .backup-actions button, :root[data-theme="dark"] .snippet-dialog-actions button, :root[data-theme="dark"] .delete-confirm-actions button { background: var(--card); border-color: var(--border); color: var(--ink-2); }
+:root[data-theme="dark"] .backup-actions button.primary, :root[data-theme="dark"] .snippet-dialog-actions button.primary, :root[data-theme="dark"] .delete-confirm-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .backup-error, :root[data-theme="dark"] .import-errors, :root[data-theme="dark"] .delete-confirm-error { background: var(--danger-bg); }
+:root[data-theme="dark"] .import-folder-list span { background: var(--accent-tint); color: var(--accent-ink); }
+:root[data-theme="dark"] .vault-body { background: var(--card); }

@@ -287,10 +287,12 @@ test("builds all and favorite shortcuts for the active content kind", () => {
   assert.deepEqual(buildDirectoryShortcuts(items, "snippet"), [
     { id: "all", label: "全部话术", count: 2 },
     { id: "pinned", label: "收藏", count: 1 },
+    { id: "recent", label: "最近使用", count: 0 },
   ]);
   assert.deepEqual(buildDirectoryShortcuts(items, "secret"), [
     { id: "all", label: "全部", count: 1 },
     { id: "pinned", label: "收藏", count: 1 },
+    { id: "recent", label: "最近使用", count: 0 },
   ]);
 });
 
@@ -435,4 +437,66 @@ test("the trash view lists trashed entries from every folder", () => {
   assert.equal(core.itemMatchesActiveFolder(items[2], "folder:询盘接待"), false);
   assert.equal(core.itemMatchesActiveFolder(items[1], "uncategorized"), true);
   assert.equal(core.itemMatchesActiveFolder({ ...items[2], pinned: true }, "pinned"), true);
+});
+
+const mk = (id, kind, folder, extra = {}) => ({ id, label: id, secret: "x", note: "", color: "#fff", kind, folder, createdAt: 1, updatedAt: 1, ...extra });
+const baseVault = () => core.normalizeVaultData({
+  items: [mk("s1", "secret", "AWS"), mk("s2", "secret", "AWS", { deletedAt: 5 }), mk("s3", "secret", ""), mk("n1", "snippet", "询盘接待")],
+  folders: { secret: ["AWS", "GitHub"], snippet: [...standardSnippetFolders, "自定义"] },
+});
+
+test("renames a folder everywhere, including colors and trashed items", () => {
+  const colored = core.setFolderColor(baseVault(), "secret", "AWS", "#F06F7D");
+  const { data, error } = core.renameFolder(colored, "secret", "AWS", " 云服务 ");
+  assert.equal(error, undefined);
+  assert.deepEqual(data.folders.secret, ["云服务", "GitHub"]);
+  assert.equal(data.items.find((i) => i.id === "s1").folder, "云服务");
+  assert.equal(data.items.find((i) => i.id === "s2").folder, "云服务");
+  assert.equal(data.folderColors.secret["云服务"], "#f06f7d");
+  assert.equal(data.folderColors.secret.AWS, undefined);
+  assert.match(core.renameFolder(colored, "secret", "AWS", "GitHub").error, /同名/);
+  assert.match(core.renameFolder(colored, "snippet", "询盘接待", "新名").error, /标准话术目录/);
+});
+
+test("deleting a secret folder moves its items to uncategorized; snippet folders must be empty", () => {
+  const { data, moved } = core.deleteFolder(baseVault(), "secret", "AWS");
+  assert.equal(moved, 2);
+  assert.deepEqual(data.folders.secret, ["GitHub"]);
+  assert.equal(data.items.find((i) => i.id === "s1").folder, "");
+  const withSnippet = core.normalizeVaultData({ ...baseVault(), items: [...baseVault().items, mk("n2", "snippet", "自定义")] });
+  assert.match(core.deleteFolder(withSnippet, "snippet", "自定义").error, /还有 1 条/);
+  assert.deepEqual(core.deleteFolder(baseVault(), "snippet", "自定义").data.folders.snippet, standardSnippetFolders);
+  assert.match(core.deleteFolder(baseVault(), "snippet", "询盘接待").error, /标准话术目录/);
+});
+
+test("folder colors survive normalization, scoped backups and merges but drop for missing folders", () => {
+  const vault = core.setFolderColor(core.setFolderColor(baseVault(), "snippet", "询盘接待", "#62C483"), "secret", "GitHub", "#4DBFC4");
+  assert.equal(core.normalizeVaultData(vault).folderColors.snippet["询盘接待"], "#62c483");
+  assert.deepEqual(core.vaultDataForBackupScope(vault, "secret").folderColors, { secret: { GitHub: "#4dbfc4" }, snippet: {} });
+  const merged = core.mergeImportedVaultData(baseVault(), core.vaultDataForBackupScope(vault, "secret"), "merge", () => "id").data;
+  assert.equal(merged.folderColors.secret.GitHub, "#4dbfc4");
+  assert.equal(core.setFolderColor(vault, "secret", "GitHub", null).folderColors?.secret?.GitHub, undefined);
+  assert.equal(core.normalizeVaultData({ ...vault, folders: { ...vault.folders, secret: [] } }).folderColors?.secret?.GitHub, undefined);
+  assert.equal("folderColors" in baseVault(), false);
+});
+
+test("bulk helpers move, trash and restore only the chosen active items", () => {
+  const items = baseVault().items;
+  const moved = core.moveItemsToFolder(items, ["s1", "s2", "n1"], "GitHub", 9);
+  assert.equal(moved.find((i) => i.id === "s1").folder, "GitHub");
+  assert.equal(moved.find((i) => i.id === "s2").folder, "AWS");
+  assert.equal(moved.find((i) => i.id === "n1").snippetMeta, undefined);
+  const trashed = core.moveItemsToTrash(items, ["s1", "s3"], 7);
+  assert.equal(trashed.filter((i) => i.deletedAt === 7).length, 2);
+  assert.equal(core.restoreTrashedItems(trashed, ["s1"]).find((i) => i.id === "s1").deletedAt, undefined);
+});
+
+test("recent folder lists used items and search highlighting splits on every term", () => {
+  assert.equal(core.itemMatchesActiveFolder(mk("a", "secret", "", { lastUsedAt: 3 }), "recent"), true);
+  assert.equal(core.itemMatchesActiveFolder(mk("a", "secret", ""), "recent"), false);
+  assert.equal(core.canAddItemInFolder("recent"), false);
+  assert.deepEqual(core.splitSearchHighlight("Quote follow-up", "quote UP"), [
+    { text: "Quote", hit: true }, { text: " follow-", hit: false }, { text: "up", hit: true },
+  ]);
+  assert.deepEqual(core.splitSearchHighlight("abc", ""), [{ text: "abc", hit: false }]);
 });

@@ -34,6 +34,8 @@ window.addEventListener("DOMContentLoaded", () => {
 contextBridge.exposeInMainWorld("clipboxDesktop", {
   copyText: (text, seconds) => ipcRenderer.invoke("clipbox:copy-text", text, seconds),
   didCopy: () => ipcRenderer.send("clipbox:did-copy"),
+  setTheme: (theme) => ipcRenderer.send("clipbox:set-theme", theme),
+  openDataFolder: () => ipcRenderer.invoke("clipbox:open-data-folder"),
   setMiniHidePolicy: (policy) => ipcRenderer.send("clipbox:set-mini-hide-policy", policy),
   getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),
