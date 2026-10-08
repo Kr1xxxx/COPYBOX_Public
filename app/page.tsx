@@ -73,6 +73,7 @@ import {
   snippetSearchText,
   type SnippetImportPreview,
 } from "./snippet-import";
+import { AI_SETTINGS_KEY, DEFAULT_AI_PROMPTS, chatCompletionsUrl, chatRequestBody, parseAiEndpoint, parseChatResponse, readAiSettings, validateAiSettings, type AiSettings } from "./ai-config";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -107,6 +108,8 @@ type WindowMode = "full" | "mini";
 type MiniHidePolicy = "hotkey" | "always" | "never";
 type ThemeChoice = "system" | "light" | "dark";
 // Windows shows this section as 备注; darwin keeps the original 秘密 wording.
+// Windows has no password-style masking or reference links: 备注 is a plain notes list.
+const PLAIN_NOTES = typeof window === "undefined" || window.clipboxDesktop?.platform !== "darwin";
 const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "秘密" : "备注";
 type CloseBehavior = "tray" | "quit";
 const DETAIL_CLOSE_MS = 220;
@@ -146,6 +149,10 @@ declare global {
       setTheme?: (theme: ThemeChoice) => void;
       openDataFolder?: () => Promise<string>;
       getVersion: () => Promise<string>;
+      aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
+      aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
+      aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
+      aiRequest?: (payload: { url: string; body: unknown }) => Promise<{ ok: boolean; status: number; text: string }>;
       relaunch: () => void;
       onFocusSearch: (callback: () => void) => () => void;
       onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
@@ -225,14 +232,76 @@ function SnippetTitle({ label, query = "" }: { label: string; query?: string }) 
   return <><span className="snippet-title-primary"><Highlight text={primary} query={query} /></span><span className="snippet-title-separator">｜</span><span className="snippet-title-detail"><Highlight text={detail} query={query} /></span></>;
 }
 
-const AI_PROMPTS: Record<AiRewriteMode, string> = {
-  polish: "润色下面这段客服话术：保持原意和原语言，让语气更自然、礼貌、简洁。必须原样保留所有 [方括号] 和 {花括号} 里的变量，不要增加原文没有的信息。只返回润色后的正文，不要解释，不要加引号。",
-  organize: "整理下面这段话术：修正错别字和标点，分段清晰，去掉重复和多余空格。不改变意思，不增删信息，原样保留所有 [方括号] 和 {花括号} 里的变量。只返回整理后的正文，不要解释，不要加引号。",
-};
+const AI_WEB_KEY = "clipbox.ai-key.web.v1";
+type AiKeyStatus = { hasKey: boolean; origin: string };
 
-// Runs on the device's own language model when the browser exposes one. 整理 can
-// still fall back to a rule-based tidy; 润色 genuinely needs a model.
-async function aiRewrite(mode: AiRewriteMode, value: string): Promise<{ text: string; unavailable: boolean }> {
+// A message from the desktop bridge arrives wrapped as "Error invoking remote method …: Error: <text>".
+function aiErrorText(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.split("Error: ").pop()?.trim() || "AI 接口出错";
+}
+
+// The desktop app keeps the key encrypted with the system; a plain browser (preview) falls back to local storage.
+async function aiKeyStatus(): Promise<AiKeyStatus> {
+  if (window.clipboxDesktop?.aiStatus) return window.clipboxDesktop.aiStatus();
+  try {
+    const stored = JSON.parse(localStorage.getItem(AI_WEB_KEY) || "null");
+    return stored?.key ? { hasKey: true, origin: String(stored.origin || "") } : { hasKey: false, origin: "" };
+  } catch { return { hasKey: false, origin: "" }; }
+}
+
+async function aiKeySave(baseUrl: string, key: string): Promise<AiKeyStatus> {
+  if (window.clipboxDesktop?.aiSave) return window.clipboxDesktop.aiSave({ baseUrl, key });
+  const origin = parseAiEndpoint(baseUrl)?.origin || "";
+  let existing: { origin?: string; key?: string } = {};
+  try { existing = JSON.parse(localStorage.getItem(AI_WEB_KEY) || "{}"); } catch { /* start fresh */ }
+  const finalKey = key.trim() || (existing.origin === origin ? existing.key || "" : "");
+  if (!finalKey) throw new Error("请填写 API Key");
+  localStorage.setItem(AI_WEB_KEY, JSON.stringify({ origin, key: finalKey }));
+  return { hasKey: true, origin };
+}
+
+async function aiKeyClear(): Promise<AiKeyStatus> {
+  if (window.clipboxDesktop?.aiClear) return window.clipboxDesktop.aiClear();
+  localStorage.removeItem(AI_WEB_KEY);
+  return { hasKey: false, origin: "" };
+}
+
+async function aiChat(settings: AiSettings, system: string, user: string): Promise<{ text: string; error: string }> {
+  const url = chatCompletionsUrl(settings.baseUrl);
+  const body = chatRequestBody(settings.model, system, user);
+  try {
+    if (window.clipboxDesktop?.aiRequest) {
+      const response = await window.clipboxDesktop.aiRequest({ url, body });
+      return parseChatResponse(response.status, response.text);
+    }
+    const stored = JSON.parse(localStorage.getItem(AI_WEB_KEY) || "null");
+    if (!stored?.key) return { text: "", error: "还没有保存 API Key" };
+    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${stored.key}` }, body: JSON.stringify(body) });
+    return parseChatResponse(response.status, await response.text());
+  } catch (error) {
+    return { text: "", error: window.clipboxDesktop ? aiErrorText(error) : "无法连接到接口（浏览器预览可能被跨域限制，桌面版不受影响）" };
+  }
+}
+
+function cleanAiText(result: string) {
+  return result.replace(/^```[a-z]*\n?|```$/gi, "").trim().replace(/^["“](.*)["”]$/s, "$1").trim();
+}
+
+// Order: the user's own interface (settings) → the device's own language model → a rule-based tidy
+// for 整理. 润色 genuinely needs a model.
+async function aiRewrite(mode: AiRewriteMode, value: string): Promise<{ text: string; unavailable: boolean; error?: string }> {
+  const custom = readAiSettings(localStorage);
+  const prompt = custom ? (mode === "polish" ? custom.polishPrompt : custom.organizePrompt) : DEFAULT_AI_PROMPTS[mode];
+  if (custom) {
+    const status = await aiKeyStatus().catch(() => ({ hasKey: false, origin: "" }));
+    if (status.hasKey) {
+      const reply = await aiChat(custom, prompt, value);
+      if (reply.error) return { text: "", unavailable: false, error: `AI 接口：${reply.error}` };
+      const cleaned = cleanAiText(reply.text);
+      return { text: mode === "organize" ? tidyText(cleaned) : cleaned, unavailable: false };
+    }
+  }
   type LanguageSession = { prompt: (prompt: string) => Promise<string>; destroy?: () => void };
   type LanguageModelAPI = { create: () => Promise<LanguageSession> };
   const model = (window as unknown as { LanguageModel?: LanguageModelAPI }).LanguageModel;
@@ -240,8 +309,7 @@ async function aiRewrite(mode: AiRewriteMode, value: string): Promise<{ text: st
     let session: LanguageSession | undefined;
     try {
       session = await model.create();
-      const result = await session.prompt(`${AI_PROMPTS[mode]}\n\n${value}`);
-      const cleaned = result.replace(/^```[a-z]*\n?|```$/gi, "").trim().replace(/^["“](.*)["”]$/s, "$1").trim();
+      const cleaned = cleanAiText(await session.prompt(`${prompt}\n\n${value}`));
       if (cleaned) return { text: mode === "organize" ? tidyText(cleaned) : cleaned, unavailable: false };
     } catch {
       // Fall through below.
@@ -511,12 +579,13 @@ export default function Home() {
       if (!row || !line || typeof row.animate !== "function") continue;
       const timing: KeyframeAnimationOptions = { duration: DETAIL_CLOSE_MS, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "forwards" };
       const plainHeight = row.classList.contains("secret-row") ? "44px" : "52px";
+      const card = getComputedStyle(row);
       const animations = [
         row.animate([
-          { margin: "2px 0 4px", borderWidth: "1px", borderColor: "#e8e5da", backgroundColor: "var(--card)", boxShadow: "0 1px 2px rgba(31,30,28,.04), 0 8px 20px rgba(31,30,28,.07)" },
-          { margin: "0px", borderWidth: "0px", borderColor: "transparent", backgroundColor: "transparent", boxShadow: "0 0 0 rgba(31,30,28,0)" },
+          { margin: card.margin, borderWidth: card.borderTopWidth, borderColor: card.borderTopColor, backgroundColor: card.backgroundColor, boxShadow: card.boxShadow },
+          { margin: "0px", borderWidth: "0px", borderColor: "rgba(0, 0, 0, 0)", backgroundColor: "rgba(0, 0, 0, 0)", boxShadow: "0 0 0 rgba(0, 0, 0, 0)" },
         ], timing),
-        line.animate([{ height: "38px" }, { height: plainHeight }], timing),
+        line.animate([{ height: `${line.getBoundingClientRect().height}px` }, { height: plainHeight }], timing),
       ];
       running.set(id, animations);
       void animations[0].finished.then(() => {
@@ -1188,7 +1257,6 @@ export default function Home() {
   // Rows slide to their new places when a different entry opens.
   function moveSelection(update: (value: number) => number) {
     const leaving = bulkMode ? undefined : filtered[safeSelected]?.id;
-    prepareSortAnimation("card");
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (leaving && !reduceMotion && update(safeSelected) !== safeSelected) {
       setClosingIds((ids) => ids.includes(leaving) ? ids : [...ids, leaving]);
@@ -1536,7 +1604,7 @@ export default function Home() {
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
                 </div>}
               </div>}
-              {activeKind === "secret" && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
+              {activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
             </div>
             <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
@@ -1576,14 +1644,14 @@ export default function Home() {
                           {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><Highlight text={item.secret} query={query} /></small>}
                         </span>
                       </button>
-                      {!isSnippet && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
+                      {!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
                       <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
                       <button type="button" className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消收藏" : "收藏"} ${item.label}`} aria-pressed={Boolean(item.pinned)} title={item.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(item.pinned)} /></button>
                       {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
-                      {copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
+                      {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      {isSnippet ? (!fillOpen && <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : (
+                      {isSnippet ? (!fillOpen && <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
@@ -1594,7 +1662,7 @@ export default function Home() {
                         : <div className="row-actions">
                           <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : "复制"}<kbd>↵</kbd></button>
                           {isSnippet && hasOptionalSnippetPreparation(item) && <button type="button" className="secondary-button" onClick={() => prepareCopy(item)}>填写变量</button>}
-                          {!isSnippet && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
+                          {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           <span className="spacer" />
                           <div className="menu-wrap">
@@ -1607,7 +1675,7 @@ export default function Home() {
                             </div>}
                           </div>
                         </div>}
-                      {!isSnippet && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
+                      {!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
                     </div></div>}
                   </article>
                 );
@@ -1960,6 +2028,100 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
+function AiSettingsSection({ localAiAvailable }: { localAiAvailable: boolean }) {
+  const [form, setForm] = useState<AiSettings>(() => readAiSettings(localStorage) || { baseUrl: "", model: "", polishPrompt: DEFAULT_AI_PROMPTS.polish, organizePrompt: DEFAULT_AI_PROMPTS.organize });
+  const [keyInput, setKeyInput] = useState("");
+  const [status, setStatus] = useState<AiKeyStatus>({ hasKey: false, origin: "" });
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState<"" | "save" | "test">("");
+  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [savedSettings, setSavedSettings] = useState<AiSettings | null>(() => readAiSettings(localStorage));
+  useEffect(() => {
+    let cancelled = false;
+    aiKeyStatus().then((value) => { if (!cancelled) setStatus(value); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+
+  const origin = parseAiEndpoint(form.baseUrl)?.origin || "";
+  const keyReady = keyInput.trim().length > 0 || (status.hasKey && status.origin === origin);
+  const problem = validateAiSettings(form, keyReady);
+  const active = Boolean(savedSettings) && status.hasKey;
+  const edit = (patch: Partial<AiSettings>) => { setForm((value) => ({ ...value, ...patch })); setTouched(true); setMessage(null); };
+
+  async function save() {
+    if (problem || busy) return false;
+    setBusy("save");
+    try {
+      const next = await aiKeySave(form.baseUrl.trim(), keyInput);
+      const clean: AiSettings = { baseUrl: form.baseUrl.trim(), model: form.model.trim(), polishPrompt: form.polishPrompt.trim(), organizePrompt: form.organizePrompt.trim() };
+      localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(clean));
+      setForm(clean);
+      setSavedSettings(clean);
+      setStatus(next);
+      setKeyInput("");
+      setTouched(false);
+      setMessage({ tone: "ok", text: "已保存，AI 润色和 AI 整理会使用这个接口" });
+      return true;
+    } catch (error) {
+      setMessage({ tone: "error", text: aiErrorText(error) });
+      return false;
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function testConnection() {
+    if (problem || busy) return;
+    if (!(await save())) return;
+    setBusy("test");
+    setMessage({ tone: "ok", text: "正在测试…" });
+    const reply = await aiChat({ ...form, baseUrl: form.baseUrl.trim(), model: form.model.trim() }, "你是连接测试。只回复 OK。", "ping");
+    setBusy("");
+    setMessage(reply.error ? { tone: "error", text: `连接失败：${reply.error}` } : { tone: "ok", text: "连接成功，接口可以使用" });
+  }
+
+  async function clearInterface() {
+    setBusy("save");
+    try { await aiKeyClear(); } catch { /* the settings below are cleared either way */ }
+    localStorage.removeItem(AI_SETTINGS_KEY);
+    setSavedSettings(null);
+    setStatus({ hasKey: false, origin: "" });
+    setForm({ baseUrl: "", model: "", polishPrompt: DEFAULT_AI_PROMPTS.polish, organizePrompt: DEFAULT_AI_PROMPTS.organize });
+    setKeyInput("");
+    setTouched(false);
+    setBusy("");
+    setMessage({ tone: "ok", text: "已停用并清除接口和密钥" });
+  }
+
+  const summary = active && savedSettings
+    ? `已启用自己的 AI 接口：${parseAiEndpoint(savedSettings.baseUrl)?.host || savedSettings.baseUrl} · ${savedSettings.model}`
+    : localAiAvailable ? "已检测到系统自带的本机 AI，文字不会离开这台电脑" : "还没有设置接口：AI 整理会用规则整理，AI 润色需要填写下面的接口";
+  return (
+    <>
+      <div className="settings-row static"><div><strong>AI 润色 / AI 整理</strong><small>{summary}</small></div></div>
+      <form className="settings-ai-form" onSubmit={(event) => { event.preventDefault(); void save(); }} autoComplete="off">
+        <label className="settings-ai-field"><span>接口地址</span><input value={form.baseUrl} onChange={(event) => edit({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" spellCheck={false} /></label>
+        <div className="settings-ai-pair">
+          <label className="settings-ai-field"><span>模型</span><input value={form.model} onChange={(event) => edit({ model: event.target.value })} placeholder="例如 gpt-4o-mini" spellCheck={false} /></label>
+          <label className="settings-ai-field"><span>API Key</span><input type="password" value={keyInput} onChange={(event) => { setKeyInput(event.target.value); setTouched(true); setMessage(null); }} placeholder={status.hasKey ? "已保存，留空则保持不变" : "sk-…"} spellCheck={false} autoComplete="new-password" /></label>
+        </div>
+        <label className="settings-ai-field"><span>润色提示词</span><textarea rows={4} value={form.polishPrompt} onChange={(event) => edit({ polishPrompt: event.target.value })} aria-invalid={!form.polishPrompt.trim()} /></label>
+        <label className="settings-ai-field"><span>整理提示词</span><textarea rows={4} value={form.organizePrompt} onChange={(event) => edit({ organizePrompt: event.target.value })} aria-invalid={!form.organizePrompt.trim()} /></label>
+        {(touched && problem) && <p className="settings-error" role="alert">{problem}</p>}
+        {message && <p className={message.tone === "error" ? "settings-error" : "settings-ok"} role="status">{message.text}</p>}
+        <div className="settings-ai-actions">
+          <button type="submit" className="primary-button" disabled={Boolean(problem) || Boolean(busy)}>{busy === "save" ? "保存中…" : "保存"}</button>
+          <button type="button" className="secondary-button" disabled={Boolean(problem) || Boolean(busy)} onClick={() => void testConnection()}>{busy === "test" ? "测试中…" : "保存并测试"}</button>
+          <button type="button" className="secondary-button" disabled={Boolean(busy)} onClick={() => { setForm((value) => ({ ...value, polishPrompt: DEFAULT_AI_PROMPTS.polish, organizePrompt: DEFAULT_AI_PROMPTS.organize })); setTouched(true); setMessage(null); }}>恢复默认提示词</button>
+          <span className="spacer" />
+          {(savedSettings || status.hasKey) && <button type="button" className="secondary-button danger-text" disabled={Boolean(busy)} onClick={() => void clearInterface()}>停用并清除</button>}
+        </div>
+      </form>
+      <p className="settings-note">接口需兼容 OpenAI 的 chat/completions 格式（也可填写本机地址，如 http://localhost:11434/v1）。API Key 由系统加密后只保存在这台电脑，不会进入备份；点“润色/整理”时，话术内容会发送到你填写的接口。提示词不能为空。</p>
+    </>
+  );
+}
+
 function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
@@ -2023,7 +2185,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
-            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{SECRET_WORD}不会进入话术备份，复制{SECRET_WORD}默认只给出引用。</p>
+            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{SECRET_WORD}不会进入话术备份{PLAIN_NOTES ? "。" : `，复制${SECRET_WORD}默认只给出引用。`}</p>
           </section>
           <section aria-labelledby="set-trash"><h3 id="set-trash">回收站</h3>
             <div className="settings-row"><div><strong>自动清理</strong><small>超过期限的已删除内容会被永久删除</small></div>
@@ -2057,7 +2219,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
           </section>
           <section aria-labelledby="set-ai"><h3 id="set-ai">AI</h3>
-            <div className="settings-row static"><div><strong>AI 润色 / AI 整理</strong><small>{aiAvailable ? "已检测到系统自带的本机 AI，文字不会离开这台电脑" : "这台电脑没有可用的本机 AI：AI 整理会用规则整理，AI 润色暂不可用"}</small></div></div>
+            <AiSettingsSection localAiAvailable={aiAvailable} />
           </section>
           <section aria-labelledby="set-about"><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
@@ -2132,7 +2294,7 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
   const [label, setLabel] = useState(item?.label || "");
   const [secret, setSecret] = useState(item?.secret || "");
   const [secretParts, setSecretParts] = useState<[string, string]>(() => item?.secretSegments || splitSecretSegments(item?.secret || ""));
-  const [segmentedSecret, setSegmentedSecret] = useState(kind === "secret" && Boolean(item?.secretSegments));
+  const [segmentedSecret, setSegmentedSecret] = useState(kind === "secret" && !PLAIN_NOTES && Boolean(item?.secretSegments));
   const [summary, setSummary] = useState(item?.summary || "");
   const [chineseText, setChineseText] = useState(item?.snippetMeta?.chineseText || "");
   const [rawProduct, setRawProduct] = useState(item?.snippetMeta?.rawProduct || "");
@@ -2258,8 +2420,9 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
     setAiNotice("");
     try {
       const generated = await aiRewrite(mode, captured);
+      if (generated.error) { setAiNotice(generated.error); return; }
       if (generated.unavailable) {
-        setAiNotice("这台电脑的系统里没有可用的本机 AI，暂时无法润色；「AI 整理」仍可使用");
+        setAiNotice("还没有可用的 AI：请在 设置 → AI 里填写自己的接口，才能润色；「AI 整理」仍可使用");
         return;
       }
       const result = resolveAiRewrite(captured, latestContentRef.current, generated.text);
@@ -2288,14 +2451,14 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
         <div className={`editor-kind ${kind}`}>
           <span>{item ? "编辑" : "新增"}{kind === "secret" ? SECRET_WORD : "话术"}</span>
           {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{item.snippetNumber}</b>}
-          {kind === "secret" && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
+          {kind === "secret" && !PLAIN_NOTES && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
         </div>
-        <span className="inline-editor-hint">{kind === "secret" ? "加密保存在这台设备上" : structured ? "中英文和使用规则一起加密保存" : "备注只给自己看；内容可用 AI 润色或整理"}</span>
+        <span className="inline-editor-hint">{kind === "secret" ? (PLAIN_NOTES ? "加密保存在这台电脑上" : "加密保存在这台设备上") : structured ? "中英文和使用规则一起加密保存" : "小提示只给自己看；内容可用 AI 润色或整理"}</span>
       </header>
       <form ref={formRef} onSubmit={submit}>
           <div className="editor-body">
             <div className="editor-meta-grid">
-              <label className="native-field"><span>{structured ? "具体场景" : "标题"}</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? "例如 prod-ssh" : "例如 售后夸赞"} maxLength={60} /></div></label>
+              <label className="native-field"><span>{structured ? "具体场景" : "标题"}</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? (PLAIN_NOTES ? "例如 常用地址" : "例如 prod-ssh") : "例如 售后夸赞"} maxLength={60} /></div></label>
               <label className="native-field folder-field">
                 <span>目录 <small>{kind === "secret" ? "可选择或手写" : "必选"}</small></span>
                 <div className="folder-select">
@@ -2318,19 +2481,19 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
               </label>
             </div>
 
-            {kind === "secret" && <label className="native-field reference-note-field"><span>被什么引用 <small>可选</small></span><div className="soft-input"><input value={referenceNote} onChange={(event) => setReferenceNote(event.target.value)} placeholder="例如 Shopify API、订单同步任务" maxLength={120} /></div></label>}
+            {kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"><span>被什么引用 <small>可选</small></span><div className="soft-input"><input value={referenceNote} onChange={(event) => setReferenceNote(event.target.value)} placeholder="例如 Shopify API、订单同步任务" maxLength={120} /></div></label>}
 
-            {kind === "secret" && <div className="segmented" role="group" aria-label="内容显示方式">
+            {kind === "secret" && !PLAIN_NOTES && <div className="segmented" role="group" aria-label="内容显示方式">
               <button type="button" className={!visible ? "active" : ""} aria-pressed={!visible} onClick={() => setVisible(false)}>隐藏内容</button>
               <button type="button" className={visible ? "active" : ""} aria-pressed={visible} onClick={() => setVisible(true)}>明文显示</button>
             </div>}
 
-            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? "密码 / 文本" : "话术内容"}</span>{kind === "secret" && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label={`${SECRET_WORD}第一段`} className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label={`${SECRET_WORD}第二段`} className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? "密码 / 文本" : "话术内容"} className={kind === "secret" && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); }} placeholder={kind === "secret" ? "输入要保存的密码或文本" : "输入需要反复使用的话术"} rows={6} />}</div></div>
+            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"}</span>{kind === "secret" && !PLAIN_NOTES && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label={`${SECRET_WORD}第一段`} className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label={`${SECRET_WORD}第二段`} className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"} className={kind === "secret" && !PLAIN_NOTES && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); }} placeholder={kind === "secret" ? (PLAIN_NOTES ? "输入要保存的备注内容" : "输入要保存的密码或文本") : "输入需要反复使用的话术"} rows={6} />}</div></div>
 
             {kind === "snippet" && aiNotice && <small className="ai-notice" role="status">{aiNotice}</small>}
 
             {kind === "snippet" && <div className="native-field summary-field">
-              <label htmlFor="summary-input">{structured ? "核心动作" : "备注"} {!structured && <small>可选，最多 {SNIPPET_NOTE_MAX} 字</small>}</label>
+              <label htmlFor="summary-input">{structured ? "核心动作" : "小提示"} {!structured && <small>可选，最多 {SNIPPET_NOTE_MAX} 字</small>}</label>
               <div className="summary-control">
                 <input id="summary-input" value={summary} onChange={(event) => setSummary(structured ? event.target.value : limitChars(event.target.value, SNIPPET_NOTE_MAX))} placeholder={structured ? "例如 发送睫毛报价" : "例如 售后夸赞时用"} />
               </div>

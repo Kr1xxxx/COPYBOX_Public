@@ -1,5 +1,6 @@
-const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, Tray } = require("electron");
+const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
 const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
+const { createAiStore } = require("./ai.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
@@ -434,6 +435,18 @@ ipcMain.handle("clipbox:copy-text", (event, text) => {
   if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Clipboard request denied");
   writeClipboard(text);
 });
+
+// The user's own AI interface; the key stays here and is never handed to the page.
+let aiStore;
+function aiStoreFor(event) {
+  if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Request denied");
+  aiStore ||= createAiStore({ filePath: path.join(app.getPath("userData"), "ai-key.json"), fs, safeStorage });
+  return aiStore;
+}
+ipcMain.handle("clipbox:ai-status", (event) => aiStoreFor(event).status());
+ipcMain.handle("clipbox:ai-save", (event, settings) => aiStoreFor(event).save(settings || {}));
+ipcMain.handle("clipbox:ai-clear", (event) => aiStoreFor(event).clear());
+ipcMain.handle("clipbox:ai-request", (event, payload) => aiStoreFor(event).request(payload || {}));
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
 

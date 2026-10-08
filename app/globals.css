@@ -216,7 +216,7 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .copy-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* Selected entry opens in place. */
-.native-row.selected { z-index: 5; margin: 2px 0 4px; transition: background .22s, box-shadow .26s; border: 1px solid #e8e5da; border-radius: 12px; background: var(--card); box-shadow: 0 1px 2px rgba(31,30,28,.04), 0 8px 20px rgba(31,30,28,.07); }
+.native-row.selected { z-index: 5; margin: 2px 0 4px; transition: background .22s, box-shadow .26s; border: 1px solid #e8e5da; border-radius: 12px; background: var(--card) padding-box; box-shadow: 0 1px 2px rgba(31,30,28,.04), 0 8px 20px rgba(31,30,28,.07); }
 .native-row.selected .row-line { height: 38px; padding-top: 0; }
 .native-row.selected .row-title strong { font-size: 14px; }
 .native-row.selected .row-title { gap: 7px; }
@@ -651,3 +651,16 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 
 /* With many variables the copy button stays reachable at the bottom of the list. */
 .fill-actions { position: sticky; bottom: 0; z-index: 3; margin: 0 -6px; padding: 10px 6px 2px; background: linear-gradient(to top, var(--card) 72%, transparent); }
+
+/* Settings → AI: the user's own interface */
+.settings-ai-form { margin: 4px 0 8px; display: grid; gap: 10px; }
+.settings-ai-field { min-width: 0; display: grid; gap: 4px; }
+.settings-ai-field > span { color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.settings-ai-field input, .settings-ai-field textarea { width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--content); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
+.settings-ai-field input { height: 32px; padding-block: 0; }
+.settings-ai-field input:focus, .settings-ai-field textarea:focus { outline: 0; border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--ring); }
+.settings-ai-field textarea[aria-invalid="true"] { border-color: var(--danger); }
+.settings-ai-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.settings-ai-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.settings-ai-actions .primary-button, .settings-ai-actions .secondary-button { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.settings-ok { margin: 0; color: var(--accent-ink); font-size: 12px; }

@@ -42,6 +42,10 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),
   getVersion: () => ipcRenderer.invoke("clipbox:get-version"),
+  aiStatus: () => ipcRenderer.invoke("clipbox:ai-status"),
+  aiSave: (settings) => ipcRenderer.invoke("clipbox:ai-save", settings),
+  aiClear: () => ipcRenderer.invoke("clipbox:ai-clear"),
+  aiRequest: (payload) => ipcRenderer.invoke("clipbox:ai-request", payload),
   relaunch: () => ipcRenderer.send("clipbox:relaunch"),
   onFocusSearch: (callback) => {
     const listener = () => callback();

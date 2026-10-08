@@ -14,7 +14,9 @@ test("settings is a full panel covering data, security, trash, window, AI and ab
   assert.match(page, /role="dialog" aria-modal="true" aria-labelledby="settings-title"/);
 });
 
-test("settings shows the version and the editor uses 备注 with AI 润色 / AI 整理 on the content", () => {
+test("settings shows the version and the editor calls the snippet note 小提示 with AI 润色 / AI 整理 on the content", () => {
+  assert.match(page, /\{structured \? "核心动作" : "小提示"\}/);
+  assert.doesNotMatch(page, /: "备注"\} \{!structured/);
   assert.match(page, /Clipbox \{version \? `v\$\{version\}`/);
   assert.match(page, /AI 润色/);
   assert.match(page, /AI 整理/);
@@ -64,4 +66,20 @@ test("the copy bar of the fill panel stays visible when many variables are fille
 
 test("the status bar no longer mentions clearing the clipboard", () => {
   assert.doesNotMatch(page, /清理剪贴板/);
+});
+
+test("on Windows the 备注 section is plain notes: no masking, reference links or segments", () => {
+  assert.match(page, /const PLAIN_NOTES = typeof window === "undefined" \|\| window\.clipboxDesktop\?\.platform !== "darwin"/);
+  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <div className="segmented"', '!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint"']) {
+    assert.ok(page.includes(marker), marker);
+  }
+  assert.match(page, /: PLAIN_NOTES \? <p className="row-content">/);
+});
+
+test("settings → AI lets people enter their own interface, key and prompts, and blocks empty prompts", () => {
+  assert.match(page, /function AiSettingsSection\(/);
+  for (const label of ["接口地址", "润色提示词", "整理提示词", "API Key", "恢复默认提示词", "保存并测试", "停用并清除"]) assert.ok(page.includes(label), label);
+  assert.match(page, /disabled=\{Boolean\(problem\) \|\| Boolean\(busy\)\}>\{busy === "save"/);
+  assert.match(page, /const problem = validateAiSettings\(form, keyReady\)/);
+  assert.match(page, /aiRequest\(\{ url, body \}\)/);
 });
