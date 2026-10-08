@@ -806,8 +806,8 @@ export default function Home() {
   }
 
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") { event.preventDefault(); setSelected((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
-    if (event.key === "ArrowUp") { event.preventDefault(); setSelected((value) => Math.max(0, value - 1)); }
+    if (event.key === "ArrowDown") { event.preventDefault(); moveSelection((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
+    if (event.key === "ArrowUp") { event.preventDefault(); moveSelection((value) => Math.max(0, value - 1)); }
     if (event.key === "Enter" && activeFolder !== "trash" && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
     if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
   }
@@ -891,6 +891,50 @@ export default function Home() {
   function chooseFolderColor(folder: string, color: string | null) {
     const kind = activeKind;
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
+  }
+
+  // Folder editing from Settings works on either kind, not just the open tab.
+  async function settingsFolderRename(kind: ItemKind, from: string, to: string) {
+    const error = await commitFolderChange((data) => renameFolder(data, kind, from, to), "目录已重命名");
+    if (!error && activeKind === kind && activeFolder === `folder:${from}`) setActiveFolder(`folder:${normalizeFolderName(to)}`);
+    return error;
+  }
+
+  async function settingsFolderDelete(kind: ItemKind, folder: string) {
+    const error = await commitFolderChange((data) => deleteFolder(data, kind, folder), `已删除目录「${folder}」`);
+    if (!error && activeKind === kind && activeFolder === `folder:${folder}`) selectFolder("all");
+    return error;
+  }
+
+  async function settingsFolderAdd(kind: ItemKind, name: string) {
+    const result = addFolder(foldersRef.current, kind, name);
+    if (!result.folder) return "请输入目录名称";
+    if (!result.created) return "已有同名目录";
+    return commitFolderChange((data) => ({ data: { ...data, folders: addFolder(data.folders, kind, name).folders } }), "目录已创建");
+  }
+
+  function settingsFolderColor(kind: ItemKind, folder: string, color: string | null) {
+    void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
+  }
+
+  function settingsFolderMove(kind: ItemKind, folder: string, delta: -1 | 1) {
+    void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: moveName(data.folders[kind], folder, delta) } } }), "目录顺序已更新");
+  }
+
+  function buildSettingsFolderGroups(): SettingsFolderGroup[] {
+    return (["snippet", "secret"] as const).map((kind) => {
+      const colors = { ...buildCategoryColorMap(folders[kind]), ...(folderColors?.[kind] || {}) };
+      return {
+        kind,
+        title: kind === "snippet" ? "话术目录" : `${SECRET_WORD}目录`,
+        folders: folders[kind].map((name) => ({
+          name,
+          count: items.filter((item) => !isTrashedItem(item) && (item.kind || "secret") === kind && item.folder === name).length,
+          color: colors[name] || UNCATEGORIZED_COLOR,
+          locked: Boolean(folderEditBlocker(kind, name)),
+        })),
+      };
+    });
   }
 
   function requestTrash(item: SecretItem) {
@@ -1102,9 +1146,15 @@ export default function Home() {
     setCopyRequest(null);
   }
 
+  // Rows slide to their new places when a different entry opens.
+  function moveSelection(update: (value: number) => number) {
+    prepareSortAnimation("card");
+    setSelected(update);
+  }
+
   function selectRow(index: number) {
     if (copyRequest && filtered[index]?.id !== copyRequest.item.id) setCopyRequest(null);
-    setSelected(index);
+    if (index !== safeSelected) moveSelection(() => index);
     setRowMenuId("");
     setRevealedId("");
   }
@@ -1486,7 +1536,7 @@ export default function Home() {
                       {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
                       {copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
-                    {isSelected && <div className="row-detail">
+                    {isSelected && <div className="row-detail"><div className="row-detail-inner">
                       {isSnippet ? (!fillOpen && <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
@@ -1512,7 +1562,7 @@ export default function Home() {
                           </div>
                         </div>}
                       {!isSnippet && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
-                    </div>}
+                    </div></div>}
                   </article>
                 );
               })}
@@ -1548,6 +1598,12 @@ export default function Home() {
         itemCount={items.filter((item) => !isTrashedItem(item)).length}
         miniHidePolicy={miniHidePolicy}
         onMiniHidePolicy={chooseMiniHidePolicy}
+        folderGroups={buildSettingsFolderGroups()}
+        onFolderAdd={settingsFolderAdd}
+        onFolderRename={settingsFolderRename}
+        onFolderDelete={settingsFolderDelete}
+        onFolderColor={settingsFolderColor}
+        onFolderMove={settingsFolderMove}
         closeBehavior={closeBehavior}
         onCloseBehavior={chooseCloseBehavior}
         trashDays={trashDays}
@@ -1746,6 +1802,95 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
   );
 }
 
+type SettingsFolderGroup = { kind: ItemKind; title: string; folders: { name: string; count: number; color: string; locked: boolean }[] };
+
+function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, onMove }: {
+  groups: SettingsFolderGroup[];
+  onAdd: (kind: ItemKind, name: string) => Promise<string>;
+  onRename: (kind: ItemKind, from: string, to: string) => Promise<string>;
+  onDelete: (kind: ItemKind, folder: string) => Promise<string>;
+  onColor: (kind: ItemKind, folder: string, color: string | null) => void;
+  onMove: (kind: ItemKind, folder: string, delta: -1 | 1) => void;
+}) {
+  const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
+  const [adding, setAdding] = useState<{ kind: ItemKind; value: string } | null>(null);
+  const [colorKey, setColorKey] = useState("");
+  const [armKey, setArmKey] = useState("");
+  const [error, setError] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLInputElement>(null);
+  const editingKey = editing?.key;
+  const addingKind = adding?.kind;
+  useEffect(() => { if (editingKey) { editRef.current?.focus(); editRef.current?.select(); } }, [editingKey]);
+  useEffect(() => { if (addingKind) addRef.current?.focus(); }, [addingKind]);
+
+  async function finish(task: Promise<string>, done: () => void) {
+    const failure = await task;
+    setError(failure);
+    if (!failure) done();
+  }
+
+  return (
+    <div className="settings-folders">
+      {groups.map((group) => (
+        <div className="settings-folder-group" key={group.kind}>
+          <div className="settings-folder-head"><strong>{group.title}</strong>
+            <button type="button" className="secondary-button" onClick={() => { setError(""); setAdding({ kind: group.kind, value: "" }); }}>新建目录</button>
+          </div>
+          {adding?.kind === group.kind && (
+            <form className="settings-folder-form" data-local-esc onSubmit={(event) => { event.preventDefault(); void finish(onAdd(group.kind, adding.value), () => setAdding(null)); }}>
+              <input ref={addRef} value={adding.value} maxLength={30} placeholder="目录名称" aria-label={`新建${group.title}`} onChange={(event) => setAdding({ kind: group.kind, value: event.target.value })} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setAdding(null); setError(""); } }} />
+              <button type="submit" className="secondary-button">创建</button>
+              <button type="button" className="secondary-button" onClick={() => { setAdding(null); setError(""); }}>取消</button>
+            </form>
+          )}
+          {group.folders.length === 0 && <p className="settings-note">还没有目录</p>}
+          {group.folders.map((folder, index) => {
+            const key = `${group.kind}:${folder.name}`;
+            const previous = group.folders[index - 1];
+            const next = group.folders[index + 1];
+            return (
+              <div className="settings-folder" key={key}>
+                <div className="settings-folder-row">
+                  <button type="button" className="settings-folder-dot" style={{ background: folder.color }} aria-label={`修改颜色 ${folder.name}`} aria-expanded={colorKey === key} onClick={() => setColorKey(colorKey === key ? "" : key)} />
+                  {editing?.key === key ? (
+                    <form className="settings-folder-form" data-local-esc onSubmit={(event) => { event.preventDefault(); void finish(onRename(group.kind, folder.name, editing.value), () => setEditing(null)); }}>
+                      <input ref={editRef} value={editing.value} maxLength={30} aria-label={`重命名 ${folder.name}`} onChange={(event) => setEditing({ key, value: event.target.value })} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditing(null); setError(""); } }} />
+                      <button type="submit" className="secondary-button">保存</button>
+                      <button type="button" className="secondary-button" onClick={() => { setEditing(null); setError(""); }}>取消</button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="settings-folder-name" title={folder.name}>{folder.name}</span>
+                      <small className="settings-folder-count">{folder.count} 条</small>
+                      {folder.locked ? <span className="settings-folder-fixed" title="标准话术目录不能改名或删除">固定</span> : <span className="settings-folder-actions">
+                        <button type="button" className="settings-mini-button" aria-label={`上移 ${folder.name}`} title="上移" disabled={folder.locked || !previous || previous.locked} onClick={() => onMove(group.kind, folder.name, -1)}>↑</button>
+                        <button type="button" className="settings-mini-button" aria-label={`下移 ${folder.name}`} title="下移" disabled={folder.locked || !next || next.locked} onClick={() => onMove(group.kind, folder.name, 1)}>↓</button>
+                        <button type="button" className="settings-mini-button" disabled={folder.locked} title={folder.locked ? "标准话术目录不能改名" : undefined} onClick={() => { setError(""); setArmKey(""); setEditing({ key, value: folder.name }); }}>改名</button>
+                        {armKey === key
+                          ? <button type="button" className="settings-mini-button danger" onClick={() => { setArmKey(""); void finish(onDelete(group.kind, folder.name), () => undefined); }}>{group.kind === "secret" && folder.count > 0 ? `确认删除（${folder.count} 条移到未分类）` : "确认删除"}</button>
+                          : <button type="button" className="settings-mini-button danger" disabled={folder.locked} title={folder.locked ? "标准话术目录不能删除" : undefined} onClick={() => { setError(""); setArmKey(key); }}>删除</button>}
+                      </span>}
+                    </>
+                  )}
+                </div>
+                {colorKey === key && (
+                  <div className="settings-swatches" role="group" aria-label={`${folder.name} 的颜色`}>
+                    <button type="button" className="settings-mini-button" onClick={() => onColor(group.kind, folder.name, null)}>自动</button>
+                    {CATEGORY_PALETTE.map((color) => <button key={color} type="button" aria-label={`颜色 ${color}`} aria-pressed={folder.color.toLowerCase() === color.toLowerCase()} className={folder.color.toLowerCase() === color.toLowerCase() ? "on" : ""} style={{ background: color }} onClick={() => onColor(group.kind, folder.name, color)} />)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {error && <p className="settings-error" role="alert">{error}</p>}
+      <p className="settings-note">标准话术目录固定，只能改颜色。话术目录里还有内容时不能删除；{SECRET_WORD}目录删除后，里面的内容会移到未分类。</p>
+    </div>
+  );
+}
+
 function backupAgeLabel(at: number) {
   if (!at) return "还没有导出过";
   const days = Math.floor((Date.now() - at) / 86_400_000);
@@ -1753,9 +1898,15 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
+function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
+  folderGroups: SettingsFolderGroup[];
+  onFolderAdd: (kind: ItemKind, name: string) => Promise<string>;
+  onFolderRename: (kind: ItemKind, from: string, to: string) => Promise<string>;
+  onFolderDelete: (kind: ItemKind, folder: string) => Promise<string>;
+  onFolderColor: (kind: ItemKind, folder: string, color: string | null) => void;
+  onFolderMove: (kind: ItemKind, folder: string, delta: -1 | 1) => void;
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
@@ -1771,12 +1922,16 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
     window.clipboxDesktop?.getLaunchAtLogin?.().then((value) => { if (!cancelled) setLaunchAtLogin(value); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
+  // onClose is a fresh closure on every render of the page, so keep it in a ref:
+  // re-running the effect would pull focus back to the close button mid-typing.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+  useEffect(() => { closeRef.current?.focus(); }, []);
   useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if ((event.target as HTMLElement | null)?.closest?.("[data-local-esc]")) return; event.stopPropagation(); onCloseRef.current(); } };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, []);
   const row = (title: string, hint: string, action: () => void, label: string, disabled = false) => (
     <div className="settings-row"><div><strong>{title}</strong><small>{hint}</small></div><button type="button" className="secondary-button" onClick={action} disabled={disabled}>{label}</button></div>
   );
@@ -1793,6 +1948,9 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             {isDesktop
               ? row("数据位置", "在文件夹中打开 Clipbox 的本机数据", onOpenDataFolder, "打开文件夹")
               : <div className="settings-row static"><div><strong>数据位置</strong><small>浏览器版保存在本站点的本地存储里，清除站点数据会一并删除</small></div></div>}
+          </section>
+          <section aria-labelledby="set-folders"><h3 id="set-folders">目录</h3>
+            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} />
           </section>
           <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>

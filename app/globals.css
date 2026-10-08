@@ -216,13 +216,14 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .copy-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* Selected entry opens in place. */
-.native-row.selected { z-index: 5; margin: 2px 0 4px; border: 1px solid #e8e5da; border-radius: 12px; background: var(--card); box-shadow: 0 1px 2px rgba(31,30,28,.04), 0 8px 20px rgba(31,30,28,.07); }
+.native-row.selected { z-index: 5; margin: 2px 0 4px; transition: background .22s, box-shadow .26s; border: 1px solid #e8e5da; border-radius: 12px; background: var(--card); box-shadow: 0 1px 2px rgba(31,30,28,.04), 0 8px 20px rgba(31,30,28,.07); }
 .native-row.selected .row-line { height: 38px; padding-top: 0; }
 .native-row.selected .row-title strong { font-size: 14px; }
 .native-row.selected .row-title { gap: 7px; }
 .native-row.selected .row-snippet-number { font-size: 10.5px; }
 .native-row.selected .row-folder { padding: 0 6px; font-size: 10.5px; }
-.row-detail { padding: 0 12px 10px 34px; display: grid; gap: 9px; animation: detail-in .2s cubic-bezier(.2,.8,.2,1) both; }
+.row-detail { display: grid; grid-template-rows: 1fr; animation: detail-open .26s cubic-bezier(.2,.8,.2,1) backwards; }
+.row-detail-inner { min-height: 0; padding: 0 12px 10px 34px; display: grid; gap: 9px; align-content: start; animation: detail-clip .26s linear; }
 .row-content { max-height: 168px; margin: 0; padding: 10px 12px; overflow: auto; border-radius: 8px; background: var(--content); color: var(--ink); font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: none; user-select: text; }
 .snippet-variable { padding: 1px 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
 .row-secret { min-height: 40px; padding: 5px 5px 5px 12px; display: flex; align-items: center; gap: 10px; border-radius: 8px; background: var(--content); }
@@ -357,6 +358,8 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 @keyframes empty-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
 @keyframes field-rise { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
 @keyframes refresh-spin { to{transform:rotate(360deg)} }
+@keyframes detail-open { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+@keyframes detail-clip { from { overflow: hidden; } to { overflow: hidden; } }
 @keyframes detail-in { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
 
 /* Keep idle windows visually still without suspending storage or local commands. */
@@ -606,3 +609,30 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
   background-size: 100% 28px, 100% 28px, 100% 9px, 100% 9px;
   background-attachment: local, local, scroll, scroll;
 }
+
+/* Settings → 目录 */
+.settings-folder-group { margin-bottom: 12px; }
+.settings-folder-head { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.settings-folder-head strong { font-size: 13px; font-weight: 600; }
+.settings-folder { border-bottom: 1px solid var(--line-soft); }
+.settings-folder:last-of-type { border-bottom: 0; }
+.settings-folder-row { min-height: 40px; display: flex; align-items: center; gap: 9px; }
+.settings-folder-dot { width: 14px; height: 14px; flex: none; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--border); }
+.settings-folder-dot:hover { transform: scale(1.15); }
+.settings-folder-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.settings-folder-count { flex: none; color: var(--muted); font-size: 11.5px; }
+.settings-folder-actions { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.settings-mini-button { height: 24px; min-width: 24px; padding: 0 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--ink-2); font: inherit; font-size: 11.5px; white-space: nowrap; cursor: pointer; }
+.settings-mini-button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); }
+.settings-mini-button:disabled { opacity: .4; cursor: default; }
+.settings-mini-button.danger { color: var(--danger); }
+.settings-folder-form { min-width: 0; flex: 1 1 auto; display: flex; align-items: center; gap: 6px; }
+.settings-folders > .settings-folder-group > .settings-folder-form { padding-bottom: 6px; }
+.settings-folder-form input { min-width: 0; flex: 1 1 auto; height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--content); color: var(--ink); font: inherit; font-size: 13px; }
+.settings-folder-form input:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.settings-folder-form .secondary-button { height: 28px; padding: 0 10px; }
+.settings-swatches { padding: 2px 0 10px 23px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.settings-swatches > button:not(.settings-mini-button) { width: 18px; height: 18px; padding: 0; border: 2px solid transparent; border-radius: 50%; background-clip: padding-box; cursor: pointer; }
+.settings-swatches > button.on { box-shadow: 0 0 0 1.5px var(--ink); }
+.settings-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; }
+.settings-folder-fixed { flex: none; padding: 1px 7px; border-radius: 9px; background: var(--fill); color: var(--muted); font-size: 11px; }
