@@ -1,56 +1,79 @@
-# 产品决定记录
+# Decision records
 
-负责人已经定下的事。改之前先问负责人；改了就把旧条目状态改成“已被 D-xxx 取代”，再追加新条目，不要直接删。
-格式参考业界常用的决策记录（ADR）：编号、状态、背景、决定、影响。状态：已采纳 / 已取代 / 已废弃。
+Decisions the owner has made. Ask the owner before changing one. When a decision changes, set the old entry's
+status to "Superseded by D-xxx" and add a new entry — do not delete history.
+Format follows lightweight architecture decision records (ADR): number, status, context, decision, consequences.
+Statuses: Accepted / Superseded / Deprecated.
 
-| 编号 | 决定 | 状态 |
+| # | Decision | Status |
 | --- | --- | --- |
-| D-001 | Windows 优先 | 已采纳 |
-| D-002 | macOS 只出 Apple 芯片（arm64） | 已采纳 |
-| D-003 | 第二板块：Windows 纯文字“备注”，macOS“秘密” | 已采纳 |
-| D-004 | 界面方案 H | 已采纳 |
-| D-005 | 不要任何快捷键 | 已采纳 |
-| D-006 | 不自动清除剪贴板；设置里不写命令行说明 | 已采纳 |
-| D-007 | 话术备注字段叫“小提示”，最多 40 字 | 已采纳 |
-| D-008 | AI 用用户自填的接口，提示词不能为空 | 已采纳 |
-| D-009 | 目录规则 | 已采纳 |
-| D-010 | 开发流程：PR + 负责人同意才合并 | 已采纳 |
+| D-001 | Windows first | Accepted |
+| D-002 | macOS ships Apple silicon (arm64) only | Accepted |
+| D-003 | Second section: plain-text 备注 on Windows, 秘密 on macOS | Accepted |
+| D-004 | UI layout "H" | Accepted |
+| D-005 | No keyboard shortcuts at all | Accepted |
+| D-006 | No auto-clear clipboard; no command-line help in Settings | Accepted |
+| D-007 | Snippet note field is 小提示, max 40 characters | Accepted |
+| D-008 | AI uses an endpoint the user configures; prompts cannot be empty | Accepted |
+| D-009 | Folder rules | Accepted |
+| D-010 | Workflow: PRs only, the owner merges | Accepted |
 
 ---
 
-### D-001 Windows 优先（2026-10）
-- 背景：主要用户用 Windows。
-- 决定：功能和外观先按 Windows 做；Mac 只做必要适配。
-- 影响：Windows 用系统原生标题栏、托盘、NSIS 安装包；没有在 Windows 真机验证的功能不算完成（见 `docs/features.json`）。
+### D-001 Windows first (2026-10)
+- Context: most users are on Windows.
+- Decision: build features and visuals for Windows first; macOS gets the necessary adaptations only.
+- Consequences: native Windows title bar, tray, NSIS installer. A feature is not done until verified on a real
+  Windows machine (`docs/features.json`).
 
-### D-002 macOS 只出 Apple 芯片（2026-10-08）
-- 决定：`npm run desktop:pack` 只出 arm64；不出 Intel、不出通用包。
+### D-002 macOS ships Apple silicon only (2026-10-08)
+- Decision: `npm run desktop:pack` builds arm64 only — no Intel, no universal build.
 
-### D-003 第二板块（2026-10-08）
-- 决定：Windows 叫“备注”，纯文字：内容直接显示，没有隐藏/按住显示、复制引用、“被什么引用”、分段。macOS 叫“秘密”，保留这些功能。
-- 影响：代码里用 `PLAIN_NOTES` 判断，数据格式两边一样。
+### D-003 Second section (2026-10-08)
+- Decision: on Windows it is called 备注 and is plain text — content shown directly, with no masking/hold-to-reveal,
+  copy reference, "referenced by" field or split segments. On macOS it is called 秘密 and keeps those features.
+- Consequences: code switches on `PLAIN_NOTES`; the stored data format is the same on both platforms.
 
-### D-004 界面方案 H（2026-10）
-- 决定：128px 侧栏 + 搜索优先的内容区；选中条目原地展开，编辑/填变量/新建目录都在原位完成，不弹窗。完整窗口最小 680×620，迷你窗口固定 360×440 置顶。隐藏滚动条，长内容用渐变阴影提示。列表里不显示总结/简略词和复制时间。
-- 影响：切换条目要有动画，旧卡片慢慢收起、边框不闪白（有端到端测试）。
+### D-004 UI layout "H" (2026-10)
+- Decision: 128px sidebar + search-first content panel; the selected entry expands in place; editing, filling
+  variables and creating folders happen inline, without dialogs. Full window minimum 680×620; mini window fixed
+  at 360×440, always on top. Hidden scrollbars, with a fade hint on long content. The list shows no summaries,
+  abbreviations or copy times.
+- Consequences: switching entries is animated — the old card folds away gradually and its border never flashes
+  white (covered by an e2e test).
 
-### D-005 不要任何快捷键（2026-10-08）
-- 背景：负责人两次要求去掉。
-- 决定：没有快捷键提示、没有 Ctrl/⌘ 组合键、没有 Alt+方向键排序、没有全局唤起键。搜索框里方向键选择、回车复制、Esc 返回是普通操作，保留但不写提示。
-- 影响：窗口靠托盘图标呼出；排序靠拖动和设置里的上移/下移。
+### D-005 No keyboard shortcuts at all (2026-10-08)
+- Context: the owner asked twice to remove them.
+- Decision: no shortcut hints, no Ctrl/⌘ combinations, no Alt+arrow sorting, no global hotkey. Arrow keys, Enter
+  to copy and Esc inside the search box are ordinary input; they stay, but nothing advertises them.
+- Consequences: the window is opened from the tray icon; reordering is by drag or the up/down buttons in Settings.
 
-### D-006 不自动清除剪贴板；不写命令行说明（2026-10）
-- 决定：两个平台都没有“复制后自动清除剪贴板”；设置里不出现命令行和快捷键说明（Mac 也不加回）。
+### D-006 No auto-clear clipboard; no command-line help (2026-10)
+- Decision: neither platform clears the clipboard after copying. Settings shows no command-line or shortcut help
+  (not on macOS either).
 
-### D-007 “小提示”（2026-10）
-- 决定：话术的备注字段叫“小提示”，最多 40 字，避免和 Windows 的“备注”板块重名。
+### D-007 小提示 (2026-10)
+- Decision: the snippet's note field is called 小提示, at most 40 characters, so it does not clash with the Windows
+  备注 section.
 
-### D-008 AI 接口（2026-10-08）
-- 决定：话术内容旁有 AI 润色 / AI 整理，可撤销。用用户在设置里填的接口（兼容 OpenAI chat/completions）：地址、模型、API Key、润色提示词、整理提示词；提示词为空不能保存；提供常用服务预设和“获取模型”。没填接口时用系统自带本机 AI，再没有时“整理”用规则、“润色”不可用。
-- 影响：API Key 用系统加密只存在本机，不进备份；点润色/整理时话术会发到所填的服务。
+### D-008 AI endpoint (2026-10-08)
+- Decision: AI 润色 (polish) and AI 整理 (tidy) sit next to the snippet content and can be undone. They use an
+  endpoint the user enters in Settings (OpenAI-compatible chat/completions): URL, model, API key, polish prompt,
+  tidy prompt. Empty prompts cannot be saved. Presets for common services and a "fetch models" button are offered.
+  Without an endpoint the device's built-in model is used; without that, tidy falls back to rules and polish is
+  unavailable.
+- Consequences: the API key is encrypted by the OS, stored only on the device and never included in backups.
+  Polishing or tidying sends the snippet text to the configured service.
 
-### D-009 目录（2026-10）
-- 决定：标准话术目录（询盘接待、产品样品、报价成交、定制生产、客户跟进、物流清关、售后争议）固定，只能改颜色；其他目录可新建、改名、改色、删除；侧栏和设置里都能拖动排序，设置里另有上移/下移。
+### D-009 Folders (2026-10)
+- Decision: the standard snippet folders (询盘接待, 产品样品, 报价成交, 定制生产, 客户跟进, 物流清关, 售后争议) are fixed —
+  colour only. Other folders can be created, renamed, recoloured, deleted and drag-sorted in both the sidebar and
+  Settings; Settings also has up/down buttons.
 
-### D-010 开发流程（2026-10）
-- 决定：不直接推 `main`；一个 PR 只做一件事；负责人同意后才合并。汇报用四段：做了什么 / 没做好的地方 / 需要你做的 / 建议下一步。能做的就做完。
+### D-010 Workflow (2026-10-09)
+- Context: agents and developers all push with the owner's GitHub account, so GitHub cannot require an approval.
+- Decision: never push to `main`; one task per PR; CI must be green; only the owner merges. Documentation is in
+  English. Reports to the owner are in Chinese, in four parts: 做了什么 / 没做好的地方 / 需要你做的 / 建议下一步.
+  Finish whatever can be finished.
+- Consequences: "only the owner merges" is enforced by rules and branch protection, not by GitHub approvals.
+  If people get their own accounts, require 1 approval.

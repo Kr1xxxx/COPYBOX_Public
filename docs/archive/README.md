@@ -1,5 +1,6 @@
-# 已归档
+# Archived
 
-这里是以前的计划和设计文档，**已经过时**，其中不少内容和现在的产品决定相反（例如快捷键、自动清除剪贴板、旧界面）。
+Old plan and design documents. **They are out of date**, and several contradict current decisions
+(keyboard shortcuts, auto-clearing the clipboard, the old UI).
 
-不要照着这里的内容开发。现行规则以 `AGENTS.md`、`docs/DECISIONS.md`、`docs/HANDOFF.md` 为准。
+Do not build from them. Current rules: `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOFF.md`.

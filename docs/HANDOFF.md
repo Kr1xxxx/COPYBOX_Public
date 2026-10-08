@@ -1,36 +1,39 @@
-# 交接板
+# Handoff board
 
-> 唯一的“现在在哪”。每次结束工作前更新；工作日志写在 `docs/handoff-log.md`。
-> 这份文件保持在 100 行以内，细节放到 `docs/` 其他文件。
+> The single "where are we now". Update it before you stop working; the session log lives in
+> `docs/handoff-log.md`. Keep this file under 100 lines.
 
-## 当前状态（2026-10-08）
+## Status (2026-10-09)
 
-- 仓库：https://github.com/Kr1xxxx/Clipbox
-- 开发分支 `ui-redesign-h` → PR #1（目标 `main`），**等负责人在 Windows 实测后合并**。
-- `npm run lint` 通过；`npm test` 169 项通过；`npm run test:e2e` 9 项通过；GitHub CI 通过。
-- 产品决定：`docs/DECISIONS.md`。功能验证情况：`docs/features.json`（目前只有浏览器验证过，Windows/Mac 真机全部未验证）。
+- Repository: https://github.com/Kr1xxxx/Clipbox
+- **`main` still has the old UI.** The new UI ("H") is on branch `ui-redesign-h`, PR #1, waiting for the owner
+  to test on Windows. Start UI work from `ui-redesign-h` until PR #1 is merged; `npm run test:e2e`, `app/ai-config.ts`
+  and `tests/e2e/` only exist there.
+- On `ui-redesign-h`: lint passes, `npm test` 169/169, `npm run test:e2e` 9/9, GitHub CI green.
+- Decisions: `docs/DECISIONS.md`. Verification status: `docs/features.json` — only verified in a browser so far;
+  nothing verified on real Windows or Mac hardware.
 
-## 任务板
+## Task board
 
-状态：待办 / 进行中 / 已完成 / 受阻 / 取消。一次只有一项“进行中”。
+States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progress" at a time.
 
-| # | 任务 | 状态 | 负责 | 备注 |
+| # | Task | State | Owner | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Windows 真机：打包安装，按 features.json 走托盘、开机启动、AI Key | 待办 | 负责人 | 需要 Windows 电脑 |
-| 2 | Mac（M 芯片）真机：打包打开，检查标题栏和“秘密” | 待办 | 负责人 | 需要 Mac |
-| 3 | 合并 PR #1 | 受阻 | 负责人 | 等 1、2 |
-| 4 | 设备密钥改用系统加密保护（现在和数据放在一起，拿到文件夹就能解开） | 待办 | — | 改存储前先问负责人（见 AGENTS 边界） |
-| 5 | “备注/秘密”加备份导出 | 待办 | — | |
-| 6 | 拆分 `app/page.tsx`（2500 行）为组件文件 | 待办 | — | 每次只拆一块，拆完测试全绿 |
-| 7 | 托盘呼出不顺手时：点任务栏/程序坞图标显示窗口 | 待办 | — | 不能用快捷键（D-005） |
+| 1 | Windows: build the installer, walk through tray, launch at login, AI key per `docs/features.json` | Todo | Owner | Needs a Windows PC |
+| 2 | Mac (Apple silicon): build and open, check title bar and 秘密 | Todo | Owner | Needs a Mac |
+| 3 | Merge PR #1 | Blocked | Owner | Waiting on 1 and 2 |
+| 4 | Protect the vault's device key with OS encryption (today it sits next to the data, so a copied data folder can be decrypted) | Todo | — | Changes storage — ask the owner first |
+| 5 | Backup/export for the 备注/秘密 section | Todo | — | |
+| 6 | Split `app/page.tsx` (~2500 lines) into component files | Todo | — | One piece at a time, tests green after each |
+| 7 | If opening from the tray feels awkward: show the window when the taskbar/Dock icon is clicked | Todo | — | No shortcuts (D-005) |
 
-## 需要负责人决定
+## Waiting on the owner
 
-- 公司统一话术库怎么分发给员工（现在每人各自导入表格）。
-- AI：用哪家、谁出 Key、话术里能否带客户信息。
-- 安装包签名和自动更新（要花钱）。
+- How the company's shared snippet library reaches every employee (today each person imports a spreadsheet).
+- AI: which provider, who pays for the key, whether snippets may contain customer data.
+- Code signing and auto-update for the installers (costs money).
 
-## 已知风险
+## Known risks
 
-- 产品主要给 Windows 用，但还没在 Windows 真机跑过。
-- 很多单元测试是“查源码文字”，重构容易红；行为以 `tests/e2e/` 为准。
+- The product is mainly for Windows but has never run on a real Windows machine.
+- Many unit tests assert on source text and break on refactors; `tests/e2e/` is the reference for behaviour.

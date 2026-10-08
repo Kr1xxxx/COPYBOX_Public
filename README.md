@@ -1,70 +1,84 @@
 # Clipbox
 
-Clipbox 是一个打开即用的本地加密复制盒，包含“秘密”和“话术”两个板块。
+Clipbox is a local, encrypted copy box that opens instantly. It has two sections: 话术 (snippets — canned
+customer-service replies) and a second section that is called 备注 on Windows and 秘密 on macOS.
 
-> Windows 版的第二个板块叫“备注”，是普通的文字备注（内容直接显示，没有隐藏、引用和分段）；macOS 版仍叫“秘密”，保留隐藏内容和复制引用。
+> On Windows, 备注 is plain-text notes (content shown directly, no masking, references or segments).
+> On macOS, 秘密 keeps masked content and copy-by-reference.
 
-## 接手开发
+## Working on this repository
 
-新的开发人员或 AI agent 请先读 [`AGENTS.md`](AGENTS.md)、[`docs/HANDOFF.md`](docs/HANDOFF.md)（现状和待办）和 [`docs/DECISIONS.md`](docs/DECISIONS.md)（已定的产品决定），流程见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+New developers and AI agents: read [`AGENTS.md`](AGENTS.md), then [`docs/HANDOFF.md`](docs/HANDOFF.md)
+(status and task board) and [`docs/DECISIONS.md`](docs/DECISIONS.md) (product decisions already made).
+The workflow is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-## 本地运行
+## Run locally
 
-需要 Node.js 22.18 或更高版本：
+Requires Node.js 22.18 or newer:
 
 ```bash
 npm install
 npm run dev
 ```
 
-然后访问 `http://localhost:3000/`。
+Then open `http://localhost:3000/`.
 
-## Windows 桌面应用
+## Windows desktop app
 
 ```bash
 npm run desktop:pack:win
 ```
 
-在 Windows 上运行，完成后可在 `release/` 找到 NSIS 安装包（`Clipbox Setup x.y.z.exe`）。应用会在内部启动本地服务，数据保存在 `%APPDATA%\Clipbox`。该配置尚未在真实 Windows 上跑通，首次打包请留意报错。
+Run it on Windows; the NSIS installer (`Clipbox Setup x.y.z.exe`) ends up in `release/`. The app starts its
+local server internally and stores data in `%APPDATA%\Clipbox`. This has not yet been run on a real Windows
+machine — watch for errors on the first build.
 
-## macOS 桌面应用
+## macOS desktop app (Apple silicon only)
 
 ```bash
 npm run desktop:pack
 ```
 
-完成后可在 `release/mac-arm64/Clipbox.app` 找到独立应用。它会在应用内部启动本地服务，不需要手动打开浏览器；数据保存在 Clipbox 自己的 macOS 应用数据目录中。
+The app ends up in `release/mac-arm64/Clipbox.app`. It starts its local server internally — no browser needed —
+and stores data in Clipbox's own macOS application-data folder.
 
-## 功能
+## Features
 
-- 启动免密码，使用本机随机密钥自动打开
-- PBKDF2-SHA256（310,000 次迭代）派生密钥
-- AES-256-GCM 加密全部条目
-- 提示词搜索、上下键选择、Enter 复制
-- 复制不会自动清除剪贴板
-- 启动读取异常时保留原数据和本机密钥，显示错误并允许重试，不会自动覆盖为空库
-- 新增、编辑、删除条目
-- 话术可填写“小提示”；话术内容旁有“AI 润色”和“AI 整理”，可一键撤销。在 设置 → AI 里选常用服务（OpenAI、DeepSeek、Gemini、Kimi、智谱、硅基流动、OpenRouter、本机 Ollama）自动填好地址和模型，或自己填写兼容 OpenAI chat/completions 的地址、模型、API Key，并可点“获取模型”查看账号可用的模型和两条提示词（不能为空）后即使用该接口；API Key 用系统加密只保存在本机。没有填写接口时，优先用系统自带的本机 AI；都没有时“AI 整理”用规则整理，“AI 润色”不可用
-- 常用条目置顶，并按最近复制时间自动排序
-- 左侧目录导航；在侧栏创建目录，并在新增或编辑弹窗中下拉选择目录
-- 秘密目录既可选择已有目录，也可直接手写新目录
-- 编辑后可点“保存并复制”一步完成
-- 托盘常驻（Windows 通知区域 / macOS 菜单栏），点托盘图标或菜单里的“快速搜索”打开迷你窗口，可设置复制后自动收起；设置里可选择点击关闭按钮时收到托盘还是退出，并可开机静默启动
-- 完整窗口最小 680×620；右上角迷你按钮切换到 360×440 的置顶迷你窗口，位置会被记住
-- 选中的条目在列表里直接展开完整内容，可直接复制、填写变量、编辑、移动或移到回收站；编辑、填写变量和新建目录都在原位完成，不再弹窗，移到回收站可在 6 秒内撤销
-- 目录可重命名、改颜色、删除（标准话术目录只能改颜色）；“选择”模式可批量移动或移到回收站
-- 搜索支持多个词、结果高亮、在当前目录或全部目录中搜，另有“最近使用”入口
-- 设置里可切换跟随系统 / 浅色 / 深色，管理回收站，查看版本、上次导出时间并打开数据文件夹（桌面版）
-- 没有快捷键提示和组合快捷键；搜索框里仍可用方向键选择、Enter 复制，Esc 返回
-- 桌面版失焦、最小化或隐藏时立即暂停界面动画；前台 30 秒无操作后暂停动画和光标闪烁，操作后恢复。闲置不会关闭保险库或本地命令。
-- 界面只导出话术备份；秘密没有界面导出入口
-- 话术和秘密分别使用独立备份密码加密，不在文件中携带本机密钥
-- 导入先解密校验，再按备份类型安全合并或覆盖；兼容旧版备份
-- 无账号、无服务器、无远端数据库
+- Opens without a password, using a random per-device key
+- Keys derived with PBKDF2-SHA256 (310,000 iterations); every entry encrypted with AES-256-GCM
+- Search, arrow keys to select, Enter to copy
+- Copying never clears the clipboard afterwards
+- If the vault cannot be read at startup, the original data and key are kept, an error is shown and you can
+  retry; it is never silently replaced by an empty vault
+- Add, edit and delete entries inline — no dialogs; moving to the trash can be undone for 6 seconds
+- Snippets have an optional 小提示 (tip, up to 40 characters). Next to the content are AI 润色 (polish) and
+  AI 整理 (tidy), both undoable. In Settings → AI pick a preset (OpenAI, DeepSeek, Gemini, Kimi, Zhipu GLM,
+  SiliconFlow, OpenRouter, local Ollama) or enter any OpenAI-compatible chat/completions endpoint, model and
+  API key, fetch the account's model list, and edit the two prompts (they cannot be empty). The key is encrypted
+  by the OS and stays on the device. Without an endpoint the device's built-in model is used; without that,
+  tidy falls back to rules and polish is unavailable
+- Pinned entries first; "recently used" view
+- Sidebar folders; folders can be created, renamed, recoloured, deleted and drag-sorted in the sidebar and in
+  Settings (standard snippet folders are fixed, colour only); "select" mode moves or trashes in bulk
+- Fill in [variables] before copying; the copy bar stays visible even with many variables
+- Tray icon (Windows notification area / macOS menu bar): click it or "快速搜索" to open the mini window, which
+  can hide again after copying; the close button either hides to the tray or quits; optional silent launch at login
+- Full window at least 680×620; the mini button switches to a 360×440 always-on-top mini window whose position
+  is remembered
+- Search with several words, highlighted matches, in the current folder or everywhere
+- Settings: system / light / dark theme, trash management, version, last export time, open the data folder
+- No keyboard shortcut hints or modifier shortcuts
+- Animations pause when the desktop window is unfocused, minimised or hidden, and after 30 s without input;
+  the vault and local commands keep working
+- The UI only exports the snippet backup; 秘密/备注 has no export button
+- Backups are encrypted with their own password and never contain the device key; imports are decrypted and
+  validated first, then merged or replaced; older backups are still accepted
+- No accounts, no server, no remote database
 
-## 让其他 Codex 任务直接修改话术
+## Letting other local tasks edit snippets (macOS/Linux)
 
-打开 Clipbox 后，其他任务可以直接调用本机的 `clipbox` 命令。修改会经过当前加密写入队列，立即出现在已打开的软件中，不需要导出、导入或刷新。
+While Clipbox is open, other local tasks can call the `clipbox` command. Changes go through the app's encrypted
+write queue and show up immediately — no export, import or refresh. The command server does not start on Windows.
 
 ```bash
 clipbox status
@@ -76,34 +90,46 @@ clipbox move CB-0003 --folder "成交"
 clipbox delete CB-0003 --confirm
 ```
 
-秘密卡片可复制稳定引用，而不会把秘密明文放进剪贴板。将引用交给其他本机任务后，可按精确引用读取：
+On macOS a 秘密 card can copy a stable reference instead of the secret itself. Another local task can read
+exactly that entry:
 
 ```bash
 clipbox secret get "clipbox://secret/<ID>" --json
 ```
 
-`--json` 响应包含秘密值，调用任务应直接用于目标 API，不要在回复或日志中打印。秘密不支持列表、搜索、批量读取或通过本地命令修改。
+The `--json` response contains the secret; the calling task should pass it straight to the target API and never
+print it. Secrets cannot be listed, searched, bulk-read or modified through the command.
 
-秘密备份没有应用内按钮。用户明确要求后，协助任务可通过标准输入传递独立密码，并直接写入当前用户专属的加密文件；命令不会打印秘密或密文，也不会覆盖已有文件：
+There is no in-app button for a secrets backup. When the user explicitly asks, a helper task can pass a separate
+password on standard input and write the encrypted file for the current user; the command never prints the
+secret or ciphertext and never overwrites an existing file:
 
 ```bash
-printf '%s' '{"password":"至少八个字符的独立密码"}' | clipbox secret export --output "/目标目录/clipbox-secrets.json" --stdin --confirm
+printf '%s' '{"password":"at-least-eight-characters"}' | clipbox secret export --output "/target/clipbox-secrets.json" --stdin --confirm
 ```
 
-需要较长或带引号的内容时可通过标准输入传入 JSON：
+Longer content or content with quotes can be passed as JSON on standard input:
 
 ```bash
 printf '%s' '{"title":"报价跟进","content":"May I follow up?","folder":"跟进"}' | clipbox add --stdin
 ```
 
-所有命令都可加 `--json` 获取适合任务读取的结构化结果。话术编号固定不变；删除和秘密备份必须显式加 `--confirm`。本地接口允许通过不可猜测的精确引用读取单个秘密，但不提供秘密索引，也不能读取本机密钥。Clipbox 关闭后接口也会关闭。
+Every command accepts `--json` for structured output. Snippet numbers never change; delete and secrets export
+require `--confirm`. The local interface reads a single secret only by its unguessable exact reference; it offers
+no index of secrets and cannot read the device key. The interface closes when Clipbox quits.
 
-## 安全边界
+## Security boundaries
 
-保险库和本机解密密钥保存在 Clipbox 自己的本地应用数据中，清理应用数据前请分别备份话术和秘密。备份密码独立于本机密钥且无法找回，请妥善保存。免密启动侧重个人设备上的使用便捷性，不能防止能够读取当前 macOS 用户数据的其他程序或恶意软件，因此不建议把它作为加密货币助记词等高价值秘密的唯一存储。
+The vault and the device key that decrypts it are both stored in Clipbox's local application data, so anyone
+who can read that folder can decrypt the vault. Back up snippets and secrets separately before clearing app data.
+Backup passwords are independent of the device key and cannot be recovered. Password-free startup favours
+convenience on a personal device and does not protect against other programs or malware that can read the
+current user's data, so do not use Clipbox as the only store for high-value secrets such as wallet seed phrases.
 
-## 构建检查
+## Checks
 
 ```bash
-npm test
+npm run lint
+npm test          # unit and source tests
+npm run test:e2e  # browser end-to-end tests
 ```

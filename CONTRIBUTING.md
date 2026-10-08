@@ -1,30 +1,42 @@
-# 参与开发
+# Contributing
 
-适用于公司内的开发人员和 AI agent。先读 `AGENTS.md`。
+For company developers and AI agents. Read `AGENTS.md` first.
 
-## 开始一项工作
+## Starting a task
 
-1. `git checkout main && git pull`，从最新的 `main` 拉新分支：`feature/简短英文名` 或 `fix/简短英文名`。
-2. 读 `docs/HANDOFF.md` 和 `docs/DECISIONS.md`，确认要做的事不和已定的决定冲突。
-3. `npm install`，跑一次 `npm test` 和 `npm run test:e2e`，确认起点是绿的。
-4. 在 `docs/HANDOFF.md` 任务板上把这一项标成“进行中”。一个分支、一个 PR 只做一件事。
+1. `git checkout main && git pull`, then branch from the latest `main`: `feature/short-name` or `fix/short-name`.
+2. Read `docs/HANDOFF.md` and `docs/DECISIONS.md`; make sure the task does not contradict a decision.
+3. `npm install`, then run `npm test` and `npm run test:e2e` to confirm the starting point is green.
+4. Mark the task "In progress" on the board in `docs/HANDOFF.md`. One branch and one PR per task.
 
-## 提交
+## Commits
 
-- 一个提交只做一件事，提交信息用一句英文或中文说清楚改了什么。
-- 提交前：`npm run lint`、`npm test` 都通过；改了界面再跑 `npm run test:e2e`。
-- 不提交：真实客户数据、API Key、`.env`、`release/`、`dist/`、`.next/`。
+- One logical change per commit, with a message that says what changed.
+- Before committing: `npm run lint` and `npm test` pass; after UI changes `npm run test:e2e` passes too.
+- Never commit real customer data, API keys, `.env`, `release/`, `dist/` or `.next/`.
 
-## 开 PR
+## Pull requests
 
-- 目标分支 `main`，按 PR 模板填写：改了什么、怎么验证的、哪些没验证、需要负责人决定的事。
-- CI（GitHub Actions）会跑三项：lint + 测试、浏览器端到端测试、交接检查（改了 `app/`、`desktop/` 却没更新 `docs/HANDOFF.md` 会失败）。三项都要绿。
-- `CODEOWNERS` 会自动请负责人审。
-- **合并需要负责人同意**；不要自己合并，也不要直接推 `main`。
+- Target `main` and fill in the template: what changed, how it was verified, what was not verified, what the
+  owner needs to decide.
+- CI runs three checks: lint + tests, browser end-to-end tests, and a handoff check (fails if `app/`,
+  `desktop/` or `package.json` changed without an update to `docs/HANDOFF.md`). All three must be green.
+- **Only the owner merges.** Do not merge your own PR and never push to `main`.
 
-## 结束一项工作
+## Finishing a task
 
-- 更新 `docs/HANDOFF.md`（当前状态、任务板），在 `docs/handoff-log.md` 最上面加一条。
-- 真的验证过的功能，在 `docs/features.json` 里把对应平台改成 `true`。
-- 新的产品决定写进 `docs/DECISIONS.md`。
-- 用四段汇报：做了什么 / 没做好的地方 / 需要你做的 / 建议下一步。
+- Update `docs/HANDOFF.md` (status, task board) and add an entry at the top of `docs/handoff-log.md`.
+- For features you actually verified, set the platform to `true` in `docs/features.json`.
+- Record new product decisions in `docs/DECISIONS.md`.
+- Report to the owner in Chinese, in four parts: 做了什么 / 没做好的地方 / 需要你做的 / 建议下一步.
+
+## Repository settings (owner)
+
+Everyone pushes with the owner's GitHub account, so GitHub cannot require an approval (nobody can approve their
+own PR). Protect `main` like this instead — Settings → Rules → Rulesets → New branch ruleset, target `main`:
+
+- Require a pull request before merging (required approvals: 0).
+- Require status checks to pass: `lint + tests`, `browser end-to-end`, `handoff updated`.
+- Block force pushes and restrict deletions.
+
+If agents or developers later get their own accounts, raise required approvals to 1 so the owner must approve.

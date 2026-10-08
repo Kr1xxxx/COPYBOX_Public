@@ -1,83 +1,94 @@
-# Clipbox 开发须知
+# Clipbox — instructions for agents and developers
 
-给接手的 AI agent 和开发人员。Claude、Codex、Cursor、Copilot 等工具都会读这份文件。
-详细内容放在 `docs/`，这里只放每次都要知道的。
+Read this first. Claude reads it through `CLAUDE.md`; Codex reads it directly.
+Details live in `docs/`; this file only holds what you need every time.
 
-## 项目
+## Project
 
-本地加密的复制盒：保存“话术”（客服常用回复）和第二个板块（Windows 叫“备注”，macOS 叫“秘密”），点一下就复制。
-**Windows 优先**；macOS 只出 Apple 芯片（arm64）版。界面全中文。数据只在本机，没有服务器和账号。
+A local, encrypted copy box: it stores "snippets" (话术 — canned customer-service replies) and a second section
+(called 备注 "notes" on Windows, 秘密 "secrets" on macOS). One click copies an entry.
+**Windows first**; macOS ships Apple-silicon (arm64) only. The UI is entirely in Chinese. Data stays on the
+device: no server, no accounts.
 
-技术栈：Electron 37（`desktop/`，CommonJS）+ React 19 + vinext 1.0 beta（类 Next.js，跑在 Vite 上，`app/`）+ 手写 CSS（`app/globals.css`）+ TypeScript，Node ≥ 22.18。
+Stack: Electron 37 (`desktop/`, CommonJS) + React 19 + vinext 1.0 beta (Next-style framework on Vite, `app/`)
++ hand-written CSS (`app/globals.css`) + TypeScript, Node ≥ 22.18.
 
-## 开始工作前（每次都做）
+## Before you start (every session)
 
-1. 读 `docs/HANDOFF.md`（现状、任务板）和 `git log --oneline -20`。
-2. 读 `docs/DECISIONS.md`，确认要做的事不和已定决定冲突。
-3. 跑 `npm test` 和 `npm run test:e2e`，先确认起点是绿的；不绿就先修，或在 HANDOFF 里记下来。
-4. 在任务板上把要做的那一项标成“进行中”。一次只做一项，做完再拿下一项。
+1. Read `docs/HANDOFF.md` (status, task board) and `git log --oneline -20`.
+2. Read `docs/DECISIONS.md`; make sure the task does not contradict a decision.
+3. Run `npm test` and `npm run test:e2e` so you know the starting point is green. If it is not, fix that first
+   or record it in the handoff.
+4. Mark your task "In progress" on the task board. Work on one task at a time.
 
-## 命令
+## Commands
 
 ```bash
 npm install
-npm run dev              # 浏览器开发 http://localhost:3000
-npm run lint             # 必须通过
-npm test                 # build + 单元/源码测试 tests/*.test.mjs
-npm run test:e2e         # build + 浏览器端到端测试 tests/e2e/（Playwright，窗口 680×620）
-npm run desktop:dev      # 本机跑桌面版
-npm run desktop:pack:win # Windows 安装包，在 Windows 上跑 → release/
-npm run desktop:pack     # macOS arm64 .app，在 Mac 上跑 → release/mac-arm64/
+npm run dev              # browser dev server, http://localhost:3000
+npm run lint             # must pass
+npm test                 # build + unit/source tests (tests/*.test.mjs)
+npm run test:e2e         # build + browser end-to-end tests (tests/e2e/, Playwright, 680×620 window)
+npm run desktop:dev      # run the desktop app locally
+npm run desktop:pack:win # Windows NSIS installer, run on Windows → release/
+npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 ```
 
-## 结构
+## Structure
 
-| 位置 | 内容 |
+| Path | What it is |
 | --- | --- |
-| `app/page.tsx` | 主界面（列表、编辑、填变量、设置、迷你窗口），约 2500 行，先搜索再改 |
-| `app/clipbox-core.ts` | 纯函数（目录、搜索、批量、`tidyText`），新逻辑优先放这里并写单元测试 |
-| `app/ai-config.ts` | 用户自填 AI 接口：预设、校验、请求/响应解析 |
-| `app/globals.css` | 全部样式；平台差异用 `.platform-darwin` / `.desktop-app:not(.platform-darwin)` |
-| `desktop/main.cjs` | 主进程：窗口、托盘、开机启动、IPC |
-| `desktop/preload.cjs` | `window.clipboxDesktop` 桥，页面只能通过它碰系统 |
-| `desktop/ai.cjs` | AI Key 用系统加密（safeStorage）保存 |
-| `tests/*.test.mjs` | node:test；不少是对源码的正则断言 |
-| `tests/e2e/` | 浏览器端到端测试，`helpers.mjs` 里有导入示例数据、模拟 Windows/Mac |
-| `docs/features.json` | 功能验证清单（浏览器 / Windows / Mac 是否真的验证过） |
-| `docs/samples/` | 模拟话术表格；测试只用这里的数据 |
-| `docs/archive/` | 以前的计划文档，**已过时，不要照着做** |
+| `app/page.tsx` | Main UI (list, inline editor, fill-in variables, settings, mini window); ~2500 lines, search before editing |
+| `app/clipbox-core.ts` | Pure functions (folders, search, bulk actions, `tidyText`); put new logic here, with unit tests |
+| `app/ai-config.ts` | User-configured AI endpoint: presets, validation, request/response parsing |
+| `app/globals.css` | All styles; platform differences via `.platform-darwin` / `.desktop-app:not(.platform-darwin)` |
+| `desktop/main.cjs` | Main process: windows, tray, launch at login, IPC |
+| `desktop/preload.cjs` | The `window.clipboxDesktop` bridge — the only way the page reaches the OS |
+| `desktop/ai.cjs` | Stores the AI key with OS encryption (safeStorage) |
+| `tests/*.test.mjs` | node:test; many are regex assertions on source text |
+| `tests/e2e/` | Browser end-to-end tests; `helpers.mjs` seeds sample data and fakes Windows/macOS |
+| `docs/features.json` | Feature verification list (verified in browser / on Windows / on Mac) |
+| `docs/samples/` | Mock snippet spreadsheet — the only data to test with |
+| `docs/archive/` | Old plans. **Out of date — do not follow them.** |
 
-## 平台差异
+## Platform differences
 
-- `window.clipboxDesktop.platform === "darwin"` → “秘密”（隐藏内容、复制引用、分段）；其他平台 → “备注”，纯文字（`PLAIN_NOTES`）。
-- Mac：隐藏标题栏 + 红黄绿按钮；Windows：系统原生边框、托盘、`--hidden` 静默开机启动。
-- 命令行自动化只在 macOS/Linux 启动。
+- `window.clipboxDesktop.platform === "darwin"` → 秘密 (masked content, copy reference, split segments);
+  any other platform → 备注, plain text (`PLAIN_NOTES`).
+- macOS: hidden title bar with traffic lights. Windows: native frame, tray, silent launch at login (`--hidden`).
+- The command-line automation server only starts on macOS/Linux.
 
-## 边界
+## Boundaries
 
-**一定要做**
-- 提交前 `npm run lint`、`npm test` 通过；改了界面再跑 `npm run test:e2e`，并在浏览器里亲眼看一遍。
-- 新功能配测试；能做端到端的写进 `tests/e2e/`。
-- 用户看得到的文字一律中文、简短、不用技术词。
-- 在 `docs/features.json` 里只把**真的走过一遍**的平台改成 `true`。
+**Always**
+- Pass `npm run lint` and `npm test` before committing; after UI changes also run `npm run test:e2e` and look at
+  the page yourself.
+- Add tests with every feature; put user-visible behaviour in `tests/e2e/`.
+- Write user-visible text in short, plain Chinese without technical terms.
+- In `docs/features.json`, set a platform to `true` only after you actually walked through the steps there.
 
-**先问负责人**
-- 推翻或修改 `docs/DECISIONS.md` 里的任何决定。
-- 加新依赖、改加密格式或存储键名（`clipbox.vault.v1` 等）—— 改错会让用户数据打不开，必须带迁移和测试。
-- 合并到 `main`、发布新版本。
+**Ask the owner first**
+- Changing or reversing anything in `docs/DECISIONS.md`.
+- Adding a dependency, or changing the encryption format or storage keys (`clipbox.vault.v1`, …) — a mistake
+  locks users out of their data, so it needs a migration and tests.
+- Merging to `main` or releasing a version.
 
-**绝不**
-- 直接推 `main`，或自己合并 PR —— 合并由负责人决定。
-- 提交真实客户数据、API Key、`.env` —— 测试数据用 `docs/samples/`。
-- 为了让测试变绿去删测试或放宽断言 —— 先弄清楚是代码错还是测试过时，测试过时要在 PR 里说明。
-- 改 `saveItem`、`submit`、`openVault` 等函数名 —— `tests/helpers/page-harness.mjs` 按名字提取它们。
-- 加任何快捷键或“自动清除剪贴板” —— 负责人已明确不要。
+**Never**
+- Push to `main` or merge a PR yourself — everyone shares the owner's GitHub account, so this rule is the only
+  thing that keeps `main` reviewed. The owner clicks merge.
+- Commit real customer data, API keys or `.env` files — use `docs/samples/`.
+- Delete or loosen a test just to make it pass — find out whether the code or the test is wrong, and say so in the PR.
+- Rename `saveItem`, `submit`, `openVault` and similar — `tests/helpers/page-harness.mjs` extracts them by name.
+- Add keyboard shortcuts or "auto-clear clipboard" — the owner explicitly rejected both (D-005, D-006).
 
-## 结束工作时
+## When you finish
 
-1. 更新 `docs/HANDOFF.md`：当前状态、任务板，在 `docs/handoff-log.md` 最上面加一条。
-2. 新决定写进 `docs/DECISIONS.md`；验证过的功能更新 `docs/features.json`。
-3. 小步提交、推分支、开 PR（按模板填）。CI 会检查：改了 `app/`、`desktop/` 却没改 `docs/HANDOFF.md` 会失败。
-4. 用中文四段汇报：**做了什么 / 没做好的地方 / 需要你做的 / 建议下一步**。能做的就做完，不留成注意事项。
+1. Update `docs/HANDOFF.md` (status, task board) and add an entry at the top of `docs/handoff-log.md`.
+2. Record new decisions in `docs/DECISIONS.md`; update `docs/features.json` for what you verified.
+3. Commit in small steps, push your branch, open a PR using the template. CI fails if `app/`, `desktop/` or
+   `package.json` changed but `docs/HANDOFF.md` did not.
+4. Report to the owner **in Chinese**, in four parts: 做了什么 (what was done) / 没做好的地方 (what is not done well)
+   / 需要你做的 (what the owner needs to do) / 建议下一步 (recommended next step). Finish everything that can be
+   finished instead of leaving it as a caveat.
 
-这份文件保持在 150 行以内。只有当 agent 反复犯同一个错时才加规则；过时的内容直接删。
+Keep this file under 150 lines. Add a rule only after an agent repeats the same mistake; delete stale rules.

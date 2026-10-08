@@ -3,12 +3,12 @@ import { seedSnippets } from "./helpers.mjs";
 
 test.beforeEach(async ({ page }) => { await seedSnippets(page); });
 
-test("导入示例表格后有 34 条话术，侧栏有标准目录", async ({ page }) => {
+test("importing the sample sheet gives 34 snippets and the standard folders", async ({ page }) => {
   await expect(page.locator(".native-row")).toHaveCount(34);
   await expect(page.locator(".sidebar")).toContainText("询盘接待");
 });
 
-test("切换话术时旧卡片慢慢收起，而不是瞬间消失", async ({ page }) => {
+test("switching entries folds the old card away gradually instead of removing it at once", async ({ page }) => {
   await page.locator(".native-row .row-main").nth(1).click();
   await page.waitForTimeout(500);
   await page.evaluate(() => {
@@ -33,7 +33,7 @@ test("切换话术时旧卡片慢慢收起，而不是瞬间消失", async ({ pa
   expect(clip).toBe("padding-box");
 });
 
-test("变量很多时复制按钮仍在窗口内", async ({ page }) => {
+test("with many variables the copy bar stays inside the window", async ({ page }) => {
   const rows = page.locator(".native-row .row-main");
   for (let i = 0; i < 12; i += 1) {
     await rows.nth(i).click();
@@ -55,7 +55,7 @@ test("变量很多时复制按钮仍在窗口内", async ({ page }) => {
   expect(box.bar).toBeLessThanOrEqual(box.list + 1);
 });
 
-test("界面上没有任何快捷键提示，Ctrl+K / Ctrl+E 不起作用", async ({ page }) => {
+test("no keyboard shortcut hints anywhere and Ctrl+E does nothing", async ({ page }) => {
   await expect(page.locator("kbd")).toHaveCount(0);
   await page.keyboard.press("Control+e");
   await page.waitForTimeout(200);
@@ -66,7 +66,7 @@ test("界面上没有任何快捷键提示，Ctrl+K / Ctrl+E 不起作用", asyn
   await expect(page.locator(".native-row.selected")).toHaveCount(1);
 });
 
-test("话术编辑里的字段叫“小提示”", async ({ page }) => {
+test("the snippet note field is called 小提示", async ({ page }) => {
   await page.getByRole("button", { name: /新增/ }).first().click();
   await page.locator(".inline-editor input").first().fill("测试话术");
   await page.locator(".inline-editor textarea").first().fill("Hello there");

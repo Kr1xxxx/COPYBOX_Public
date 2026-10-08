@@ -33,9 +33,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      # The e2e suite only exists once the new UI (PR #1) is merged; skip it before that.
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npm ci
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npx playwright install --with-deps chromium
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npm run test:e2e
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

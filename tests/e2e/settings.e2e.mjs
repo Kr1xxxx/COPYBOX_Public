@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await page.waitForSelector(".settings-dialog");
 });
 
-test("设置里可以拖动目录排序，标准目录不能拖", async ({ page }) => {
+test("folders can be drag-sorted in Settings; standard folders cannot", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   const group = dialog.locator(".settings-folder-group").nth(1);
   for (const name of ["甲", "乙", "丙"]) {
@@ -31,7 +31,7 @@ test("设置里可以拖动目录排序，标准目录不能拖", async ({ page 
   await expect(dialog.locator(".settings-folder", { hasText: "询盘接待" }).locator("button.settings-folder-grip")).toHaveCount(0);
 });
 
-test("AI 设置：提示词为空不能保存，预设会填好地址和模型", async ({ page }) => {
+test("AI settings: empty prompts cannot be saved; presets fill URL and model", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   await dialog.locator("#set-ai").scrollIntoViewIfNeeded();
   const save = dialog.getByRole("button", { name: "保存", exact: true });
