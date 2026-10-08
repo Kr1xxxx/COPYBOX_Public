@@ -14,7 +14,7 @@
   nothing verified on real Windows or Mac hardware.
 
 Merging (D-011): small PRs merge themselves when CI is green; big ones are labelled `needs-owner` and wait for the
-owner to write 合并. PR #1 (new UI) and PR #2 (these docs) are both big.
+owner to write 合并. PR #2 (handoff docs + merge policy) is merged; PR #1 (new UI) is big and waits.
 
 ## Task board
 
