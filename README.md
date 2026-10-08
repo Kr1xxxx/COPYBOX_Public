@@ -4,6 +4,10 @@ Clipbox 是一个打开即用的本地加密复制盒，包含“秘密”和“
 
 > Windows 版的第二个板块叫“备注”，是普通的文字备注（内容直接显示，没有隐藏、引用和分段）；macOS 版仍叫“秘密”，保留隐藏内容和复制引用。
 
+## 接手开发
+
+新的开发人员或 AI agent 请先读 [`AGENTS.md`](AGENTS.md)、[`docs/HANDOFF.md`](docs/HANDOFF.md)（现状和待办）和 [`docs/DECISIONS.md`](docs/DECISIONS.md)（已定的产品决定），流程见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+
 ## 本地运行
 
 需要 Node.js 22.18 或更高版本：
