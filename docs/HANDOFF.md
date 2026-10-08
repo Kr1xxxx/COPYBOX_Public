@@ -9,7 +9,7 @@
 - **`main` still has the old UI.** The new UI ("H") is on branch `ui-redesign-h`, PR #1, waiting for the owner
   to test on Windows. Start UI work from `ui-redesign-h` until PR #1 is merged; `npm run test:e2e`, `app/ai-config.ts`
   and `tests/e2e/` only exist there.
-- On `ui-redesign-h`: lint passes, `npm test` 169/169, `npm run test:e2e` 9/9, GitHub CI green.
+- On `ui-redesign-h` (synced with `main` 2026-10-08): lint passes, `npm test` 176/176, `npm run test:e2e` 9/9.
 - Decisions: `docs/DECISIONS.md`. Verification status: `docs/features.json` — only verified in a browser so far;
   nothing verified on real Windows or Mac hardware.
 
