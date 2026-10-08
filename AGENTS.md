@@ -71,11 +71,10 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 - Changing or reversing anything in `docs/DECISIONS.md`.
 - Adding a dependency, or changing the encryption format or storage keys (`clipbox.vault.v1`, …) — a mistake
   locks users out of their data, so it needs a migration and tests.
-- Merging to `main` or releasing a version.
+- Releasing a version.
 
 **Never**
-- Push to `main` or merge a PR yourself — everyone shares the owner's GitHub account, so this rule is the only
-  thing that keeps `main` reviewed. The owner clicks merge.
+- Push to `main`, or merge a PR labelled `needs-owner` before the owner says so (see "Merging").
 - Commit real customer data, API keys or `.env` files — use `docs/samples/`.
 - Delete or loosen a test just to make it pass — find out whether the code or the test is wrong, and say so in the PR.
 - Rename `saveItem`, `submit`, `openVault` and similar — `tests/helpers/page-harness.mjs` extracts them by name.
@@ -90,5 +89,20 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 4. Report to the owner **in Chinese**, in four parts: 做了什么 (what was done) / 没做好的地方 (what is not done well)
    / 需要你做的 (what the owner needs to do) / 建议下一步 (recommended next step). Finish everything that can be
    finished instead of leaving it as a caveat.
+
+## Merging (D-011)
+
+The owner never uses the GitHub website; all work goes through agents. CI decides how each PR merges:
+
+- **Small** — merges by itself once every check is green: wording, styling, bug fixes, tests and docs, with at most
+  300 changed lines in `app/` (tests and docs do not count).
+- **Big** — CI labels it `needs-owner` and stops: anything under `desktop/`, dependencies, CI and scripts, the
+  rulebook (`AGENTS.md`, `CONTRIBUTING.md`, `docs/DECISIONS.md`), data storage or encryption, deleted app files,
+  weakened tests, more than 300 lines of app code.
+- New or removed features and layout changes cannot be detected from files: **add the `major` label yourself** when
+  you open such a PR (`gh pr edit <n> --add-label major`), right away, before CI finishes.
+- A `needs-owner` PR is merged only after the owner writes 合并 (merge) in the conversation about that PR. Then merge
+  it with `gh api -X PUT repos/Kr1xxxx/Clipbox/pulls/<n>/merge -f merge_method=merge` and log it.
+- Tell the owner in Chinese which PRs merged by themselves and which are waiting.
 
 Keep this file under 150 lines. Add a rule only after an agent repeats the same mistake; delete stale rules.
