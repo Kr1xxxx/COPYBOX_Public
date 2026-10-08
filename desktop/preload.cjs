@@ -50,4 +50,10 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
     ipcRenderer.send("clipbox:automation-response", { requestId, response });
   },
   automationReady: () => ipcRenderer.send("clipbox:automation-ready"),
+  setWindowMode: (mode) => ipcRenderer.send("clipbox:set-window-mode", mode === "mini" ? "mini" : "full"),
+  onWindowMode: (callback) => {
+    const listener = (_event, mode) => callback(mode === "mini" ? "mini" : "full");
+    ipcRenderer.on("clipbox:window-mode", listener);
+    return () => ipcRenderer.removeListener("clipbox:window-mode", listener);
+  },
 });

@@ -422,3 +422,17 @@ test("waits for modal teardown before resolving a disconnected opener fallback",
   assert.equal(resolvePostCommitFocusTarget({ trigger: removedOpener }, false, false, searchFallback), searchFallback);
   assert.equal(resolvePostCommitFocusTarget({ trigger: connectedOpener }, false, false, searchFallback), connectedOpener);
 });
+
+test("the trash view lists trashed entries from every folder", () => {
+  const items = [
+    { id: "a", label: "A", secret: "a", note: "", color: "", kind: "snippet", folder: "售后争议", deletedAt: 5, createdAt: 1, updatedAt: 1 },
+    { id: "b", label: "B", secret: "b", note: "", color: "", kind: "snippet", folder: "", deletedAt: 6, createdAt: 1, updatedAt: 1 },
+    { id: "c", label: "C", secret: "c", note: "", color: "", kind: "snippet", folder: "售后争议", createdAt: 1, updatedAt: 1 },
+  ];
+  const trashed = core.selectItemsByTrashState(items, "snippet", "trash");
+  assert.deepEqual(trashed.filter((item) => core.itemMatchesActiveFolder(item, "trash")).map((item) => item.id), ["a", "b"]);
+  assert.equal(core.itemMatchesActiveFolder(items[2], "folder:售后争议"), true);
+  assert.equal(core.itemMatchesActiveFolder(items[2], "folder:询盘接待"), false);
+  assert.equal(core.itemMatchesActiveFolder(items[1], "uncategorized"), true);
+  assert.equal(core.itemMatchesActiveFolder({ ...items[2], pinned: true }, "pinned"), true);
+});

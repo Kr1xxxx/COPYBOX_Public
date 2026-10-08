@@ -1,8 +1,9 @@
 const fs = require("node:fs");
 
 const DEFAULT_WINDOW_BOUNDS = Object.freeze({ width: 680, height: 620 });
-const MIN_WINDOW_WIDTH = 500;
-const MIN_WINDOW_HEIGHT = 520;
+const MIN_WINDOW_WIDTH = 680;
+const MIN_WINDOW_HEIGHT = 620;
+const MINI_WINDOW_SIZE = Object.freeze({ width: 360, height: 440 });
 const MAX_WINDOW_SIZE = 10000;
 const MIN_VISIBLE_EDGE = 80;
 
@@ -73,8 +74,45 @@ function createWindowStateStore({ filePath, getWorkAreas }) {
   };
 }
 
+function normalizeMiniWindowPosition(position, workAreas) {
+  if (!position || !isFiniteNumber(position.x) || !isFiniteNumber(position.y)) return null;
+  const bounds = { x: Math.round(position.x), y: Math.round(position.y), ...MINI_WINDOW_SIZE };
+  if (!Array.isArray(workAreas) || !workAreas.some((workArea) => intersectsWorkArea(bounds, workArea))) return null;
+  return { x: bounds.x, y: bounds.y };
+}
+
+// The mini window has a fixed size, so only its position is remembered.
+function createMiniWindowStore({ filePath, getWorkAreas }) {
+  return {
+    load() {
+      try {
+        return normalizeMiniWindowPosition(JSON.parse(fs.readFileSync(filePath, "utf8")), getWorkAreas());
+      } catch {
+        return null;
+      }
+    },
+    save(position) {
+      try {
+        const normalized = normalizeMiniWindowPosition(position, getWorkAreas());
+        if (!normalized) return false;
+        const temporaryPath = `${filePath}.tmp-${process.pid}`;
+        fs.writeFileSync(temporaryPath, `${JSON.stringify(normalized)}\n`, "utf8");
+        fs.renameSync(temporaryPath, filePath);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 module.exports = {
   DEFAULT_WINDOW_BOUNDS,
+  MINI_WINDOW_SIZE,
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+  createMiniWindowStore,
   createWindowStateStore,
+  normalizeMiniWindowPosition,
   normalizeWindowBounds,
 };

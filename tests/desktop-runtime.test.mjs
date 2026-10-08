@@ -24,3 +24,18 @@ test("restores and persists normal window bounds across desktop restarts", () =>
   assert.match(source, /windowStateStore\.save\(mainWindow\.getNormalBounds\(\)\)/);
   assert.match(source, /saveWindowBounds\(\);\s+quitting = true;/);
 });
+
+test("keeps the full window at least 680×620 and switches to a fixed, floating mini window", () => {
+  const source = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+
+  assert.match(source, /minWidth: MIN_WINDOW_WIDTH,\s+minHeight: MIN_WINDOW_HEIGHT,/);
+  assert.match(source, /mainWindow\.setBounds\(\{ \.\.\.position, \.\.\.MINI_WINDOW_SIZE \}\)/);
+  assert.match(source, /mainWindow\.setResizable\(false\)/);
+  assert.match(source, /mainWindow\.setAlwaysOnTop\(true, "floating"\)/);
+  assert.match(source, /mainWindow\.setMinimumSize\(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT\)/);
+  assert.match(source, /if \(quickMode && miniAutoHide\) setTimeout/);
+  assert.match(source, /mainWindow\.webContents !== event\.sender\) return;/);
+  assert.match(preload, /setWindowMode: \(mode\) => ipcRenderer\.send\("clipbox:set-window-mode"/);
+  assert.match(preload, /ipcRenderer\.on\("clipbox:window-mode", listener\)/);
+});

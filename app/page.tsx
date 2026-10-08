@@ -19,6 +19,7 @@ import {
   DEFAULT_ITEM_KIND,
   EMPTY_FOLDER_REGISTRY,
   homeShortcutAction,
+  itemMatchesActiveFolder,
   limitChars,
   mergeImportedVaultData,
   modalInteractionState,
@@ -41,7 +42,6 @@ import {
   type ItemKind,
   type SecretItem,
   synchronizeVaultData,
-  toggleItemKind,
   type VaultData,
   vaultDataForBackupScope,
   moveItemToTrash,
@@ -90,6 +90,7 @@ type BackupMode = "export" | "import";
 type CopyLanguage = "en" | "zh";
 type SnippetCopyRequest = { item: SecretItem; language: CopyLanguage };
 type DeleteRequest = { item: SecretItem; permanent: boolean };
+type WindowMode = "full" | "mini";
 
 declare global {
   interface Window {
@@ -102,6 +103,8 @@ declare global {
       onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
       respondAutomationCommand: (requestId: string, response: unknown) => void;
       automationReady: () => void;
+      setWindowMode?: (mode: WindowMode) => void;
+      onWindowMode?: (callback: (mode: WindowMode) => void) => () => void;
     };
   }
 }
@@ -133,6 +136,40 @@ function localSummary(value: string) {
   const clause = text.split(/[。！？!?；;\n]/).find((part) => part.trim()) || text;
   if (Array.from(clause).every((char) => char.charCodeAt(0) <= 127)) return limitChars(clause.split(/\s+/).slice(0, 3).join(" "));
   return limitChars(clause.replace(/[，,：:“”"'（）()]/g, ""));
+}
+
+const ICON_PATHS: Record<string, React.ReactNode> = {
+  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  mini: <><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><rect x="4" y="13" width="8" height="7" rx="1.5" /></>,
+  restore: <><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5" /><path d="M15 4h5v5M20 4l-7 7" /></>,
+  grid: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M4 10h16" /></>,
+  star: <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" />,
+  trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />,
+  settings: <><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
+  copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></>,
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
+  more: <><circle cx="5" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="19" cy="12" r="1.4" fill="currentColor" /></>,
+  eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
+  lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
+  shield: <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3z" />,
+  chevron: <path d="m6 9 6 6 6-6" />,
+};
+
+function Icon({ name, filled = false, className }: { name: keyof typeof ICON_PATHS; filled?: boolean; className?: string }) {
+  return (
+    <svg className={`icon${className ? ` ${className}` : ""}`} width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
+
+function SnippetContent({ text }: { text: string }) {
+  const parts = text.split(/(\[[^\]]+\])/g);
+  return <>{parts.map((part, index) => /^\[[^\]]+\]$/.test(part)
+    ? <mark key={index} className="snippet-variable">{part}</mark>
+    : <span key={index}>{part}</span>)}</>;
 }
 
 function SnippetTitle({ label }: { label: string }) {
@@ -270,6 +307,9 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [startupError, setStartupError] = useState("");
   const [appVersion, setAppVersion] = useState("");
+  const [windowMode, setWindowMode] = useState<WindowMode>("full");
+  const [revealedId, setRevealedId] = useState("");
+  const [rowMenuId, setRowMenuId] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const spreadsheetFileRef = useRef<HTMLInputElement>(null);
@@ -311,7 +351,7 @@ export default function Home() {
       const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
       if (!raw) {
         const nextDeviceKey = storedDeviceKey || createDeviceKey();
-        const data: VaultData = { items: [], folders: EMPTY_FOLDER_REGISTRY, nextSnippetNumber: 1 };
+        const data: VaultData = synchronizeVaultData([], EMPTY_FOLDER_REGISTRY, 1);
         const envelope = await encryptVault(data, nextDeviceKey);
         localStorage.setItem(DEVICE_KEY, nextDeviceKey);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
@@ -347,6 +387,10 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => window.clipboxDesktop?.onWindowMode?.((mode) => {
+    setWindowMode(mode === "mini" ? "mini" : "full");
+  }), []);
+
   const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
   const categoryColors = useMemo(() => buildCategoryColorMap(activeFolders), [activeFolders]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
@@ -356,12 +400,7 @@ export default function Home() {
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const kindItems = selectItemsByTrashState(items, activeKind, activeFolder === "trash" ? "trash" : "active");
-    const scoped = kindItems.filter((item) => {
-      if (activeFolder === "all") return true;
-      if (activeFolder === "pinned") return Boolean(item.pinned);
-      if (activeFolder === "uncategorized") return !item.folder?.trim();
-      return item.folder === activeFolder.slice(7);
-    });
+    const scoped = kindItems.filter((item) => itemMatchesActiveFolder(item, activeFolder));
     const productMatched = activeKind === "snippet" && activeFolder !== "trash"
       ? scoped.filter((item) => matchesSnippetProduct(item, productFilter))
       : scoped;
@@ -457,7 +496,7 @@ export default function Home() {
     try {
       await persistQueueRef.current.catch(() => undefined);
       const opened = await readLocalEncryptedVault();
-      const nextActiveFolder = resolveRefreshedFolder(opened.data.folders[activeKind], activeFolder);
+      const nextActiveFolder = resolveRefreshedActiveFolder(activeKind, opened.data.folders[activeKind], activeFolder);
       if (window.clipboxDesktop?.relaunch) {
         localStorage.setItem(REFRESH_CONTEXT_KEY, JSON.stringify({
           activeKind,
@@ -524,16 +563,19 @@ export default function Home() {
       }
       if (action === "add") {
         event.preventDefault();
+        if (windowMode === "mini") { setWindowMode("full"); window.clipboxDesktop?.setWindowMode?.("full"); }
         openEditor(null);
       }
       if (action === "edit" && activeFolder !== "trash" && filtered[safeSelected]) {
         event.preventDefault();
+        if (windowMode === "mini") { setWindowMode("full"); window.clipboxDesktop?.setWindowMode?.("full"); }
         openEditor(filtered[safeSelected]);
       }
       if (event.key === "Escape" && !modalOpen && !auxiliaryDialogOpen) {
         setQuery("");
         setMenuOpen(false);
         setProductMenuOpen(false);
+        setRowMenuId("");
         searchRef.current?.blur();
       }
     };
@@ -548,7 +590,7 @@ export default function Home() {
       window.removeEventListener("keydown", shortcut);
       removeDesktopListener?.();
     };
-  }, [loading, modalOpen, auxiliaryDialogOpen, folderDialogKind, backupMode, homeShortcutsEnabled, filtered, safeSelected, activeFolder]);
+  }, [loading, modalOpen, auxiliaryDialogOpen, folderDialogKind, backupMode, homeShortcutsEnabled, filtered, safeSelected, activeFolder, windowMode]);
 
   const readVault = useCallback((): VaultData => ({
     items: itemsRef.current,
@@ -745,8 +787,60 @@ export default function Home() {
   }
 
   function togglePinned(item: SecretItem) {
-    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) })).catch(() => setToast("置顶保存失败，请重试"));
+    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) })).catch(() => setToast("收藏保存失败，请重试"));
   }
+
+  function switchKind(kind: ItemKind) {
+    if (kind === activeKind) return;
+    setActiveKind(kind);
+    setActiveFolder("all");
+    setProductFilter("全部产品");
+    setQuery("");
+    setSelected(0);
+    setRowMenuId("");
+    setRevealedId("");
+  }
+
+  function selectFolder(folder: string) {
+    setActiveFolder(folder);
+    if (folder === "trash") setProductFilter("全部产品");
+    setSelected(0);
+    setRowMenuId("");
+    setRevealedId("");
+  }
+
+  function selectRow(index: number) {
+    setSelected(index);
+    setRowMenuId("");
+    setRevealedId("");
+  }
+
+  function requestWindowMode(mode: WindowMode) {
+    setWindowMode(mode);
+    setMenuOpen(false);
+    setProductMenuOpen(false);
+    setRowMenuId("");
+    setRevealedId("");
+    if (mode === "mini" && activeFolder === "trash") setActiveFolder("all");
+    window.clipboxDesktop?.setWindowMode?.(mode);
+    window.setTimeout(() => searchRef.current?.focus(), 60);
+  }
+
+  async function moveItemToFolder(item: SecretItem, folder: string) {
+    setRowMenuId("");
+    try {
+      await persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, folder, updatedAt: timestampNow() } : value) }));
+      setToast(folder ? `已移动到「${folder}」` : "已移到未分类");
+      window.setTimeout(() => setToast(""), 2000);
+    } catch {
+      setToast("移动失败，条目保持原位");
+      window.setTimeout(() => setToast(""), 2400);
+    }
+  }
+
+  useEffect(() => {
+    document.querySelector(`[data-row-index="${safeSelected}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [safeSelected, windowMode, activeFolder, activeKind]);
 
   async function exportVault(password: string) {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current };
@@ -848,89 +942,202 @@ export default function Home() {
   if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipbox 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipbox…</span></main>;
 
+  const isMini = windowMode === "mini";
+  const sectionTitle = activeFolder === "all"
+    ? (activeKind === "snippet" ? "全部话术" : "全部秘密")
+    : activeFolder === "pinned" ? "收藏"
+      : activeFolder === "trash" ? "回收站"
+        : activeFolder === "uncategorized" ? "未分类"
+          : activeFolder.slice(7);
+  const searchPlaceholder = activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? "搜索秘密标题" : "搜索标题、编号或内容";
+  const kindSwitch = (
+    <div className={`kind-switch ${isMini ? "compact" : ""}`} role="group" aria-label="内容板块">
+      {(["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={activeKind === kind ? "active" : ""} aria-pressed={activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : "秘密"}</button>)}
+    </div>
+  );
+  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (activeKind === "secret" ? "搜索秘密" : "搜索话术") : searchPlaceholder} />;
+  const emptyState = (
+    <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : "这个目录还是空的"}</strong><span>{query ? "换个词搜索试试" : activeFolder === "trash" ? "删除的内容会加密保留在这里" : activeFolder === "pinned" ? "点条目右侧的星标添加收藏" : isMini ? "回到完整窗口添加第一条" : "点右上角的「新增」添加第一条"}</span></div>
+  );
+
   return (
-    <main className="desktop-stage">
-      <section className={`native-window ${backgroundInert ? "editing" : ""}`} inert={backgroundInert}>
-        <header className="native-titlebar">
-          <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
-          <strong>Clipbox</strong>
-        </header>
+    <main className={`desktop-stage ${isMini ? "mini-stage" : ""}`}>
+      <section className={`app-shell ${isMini ? "mini" : "full"} ${backgroundInert ? "editing" : ""}`} inert={backgroundInert}>
+        {isMini ? <>
+          <header className="mini-top drag-region">
+            <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
+            {kindSwitch}
+            <button type="button" className="icon-button" onClick={() => requestWindowMode("full")} aria-label="恢复完整窗口" title="恢复完整窗口"><Icon name="restore" /></button>
+          </header>
+          <div className="mini-search">
+            <div className="native-search">
+              <Icon name="search" className="search-glyph" />
+              {searchInput}
+              <label className="mini-folder">
+                <span className="sr-only">目录</span>
+                <select value={activeFolder} onChange={(event) => selectFolder(event.target.value)}>
+                  <option value="all">全部</option>
+                  <option value="pinned">收藏</option>
+                  {activeFolders.map((folder) => <option key={folder} value={`folder:${folder}`}>{folder}</option>)}
+                  {activeKind === "secret" && <option value="uncategorized">未分类</option>}
+                </select>
+                <Icon name="chevron" />
+              </label>
+            </div>
+          </div>
+          <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
+            {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
+              const isSelected = safeSelected === index;
+              return (
+                <article key={item.id} data-row-index={index} className={`native-row mini-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""}`}>
+                  <button type="button" className="row-main" onClick={() => { setSelected(index); void copy(item); }} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`}>
+                    <i className="row-dot" aria-hidden="true" style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} />
+                    <span className="row-copy">
+                      <strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong>
+                      {activeKind === "snippet" && <small className="snippet-preview" lang="en">{item.secret}</small>}
+                    </span>
+                    {item.pinned && <Icon name="star" filled className="row-star" />}
+                    {copiedId === item.id ? <span className="mini-copied">已复制</span> : isSelected && <kbd className="enter-key">↵</kbd>}
+                  </button>
+                  {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
+                </article>
+              );
+            })}
+          </div>
+          <footer className="status-bar">
+            <span><kbd>↵</kbd>复制</span>
+            <span><kbd>⌘E</kbd>编辑</span>
+            <span className="spacer" />
+            <span>{filtered.length} 条</span>
+          </footer>
+        </> : <>
+          <aside className="sidebar" aria-label="目录">
+            <div className="sidebar-top drag-region"><div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div></div>
+            {kindSwitch}
+            <nav className="nav-list" aria-label="快捷入口">
+              {directoryShortcuts.map((shortcut) => <button key={shortcut.id} type="button" className={`nav-item ${activeFolder === shortcut.id ? "active" : ""}`} onClick={() => selectFolder(shortcut.id)}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{shortcut.count}</b></button>)}
+            </nav>
+            <div className="nav-heading">
+              <span>目录</span>
+              <button ref={folderCreateButtonRef} type="button" onClick={() => setFolderDialogKind(activeKind)} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
+            </div>
+            <div className="nav-scroll directory-list">
+              {activeKind === "snippet" ? activeFolders.map((folder) => <div key={folder} className={`directory-row fixed ${activeFolder === `folder:${folder}` ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder(`folder:${folder}`)} title={folder}><span className="nav-icon"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} /></span><span className="nav-label">{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button></div>) : <>
+                {activeFolders.map((folder) => <div key={folder} data-sort-scope="folder" data-sort-id={folder} className={`directory-row ${activeFolder === `folder:${folder}` ? "active" : ""} ${folderReorder.draggingId === folder ? "dragging" : ""} ${folderReorder.overId === folder && folderReorder.draggingId !== folder ? "drag-over" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder(`folder:${folder}`)} title={folder}><span className="nav-icon"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} /></span><span className="nav-label">{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button><button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序，或按 Option 加方向键" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)} onKeyDown={(event) => handleFolderSortKey(event, folder)}><span aria-hidden="true">⠿</span></button></div>)}
+                <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>
+              </>}
+            </div>
+            <div className="nav-footer">
+              <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length > 0 && <b>{trashedKindItems.length}</b>}</button>
+              <div className="menu-wrap sidebar-menu-wrap">
+                <button type="button" className={`nav-item ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
+                {menuOpen && <div className="dropdown" role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setBackupMode("export"); setMenuOpen(false); }}>导出话术备份</button>
+                  <button type="button" role="menuitem" onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}>导入备份</button>
+                  <button type="button" role="menuitem" onClick={() => { spreadsheetFileRef.current?.click(); setMenuOpen(false); }}>导入话术表格</button>
+                  <button type="button" role="menuitem" className={`refresh-button ${refreshing ? "refreshing" : ""}`} onClick={() => { setMenuOpen(false); void refreshLocalVault(); }} disabled={refreshing}><span aria-hidden="true">↻</span>{refreshing ? "正在重新加载…" : "重新加载"}</button>
+                  <div className="settings-version">{appVersion ? `版本 v${appVersion}` : "开发版本"}</div>
+                </div>}
+              </div>
+              <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
+              <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
+            </div>
+          </aside>
 
-        <div className="vault-view view-enter">
-            <div className="workspace-body">
-              <aside className="directory-sidebar" aria-label="目录">
-                <div className="directory-scroll">
-                  <div className="home-switch" aria-label="内容板块">
-                    <button type="button" className="active" aria-label={`切换到${activeKind === "snippet" ? "秘密" : "话术"}`} onClick={() => { setActiveKind(toggleItemKind(activeKind)); setActiveFolder("all"); setProductFilter("全部产品"); setQuery(""); setSelected(0); }}>{activeKind === "snippet" ? "话术" : "秘密"} <span>{activeKindItems.length}</span></button>
+          <section className="content-panel">
+            <header className="toolbar drag-region">
+              <div className="native-search">
+                <Icon name="search" className="search-glyph" />
+                {searchInput}
+                <kbd>⌘K</kbd>
+              </div>
+              {canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+              <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
+            </header>
+            <div className="section-head">
+              <h1>{sectionTitle}</h1>
+              <span className="section-count">{filtered.length}</span>
+              <span className="spacer" />
+              {activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
+                <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
+                {productMenuOpen && <div className="product-filter-menu" role="menu">
+                  {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
+                </div>}
+              </div>}
+              {activeKind === "secret" && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
+            </div>
+            <div key={`${activeKind}:${activeFolder}`} className="native-list list-switch">
+              {filtered.length === 0 ? emptyState : activeFolder === "trash" ? filtered.map((item, index) => (
+                <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
+                  <span className="trash-row-icon" aria-hidden="true"><Icon name="trash" /></span>
+                  <div className="row-main trash-row-main">
+                    <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong><small>{item.folder || "未分类"}</small></span>
                   </div>
-                  <div className="directory-heading">
-                    <p className="directory-label">目录</p>
-                    <button ref={folderCreateButtonRef} type="button" onClick={() => setFolderDialogKind(activeKind)} aria-label="新建目录">＋</button>
-                  </div>
-                  <nav className="directory-list">
-                    {directoryShortcuts.map((shortcut) => <button key={shortcut.id} className={activeFolder === shortcut.id ? "active" : ""} onClick={() => { setActiveFolder(shortcut.id); setSelected(0); }}><span className={shortcut.id === "pinned" ? "directory-name" : undefined}>{shortcut.id === "pinned" && <i className="favorite-directory-icon" aria-hidden="true">★</i>}{shortcut.label}</span><b>{shortcut.count}</b></button>)}
-                    {activeKind === "snippet" ? activeFolders.map((folder) => <div key={folder} className={`directory-row fixed ${activeFolder === `folder:${folder}` ? "active" : ""}`}><button className="directory-main" onClick={() => { setActiveFolder(`folder:${folder}`); setSelected(0); }} title={folder}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button></div>) : <>
-                      {activeFolders.map((folder) => <div key={folder} data-sort-scope="folder" data-sort-id={folder} className={`directory-row ${activeFolder === `folder:${folder}` ? "active" : ""} ${folderReorder.draggingId === folder ? "dragging" : ""} ${folderReorder.overId === folder && folderReorder.draggingId !== folder ? "drag-over" : ""}`}><button className="directory-main" onClick={() => { setActiveFolder(`folder:${folder}`); setSelected(0); }} title={folder}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button><button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序，或按 Option 加方向键" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)} onKeyDown={(event) => handleFolderSortKey(event, folder)}><span aria-hidden="true">⠿</span></button></div>)}
-                      <button className={activeFolder === "uncategorized" ? "active" : ""} onClick={() => { setActiveFolder("uncategorized"); setSelected(0); }}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: UNCATEGORIZED_COLOR }} />未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button>
-                    </>}
-                    <button className={`trash-directory ${activeFolder === "trash" ? "active" : ""}`} onClick={() => { setActiveFolder("trash"); setProductFilter("全部产品"); setSelected(0); }}><span className="directory-name"><i className="trash-directory-icon" aria-hidden="true" />回收站</span><b>{trashedKindItems.length}</b></button>
-                  </nav>
-                </div>
-                <div className="sidebar-settings">
-                  <div className="menu-wrap sidebar-menu-wrap">
-                    <button className={`sidebar-setting-button ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)} aria-label="设置"><i aria-hidden="true">⚙︎</i><span>设置</span></button>
-                    {menuOpen && <div className="dropdown"><button onClick={() => { setBackupMode("export"); setMenuOpen(false); }}>导出话术备份</button><button onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}>导入备份</button><button onClick={() => { spreadsheetFileRef.current?.click(); setMenuOpen(false); }}>导入话术表格</button><div className="settings-version">{appVersion ? `版本 v${appVersion}` : "开发版本"}</div></div>}
-                  </div>
-                  <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
-                  <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
-                </div>
-              </aside>
-
-              <section className="content-panel">
-                <div className="native-search">
-                  <span className="search-icon" aria-hidden="true" />
-                  <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); }} onKeyDown={handleSearchKey} placeholder={activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? "搜索秘密关键词" : "搜索编号、标题、中英文内容"} />
-                  <button type="button" className={`refresh-button ${refreshing ? "refreshing" : ""}`} onClick={() => void refreshLocalVault()} disabled={refreshing} aria-label="重新加载本地数据和软件"><span aria-hidden="true">↻</span><b>{refreshing ? "刷新中" : "刷新"}</b></button>
-                  {activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
-                    <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter === "全部产品" ? "产品" : productFilter}<span>⌄</span></button>
-                    {productMenuOpen && <div className="product-filter-menu" role="menu">
-                      {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
-                    </div>}
-                  </div>}
-                </div>
-                <div className="native-divider" />
-                <div key={`${activeKind}:${activeFolder}`} className="native-list list-switch">
-                  {filtered.length === 0 ? (
-                    <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : "这个目录还是空的"}</strong><span>{query ? "换个词搜索试试" : activeFolder === "trash" ? "删除的内容会加密保留在这里" : activeFolder === "pinned" ? "点击卡片右侧的 ☆ 添加收藏" : "点右下角的 ＋ 添加第一条"}</span></div>
-                  ) : activeFolder === "trash" ? filtered.map((item, index) => (
-                    <article key={item.id} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`} style={{ animationDelay: `${index * 45}ms` }} onMouseEnter={() => setSelected(index)}>
-                      <span className="trash-row-icon" aria-hidden="true" />
-                      <div className="row-main trash-row-main">
-                        <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong><small>{item.folder || "未分类"}</small></span>
-                      </div>
-                      <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
-                      <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
-                    </article>
-                  )) : filtered.map((item, index) => (
-                    <article key={item.id} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${hasOptionalSnippetPreparation(item) ? "has-preparation" : ""} ${item.pinned ? "pinned" : ""} ${safeSelected === index ? "selected" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`} style={{ animationDelay: `${index * 45}ms` }} onMouseEnter={() => setSelected(index)} onDoubleClick={() => void copy(item)}>
-                      <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "拖动排序，或按 Option 加方向键" : "清除搜索后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)} onKeyDown={(event) => handleCardSortKey(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>
-                      <button className="row-main" onClick={() => openEditor(item)} aria-label={`编辑 ${item.label}`}>
-                        <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong>{activeKind === "snippet" ? <><small className="snippet-summary">{item.summary || "未填写中文总结"}</small><small className="snippet-preview" lang="en">{item.secret}</small></> : <small>{item.folder || "未分类"}</small>}</span>
+                  <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
+                  <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
+                </article>
+              )) : filtered.map((item, index) => {
+                const isSelected = safeSelected === index;
+                const isSnippet = activeKind === "snippet";
+                const revealed = revealedId === item.id;
+                const moveTargets = [...activeFolders, ...(isSnippet ? [] : [""])].filter((folder) => folder !== (item.folder || ""));
+                return (
+                  <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
+                    <div className="row-line">
+                      <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "拖动排序，或按 Option 加方向键" : "清除搜索和筛选后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)} onKeyDown={(event) => handleCardSortKey(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>
+                      <button type="button" className="row-main" onClick={() => selectRow(index)} onDoubleClick={() => void copy(item)} aria-expanded={isSelected} aria-label={`${isSelected ? "已展开" : "展开"} ${item.label}`}>
+                        <span className="row-copy">
+                          <span className="row-title">
+                            <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} /> : item.label}</strong>
+                            {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{item.snippetNumber}</b>}
+                          </span>
+                          {!isSelected && isSnippet && <small className="snippet-preview" lang="en">{item.secret}</small>}
+                        </span>
                       </button>
-                      <button className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消置顶" : "置顶"} ${item.label}`} title={item.pinned ? "取消置顶" : "置顶"}>{item.pinned ? "★" : "☆"}</button>
-                      {hasOptionalSnippetPreparation(item) && <button className="native-prepare" onClick={() => prepareCopy(item)} aria-label={`填写变量后复制 ${item.label}`} title="填写变量后复制">填</button>}
-                      {activeKind === "secret" && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
+                      {!isSnippet && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
                       <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
+                      <button type="button" className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消收藏" : "收藏"} ${item.label}`} aria-pressed={Boolean(item.pinned)} title={item.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(item.pinned)} /></button>
                       {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
                       {copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
-                    </article>
-                  ))}
-                </div>
-              </section>
+                    </div>
+                    {isSelected && <div className="row-detail">
+                      {isSnippet ? <p className="row-content" lang="en"><SnippetContent text={item.secret} /></p> : (
+                        <div className={`row-secret ${revealed ? "revealed" : ""}`}>
+                          <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
+                          <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
+                        </div>
+                      )}
+                      <div className="row-actions">
+                        <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : "复制"}<kbd>↵</kbd></button>
+                        {isSnippet && hasOptionalSnippetPreparation(item) && <button type="button" className="secondary-button" onClick={() => prepareCopy(item)}>填写变量</button>}
+                        {!isSnippet && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title="只复制编号，秘密本身不会出现在聊天或日志里"><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
+                        <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
+                        <span className="spacer" />
+                        <div className="menu-wrap">
+                          <button type="button" className="icon-button" aria-label={`更多操作 ${item.label}`} aria-expanded={rowMenuId === item.id} onClick={() => setRowMenuId((value) => value === item.id ? "" : item.id)}><Icon name="more" /></button>
+                          {rowMenuId === item.id && <div className="dropdown row-menu" role="menu">
+                            {moveTargets.length > 0 && <p className="menu-label">移动到</p>}
+                            {moveTargets.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void moveItemToFolder(item, folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
+                            {moveTargets.length > 0 && <div className="menu-divider" />}
+                            <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); setDeleteRequest({ item, permanent: false }); }}>移到回收站</button>
+                          </div>}
+                        </div>
+                      </div>
+                      {!isSnippet && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，秘密本身不会出现在聊天或日志里。</p>}
+                    </div>}
+                  </article>
+                );
+              })}
             </div>
-
-            {canAddItemInFolder(activeFolder) && <button className="floating-add" onClick={() => openEditor(null)} aria-label="新增条目"><span>＋</span></button>}
-          </div>
+            <footer className="status-bar">
+              {appVersion && <span className="status-note"><Icon name="shield" />60 秒后清理剪贴板</span>}
+              <span className="spacer" />
+              <span><kbd>↑↓</kbd>选择</span>
+              <span><kbd>↵</kbd>复制</span>
+              <span><kbd>⌘E</kbd>编辑</span>
+            </footer>
+          </section>
+        </>}
       </section>
       {modalOpen && <ItemEditor kind={editing?.kind || activeKind} item={editing} folders={activeFolders} defaultFolder={activeFolder.startsWith("folder:") ? activeFolder.slice(7) : ""} onClose={closeEditor} onDelete={editing ? async () => requestTrash(editing) : undefined} onSave={saveItem} onCopy={copyTextWithExpiry} />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}

@@ -66,6 +66,14 @@ export function selectItemsByTrashState(
   return items.filter((item) => (item.kind || "secret") === kind && isTrashedItem(item) === trashed);
 }
 
+// "all" and "trash" list every entry of the selected state; folders filter by name.
+export function itemMatchesActiveFolder(item: SecretItem, activeFolder: string) {
+  if (activeFolder === "all" || activeFolder === "trash") return true;
+  if (activeFolder === "pinned") return Boolean(item.pinned);
+  if (activeFolder === "uncategorized") return !item.folder?.trim();
+  return item.folder === activeFolder.slice(7);
+}
+
 export function buildDirectoryShortcuts(items: SecretItem[], kind: ItemKind) {
   const activeItems = selectItemsByTrashState(items, kind, "active");
   return [

@@ -8,21 +8,27 @@ const path = require("node:path");
 const { createRendererCommandBridge } = require("./automation-bridge.cjs");
 const { createAutomationServer, installAutomationCli } = require("./automation-server.cjs");
 const { APP_HOST, APP_ORIGIN, APP_PORT } = require("./runtime-config.cjs");
-const { createWindowStateStore } = require("./window-state.cjs");
+const { createMiniWindowStore, createWindowStateStore, MINI_WINDOW_SIZE, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } = require("./window-state.cjs");
 
 let mainWindow;
 let serverProcess;
 let tray;
 let quitting = false;
+// quickMode means the window is showing the compact mini layout.
 let quickMode = false;
+let miniAutoHide = false;
 let normalWindowBounds;
 let saveWindowTimer;
+let saveMiniTimer;
 let windowStateStore;
+let miniWindowStore;
 let automationServer;
 let rendererCommandBridge;
 let automationRendererReady = false;
 const appOrigin = APP_ORIGIN;
 const WINDOW_STATE_SAVE_DELAY = 180;
+const FULL_TRAFFIC_LIGHTS = { x: 14, y: 19 };
+const MINI_TRAFFIC_LIGHTS = { x: 14, y: 14 };
 
 function serverEntry() {
   if (!app.isPackaged) {
@@ -169,22 +175,98 @@ function scheduleWindowBoundsSave() {
   saveWindowTimer = setTimeout(saveWindowBounds, WINDOW_STATE_SAVE_DELAY);
 }
 
+function saveMiniPosition() {
+  clearTimeout(saveMiniTimer);
+  saveMiniTimer = undefined;
+  if (!quickMode || !mainWindow || mainWindow.isDestroyed() || !miniWindowStore) return;
+  const { x, y } = mainWindow.getBounds();
+  miniWindowStore.save({ x, y });
+}
+
+function scheduleMiniPositionSave() {
+  if (!quickMode) return;
+  clearTimeout(saveMiniTimer);
+  saveMiniTimer = setTimeout(saveMiniPosition, WINDOW_STATE_SAVE_DELAY);
+}
+
+function sendWindowMode() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("clipbox:window-mode", quickMode ? "mini" : "full");
+}
+
+function setTrafficLights(position) {
+  if (typeof mainWindow?.setWindowButtonPosition === "function") mainWindow.setWindowButtonPosition(position);
+}
+
+// The mini window keeps the top-right corner of the full window, unless the
+// person has already placed it somewhere else.
+function defaultMiniPosition() {
+  const bounds = normalWindowBounds?.x === undefined ? mainWindow.getBounds() : normalWindowBounds;
+  return { x: Math.round(bounds.x + bounds.width - MINI_WINDOW_SIZE.width), y: Math.round(bounds.y) };
+}
+
+function enterMiniMode(autoHide) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (quickMode) {
+    miniAutoHide = autoHide;
+    sendWindowMode();
+    return;
+  }
+  saveWindowBounds();
+  quickMode = true;
+  miniAutoHide = autoHide;
+  if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  const position = miniWindowStore?.load() || defaultMiniPosition();
+  mainWindow.setMinimumSize(MINI_WINDOW_SIZE.width, MINI_WINDOW_SIZE.height);
+  mainWindow.setBounds({ ...position, ...MINI_WINDOW_SIZE });
+  mainWindow.setResizable(false);
+  mainWindow.setMaximizable(false);
+  mainWindow.setFullScreenable(false);
+  mainWindow.setAlwaysOnTop(true, "floating");
+  setTrafficLights(MINI_TRAFFIC_LIGHTS);
+  sendWindowMode();
+}
+
+function enterFullMode() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!quickMode) {
+    sendWindowMode();
+    return;
+  }
+  saveMiniPosition();
+  quickMode = false;
+  miniAutoHide = false;
+  mainWindow.setAlwaysOnTop(false);
+  mainWindow.setResizable(true);
+  mainWindow.setMaximizable(true);
+  mainWindow.setFullScreenable(true);
+  mainWindow.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
+  if (normalWindowBounds) mainWindow.setBounds(normalWindowBounds);
+  setTrafficLights(FULL_TRAFFIC_LIGHTS);
+  sendWindowMode();
+}
+
 function createWindow() {
   automationRendererReady = false;
   windowStateStore = createWindowStateStore({
     filePath: path.join(app.getPath("userData"), "window-state.json"),
     getWorkAreas: () => screen.getAllDisplays().map((display) => display.workArea),
   });
+  miniWindowStore = createMiniWindowStore({
+    filePath: path.join(app.getPath("userData"), "mini-window-state.json"),
+    getWorkAreas: () => screen.getAllDisplays().map((display) => display.workArea),
+  });
   normalWindowBounds = windowStateStore.load();
   mainWindow = new BrowserWindow({
     ...normalWindowBounds,
-    minWidth: 500,
-    minHeight: 520,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
     show: false,
-    backgroundColor: "#070707",
+    backgroundColor: "#faf9f5",
     title: "Clipbox",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
+    trafficLightPosition: FULL_TRAFFIC_LIGHTS,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
@@ -202,10 +284,13 @@ function createWindow() {
     void mainWindow.webContents.executeJavaScript("document.documentElement.classList.add('desktop-app')");
   });
   mainWindow.webContents.once("did-finish-load", () => mainWindow.show());
+  mainWindow.webContents.on("did-finish-load", sendWindowMode);
   mainWindow.on("move", scheduleWindowBoundsSave);
+  mainWindow.on("move", scheduleMiniPositionSave);
   mainWindow.on("resize", scheduleWindowBoundsSave);
   mainWindow.on("close", (event) => {
     saveWindowBounds();
+    saveMiniPosition();
     if (!quitting) {
       event.preventDefault();
       mainWindow.hide();
@@ -217,17 +302,12 @@ function createWindow() {
   void mainWindow.loadURL(appOrigin);
 }
 
+// ⌥ Space opens the mini window and hides it again after a copy. Other ways
+// of opening Clipbox return to the full window.
 function showWindow(asQuickSearch = false) {
   if (!mainWindow) return;
-  const wasQuickMode = quickMode;
-  if (asQuickSearch && !wasQuickMode) saveWindowBounds();
-  quickMode = asQuickSearch;
-  if (asQuickSearch) {
-    const bounds = mainWindow.getBounds();
-    mainWindow.setBounds({ ...bounds, width: Math.max(520, Math.min(bounds.width, 680)), height: Math.max(540, Math.min(bounds.height, 680)) });
-  } else if (wasQuickMode && normalWindowBounds) {
-    mainWindow.setBounds(normalWindowBounds);
-  }
+  if (asQuickSearch) enterMiniMode(true);
+  else enterFullMode();
   mainWindow.show();
   mainWindow.focus();
   mainWindow.webContents.send("clipbox:focus-search");
@@ -278,6 +358,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  saveMiniPosition();
   saveWindowBounds();
   quitting = true;
   globalShortcut.unregisterAll();
@@ -286,7 +367,13 @@ app.on("before-quit", () => {
 });
 
 ipcMain.on("clipbox:did-copy", () => {
-  if (quickMode) setTimeout(() => mainWindow?.hide(), 1200);
+  if (quickMode && miniAutoHide) setTimeout(() => mainWindow?.hide(), 1200);
+});
+
+ipcMain.on("clipbox:set-window-mode", (event, mode) => {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents !== event.sender) return;
+  if (mode === "mini") enterMiniMode(false);
+  else enterFullMode();
 });
 
 const writeClipboard = createClipboardWriter(clipboard);

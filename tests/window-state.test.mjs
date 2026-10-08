@@ -67,3 +67,38 @@ test("saves and reloads window bounds while recovering from corrupt JSON", () =>
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }
 });
+
+test("rejects stored full-window sizes below the 680×620 minimum", () => {
+  assert.deepEqual(
+    windowState.normalizeWindowBounds({ x: 100, y: 100, width: 600, height: 620 }, workAreas),
+    { width: 680, height: 620 },
+  );
+  assert.deepEqual(
+    windowState.normalizeWindowBounds({ x: 100, y: 100, width: 680, height: 600 }, workAreas),
+    { width: 680, height: 620 },
+  );
+  assert.equal(windowState.MIN_WINDOW_WIDTH, 680);
+  assert.equal(windowState.MIN_WINDOW_HEIGHT, 620);
+});
+
+test("remembers only a visible position for the fixed-size mini window", () => {
+  assert.deepEqual(windowState.MINI_WINDOW_SIZE, { width: 360, height: 440 });
+  assert.deepEqual(windowState.normalizeMiniWindowPosition({ x: 1000.4, y: 40 }, workAreas), { x: 1000, y: 40 });
+  assert.equal(windowState.normalizeMiniWindowPosition({ x: 9000, y: 9000 }, workAreas), null);
+  assert.equal(windowState.normalizeMiniWindowPosition({ x: "1", y: 40 }, workAreas), null);
+
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "clipbox-mini-state-"));
+  const filePath = path.join(temporaryDirectory, "mini-window-state.json");
+  const store = windowState.createMiniWindowStore({ filePath, getWorkAreas: () => workAreas });
+  try {
+    assert.equal(store.load(), null);
+    assert.equal(store.save({ x: 300, y: 120 }), true);
+    assert.deepEqual(store.load(), { x: 300, y: 120 });
+    assert.equal(store.save({ x: 9000, y: 9000 }), false);
+    assert.deepEqual(store.load(), { x: 300, y: 120 });
+    fs.writeFileSync(filePath, "not-json");
+    assert.equal(store.load(), null);
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
