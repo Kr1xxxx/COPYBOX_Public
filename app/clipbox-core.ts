@@ -242,6 +242,7 @@ export function tidyText(value: string) {
       .replace(/([\u3400-\u9fff\uff09\u300d\u300f\u201d\u300b])\s+(?=[\u3400-\u9fff\uff08\u300c\u300e\u201c\u300a])/g, "$1")
       .replace(/\s+([,;!?])/g, "$1")
       .replace(/\s+:(?=\s|$)/g, ":")
+      .replace(/\s+\.(?=\s|$)/g, ".")
       .replace(/\s+([\uff0c\u3002\uff01\uff1f\uff1b\uff1a\u3001\uff09\u300d\u300f\u201d\u300b])/g, "$1")
       .replace(/([\uff08\u300c\u300e\u201c\u300a])\s+/g, "$1")
       .replace(/([,;!?])(?=[A-Za-z])/g, "$1 "))

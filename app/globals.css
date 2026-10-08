@@ -590,3 +590,16 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .k-mac { display: none; }
 .platform-darwin .k-mac { display: inline; }
 .platform-darwin .k-win { display: none; }
+
+/* Scrollbars are hidden, so long text shows a soft shadow where more is hidden. */
+.row-content, .fill-panel .copy-preview p {
+  background:
+    linear-gradient(var(--content) 30%, rgba(0,0,0,0)) center top,
+    linear-gradient(rgba(0,0,0,0), var(--content) 70%) center bottom,
+    radial-gradient(farthest-side at 50% 0, rgba(0,0,0,.16), rgba(0,0,0,0)) center top,
+    radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,.16), rgba(0,0,0,0)) center bottom;
+  background-color: var(--content);
+  background-repeat: no-repeat;
+  background-size: 100% 28px, 100% 28px, 100% 9px, 100% 9px;
+  background-attachment: local, local, scroll, scroll;
+}

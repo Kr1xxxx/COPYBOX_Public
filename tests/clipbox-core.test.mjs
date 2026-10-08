@@ -349,6 +349,7 @@ test("rejects malformed or invalid application refresh context", () => {
 
 test("tidyText cleans spacing and blank lines but keeps [变量]", () => {
   assert.equal(tidyText("Hi  [name] ,thanks!We   will  follow up.\r\n\r\n\r\n\r\n 您好  ，请查收 [quote] 。 "), "Hi [name], thanks! We will follow up.\n\n您好，请查收 [quote]。");
+  assert.equal(tidyText("We will reply soon . Thanks ."), "We will reply soon. Thanks.");
   assert.equal(tidyText("你 好 世 界 {order}"), "你好世界 {order}");
   assert.equal(tidyText("https://a.com/x 10:30"), "https://a.com/x 10:30");
 });
