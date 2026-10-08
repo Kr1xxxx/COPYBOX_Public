@@ -109,7 +109,7 @@ type ThemeChoice = "system" | "light" | "dark";
 // Windows has no password-style masking or reference links: 备注 is a plain notes list.
 const PLAIN_NOTES = typeof window === "undefined" || window.clipboxDesktop?.platform !== "darwin";
 const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "秘密" : "备注";
-type CloseBehavior = "tray" | "quit";
+type CloseBehavior = "tray" | "taskbar" | "quit";
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -1105,7 +1105,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [closeBehavior, setCloseBehavior] = useState<CloseBehavior>(() => readStoredChoice<CloseBehavior>(CLOSE_BEHAVIOR_KEY, ["tray", "quit"], "tray"));
+  const [closeBehavior, setCloseBehavior] = useState<CloseBehavior>(() => readStoredChoice<CloseBehavior>(CLOSE_BEHAVIOR_KEY, ["tray", "taskbar", "quit"], "tray"));
   useEffect(() => {
     window.clipboxDesktop?.setCloseBehavior?.(closeBehavior);
     // Sent once on start; later changes go through chooseCloseBehavior.
@@ -2204,9 +2204,9 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
                 {([[false, "关"], [true, "开"]] as [boolean, string][]).map(([value, label]) => <button key={label} type="button" role="radio" aria-checked={launchAtLogin === value} className={launchAtLogin === value ? "active" : ""} onClick={() => { void window.clipboxDesktop?.setLaunchAtLogin?.(value).then(setLaunchAtLogin).catch(() => undefined); }}>{label}</button>)}
               </div>
             </div>}
-            {isDesktop && <div className="settings-row"><div><strong>点击窗口关闭按钮时</strong><small>{closeBehavior === "tray" ? "Clipbox 继续在托盘里运行，可随时呼出" : "直接退出 Clipbox"}</small></div>
+            {isDesktop && <div className="settings-row"><div><strong>点击窗口关闭按钮时</strong><small>{closeBehavior === "tray" ? "Clipbox 继续在托盘里运行，可随时呼出" : closeBehavior === "taskbar" ? "窗口缩到任务栏，点任务栏上的图标就能再打开" : "直接退出 Clipbox"}</small></div>
               <div className="settings-segment" role="radiogroup" aria-label="点击窗口关闭按钮时">
-                {([["tray", "收到托盘"], ["quit", "退出"]] as [CloseBehavior, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={closeBehavior === value} className={closeBehavior === value ? "active" : ""} onClick={() => onCloseBehavior(value)}>{label}</button>)}
+                {([["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]] as [CloseBehavior, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={closeBehavior === value} className={closeBehavior === value ? "active" : ""} onClick={() => onCloseBehavior(value)}>{label}</button>)}
               </div>
             </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>

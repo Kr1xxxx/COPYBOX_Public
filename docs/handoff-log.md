@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 7: Windows close option "缩到任务栏" (minimise instead of hide, so the taskbar button stays); a minimised window is restored by tray/second launch/Dock. Verified in unit + simulated e2e only; needs a Windows check. Next: task 6 (split page.tsx).
 - 2026-10-08 — Claude — Synced PR #1 (`ui-redesign-h`) with `main` after PR #2; no conflicts, tests green. PR #1
   waits for Windows testing and the owner's 合并.
 - 2026-10-08 — Claude — Owner said 合并: merged PR #2 (handoff docs + merge policy) into `main`. Rule kept: one
