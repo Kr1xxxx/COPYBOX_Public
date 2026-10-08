@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-export const APP_LINE_LIMIT = 300;
+export const APP_LINE_LIMIT = 350;
 
 // Files that change how the product or the process works — always the owner's call.
 const OWNER_PATHS = [

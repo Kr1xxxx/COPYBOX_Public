@@ -84,9 +84,11 @@ Statuses: Accepted / Superseded / Deprecated.
   unnecessary. The repository is private on a free plan, so GitHub's own branch protection and auto-merge are not
   available.
 - Decision: CI classifies every PR (`scripts/classify-pr.mjs`). **Small** (wording, styling, bug fixes, tests, docs;
-  at most 300 changed lines in `app/`, tests and docs not counted) merges itself once all checks pass. **Big**
+  at most 350 changed lines in `app/`, tests and docs not counted) merges itself once all checks pass. **Big**
   (anything in `desktop/`, dependencies, CI/scripts, the rulebook, storage/encryption, deleted app files, weakened
-  tests, over 300 app lines, or labelled `major` by the agent for new/removed features and layout changes) is
+  tests, over 350 app lines, or labelled `major` by the agent for new/removed features and layout changes) is
   labelled `needs-owner` and merged only after the owner writes 合并 in the conversation.
-- Consequences: agents report which PRs merged by themselves. The 300-line limit comes from this project's history:
+- Consequences: agents report which PRs merged by themselves. The owner raised the limit to 350 lines (2026-10-08); it is based on this project's history:
   real small fixes were 5–40 lines, features 100–1000+. Every merge can be reverted.
+- One change per PR — changes are not batched. Small, frequent PRs are easier to check and to revert; the only cost
+  is GitHub Actions minutes (about 5 billed minutes per CI run; the free plan includes 2,000 a month).
