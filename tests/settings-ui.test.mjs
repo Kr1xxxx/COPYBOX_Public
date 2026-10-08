@@ -3,6 +3,9 @@ import fs from "node:fs";
 import test from "node:test";
 
 const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+// The AI settings panel and the AI request code live in their own files (split out of page.tsx).
+const aiSettings = fs.readFileSync(new URL("../app/ai-settings.tsx", import.meta.url), "utf8");
+const aiClient = fs.readFileSync(new URL("../app/ai-client.ts", import.meta.url), "utf8");
 
 test("settings is a full panel covering data, security, trash, window, AI and about (no shortcut list)", () => {
   for (const heading of ["数据", "目录", "安全", "回收站", "窗口", "AI", "关于"]) assert.match(page, new RegExp(`>${heading}</h3>`));
@@ -77,18 +80,18 @@ test("on Windows the 备注 section is plain notes: no masking, reference links 
 });
 
 test("settings → AI lets people enter their own interface, key and prompts, and blocks empty prompts", () => {
-  assert.match(page, /function AiSettingsSection\(/);
-  for (const label of ["接口地址", "润色提示词", "整理提示词", "API Key", "恢复默认提示词", "保存并测试", "停用并清除"]) assert.ok(page.includes(label), label);
-  assert.match(page, /disabled=\{Boolean\(problem\) \|\| Boolean\(busy\)\}>\{busy === "save"/);
-  assert.match(page, /const problem = validateAiSettings\(form, keyReady\)/);
-  assert.match(page, /aiRequest\(\{ url, body \}\)/);
+  assert.match(aiSettings, /function AiSettingsSection\(/);
+  for (const label of ["接口地址", "润色提示词", "整理提示词", "API Key", "恢复默认提示词", "保存并测试", "停用并清除"]) assert.ok(aiSettings.includes(label), label);
+  assert.match(aiSettings, /disabled=\{Boolean\(problem\) \|\| Boolean\(busy\)\}>\{busy === "save"/);
+  assert.match(aiSettings, /const problem = validateAiSettings\(form, keyReady\)/);
+  assert.match(aiClient, /aiRequest\(\{ url, body \}\)/);
 });
 
 test("settings → AI offers common-service presets and can list the models of the account", () => {
-  assert.match(page, /AI_PRESETS\.map\(\(preset\) => <option key=\{preset\.id\}/);
-  assert.match(page, /function applyPreset\(/);
-  assert.match(page, /获取模型/);
-  assert.match(page, /list="ai-model-choices"/);
+  assert.match(aiSettings, /AI_PRESETS\.map\(\(preset\) => <option key=\{preset\.id\}/);
+  assert.match(aiSettings, /function applyPreset\(/);
+  assert.match(aiSettings, /获取模型/);
+  assert.match(aiSettings, /list="ai-model-choices"/);
 });
 
 test("no fake title-bar band, drag regions or missing fonts off Mac", () => {

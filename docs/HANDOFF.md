@@ -27,7 +27,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 3 | Merge PR #1 | Blocked | Owner | Waiting on 1 and 2 |
 | 4 | Protect the vault's device key with OS encryption (today it sits next to the data, so a copied data folder can be decrypted) | Todo | — | Changes storage — ask the owner first |
 | 5 | Backup/export for the 备注/秘密 section | Todo | — | |
-| 6 | Split `app/page.tsx` (~2500 lines) into component files | Todo | — | One piece at a time, tests green after each |
+| 6 | Split `app/page.tsx` into component files | In progress | Claude | One piece at a time, tests green after each. Done: AI client (`app/ai-client.ts`) and AI settings panel (`app/ai-settings.tsx`). Next: backup/import dialogs, settings dialog, item editor. Update the `page.tsx` row in AGENTS.md when the split is finished |
 | 7 | If opening from the tray feels awkward: show the window when the taskbar/Dock icon is clicked | Todo | — | No shortcuts (D-005) |
 
 ## Waiting on the owner
