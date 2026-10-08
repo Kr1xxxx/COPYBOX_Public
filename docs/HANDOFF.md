@@ -25,7 +25,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 1 | Windows: build the installer, walk through tray, launch at login, AI key per `docs/features.json` | Todo | Owner | Needs a Windows PC |
 | 2 | Mac (Apple silicon): build and open, check title bar and 秘密 | Todo | Owner | Needs a Mac |
 | 3 | Merge PR #1 | Blocked | Owner | Waiting on 1 and 2 |
-| 4 | Protect the vault's device key with OS encryption (today it sits next to the data, so a copied data folder can be decrypted) | Todo | — | Changes storage — ask the owner first |
+| 4 | Protect the vault's device key with OS encryption (D-012) | Done (PR open, needs Windows test) | Claude | Windows only. DPAPI cannot be tested on Linux: on a real Windows PC check first start, migration of an older vault, and a restart |
 | 5 | Backup/export for the 备注/秘密 section | Todo | — | |
 | 6 | Split `app/page.tsx` into component files | In progress | Claude | One piece at a time, tests green after each. Done: AI client (`app/ai-client.ts`) and AI settings panel (`app/ai-settings.tsx`). Next: backup/import dialogs, settings dialog, item editor. Update the `page.tsx` row in AGENTS.md when the split is finished |
 | 7 | Alternative to the tray: Windows setting "缩到任务栏" keeps the taskbar button; Dock click already reopens on Mac | Done (PR open, needs Windows test) | Claude | No shortcuts (D-005) |
@@ -34,9 +34,10 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 
 - How the company's shared snippet library reaches every employee (today each person imports a spreadsheet).
 - AI: which provider, who pays for the key, whether snippets may contain customer data.
-- Code signing and auto-update for the installers (costs money).
 
 ## Known risks
+
+- Device-key protection (D-012) has only been tested with a fake key store. If DPAPI misbehaves on real Windows the vault will not open; the old data stays untouched until the new key is saved and read back.
 
 - The product is mainly for Windows but has never run on a real Windows machine.
 - Many unit tests assert on source text and break on refactors; `tests/e2e/` is the reference for behaviour.
