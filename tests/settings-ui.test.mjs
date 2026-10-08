@@ -90,3 +90,11 @@ test("settings → AI offers common-service presets and can list the models of t
   assert.match(page, /获取模型/);
   assert.match(page, /list="ai-model-choices"/);
 });
+
+test("platform wording and chrome: Alt on Windows, Option on Mac, no fake title-bar band off Mac", () => {
+  assert.match(page, /const ALT_KEY_WORD = .*platform === "darwin" \? "Option" : "Alt"/);
+  assert.doesNotMatch(page, /按 Option 加方向键/);
+  assert.match(css, /\.desktop-app:not\(\.platform-darwin\) \.sidebar-top \.traffic-lights \{ display: none; \}/);
+  assert.match(css, /\.desktop-app:not\(\.platform-darwin\) \.drag-region \{ -webkit-app-region: no-drag; \}/);
+  assert.match(css, /--font-sans:[^;]*"Segoe UI"[^;]*"Microsoft YaHei UI"/);
+});

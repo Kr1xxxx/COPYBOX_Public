@@ -110,6 +110,7 @@ type ThemeChoice = "system" | "light" | "dark";
 // Windows shows this section as 备注; darwin keeps the original 秘密 wording.
 // Windows has no password-style masking or reference links: 备注 is a plain notes list.
 const PLAIN_NOTES = typeof window === "undefined" || window.clipboxDesktop?.platform !== "darwin";
+const ALT_KEY_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "Option" : "Alt";
 const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "秘密" : "备注";
 type CloseBehavior = "tray" | "quit";
 const DETAIL_CLOSE_MS = 220;
@@ -1491,7 +1492,7 @@ export default function Home() {
             setFolderMenuPos({ top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 270)), left: rect.left });
             setFolderMenu((value) => value === folder ? "" : folder);
           }}><Icon name="more" /></button>}
-        {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序，或按 Option 加方向键" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)} onKeyDown={(event) => handleFolderSortKey(event, folder)}><span aria-hidden="true">⠿</span></button>}
+        {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title={`拖动排序，或按 ${ALT_KEY_WORD} 加方向键`} onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)} onKeyDown={(event) => handleFolderSortKey(event, folder)}><span aria-hidden="true">⠿</span></button>}
       </div>
     );
   };
@@ -1649,7 +1650,7 @@ export default function Home() {
                     <div className="row-line">
                       {bulkMode
                         ? <button type="button" className={`row-check ${checked ? "on" : ""}`} role="checkbox" aria-checked={checked} aria-label={`选择 ${item.label}`} onClick={() => toggleBulk(item.id)}><Icon name="check" /></button>
-                        : <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "拖动排序，或按 Option 加方向键" : "清除搜索和筛选后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)} onKeyDown={(event) => handleCardSortKey(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>}
+                        : <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? `拖动排序，或按 ${ALT_KEY_WORD} 加方向键` : "清除搜索和筛选后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)} onKeyDown={(event) => handleCardSortKey(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>}
                       <button type="button" className="row-main" onClick={(event) => { if (bulkMode || event.metaKey || event.ctrlKey || event.shiftKey) { toggleBulk(item.id); return; } selectRow(index); }} onDoubleClick={() => { if (!bulkMode) void copy(item); }} aria-expanded={bulkMode ? undefined : isSelected} aria-label={bulkMode ? `选择 ${item.label}` : `${isSelected ? "已展开" : "展开"} ${item.label}`}>
                         <span className="row-copy">
                           <span className="row-title">

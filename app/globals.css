@@ -24,7 +24,7 @@
   --ring: rgba(181, 89, 58, .16);
   --optical-text-rise: -0.5px;
   --optical-glyph-rise: -1px;
-  --font-sans: "SF Pro Text", "PingFang SC", -apple-system, BlinkMacSystemFont, "Noto Sans SC", sans-serif;
+  --font-sans: "SF Pro Text", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-serif: "Songti SC", "STSong", "Noto Serif SC", Georgia, serif;
   --font-geist-sans: var(--font-sans);
   --font-geist-mono: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
@@ -669,3 +669,10 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .settings-link-button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--accent-ink); font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
 .settings-link-button:hover:not(:disabled) { text-decoration: underline; }
 .settings-link-button:disabled { opacity: .5; cursor: default; }
+
+/* Windows / Linux desktop: the system draws the title bar, so no fake traffic lights, no empty band, and no drag regions that would maximise on double-click. */
+.desktop-app:not(.platform-darwin) { --font-serif: var(--font-sans); }
+.desktop-app:not(.platform-darwin) .sidebar-top .traffic-lights { display: none; }
+.desktop-app:not(.platform-darwin) .sidebar-top { height: 14px; }
+.desktop-app:not(.platform-darwin) .mini-top { height: 36px; }
+.desktop-app:not(.platform-darwin) .drag-region { -webkit-app-region: no-drag; }
