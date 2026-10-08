@@ -281,6 +281,8 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 
 .toast { position: fixed; left: 50%; bottom: 44px; z-index: 120; display: flex; align-items: center; gap: 8px; padding: 9px 15px; border-radius: 20px; background: rgba(31,30,28,.92); color: #fff; box-shadow: 0 13px 35px rgba(31,30,28,.28); backdrop-filter: blur(12px); font-size: 12.5px; transform: translateX(-50%); animation: toast-in .25s cubic-bezier(.2,.9,.2,1) both; white-space: nowrap; }
 .toast span { color: #f3c3ad; }
+.undo-toast button { margin-left: 6px; padding: 2px 9px; border: 0; border-radius: 10px; background: rgba(255,255,255,.14); color: #f3c3ad; font: inherit; font-weight: 600; cursor: pointer; }
+.undo-toast button:hover { background: rgba(255,255,255,.24); }
 
 /* Editor and dialogs */
 /* Editor */

@@ -302,6 +302,8 @@ export default function Home() {
   const [snippetImportName, setSnippetImportName] = useState("");
   const [copyRequest, setCopyRequest] = useState<SnippetCopyRequest | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
+  const [undoTrash, setUndoTrash] = useState<SecretItem | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
   const [productFilter, setProductFilter] = useState("全部产品");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -760,7 +762,32 @@ export default function Home() {
 
   function requestTrash(item: SecretItem) {
     closeEditor();
-    setDeleteRequest({ item, permanent: false });
+    void trashNow(item);
+  }
+
+  // Moving to trash is reversible, so it happens immediately and offers an undo
+  // instead of a confirmation dialog.
+  async function trashNow(item: SecretItem) {
+    try {
+      await persist((current) => ({ ...current, items: moveItemToTrash(current.items, item.id, timestampNow()) }));
+    } catch {
+      setToast("移入回收站失败，条目保持原位");
+      window.setTimeout(() => setToast(""), 2400);
+      return;
+    }
+    setSelected(0);
+    setRevealedId("");
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setUndoTrash(item);
+    undoTimerRef.current = window.setTimeout(() => setUndoTrash(null), 6000);
+  }
+
+  async function undoTrashNow() {
+    const item = undoTrash;
+    if (!item) return;
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setUndoTrash(null);
+    await restoreItem(item);
   }
 
   async function confirmDelete() {
@@ -1119,7 +1146,7 @@ export default function Home() {
                             {moveTargets.length > 0 && <p className="menu-label">移动到</p>}
                             {moveTargets.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void moveItemToFolder(item, folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
                             {moveTargets.length > 0 && <div className="menu-divider" />}
-                            <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); setDeleteRequest({ item, permanent: false }); }}>移到回收站</button>
+                            <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); void trashNow(item); }}>移到回收站</button>
                           </div>}
                         </div>
                       </div>
@@ -1155,7 +1182,8 @@ export default function Home() {
       />}
       {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
       {copyRequest && <SnippetCopyDialog request={copyRequest} onClose={() => setCopyRequest(null)} onCopy={async (text) => { await finishCopy(copyRequest.item, text); setCopyRequest(null); }} />}
-      {toast && <div className="toast"><span>✓</span>{toast}</div>}
+      {undoTrash && <div className="toast undo-toast" role="status"><span>✓</span>已移入回收站<button type="button" onClick={() => void undoTrashNow()}>撤销</button></div>}
+      {toast && !undoTrash && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
   );
 }
