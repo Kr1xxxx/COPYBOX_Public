@@ -1514,10 +1514,6 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
   );
 }
 
-const SHORTCUTS: [string, string][] = [
-  ["⌘K", "搜索"], ["⌘N", "新增条目"], ["⌘E", "编辑当前条目"], ["↑ ↓", "选择条目"], ["↵", "复制当前条目"], ["⌥ Space", "呼出 / 隐藏迷你窗口（桌面版）"], ["Esc", "关闭面板或收起菜单"],
-];
-
 const CLI_COMMANDS: [string, string][] = [
   ["clipbox list", "列出话术"], ["clipbox get CB-0003", "读取一条"], ["clipbox add --title … --content …", "新增"],
   ["clipbox update CB-0003 --content …", "修改"], ["clipbox move CB-0003 --folder …", "移动目录"], ["clipbox delete CB-0003 --confirm", "删除"],
@@ -1594,10 +1590,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
                 {([[false, "关"], [true, "开"]] as [boolean, string][]).map(([value, label]) => <button key={label} type="button" role="radio" aria-checked={launchAtLogin === value} className={launchAtLogin === value ? "active" : ""} onClick={() => { void window.clipboxDesktop?.setLaunchAtLogin?.(value).then(setLaunchAtLogin).catch(() => undefined); }}>{label}</button>)}
               </div>
             </div>}
-            <p className="settings-note">完整窗口最小 680×620。{isDesktop ? "⌥Space 可随时呼出迷你窗口，复制后自动收起。" : "全局快捷键 ⌥Space 仅桌面版可用。"}</p>
-          </section>
-          <section aria-labelledby="set-keys"><h3 id="set-keys">快捷键</h3>
-            <dl className="settings-keys">{SHORTCUTS.map(([key, what]) => <div key={key}><dt><kbd>{key}</kbd></dt><dd>{what}</dd></div>)}</dl>
+            <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
           </section>
           <section aria-labelledby="set-cli"><h3 id="set-cli">命令行</h3>
             <p className="settings-note">打开 Clipbox 后，其他本机任务可用 <code>clipbox</code> 命令直接读写话术，修改会立即出现在窗口里。</p>
