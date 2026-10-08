@@ -60,3 +60,39 @@ jobs:
       - run: node scripts/check-handoff.mjs
         env:
           BASE_REF: origin/${{ github.base_ref }}
+
+  # D-011: small changes merge themselves once every check is green; big ones wait for the owner.
+  merge-policy:
+    name: merge policy
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [check, e2e, handoff]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Read labels now (not from the event) so a "major" label added after opening still counts.
+      - id: labels
+        run: echo "json=$(gh pr view "$PR" --json labels --jq '[.labels[].name]')" >> "$GITHUB_OUTPUT"
+      - id: size
+        run: node scripts/classify-pr.mjs
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          LABELS: ${{ steps.labels.outputs.json }}
+      - name: Small change → merge
+        if: steps.size.outputs.size == 'small'
+        run: |
+          gh pr edit "$PR" --remove-label needs-owner || true
+          gh pr edit "$PR" --add-label auto-merged
+          gh pr merge "$PR" --merge --delete-branch
+      - name: Big change → wait for the owner
+        if: steps.size.outputs.size == 'big'
+        run: |
+          gh pr edit "$PR" --add-label needs-owner
+          echo "::notice::Waiting for the owner to say 合并 (merge)."

@@ -16,7 +16,8 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-007 | Snippet note field is 小提示, max 40 characters | Accepted |
 | D-008 | AI uses an endpoint the user configures; prompts cannot be empty | Accepted |
 | D-009 | Folder rules | Accepted |
-| D-010 | Workflow: PRs only, the owner merges | Accepted |
+| D-010 | Workflow: PRs only, the owner merges | Superseded by D-011 |
+| D-011 | Small changes merge themselves; big ones wait for the owner's 合并 | Accepted |
 
 ---
 
@@ -70,10 +71,22 @@ Statuses: Accepted / Superseded / Deprecated.
   colour only. Other folders can be created, renamed, recoloured, deleted and drag-sorted in both the sidebar and
   Settings; Settings also has up/down buttons.
 
-### D-010 Workflow (2026-10-09)
+### D-010 Workflow (2026-10-09) — superseded by D-011
 - Context: agents and developers all push with the owner's GitHub account, so GitHub cannot require an approval.
 - Decision: never push to `main`; one task per PR; CI must be green; only the owner merges. Documentation is in
   English. Reports to the owner are in Chinese, in four parts: 做了什么 / 没做好的地方 / 需要你做的 / 建议下一步.
   Finish whatever can be finished.
 - Consequences: "only the owner merges" is enforced by rules and branch protection, not by GitHub approvals.
   If people get their own accounts, require 1 approval.
+
+### D-011 Merge policy (2026-10-08)
+- Context: the owner works only through agents and never opens the GitHub website; waiting on every small fix is
+  unnecessary. The repository is private on a free plan, so GitHub's own branch protection and auto-merge are not
+  available.
+- Decision: CI classifies every PR (`scripts/classify-pr.mjs`). **Small** (wording, styling, bug fixes, tests, docs;
+  at most 300 changed lines in `app/`, tests and docs not counted) merges itself once all checks pass. **Big**
+  (anything in `desktop/`, dependencies, CI/scripts, the rulebook, storage/encryption, deleted app files, weakened
+  tests, over 300 app lines, or labelled `major` by the agent for new/removed features and layout changes) is
+  labelled `needs-owner` and merged only after the owner writes 合并 in the conversation.
+- Consequences: agents report which PRs merged by themselves. The 300-line limit comes from this project's history:
+  real small fixes were 5–40 lines, features 100–1000+. Every merge can be reverted.
