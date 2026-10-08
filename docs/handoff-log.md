@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-08 — Claude — Checked the merge policy with a real small PR (this log entry): CI merged it by itself.
 - 2026-10-08 — Claude — Merge policy (D-011): `scripts/classify-pr.mjs` + CI job `merge policy` merge small PRs
   automatically and label big ones `needs-owner`; labels created in the repository. GitHub's own branch protection
   and auto-merge need GitHub Pro for a private repository, so the policy lives in CI. Next: owner says 合并 for PR #2.
