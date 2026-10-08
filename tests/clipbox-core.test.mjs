@@ -1,0 +1,424 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import * as core from "../app/clipbox-core.ts";
+
+const {
+  addFolder,
+  attemptEditorSave,
+  buildDirectoryShortcuts,
+  canAddItemInFolder,
+  canHandleHomeShortcuts,
+  combineSecretSegments,
+  DEFAULT_ITEM_KIND,
+  homeShortcutAction,
+  isTrashedItem,
+  limitChars,
+  mergeFolderRegistries,
+  mergeImportedVaultData,
+  modalInteractionState,
+  normalizeReferenceNote,
+  normalizeVaultData,
+  permanentlyDeleteTrashedItem,
+  parseRefreshContext,
+  normalizeSecretSegments,
+  resolveGeneratedSummary,
+  resolveConnectedFocusTarget,
+  resolveFocusWrapIndex,
+  resolvePostCommitFocusTarget,
+  resolveRefreshedActiveFolder,
+  resolveRefreshedFolder,
+  resolveSelectedFolder,
+  restoreTrashedItem,
+  selectItemsByTrashState,
+  splitSecretSegments,
+  synchronizeVaultData,
+  vaultDataForBackupScope,
+  moveItemToTrash,
+  toggleItemKind,
+} = core;
+
+const legacyItems = [
+  { id: "s1", label: "登录", secret: "alpha", note: "", color: "#fff", kind: "secret", folder: "工作", createdAt: 1, updatedAt: 1 },
+  { id: "t1", label: "售后", secret: "hello", note: "", color: "#fff", kind: "snippet", folder: "客服", createdAt: 1, updatedAt: 1 },
+];
+
+const standardSnippetFolders = ["询盘接待", "产品样品", "报价成交", "定制生产", "客户跟进", "物流清关", "售后争议"];
+
+test("opens snippets first and toggles between the two content kinds", () => {
+  assert.equal(DEFAULT_ITEM_KIND, "snippet");
+  assert.equal(toggleItemKind(DEFAULT_ITEM_KIND), "secret");
+  assert.equal(toggleItemKind("secret"), "snippet");
+});
+
+test("limits summaries by Unicode code point", () => {
+  assert.equal(limitChars("一二三四五六七八九十十一"), "一二三四五六七八九十");
+  assert.equal(limitChars("😀😀😀", 2), "😀😀");
+});
+
+test("normalizes an encrypted secret reference note without splitting Unicode", () => {
+  assert.equal(typeof normalizeReferenceNote, "function");
+  assert.equal(normalizeReferenceNote("  Shopify API  "), "Shopify API");
+  assert.equal(normalizeReferenceNote(`${"引".repeat(119)}😀尾`), `${"引".repeat(119)}😀`);
+});
+
+test("splits a secret at the first line break and recombines both segments without loss", () => {
+  assert.equal(typeof splitSecretSegments, "function");
+  assert.deepEqual(splitSecretSegments("账号@example.com\n密码123\n备用说明"), ["账号@example.com", "密码123\n备用说明"]);
+  assert.deepEqual(splitSecretSegments("只有一段"), ["只有一段", ""]);
+  assert.equal(combineSecretSegments(["账号@example.com", "密码123\n备用说明"]), "账号@example.com\n密码123\n备用说明");
+});
+
+test("keeps only an explicit pair of encrypted secret segments", () => {
+  assert.equal(typeof normalizeSecretSegments, "function");
+  assert.deepEqual(normalizeSecretSegments(["第一段", "第二段"]), ["第一段", "第二段"]);
+  assert.equal(normalizeSecretSegments(["只有一段"]), undefined);
+  assert.equal(normalizeSecretSegments("第一段\n第二段"), undefined);
+});
+
+test("returns an editor save error while preserving control after persistence fails", async () => {
+  assert.equal(typeof attemptEditorSave, "function");
+  assert.deepEqual(await attemptEditorSave(async () => undefined), { saved: true, error: "" });
+  assert.deepEqual(
+    await attemptEditorSave(async () => { throw new Error("disk full"); }),
+    { saved: false, error: "保存失败，当前内容仍保留，请重试" },
+  );
+});
+
+test("normalizes a legacy item array into per-kind encrypted folders", () => {
+  const normalized = normalizeVaultData(legacyItems);
+  assert.deepEqual(normalized, {
+    items: [legacyItems[0], { ...legacyItems[1], snippetNumber: "CB-0001" }],
+    folders: { secret: ["工作"], snippet: [...standardSnippetFolders, "客服"] },
+    nextSnippetNumber: 2,
+  });
+});
+
+test("normalizes and deduplicates a new vault payload", () => {
+  const data = normalizeVaultData({
+    items: legacyItems,
+    folders: { secret: [" 工作 ", "工作", "个人"], snippet: ["客服"] },
+  });
+  assert.deepEqual(data.folders, { secret: ["工作", "个人"], snippet: [...standardSnippetFolders, "客服"] });
+});
+
+test("moves both content kinds to an encrypted trash view without losing their metadata", () => {
+  const snippet = { ...legacyItems[1], folder: "售后争议", snippetNumber: "CB-0042", pinned: true };
+  const source = [legacyItems[0], snippet];
+  const withSecretTrashed = moveItemToTrash(source, "s1", 2_000);
+  const withBothTrashed = moveItemToTrash(withSecretTrashed, "t1", 3_000);
+
+  assert.equal(isTrashedItem(withBothTrashed[0]), true);
+  assert.equal(isTrashedItem(withBothTrashed[1]), true);
+  assert.equal(source[0].deletedAt, undefined);
+  assert.deepEqual(
+    selectItemsByTrashState(withBothTrashed, "secret", "trash").map((item) => item.id),
+    ["s1"],
+  );
+  assert.deepEqual(
+    selectItemsByTrashState(withBothTrashed, "snippet", "active").map((item) => item.id),
+    [],
+  );
+  assert.equal(withBothTrashed[1].folder, "售后争议");
+  assert.equal(withBothTrashed[1].snippetNumber, "CB-0042");
+  assert.equal(withBothTrashed[1].pinned, true);
+});
+
+test("restores a trashed item exactly and permanently deletes only trashed items", () => {
+  const trashed = moveItemToTrash(
+    [{ ...legacyItems[1], folder: "客户跟进", snippetNumber: "CB-0016" }],
+    "t1",
+    4_000,
+  );
+  const restored = restoreTrashedItem(trashed, "t1");
+
+  assert.equal(restored[0].deletedAt, undefined);
+  assert.equal(restored[0].folder, "客户跟进");
+  assert.equal(restored[0].snippetNumber, "CB-0016");
+  assert.deepEqual(permanentlyDeleteTrashedItem(restored, "t1").map((item) => item.id), ["t1"]);
+  assert.deepEqual(permanentlyDeleteTrashedItem(trashed, "t1"), []);
+});
+
+test("drops retired snippet priority while preserving legacy structured metadata", () => {
+  const structured = {
+    ...legacyItems[1],
+    snippetMeta: {
+      stage: "客服",
+      scene: "售后",
+      action: "回复",
+      productGroups: ["通用"],
+      rawProduct: "通用",
+      chineseText: "您好",
+      placeholders: [],
+      requiredInputs: [],
+      usageNote: "保持礼貌",
+      priority: "高",
+      requiresVerification: false,
+      sourceRow: 2,
+    },
+  };
+
+  const normalized = normalizeVaultData({ items: [structured], folders: { secret: [], snippet: ["客服"] } });
+  assert.equal("priority" in normalized.items[0].snippetMeta, false);
+  assert.equal(normalized.items[0].snippetMeta.action, "回复");
+  assert.equal(normalized.items[0].snippetMeta.usageNote, "保持礼貌");
+});
+
+test("creates custom snippet directories after the fixed standard directories", () => {
+  const first = addFolder({ secret: [], snippet: standardSnippetFolders }, "snippet", " VIP 客户 ");
+  assert.deepEqual(first, {
+    folders: { secret: [], snippet: [...standardSnippetFolders, "VIP 客户"] },
+    folder: "VIP 客户",
+    created: true,
+  });
+  assert.equal(addFolder(first.folders, "snippet", "VIP 客户").created, false);
+  assert.equal(addFolder(first.folders, "snippet", "   ").folder, "");
+});
+
+test("merges folder registries without crossing content kinds", () => {
+  assert.deepEqual(
+    mergeFolderRegistries(
+      { secret: ["工作"], snippet: ["售后"] },
+      { secret: ["个人"], snippet: ["售后", "物流"] },
+    ),
+    { secret: ["工作", "个人"], snippet: [...standardSnippetFolders, "售后", "物流"] },
+  );
+});
+
+test("merges imported items and per-kind folders without duplicate content", () => {
+  const current = normalizeVaultData(legacyItems);
+  const incoming = normalizeVaultData({
+    items: [legacyItems[1], { ...legacyItems[0], id: "s1", label: "新秘密", secret: "beta", folder: "个人" }],
+    folders: { secret: ["空秘密"], snippet: ["空话术"] },
+  });
+  const result = mergeImportedVaultData(current, incoming, "merge", () => "fresh-id");
+  assert.equal(result.importedCount, 1);
+  assert.deepEqual(result.data.items.map((item) => item.id), ["fresh-id", "s1", "t1"]);
+  assert.deepEqual(result.data.folders, {
+    secret: ["工作", "空秘密", "个人"],
+    snippet: [...standardSnippetFolders, "客服", "空话术"],
+  });
+});
+
+test("replace import discards current items and directories", () => {
+  const incoming = normalizeVaultData({ items: [], folders: { secret: ["空秘密"], snippet: ["空话术"] } });
+  const result = mergeImportedVaultData(normalizeVaultData(legacyItems), incoming, "replace", () => "unused");
+  assert.deepEqual(result, { data: incoming, importedCount: 0 });
+});
+
+test("builds separate backup payloads without crossing secrets and snippets", () => {
+  const current = normalizeVaultData({
+    items: legacyItems,
+    folders: { secret: ["工作", "个人"], snippet: ["询盘接待"] },
+    nextSnippetNumber: 9,
+  });
+
+  const snippets = vaultDataForBackupScope(current, "snippet");
+  const secrets = vaultDataForBackupScope(current, "secret");
+
+  assert.deepEqual(snippets.items.map((item) => item.id), ["t1"]);
+  assert.equal(JSON.stringify(snippets).includes("alpha"), false);
+  assert.deepEqual(snippets.folders, { secret: [], snippet: [...standardSnippetFolders, "客服"] });
+  assert.equal(snippets.nextSnippetNumber, 10);
+
+  assert.deepEqual(secrets.items.map((item) => item.id), ["s1"]);
+  assert.equal(JSON.stringify(secrets).includes("hello"), false);
+  assert.deepEqual(secrets.folders, { secret: ["工作", "个人"], snippet: standardSnippetFolders });
+  assert.equal(secrets.nextSnippetNumber, 1);
+});
+
+test("scoped replace import changes only the matching content kind", () => {
+  const current = normalizeVaultData({
+    items: legacyItems,
+    folders: { secret: ["工作"], snippet: ["询盘接待"] },
+    nextSnippetNumber: 8,
+  });
+  const incomingSnippet = normalizeVaultData({
+    items: [{ ...legacyItems[1], id: "t2", label: "新话术", secret: "new copy" }],
+    folders: { secret: [], snippet: ["产品样品"] },
+    nextSnippetNumber: 12,
+  });
+  const incomingSecret = normalizeVaultData({
+    items: [{ ...legacyItems[0], id: "s2", label: "新秘密", secret: "new secret", folder: "个人" }],
+    folders: { secret: ["个人"], snippet: [] },
+  });
+
+  const snippetsReplaced = mergeImportedVaultData(current, incomingSnippet, "replace", () => "unused", "snippet").data;
+  assert.deepEqual(snippetsReplaced.items.map((item) => item.id), ["t2", "s1"]);
+  assert.equal(snippetsReplaced.items.find((item) => item.id === "s1").secret, "alpha");
+  assert.deepEqual(snippetsReplaced.folders.secret, ["工作"]);
+  assert.equal(snippetsReplaced.nextSnippetNumber, 13);
+
+  const secretsReplaced = mergeImportedVaultData(current, incomingSecret, "replace", () => "unused", "secret").data;
+  assert.deepEqual(secretsReplaced.items.map((item) => item.id), ["s2", "t1"]);
+  assert.equal(secretsReplaced.items.find((item) => item.id === "t1").secret, "hello");
+  assert.deepEqual(secretsReplaced.folders.secret, ["个人"]);
+  assert.equal(secretsReplaced.nextSnippetNumber, 9);
+});
+
+test("synchronizes a newly saved folder while retaining empty scoped directories", () => {
+  const data = synchronizeVaultData(
+    [{ ...legacyItems[0], id: "s2", label: "账单", folder: "财务" }],
+    { secret: ["空秘密"], snippet: ["空话术"] },
+  );
+  assert.deepEqual(data.folders, {
+    secret: ["空秘密", "财务"],
+    snippet: [...standardSnippetFolders, "空话术"],
+  });
+});
+
+test("keeps supplied and item-derived custom snippet directories through normalization", () => {
+  const data = normalizeVaultData({
+    items: [{ ...legacyItems[1], folder: "重点客户" }],
+    folders: { secret: [], snippet: ["产品样品", "团队专用"] },
+  });
+
+  assert.deepEqual(data.folders.snippet, [...standardSnippetFolders, "团队专用", "重点客户"]);
+});
+
+test("builds all and favorite shortcuts for the active content kind", () => {
+  assert.equal(typeof buildDirectoryShortcuts, "function");
+  const items = [
+    { ...legacyItems[0], pinned: true },
+    { ...legacyItems[1], pinned: true },
+    { ...legacyItems[1], id: "t2", pinned: false },
+    { ...legacyItems[1], id: "trash", pinned: true, deletedAt: 10 },
+  ];
+
+  assert.deepEqual(buildDirectoryShortcuts(items, "snippet"), [
+    { id: "all", label: "全部话术", count: 2 },
+    { id: "pinned", label: "收藏", count: 1 },
+  ]);
+  assert.deepEqual(buildDirectoryShortcuts(items, "secret"), [
+    { id: "all", label: "全部", count: 1 },
+    { id: "pinned", label: "收藏", count: 1 },
+  ]);
+});
+
+test("keeps favorites after refresh and hides add controls in virtual directories", () => {
+  assert.equal(typeof resolveRefreshedActiveFolder, "function");
+  assert.equal(resolveRefreshedActiveFolder("snippet", standardSnippetFolders, "pinned"), "pinned");
+  assert.equal(resolveRefreshedActiveFolder("snippet", standardSnippetFolders, "uncategorized"), "all");
+  assert.equal(resolveRefreshedActiveFolder("secret", [], "uncategorized"), "uncategorized");
+  assert.equal(canAddItemInFolder("all"), true);
+  assert.equal(canAddItemInFolder("folder:团队专用"), true);
+  assert.equal(canAddItemInFolder("pinned"), false);
+  assert.equal(canAddItemInFolder("trash"), false);
+});
+
+test("accepts only an available directory selection", () => {
+  assert.equal(resolveSelectedFolder(["售后", "物流"], "物流"), "物流");
+  assert.equal(resolveSelectedFolder(["售后", "物流"], "不存在"), "");
+});
+
+test("accepts and normalizes a handwritten directory when custom folders are enabled", () => {
+  assert.equal(resolveSelectedFolder(["工作"], "  新项目  ", true), "新项目");
+  assert.equal(resolveSelectedFolder(["工作"], "一".repeat(31), true), "一".repeat(30));
+  assert.equal(resolveSelectedFolder(["工作"], "   ", true), "");
+});
+
+test("preserves valid special and custom folders after refresh", () => {
+  assert.equal(resolveRefreshedFolder(["报价", "售后"], "folder:售后"), "folder:售后");
+  assert.equal(resolveRefreshedFolder(["报价"], "folder:已删除"), "all");
+  assert.equal(resolveRefreshedFolder([], "pinned"), "pinned");
+  assert.equal(resolveRefreshedFolder([], "uncategorized"), "uncategorized");
+  assert.equal(resolveRefreshedFolder([], "trash"), "trash");
+});
+
+test("parses the one-shot view context used by an application refresh", () => {
+  assert.deepEqual(parseRefreshContext(JSON.stringify({
+    activeKind: "snippet",
+    activeFolder: "folder:开发",
+    productFilter: "镊子",
+    query: "tweezer",
+  })), {
+    activeKind: "snippet",
+    activeFolder: "folder:开发",
+    productFilter: "镊子",
+    query: "tweezer",
+  });
+});
+
+test("rejects malformed or invalid application refresh context", () => {
+  assert.equal(parseRefreshContext("{"), null);
+  assert.equal(parseRefreshContext(JSON.stringify({ activeKind: "account", activeFolder: "all", productFilter: "全部产品", query: "" })), null);
+  assert.equal(parseRefreshContext(JSON.stringify({ activeKind: "secret", activeFolder: 7, productFilter: "全部产品", query: "" })), null);
+});
+
+test("accepts a generated summary only while source and summary are unchanged", () => {
+  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "旧总结", "一二三四五六七八九十十一"), {
+    summary: "一二三四五六七八九十",
+    stale: false,
+    error: "",
+  });
+  assert.deepEqual(resolveGeneratedSummary("原内容", "新内容", "旧总结", "旧总结", "新总结"), {
+    summary: "旧总结",
+    stale: true,
+    error: "",
+  });
+  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "旧总结", ""), {
+    summary: "旧总结",
+    stale: false,
+    error: "暂时无法生成，请手动填写",
+  });
+});
+
+test("preserves a manual summary edited while generation is running", () => {
+  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "手动新总结", "AI 总结"), {
+    summary: "手动新总结",
+    stale: true,
+    error: "",
+  });
+});
+
+test("disables Home shortcuts while any modal owns interaction", () => {
+  assert.equal(canHandleHomeShortcuts(false, false, false), true);
+  assert.equal(canHandleHomeShortcuts(true, false, false), false);
+  assert.equal(canHandleHomeShortcuts(false, true, false), false);
+  assert.equal(canHandleHomeShortcuts(false, false, true), false);
+});
+
+test("rejects every wired Home command and desktop search while an editor owns interaction", () => {
+  for (const [key, expected] of [["k", "search"], ["n", "add"], ["e", "edit"]]) {
+    assert.equal(homeShortcutAction(key, true, false, false, false), expected);
+    assert.equal(homeShortcutAction(key, true, true, false, false), null);
+  }
+  assert.equal(homeShortcutAction("k", true, false, true, false), null);
+  assert.equal(homeShortcutAction("k", true, false, false, true), null);
+  assert.equal(homeShortcutAction("k", false, false, false, false), null);
+});
+
+test("keeps the background inert for every modal state", () => {
+  assert.deepEqual(modalInteractionState(false, false, false), { homeShortcutsEnabled: true, backgroundInert: false });
+  assert.deepEqual(modalInteractionState(true, false, false), { homeShortcutsEnabled: false, backgroundInert: true });
+  assert.deepEqual(modalInteractionState(false, true, false), { homeShortcutsEnabled: false, backgroundInert: true });
+  assert.deepEqual(modalInteractionState(false, false, true), { homeShortcutsEnabled: false, backgroundInert: true });
+});
+
+test("wraps modal focus in both directions and recovers from outside focus", () => {
+  assert.equal(resolveFocusWrapIndex(0, 6, true), 5);
+  assert.equal(resolveFocusWrapIndex(5, 6, false), 0);
+  assert.equal(resolveFocusWrapIndex(-1, 6, false), 0);
+  assert.equal(resolveFocusWrapIndex(-1, 6, true), 5);
+  assert.equal(resolveFocusWrapIndex(2, 6, false), -1);
+});
+
+test("restores focus only to a connected opener, then a connected logical fallback", () => {
+  const connectedOpener = { id: "row", isConnected: true };
+  const removedOpener = { id: "deleted-row", isConnected: false };
+  const searchFallback = { id: "search", isConnected: true };
+  assert.equal(resolveConnectedFocusTarget(connectedOpener, searchFallback), connectedOpener);
+  assert.equal(resolveConnectedFocusTarget(removedOpener, searchFallback), searchFallback);
+  assert.equal(resolveConnectedFocusTarget(removedOpener, { id: "gone", isConnected: false }), null);
+});
+
+test("waits for modal teardown before resolving a disconnected opener fallback", () => {
+  const connectedOpener = { id: "row", isConnected: true };
+  const removedOpener = { id: "deleted-row", isConnected: false };
+  const searchFallback = { id: "search", isConnected: true };
+
+  assert.equal(resolvePostCommitFocusTarget({ trigger: removedOpener }, true, true, searchFallback), null);
+  assert.equal(resolvePostCommitFocusTarget({ trigger: removedOpener }, false, true, searchFallback), null);
+  assert.equal(resolvePostCommitFocusTarget(null, false, false, searchFallback), null);
+  assert.equal(resolvePostCommitFocusTarget({ trigger: removedOpener }, false, false, searchFallback), searchFallback);
+  assert.equal(resolvePostCommitFocusTarget({ trigger: connectedOpener }, false, false, searchFallback), connectedOpener);
+});
