@@ -1,6 +1,6 @@
 "use client";
 
-import { CLIPBOARD_CLEAR_OPTIONS, copyTextWithExpiry, readClipboardClearSeconds, writeClipboardClearSeconds } from "./clipboard";
+import { copyTextWithExpiry } from "./clipboard";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
 import {
@@ -106,6 +106,8 @@ type DeleteRequest = { item: SecretItem; permanent: boolean };
 type WindowMode = "full" | "mini";
 type MiniHidePolicy = "hotkey" | "always" | "never";
 type ThemeChoice = "system" | "light" | "dark";
+// Windows shows this section as 备注; darwin keeps the original 秘密 wording.
+const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "秘密" : "备注";
 type CloseBehavior = "tray" | "quit";
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -133,7 +135,8 @@ function writeStoredChoice(key: string, value: string | number) {
 declare global {
   interface Window {
     clipboxDesktop?: {
-      copyText: (text: string, seconds?: number) => Promise<void>;
+      platform?: string;
+      copyText: (text: string) => Promise<void>;
       didCopy: () => void;
       setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
       setCloseBehavior?: (behavior: CloseBehavior) => void;
@@ -731,7 +734,7 @@ export default function Home() {
               secretCount: secretData.items.length,
               backup,
             });
-            setToast("秘密加密备份已生成");
+            setToast(`${SECRET_WORD}加密备份已生成`);
             window.setTimeout(() => setToast(""), 2200);
             return;
           }
@@ -1237,24 +1240,24 @@ export default function Home() {
 
   const isMini = windowMode === "mini";
   const sectionTitle = activeFolder === "all"
-    ? (activeKind === "snippet" ? "全部话术" : "全部秘密")
+    ? (activeKind === "snippet" ? "全部话术" : `全部${SECRET_WORD}`)
     : activeFolder === "pinned" ? "收藏"
       : activeFolder === "recent" ? "最近使用"
       : activeFolder === "trash" ? "回收站"
         : activeFolder === "uncategorized" ? "未分类"
           : activeFolder.slice(7);
-  const searchPlaceholder = activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? "搜索秘密标题" : "搜索标题、编号或内容";
+  const searchPlaceholder = activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : "搜索标题、编号或内容";
   const kindSwitch = (
     <div className={`kind-switch ${isMini ? "compact" : ""}`} role="group" aria-label="内容板块">
-      {(["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={activeKind === kind ? "active" : ""} aria-pressed={activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : "秘密"}</button>)}
+      {(["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={activeKind === kind ? "active" : ""} aria-pressed={activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : SECRET_WORD}</button>)}
     </div>
   );
-  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (activeKind === "secret" ? "搜索秘密" : "搜索话术") : searchPlaceholder} />;
+  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = firstRun ? (
     <div className="native-empty onboarding">
       <VaultMark />
-      <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : "还没有秘密，先添加第一条"}</strong>
+      <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
       <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
       <div className="onboarding-actions">
         <button type="button" className="primary-button" onClick={() => openEditor(null)}><Icon name="plus" />新增第一条</button>
@@ -1495,7 +1498,7 @@ export default function Home() {
                         : <div className="row-actions">
                           <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : "复制"}<kbd>↵</kbd></button>
                           {isSnippet && hasOptionalSnippetPreparation(item) && <button type="button" className="secondary-button" onClick={() => prepareCopy(item)}>填写变量</button>}
-                          {!isSnippet && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title="只复制编号，秘密本身不会出现在聊天或日志里"><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
+                          {!isSnippet && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           <span className="spacer" />
                           <div className="menu-wrap">
@@ -1508,7 +1511,7 @@ export default function Home() {
                             </div>}
                           </div>
                         </div>}
-                      {!isSnippet && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，秘密本身不会出现在聊天或日志里。</p>}
+                      {!isSnippet && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
                     </div>}
                   </article>
                 );
@@ -1636,7 +1639,7 @@ function SnippetImportDialog({ preview, fileName, onClose, onImport }: {
           <section className="import-section"><h3>将创建或合并的目录</h3><div className="import-folder-list">{preview.folders.map((folder) => <span key={folder}>{folder}</span>)}</div></section>
           <section className="import-section"><h3>内容预览</h3><div className="import-preview-list">{preview.items.slice(0, 5).map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.folder} · {item.summary}</span></div>)}</div></section>
           {preview.errors.length > 0 && <section className="import-errors"><h3>需要跳过的行</h3>{preview.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}{preview.errors.length > 4 && <small>另有 {preview.errors.length - 4} 行</small>}</section>}
-          <p className="import-privacy">表格只在本机解析。导入采用合并方式，不会覆盖秘密或现有话术。</p>
+          <p className="import-privacy">表格只在本机解析。导入采用合并方式，不会覆盖{SECRET_WORD}或现有话术。</p>
         </div>
         <footer className="snippet-dialog-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button type="button" className="primary" onClick={() => void confirm()} disabled={busy || preview.importableCount === 0}>{busy ? "正在加密写入…" : `导入 ${preview.importableCount} 条话术`}</button></footer>
       </section>
@@ -1730,7 +1733,7 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
           <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
         </header>
         <form className="backup-form" onSubmit={submit}>
-          <p className="backup-intro">{mode === "export" ? "只备份话术，并使用独立密码加密；秘密不会包含在文件中。" : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
+          <p className="backup-intro">{mode === "export" ? `只备份话术，并使用独立密码加密；${SECRET_WORD}不会包含在文件中。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
           {needsPassword && <label className="backup-field"><span>备份密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "export" ? "至少 8 个字符" : "输入导出时设置的密码"} autoComplete="off" /></label>}
           {mode === "export" && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认备份密码" autoComplete="off" /></label>}
           {mode === "import" && <fieldset className="backup-strategy"><legend>导入方式</legend><div><button type="button" className={strategy === "merge" ? "active" : ""} onClick={() => setStrategy("merge")}><strong>合并</strong><small>保留现有内容并去重</small></button><button type="button" className={strategy === "replace" ? "active danger" : ""} onClick={() => setStrategy("replace")}><strong>覆盖</strong><small>用备份替换当前内容</small></button></div></fieldset>}
@@ -1750,10 +1753,6 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-function clearLabel(seconds: number) {
-  return seconds === 0 ? "不清除" : seconds < 60 ? `${seconds} 秒` : `${seconds / 60} 分钟`;
-}
-
 function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
@@ -1762,7 +1761,6 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
   onClose: () => void; onExport: () => void; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
 }) {
-  const [clearSeconds, setClearSeconds] = useState(readClipboardClearSeconds);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [versionCopied, setVersionCopied] = useState(false);
@@ -1788,7 +1786,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
         <header><h2 id="settings-title">设置</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">×</button></header>
         <div className="settings-body">
           <section aria-labelledby="set-data"><h3 id="set-data">数据</h3>
-            {row("导出话术备份", `用独立密码加密，不包含秘密 · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
+            {row("导出话术备份", `用独立密码加密，不包含${SECRET_WORD} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
             {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
@@ -1804,12 +1802,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
-            <div className="settings-row"><div><strong>复制后自动清除剪贴板</strong><small>仅当剪贴板仍是刚复制的内容才清除；清不掉 Win+V 历史里的副本</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="自动清除剪贴板">
-                {CLIPBOARD_CLEAR_OPTIONS.map((seconds) => <button key={seconds} type="button" role="radio" aria-checked={clearSeconds === seconds} className={clearSeconds === seconds ? "active" : ""} onClick={() => { setClearSeconds(seconds); writeClipboardClearSeconds(seconds); }}>{clearLabel(seconds)}</button>)}
-              </div>
-            </div>
-            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。秘密不会进入话术备份，复制秘密默认只给出引用。</p>
+            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{SECRET_WORD}不会进入话术备份，复制{SECRET_WORD}默认只给出引用。</p>
           </section>
           <section aria-labelledby="set-trash"><h3 id="set-trash">回收站</h3>
             <div className="settings-row"><div><strong>自动清理</strong><small>超过期限的已删除内容会被永久删除</small></div>
@@ -2069,10 +2062,10 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
   }
 
   return (
-    <section ref={dialogRef} className="inline-editor" role="group" aria-label={item ? `编辑 ${item.label}` : kind === "secret" ? "添加秘密" : "添加话术"}>
+    <section ref={dialogRef} className="inline-editor" role="group" aria-label={item ? `编辑 ${item.label}` : kind === "secret" ? `添加${SECRET_WORD}` : "添加话术"}>
       <header className="inline-editor-head">
         <div className={`editor-kind ${kind}`}>
-          <span>{item ? "编辑" : "新增"}{kind === "secret" ? "秘密" : "话术"}</span>
+          <span>{item ? "编辑" : "新增"}{kind === "secret" ? SECRET_WORD : "话术"}</span>
           {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{item.snippetNumber}</b>}
           {kind === "secret" && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
         </div>
@@ -2111,7 +2104,7 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
               <button type="button" className={visible ? "active" : ""} aria-pressed={visible} onClick={() => setVisible(true)}>明文显示</button>
             </div>}
 
-            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? "密码 / 文本" : "话术内容"}</span>{kind === "secret" && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label="秘密第一段" className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label="秘密第二段" className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? "密码 / 文本" : "话术内容"} className={kind === "secret" && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); }} placeholder={kind === "secret" ? "输入要保存的密码或文本" : "输入需要反复使用的话术"} rows={6} />}</div></div>
+            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? "密码 / 文本" : "话术内容"}</span>{kind === "secret" && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label={`${SECRET_WORD}第一段`} className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label={`${SECRET_WORD}第二段`} className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? "密码 / 文本" : "话术内容"} className={kind === "secret" && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); }} placeholder={kind === "secret" ? "输入要保存的密码或文本" : "输入需要反复使用的话术"} rows={6} />}</div></div>
 
             {kind === "snippet" && aiNotice && <small className="ai-notice" role="status">{aiNotice}</small>}
 

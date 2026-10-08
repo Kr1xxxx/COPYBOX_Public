@@ -430,9 +430,9 @@ ipcMain.on("clipbox:set-window-mode", (event, mode) => {
 });
 
 const writeClipboard = createClipboardWriter(clipboard);
-ipcMain.handle("clipbox:copy-text", (event, text, seconds) => {
+ipcMain.handle("clipbox:copy-text", (event, text) => {
   if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Clipboard request denied");
-  writeClipboard(text, seconds);
+  writeClipboard(text);
 });
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
