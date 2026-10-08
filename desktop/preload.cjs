@@ -30,8 +30,27 @@ window.addEventListener("DOMContentLoaded", () => {
   wake();
 }, { once: true });
 
+// Sandboxed preload scripts cannot require local CommonJS modules, so this
+// security-critical profile must remain self-contained in this file.
+const windows = process.platform === "win32";
+const profile = Object.freeze({
+  edition: windows ? "snippet-only" : "full",
+  platform: windows ? "win32" : "darwin",
+  supportsSecrets: !windows,
+  supportsExport: !windows,
+  supportsAutomation: !windows,
+  shortcutLabel: windows ? "" : "⌥ Space",
+});
 
-contextBridge.exposeInMainWorld("clipboxDesktop", {
+const desktopBridge = {
+  capabilities: Object.freeze({
+    edition: profile.edition,
+    platform: profile.platform,
+    supportsSecrets: profile.supportsSecrets,
+    supportsExport: profile.supportsExport,
+    supportsAutomation: profile.supportsAutomation,
+    globalShortcut: profile.shortcutLabel,
+  }),
   copyText: (text) => ipcRenderer.invoke("clipbox:copy-text", text),
   didCopy: () => ipcRenderer.send("clipbox:did-copy"),
   getVersion: () => ipcRenderer.invoke("clipbox:get-version"),
@@ -41,6 +60,9 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
     ipcRenderer.on("clipbox:focus-search", listener);
     return () => ipcRenderer.removeListener("clipbox:focus-search", listener);
   },
+};
+
+if (profile.supportsAutomation) Object.assign(desktopBridge, {
   onAutomationCommand: (callback) => {
     const listener = (_event, request) => callback(request);
     ipcRenderer.on("clipbox:automation-command", listener);
@@ -51,3 +73,5 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   },
   automationReady: () => ipcRenderer.send("clipbox:automation-ready"),
 });
+
+contextBridge.exposeInMainWorld("clipboxDesktop", desktopBridge);

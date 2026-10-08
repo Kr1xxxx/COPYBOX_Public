@@ -20,7 +20,6 @@ import {
   EMPTY_FOLDER_REGISTRY,
   homeShortcutAction,
   limitChars,
-  mergeImportedVaultData,
   modalInteractionState,
   normalizeFolderName,
   normalizeReferenceNote,
@@ -46,6 +45,15 @@ import {
   vaultDataForBackupScope,
   moveItemToTrash,
 } from "./clipbox-core";
+import {
+  filterVaultForEdition,
+  FULL_CAPABILITIES,
+  legacyVaultActionForEdition,
+  prepareImportForEdition,
+  resolveRuntimeCapabilities,
+  viewPolicyForEdition,
+  type ClipboxCapabilities,
+} from "./clipbox-edition";
 import {
   buildSnippetImportPreview,
   extractPlaceholders,
@@ -91,23 +99,27 @@ type CopyLanguage = "en" | "zh";
 type SnippetCopyRequest = { item: SecretItem; language: CopyLanguage };
 type DeleteRequest = { item: SecretItem; permanent: boolean };
 
+class NoImportableSnippetsError extends Error {}
+
 declare global {
   interface Window {
     clipboxDesktop?: {
+      capabilities: ClipboxCapabilities;
       copyText: (text: string) => Promise<void>;
       didCopy: () => void;
-      getVersion: () => Promise<string>;
-      relaunch: () => void;
+      getVersion?: () => Promise<string>;
+      relaunch?: () => void;
       onFocusSearch: (callback: () => void) => () => void;
-      onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
-      respondAutomationCommand: (requestId: string, response: unknown) => void;
-      automationReady: () => void;
+      onAutomationCommand?: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
+      respondAutomationCommand?: (requestId: string, response: unknown) => void;
+      automationReady?: () => void;
     };
   }
 }
 
 const STORAGE_KEY = "clipbox.vault.v1";
 const DEVICE_KEY = "clipbox.device-key.v1";
+const LEGACY_STORAGE_KEY = "clipbox.legacy-vault.v1";
 const REFRESH_CONTEXT_KEY = "clipbox:refresh-context";
 const ITERATIONS = 310_000;
 const COLORS = ["#ffb02e", "#4bc67a", "#4f8df7", "#9b70df", "#ef6d63", "#23b6b0"];
@@ -245,6 +257,8 @@ function VaultMark({ small = false }: { small?: boolean }) {
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
+  const [startupError, setStartupError] = useState("");
+  const [capabilities, setCapabilities] = useState<ClipboxCapabilities>(FULL_CAPABILITIES);
   const [deviceKey, setDeviceKey] = useState("");
   const [items, setItems] = useState<SecretItem[]>([]);
   const [folders, setFolders] = useState<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
@@ -268,7 +282,6 @@ export default function Home() {
   const [productFilter, setProductFilter] = useState("全部产品");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [startupError, setStartupError] = useState("");
   const [appVersion, setAppVersion] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -282,6 +295,7 @@ export default function Home() {
   const foldersRef = useRef<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
   const nextSnippetNumberRef = useRef(1);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const capabilitiesRef = useRef<ClipboxCapabilities>(FULL_CAPABILITIES);
   const { prepareSortAnimation } = useSortFlipAnimation();
 
   useEffect(() => {
@@ -298,8 +312,9 @@ export default function Home() {
       setItems(data.items);
       setFolders(data.folders);
       if (refreshContext) {
-        setActiveKind(refreshContext.activeKind);
-        setActiveFolder(resolveRefreshedActiveFolder(refreshContext.activeKind, data.folders[refreshContext.activeKind], refreshContext.activeFolder));
+        const restoredKind = capabilitiesRef.current.supportsSecrets ? refreshContext.activeKind : "snippet";
+        setActiveKind(restoredKind);
+        setActiveFolder(resolveRefreshedActiveFolder(restoredKind, data.folders[restoredKind], refreshContext.activeFolder));
         setProductFilter(refreshContext.productFilter);
         setQuery(refreshContext.query);
       }
@@ -307,11 +322,33 @@ export default function Home() {
     }
 
     async function openVault() {
+      const capabilityResolution = resolveRuntimeCapabilities(
+        window.location.protocol,
+        window.clipboxDesktop?.capabilities,
+        new URLSearchParams(window.location.search).get("clipbox-desktop") === "win32",
+      );
+      if (!capabilityResolution.ok) {
+        if (!cancelled) {
+          setStartupError(capabilityResolution.error);
+          setLoading(false);
+        }
+        return;
+      }
+      const nextCapabilities = capabilityResolution.capabilities;
+      const editionPolicy = viewPolicyForEdition(nextCapabilities.edition);
+      capabilitiesRef.current = nextCapabilities;
+      setCapabilities(nextCapabilities);
+      setActiveKind(editionPolicy.defaultKind);
+      const legacyVaultAction = legacyVaultActionForEdition(nextCapabilities.edition);
+      if (legacyVaultAction === "remove") localStorage.removeItem(LEGACY_STORAGE_KEY);
       const raw = localStorage.getItem(STORAGE_KEY);
       const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
       if (!raw) {
         const nextDeviceKey = storedDeviceKey || createDeviceKey();
-        const data: VaultData = { items: [], folders: EMPTY_FOLDER_REGISTRY, nextSnippetNumber: 1 };
+        const data = filterVaultForEdition(
+          { items: [], folders: EMPTY_FOLDER_REGISTRY, nextSnippetNumber: 1 },
+          nextCapabilities.edition,
+        ).data;
         const envelope = await encryptVault(data, nextDeviceKey);
         localStorage.setItem(DEVICE_KEY, nextDeviceKey);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
@@ -321,8 +358,13 @@ export default function Home() {
       if (!storedDeviceKey) throw new Error("Local vault key is missing");
       try {
         const openedVault = await readLocalEncryptedVault();
-        const opened = openedVault.data;
-        finishOpening(opened, openedVault.deviceKey);
+        const filtered = filterVaultForEdition(openedVault.data, nextCapabilities.edition);
+        if (filtered.requiresRewrite) {
+          const current = JSON.parse(raw) as VaultEnvelope;
+          const envelope = await encryptVault(filtered.data, openedVault.deviceKey, current.salt);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+        }
+        finishOpening(filtered.data, openedVault.deviceKey);
       } catch {
         if (!cancelled) {
           setStartupError("本地数据读取失败，原数据和密钥已保留。请重试；如仍失败，请先备份应用数据再排查。");
@@ -341,38 +383,42 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    window.clipboxDesktop?.getVersion()
+    const getVersion = window.clipboxDesktop?.getVersion;
+    if (!getVersion) return () => { cancelled = true; };
+    getVersion()
       .then((version) => { if (!cancelled) setAppVersion(version); })
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
 
-  const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
+  const editionPolicy = viewPolicyForEdition(capabilities.edition);
+  const effectiveKind: ItemKind = capabilities.supportsSecrets ? activeKind : "snippet";
+  const activeFolders = useMemo(() => folders[effectiveKind], [effectiveKind, folders]);
   const categoryColors = useMemo(() => buildCategoryColorMap(activeFolders), [activeFolders]);
-  const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
-  const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
-  const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
+  const activeKindItems = useMemo(() => selectItemsByTrashState(items, effectiveKind, "active"), [items, effectiveKind]);
+  const trashedKindItems = useMemo(() => selectItemsByTrashState(items, effectiveKind, "trash"), [items, effectiveKind]);
+  const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, effectiveKind), [items, effectiveKind]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const kindItems = selectItemsByTrashState(items, activeKind, activeFolder === "trash" ? "trash" : "active");
+    const kindItems = selectItemsByTrashState(items, effectiveKind, activeFolder === "trash" ? "trash" : "active");
     const scoped = kindItems.filter((item) => {
       if (activeFolder === "all") return true;
       if (activeFolder === "pinned") return Boolean(item.pinned);
       if (activeFolder === "uncategorized") return !item.folder?.trim();
       return item.folder === activeFolder.slice(7);
     });
-    const productMatched = activeKind === "snippet" && activeFolder !== "trash"
+    const productMatched = effectiveKind === "snippet" && activeFolder !== "trash"
       ? scoped.filter((item) => matchesSnippetProduct(item, productFilter))
       : scoped;
     const matched = normalized ? productMatched.filter((item) => {
-      const searchable = activeKind === "snippet"
+      const searchable = effectiveKind === "snippet"
         ? snippetSearchText(item)
         : `${item.label} ${item.note} ${item.summary || ""}`;
       return searchable.toLowerCase().includes(normalized);
     }) : productMatched;
     return matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
-  }, [items, query, activeKind, activeFolder, productFilter]);
+  }, [items, query, effectiveKind, activeFolder, productFilter]);
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
   const auxiliaryDialogOpen = Boolean(snippetImport || copyRequest || deleteRequest);
@@ -564,7 +610,8 @@ export default function Home() {
   }, []);
 
   const writeVault = useCallback(async (nextData: VaultData) => {
-    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber);
+    const synchronized = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber);
+    const data = filterVaultForEdition(synchronized, capabilitiesRef.current.edition).data;
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as VaultEnvelope | null;
     const envelope = await encryptVault(data, deviceKey, current?.salt);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
@@ -580,7 +627,7 @@ export default function Home() {
   ), [enqueueVaultTask, readVault, writeVault]);
 
   useEffect(() => {
-    if (loading || !deviceKey || !window.clipboxDesktop?.onAutomationCommand) return;
+    if (loading || !deviceKey || !capabilities.supportsAutomation || !window.clipboxDesktop?.onAutomationCommand) return;
     const remove = window.clipboxDesktop.onAutomationCommand(({ requestId, command }) => {
       const execute = async () => {
         try {
@@ -600,7 +647,7 @@ export default function Home() {
               createdAt: Date.now(),
               envelope,
             };
-            window.clipboxDesktop?.respondAutomationCommand(requestId, {
+            window.clipboxDesktop?.respondAutomationCommand?.(requestId, {
               ok: true,
               action: "secret-export",
               secretCount: secretData.items.length,
@@ -620,7 +667,7 @@ export default function Home() {
             { createId: () => crypto.randomUUID(), now: timestampNow },
             writeVault,
           );
-          window.clipboxDesktop?.respondAutomationCommand(requestId, committed.response);
+          window.clipboxDesktop?.respondAutomationCommand?.(requestId, committed.response);
           if (!isAutomationReadAction(committed.response.action)) {
             const number = committed.response.action === "delete"
               ? committed.response.number
@@ -634,16 +681,16 @@ export default function Home() {
         } catch (error) {
           const code = error instanceof AutomationCommandError ? error.code : "PERSIST_FAILED";
           const message = error instanceof Error ? error.message : "外部命令执行失败";
-          window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: false, error: { code, message } });
+          window.clipboxDesktop?.respondAutomationCommand?.(requestId, { ok: false, error: { code, message } });
           setToast("外部修改失败");
           window.setTimeout(() => setToast(""), 2400);
         }
       };
       void enqueueVaultTask(execute);
     });
-    window.clipboxDesktop.automationReady();
+    window.clipboxDesktop.automationReady?.();
     return remove;
-  }, [deviceKey, enqueueVaultTask, loading, writeVault]);
+  }, [capabilities.supportsAutomation, deviceKey, enqueueVaultTask, loading, writeVault]);
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
@@ -686,10 +733,11 @@ export default function Home() {
   async function saveItem(data: Omit<SecretItem, "id" | "createdAt" | "updatedAt">) {
     const now = timestampNow();
     const wasEditing = Boolean(editing);
+    const safeData = capabilitiesRef.current.supportsSecrets ? data : { ...data, kind: "snippet" as const };
     if (editing) {
-      await persist((current) => ({ ...current, items: current.items.map((item) => item.id === editing.id ? { ...item, ...data, updatedAt: now } : item) }));
+      await persist((current) => ({ ...current, items: current.items.map((item) => item.id === editing.id ? { ...item, ...safeData, updatedAt: now } : item) }));
     } else {
-      await persist((current) => ({ ...current, items: [{ ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now }, ...current.items] }));
+      await persist((current) => ({ ...current, items: [{ ...safeData, id: crypto.randomUUID(), createdAt: now, updatedAt: now }, ...current.items] }));
     }
     closeEditor();
     setToast(wasEditing ? "条目已更新" : "条目已加密保存");
@@ -697,10 +745,11 @@ export default function Home() {
   }
 
   async function createFolder(kind: ItemKind, rawName: string) {
-    const result = addFolder(foldersRef.current, kind, rawName);
+    const safeKind: ItemKind = capabilitiesRef.current.supportsSecrets ? kind : "snippet";
+    const result = addFolder(foldersRef.current, safeKind, rawName);
     if (!result.folder) return { created: false, folder: "", error: "请输入目录名称" };
     try {
-      if (result.created) await persist((current) => ({ ...current, folders: addFolder(current.folders, kind, rawName).folders }));
+      if (result.created) await persist((current) => ({ ...current, folders: addFolder(current.folders, safeKind, rawName).folders }));
       setActiveFolder(`folder:${result.folder}`);
       setSelected(0);
       setToast(result.created ? "目录已创建" : "目录已存在，已打开");
@@ -749,6 +798,7 @@ export default function Home() {
   }
 
   async function exportVault(password: string) {
+    if (!capabilitiesRef.current.supportsExport) throw new Error("Export is unavailable in this edition");
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current };
     const snippetData = vaultDataForBackupScope(currentData, "snippet");
     const envelope = await encryptVault(snippetData, password);
@@ -798,19 +848,26 @@ export default function Home() {
     if (!pendingImport) return;
     const importedData = pendingImport.legacyData || await decryptVault(pendingImport.envelope as VaultEnvelope, password);
     const result = await enqueueVaultTask(async () => {
-      const result = mergeImportedVaultData(
+      const result = prepareImportForEdition(
         readVault(),
         importedData,
         strategy,
+        capabilitiesRef.current.edition,
         () => crypto.randomUUID(),
         pendingImport.scope,
       );
+      if (!result.shouldPersist) throw new NoImportableSnippetsError();
       await writeVault(result.data);
       return result;
     });
     setPendingImport(null);
     setBackupMode(null);
-    setToast(strategy === "replace" ? `已恢复 ${result.importedCount} 条内容` : `已安全导入 ${result.importedCount} 条内容`);
+    if (capabilitiesRef.current.edition === "snippet-only") {
+      const skipped = result.skippedSecretCount ? `，跳过 ${result.skippedSecretCount} 条秘密` : "";
+      setToast(`已导入 ${result.importedCount} 条话术${skipped}`);
+    } else {
+      setToast(strategy === "replace" ? `已恢复 ${result.importedCount} 条内容` : `已安全导入 ${result.importedCount} 条内容`);
+    }
     window.setTimeout(() => setToast(""), 2400);
   }
 
@@ -845,11 +902,11 @@ export default function Home() {
     window.setTimeout(() => setToast(""), 2600);
   }
 
-  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipbox 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipbox…</span></main>;
+  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipbox 无法安全启动</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
 
   return (
-    <main className="desktop-stage">
+    <main className={`desktop-stage ${capabilities.edition === "snippet-only" ? "snippet-only" : ""}`}>
       <section className={`native-window ${backgroundInert ? "editing" : ""}`} inert={backgroundInert}>
         <header className="native-titlebar">
           <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
@@ -860,16 +917,16 @@ export default function Home() {
             <div className="workspace-body">
               <aside className="directory-sidebar" aria-label="目录">
                 <div className="directory-scroll">
-                  <div className="home-switch" aria-label="内容板块">
-                    <button type="button" className="active" aria-label={`切换到${activeKind === "snippet" ? "秘密" : "话术"}`} onClick={() => { setActiveKind(toggleItemKind(activeKind)); setActiveFolder("all"); setProductFilter("全部产品"); setQuery(""); setSelected(0); }}>{activeKind === "snippet" ? "话术" : "秘密"} <span>{activeKindItems.length}</span></button>
-                  </div>
+                  {editionPolicy.showKindSwitcher ? <div className="home-switch" aria-label="内容板块">
+                    <button type="button" className="active" aria-label={`切换到${effectiveKind === "snippet" ? "秘密" : "话术"}`} onClick={() => { setActiveKind(toggleItemKind(effectiveKind)); setActiveFolder("all"); setProductFilter("全部产品"); setQuery(""); setSelected(0); }}>{effectiveKind === "snippet" ? "话术" : "秘密"} <span>{activeKindItems.length}</span></button>
+                  </div> : <div className="snippet-edition-heading"><strong>{editionPolicy.sidebarTitle}</strong><span>{activeKindItems.length}</span></div>}
                   <div className="directory-heading">
                     <p className="directory-label">目录</p>
-                    <button ref={folderCreateButtonRef} type="button" onClick={() => setFolderDialogKind(activeKind)} aria-label="新建目录">＋</button>
+                    <button ref={folderCreateButtonRef} type="button" onClick={() => setFolderDialogKind(effectiveKind)} aria-label="新建目录">＋</button>
                   </div>
                   <nav className="directory-list">
                     {directoryShortcuts.map((shortcut) => <button key={shortcut.id} className={activeFolder === shortcut.id ? "active" : ""} onClick={() => { setActiveFolder(shortcut.id); setSelected(0); }}><span className={shortcut.id === "pinned" ? "directory-name" : undefined}>{shortcut.id === "pinned" && <i className="favorite-directory-icon" aria-hidden="true">★</i>}{shortcut.label}</span><b>{shortcut.count}</b></button>)}
-                    {activeKind === "snippet" ? activeFolders.map((folder) => <div key={folder} className={`directory-row fixed ${activeFolder === `folder:${folder}` ? "active" : ""}`}><button className="directory-main" onClick={() => { setActiveFolder(`folder:${folder}`); setSelected(0); }} title={folder}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button></div>) : <>
+                    {effectiveKind === "snippet" ? activeFolders.map((folder) => <div key={folder} className={`directory-row fixed ${activeFolder === `folder:${folder}` ? "active" : ""}`}><button className="directory-main" onClick={() => { setActiveFolder(`folder:${folder}`); setSelected(0); }} title={folder}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button></div>) : <>
                       {activeFolders.map((folder) => <div key={folder} data-sort-scope="folder" data-sort-id={folder} className={`directory-row ${activeFolder === `folder:${folder}` ? "active" : ""} ${folderReorder.draggingId === folder ? "dragging" : ""} ${folderReorder.overId === folder && folderReorder.draggingId !== folder ? "drag-over" : ""}`}><button className="directory-main" onClick={() => { setActiveFolder(`folder:${folder}`); setSelected(0); }} title={folder}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />{folder}</span><b>{activeKindItems.filter((item) => item.folder === folder).length}</b></button><button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序，或按 Option 加方向键" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)} onKeyDown={(event) => handleFolderSortKey(event, folder)}><span aria-hidden="true">⠿</span></button></div>)}
                       <button className={activeFolder === "uncategorized" ? "active" : ""} onClick={() => { setActiveFolder("uncategorized"); setSelected(0); }}><span className="directory-name"><i className="directory-color-marker" aria-hidden="true" style={{ background: UNCATEGORIZED_COLOR }} />未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button>
                     </>}
@@ -878,8 +935,8 @@ export default function Home() {
                 </div>
                 <div className="sidebar-settings">
                   <div className="menu-wrap sidebar-menu-wrap">
-                    <button className={`sidebar-setting-button ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)} aria-label="设置"><i aria-hidden="true">⚙︎</i><span>设置</span></button>
-                    {menuOpen && <div className="dropdown"><button onClick={() => { setBackupMode("export"); setMenuOpen(false); }}>导出话术备份</button><button onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}>导入备份</button><button onClick={() => { spreadsheetFileRef.current?.click(); setMenuOpen(false); }}>导入话术表格</button><div className="settings-version">{appVersion ? `版本 v${appVersion}` : "开发版本"}</div></div>}
+                    <button className={`sidebar-setting-button ${editionPolicy.showExport ? "" : "snippet-import-button"} ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)} aria-label={editionPolicy.showExport ? "设置" : "导入话术备份"}><i aria-hidden="true">{editionPolicy.showExport ? "⚙︎" : "⇧"}</i><span>{editionPolicy.showExport ? "设置" : "导入话术备份"}</span></button>
+                    {menuOpen && <div className="dropdown">{editionPolicy.showExport && <button onClick={() => { setBackupMode("export"); setMenuOpen(false); }}>导出话术备份</button>}<button onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}>导入备份</button><button onClick={() => { spreadsheetFileRef.current?.click(); setMenuOpen(false); }}>导入话术表格</button><div className="settings-version">{appVersion ? `版本 v${appVersion}` : "开发版本"}</div></div>}
                   </div>
                   <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
                   <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
@@ -889,9 +946,9 @@ export default function Home() {
               <section className="content-panel">
                 <div className="native-search">
                   <span className="search-icon" aria-hidden="true" />
-                  <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); }} onKeyDown={handleSearchKey} placeholder={activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? "搜索秘密关键词" : "搜索编号、标题、中英文内容"} />
+                  <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); }} onKeyDown={handleSearchKey} placeholder={activeFolder === "trash" ? "搜索回收站" : effectiveKind === "secret" ? "搜索秘密关键词" : "搜索编号、标题、中英文内容"} />
                   <button type="button" className={`refresh-button ${refreshing ? "refreshing" : ""}`} onClick={() => void refreshLocalVault()} disabled={refreshing} aria-label="重新加载本地数据和软件"><span aria-hidden="true">↻</span><b>{refreshing ? "刷新中" : "刷新"}</b></button>
-                  {activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
+                  {effectiveKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                     <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter === "全部产品" ? "产品" : productFilter}<span>⌄</span></button>
                     {productMenuOpen && <div className="product-filter-menu" role="menu">
                       {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
@@ -899,27 +956,28 @@ export default function Home() {
                   </div>}
                 </div>
                 <div className="native-divider" />
-                <div key={`${activeKind}:${activeFolder}`} className="native-list list-switch">
+                <div key={`${effectiveKind}:${activeFolder}`} className="native-list list-switch">
                   {filtered.length === 0 ? (
+                    capabilities.edition === "snippet-only" && items.length === 0 && !query ? <div className="native-empty snippet-empty"><strong>还没有话术</strong><span>导入现有备份，或者创建第一条话术</span><div className="snippet-empty-actions"><button type="button" onClick={() => fileRef.current?.click()}>导入 Clipbox 备份</button><button type="button" className="primary" onClick={() => openEditor(null)}>新建话术</button></div></div> :
                     <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : "这个目录还是空的"}</strong><span>{query ? "换个词搜索试试" : activeFolder === "trash" ? "删除的内容会加密保留在这里" : activeFolder === "pinned" ? "点击卡片右侧的 ☆ 添加收藏" : "点右下角的 ＋ 添加第一条"}</span></div>
                   ) : activeFolder === "trash" ? filtered.map((item, index) => (
-                    <article key={item.id} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`} style={{ animationDelay: `${index * 45}ms` }} onMouseEnter={() => setSelected(index)}>
+                    <article key={item.id} className={`native-row trash-row ${effectiveKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`} style={{ animationDelay: `${index * 45}ms` }} onMouseEnter={() => setSelected(index)}>
                       <span className="trash-row-icon" aria-hidden="true" />
                       <div className="row-main trash-row-main">
-                        <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong><small>{item.folder || "未分类"}</small></span>
+                        <span className="row-copy"><strong className={effectiveKind === "snippet" ? "snippet-label" : undefined}>{effectiveKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong><small>{item.folder || "未分类"}</small></span>
                       </div>
                       <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
                       <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
                     </article>
                   )) : filtered.map((item, index) => (
-                    <article key={item.id} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${hasOptionalSnippetPreparation(item) ? "has-preparation" : ""} ${item.pinned ? "pinned" : ""} ${safeSelected === index ? "selected" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`} style={{ animationDelay: `${index * 45}ms` }} onMouseEnter={() => setSelected(index)} onDoubleClick={() => void copy(item)}>
+                    <article key={item.id} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${effectiveKind === "snippet" ? "snippet-row" : "secret-row"} ${hasOptionalSnippetPreparation(item) ? "has-preparation" : ""} ${item.pinned ? "pinned" : ""} ${safeSelected === index ? "selected" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`} style={{ animationDelay: `${index * 45}ms` }} onMouseEnter={() => setSelected(index)} onDoubleClick={() => void copy(item)}>
                       <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "拖动排序，或按 Option 加方向键" : "清除搜索后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)} onKeyDown={(event) => handleCardSortKey(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>
                       <button className="row-main" onClick={() => openEditor(item)} aria-label={`编辑 ${item.label}`}>
-                        <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong>{activeKind === "snippet" ? <><small className="snippet-summary">{item.summary || "未填写中文总结"}</small><small className="snippet-preview" lang="en">{item.secret}</small></> : <small>{item.folder || "未分类"}</small>}</span>
+                        <span className="row-copy"><strong className={effectiveKind === "snippet" ? "snippet-label" : undefined}>{effectiveKind === "snippet" ? <SnippetTitle label={item.label} /> : item.label}</strong>{effectiveKind === "snippet" ? <><small className="snippet-summary">{item.summary || "未填写中文总结"}</small><small className="snippet-preview" lang="en">{item.secret}</small></> : <small>{item.folder || "未分类"}</small>}</span>
                       </button>
                       <button className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消置顶" : "置顶"} ${item.label}`} title={item.pinned ? "取消置顶" : "置顶"}>{item.pinned ? "★" : "☆"}</button>
                       {hasOptionalSnippetPreparation(item) && <button className="native-prepare" onClick={() => prepareCopy(item)} aria-label={`填写变量后复制 ${item.label}`} title="填写变量后复制">填</button>}
-                      {activeKind === "secret" && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
+                      {effectiveKind === "secret" && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
                       <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
                       {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
                       {copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
@@ -932,7 +990,7 @@ export default function Home() {
             {canAddItemInFolder(activeFolder) && <button className="floating-add" onClick={() => openEditor(null)} aria-label="新增条目"><span>＋</span></button>}
           </div>
       </section>
-      {modalOpen && <ItemEditor kind={editing?.kind || activeKind} item={editing} folders={activeFolders} defaultFolder={activeFolder.startsWith("folder:") ? activeFolder.slice(7) : ""} onClose={closeEditor} onDelete={editing ? async () => requestTrash(editing) : undefined} onSave={saveItem} onCopy={copyTextWithExpiry} />}
+      {modalOpen && <ItemEditor kind={capabilities.supportsSecrets ? editing?.kind || effectiveKind : "snippet"} item={editing} folders={activeFolders} defaultFolder={activeFolder.startsWith("folder:") ? activeFolder.slice(7) : ""} onClose={closeEditor} onDelete={editing ? async () => requestTrash(editing) : undefined} onSave={saveItem} onCopy={copyTextWithExpiry} />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}
@@ -1179,8 +1237,10 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
     try {
       if (mode === "export") await onExport(password);
       else await onImport(password, strategy);
-    } catch {
-      setError(mode === "import" ? "备份密码不正确，或文件已经损坏" : "导出失败，请重试");
+    } catch (caught) {
+      setError(caught instanceof NoImportableSnippetsError
+        ? "备份中没有可导入的话术"
+        : mode === "import" ? "备份密码不正确，或文件已经损坏" : "导出失败，请重试");
     } finally {
       setBusy(false);
     }

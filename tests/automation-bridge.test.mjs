@@ -71,12 +71,23 @@ test("preload exposes only narrow automation receive and response methods", () =
   const sandbox = {
     window: new EventTarget(),
     require: (name) => {
-      assert.equal(name, "electron");
-      return {
+      if (name === "electron") return {
         contextBridge: { exposeInMainWorld: (_name, value) => { exposed = value; } },
         ipcRenderer,
       };
+      assert.equal(name, "./platform.cjs");
+      return {
+        desktopProfile: () => ({
+          edition: "full",
+          platform: "darwin",
+          supportsSecrets: true,
+          supportsExport: true,
+          supportsAutomation: true,
+          shortcutLabel: "⌥ Space",
+        }),
+      };
     },
+    process: { platform: "darwin" },
   };
   vm.runInNewContext(source, sandbox, { filename: "preload.cjs" });
 
@@ -95,4 +106,34 @@ test("preload exposes only narrow automation receive and response methods", () =
   assert.deepEqual(JSON.parse(JSON.stringify(sent.at(-1))), { channel: "clipbox:automation-response", payload: { requestId: "one", response: { ok: true } } });
   remove();
   assert.equal(listeners.has("clipbox:automation-command"), false);
+});
+
+test("preload omits automation methods from the Windows bridge", () => {
+  const source = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+  let exposed;
+  const sandbox = {
+    window: new EventTarget(),
+    require: (name) => name === "electron"
+      ? {
+          contextBridge: { exposeInMainWorld: (_name, value) => { exposed = value; } },
+          ipcRenderer: { invoke() {}, on() {}, removeListener() {}, send() {} },
+        }
+      : {
+          desktopProfile: () => ({
+            edition: "snippet-only",
+            platform: "win32",
+            supportsSecrets: false,
+            supportsExport: false,
+            supportsAutomation: false,
+            shortcutLabel: "",
+          }),
+        },
+    process: { platform: "win32" },
+  };
+
+  vm.runInNewContext(source, sandbox, { filename: "preload.cjs" });
+  assert.equal(exposed.capabilities.supportsAutomation, false);
+  assert.equal(exposed.onAutomationCommand, undefined);
+  assert.equal(exposed.respondAutomationCommand, undefined);
+  assert.equal(exposed.automationReady, undefined);
 });

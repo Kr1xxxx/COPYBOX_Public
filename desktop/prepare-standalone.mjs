@@ -1,5 +1,8 @@
-import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import runtimeArtifactPolicy from "./runtime-artifact-policy.cjs";
+
+const { shouldPruneRuntimeArtifact } = runtimeArtifactPolicy;
 
 const source = path.resolve("dist");
 const target = path.resolve("dist/desktop-standalone");
@@ -34,4 +37,14 @@ for (const dependency of ["vinext", "react", "react-dom", "react-server-dom-webp
 }
 
 await rename(path.join(target, "node_modules"), path.join(target, "modules"));
+
+async function pruneRuntimeArtifacts(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) await pruneRuntimeArtifacts(entryPath);
+    else if (entry.isFile() && shouldPruneRuntimeArtifact(entry.name)) await rm(entryPath);
+  }
+}
+
+await pruneRuntimeArtifacts(target);
 await writeFile(path.join(target, ".runtime-id"), Date.now().toString(36));

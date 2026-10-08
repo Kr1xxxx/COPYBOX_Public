@@ -1,17 +1,34 @@
 const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, Tray } = require("electron");
 const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { spawn } = require("node:child_process");
-const { randomUUID } = require("node:crypto");
+const { randomBytes, randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
+const {
+  WINDOWS_APP_ORIGIN,
+  WINDOWS_APP_URL,
+  WINDOWS_SERVER_PORT,
+  isSameOriginUrl,
+  isTrustedWindowsPageUrl,
+  isValidServerReadyMessage,
+} = require("./app-origin.cjs");
 const { createRendererCommandBridge } = require("./automation-bridge.cjs");
 const { createAutomationServer, installAutomationCli } = require("./automation-server.cjs");
+const { desktopProfile } = require("./platform.cjs");
 const { APP_HOST, APP_ORIGIN, APP_PORT } = require("./runtime-config.cjs");
 const { createWindowStateStore } = require("./window-state.cjs");
 
+const profile = desktopProfile(process.platform);
+const appOrigin = profile.platform === "win32" ? WINDOWS_APP_ORIGIN : APP_ORIGIN;
+const appPort = profile.platform === "win32" ? WINDOWS_SERVER_PORT : APP_PORT;
+const WINDOW_STATE_SAVE_DELAY = 180;
+
 let mainWindow;
 let serverProcess;
+let serverStartError;
+let serverReady = false;
+let serverReadyPromise;
 let tray;
 let quitting = false;
 let quickMode = false;
@@ -21,14 +38,16 @@ let windowStateStore;
 let automationServer;
 let rendererCommandBridge;
 let automationRendererReady = false;
-const appOrigin = APP_ORIGIN;
-const WINDOW_STATE_SAVE_DELAY = 180;
+
+const ownsInstanceLock = app.requestSingleInstanceLock();
+if (!ownsInstanceLock) {
+  quitting = true;
+  app.quit();
+} else {
+  app.on("second-instance", () => showWindow(false));
+}
 
 function serverEntry() {
-  if (!app.isPackaged) {
-    return path.join(__dirname, "..", "dist", "server", "index.js");
-  }
-
   const bundledRuntime = path.join(process.resourcesPath, "standalone");
   const runtimeId = fs.readFileSync(path.join(bundledRuntime, ".runtime-id"), "utf8").trim();
   const runtimeName = `server-runtime-${runtimeId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -54,9 +73,20 @@ function serverEntry() {
 }
 
 function startServer(port) {
+  const nonce = randomBytes(32).toString("hex");
+  let resolveReady;
+  let rejectReady;
   const serverArgs = app.isPackaged
     ? [serverEntry()]
     : [path.join(__dirname, "..", "node_modules", "vinext", "dist", "cli.js"), "start"];
+
+  if (app.isPackaged) {
+    serverReadyPromise = new Promise((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
+  }
+
   serverProcess = spawn(process.execPath, serverArgs, {
     env: {
       ...process.env,
@@ -64,24 +94,55 @@ function startServer(port) {
       HOST: APP_HOST,
       PORT: String(port),
       NODE_ENV: "production",
+      CLIPBOX_SERVER_NONCE: nonce,
     },
-    stdio: "ignore",
+    stdio: app.isPackaged ? ["ignore", "ignore", "ignore", "ipc"] : "ignore",
+  });
+
+  if (app.isPackaged) {
+    serverProcess.on("message", (message) => {
+      if (isValidServerReadyMessage(message, nonce, port)) resolveReady();
+    });
+  }
+  serverProcess.once("error", (error) => {
+    serverStartError = error;
+    rejectReady?.(error);
   });
   serverProcess.once("exit", (code) => {
-    if (!quitting && code !== 0) {
-      void dialog.showErrorBox("Clipbox 无法启动", "本地服务启动失败，请重新打开应用。");
-      app.quit();
-    }
+    if (quitting) return;
+    if (!serverReady) rejectReady?.(new Error(`Local server exited with code ${code}`));
+    else dialog.showErrorBox("Clipbox 无法启动", "本地服务意外退出，请重新打开应用。");
+    app.quit();
   });
+}
+
+function waitForOwnedServer(timeoutMs = 15000) {
+  if (!serverReadyPromise) return Promise.reject(new Error("Missing server readiness channel"));
+  return Promise.race([
+    serverReadyPromise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Server readiness timeout")), timeoutMs)),
+  ]);
 }
 
 function waitForServer(timeoutMs = 15000) {
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
+      if (serverStartError) {
+        reject(serverStartError);
+        return;
+      }
       const request = http.get(appOrigin, (response) => {
-        response.resume();
-        resolve();
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          if (body.length < 32_768) body += chunk;
+        });
+        response.on("end", () => {
+          if (response.statusCode === 200 && body.includes("Clipbox")) resolve();
+          else if (Date.now() - startedAt >= timeoutMs) reject(new Error("Unexpected local server response"));
+          else setTimeout(check, 120);
+        });
       });
       request.on("error", () => {
         if (Date.now() - startedAt >= timeoutMs) reject(new Error("Server timeout"));
@@ -116,6 +177,7 @@ function stopServer(timeoutMs = 1200) {
 }
 
 async function startAutomation() {
+  if (!profile.supportsAutomation) return;
   const socketPath = process.env.CLIPBOX_AUTOMATION_SOCKET_PATH
     || path.join(app.getPath("userData"), "automation.sock");
   installAutomationCli({
@@ -143,17 +205,6 @@ async function stopAutomation() {
   await server?.close();
 }
 
-async function relaunchApplication() {
-  if (quitting) return;
-  saveWindowBounds();
-  quitting = true;
-  globalShortcut.unregisterAll();
-  await stopAutomation();
-  await stopServer();
-  app.relaunch();
-  app.exit(0);
-}
-
 function saveWindowBounds() {
   clearTimeout(saveWindowTimer);
   saveWindowTimer = undefined;
@@ -169,6 +220,17 @@ function scheduleWindowBoundsSave() {
   saveWindowTimer = setTimeout(saveWindowBounds, WINDOW_STATE_SAVE_DELAY);
 }
 
+function isAllowedRendererUrl(value) {
+  if (profile.platform === "win32") return isTrustedWindowsPageUrl(value);
+  return isSameOriginUrl(value, appOrigin);
+}
+
+function isAllowedClipboardSource(webContents, value, isMainFrame) {
+  if (!webContents || webContents !== mainWindow?.webContents || !isMainFrame) return false;
+  if (!isSameOriginUrl(value, appOrigin)) return false;
+  return profile.platform !== "win32" || isTrustedWindowsPageUrl(webContents.getURL());
+}
+
 function createWindow() {
   automationRendererReady = false;
   windowStateStore = createWindowStateStore({
@@ -176,15 +238,13 @@ function createWindow() {
     getWorkAreas: () => screen.getAllDisplays().map((display) => display.workArea),
   });
   normalWindowBounds = windowStateStore.load();
-  mainWindow = new BrowserWindow({
+  const windowOptions = {
     ...normalWindowBounds,
     minWidth: 500,
     minHeight: 520,
     show: false,
     backgroundColor: "#070707",
     title: "Clipbox",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
@@ -192,16 +252,25 @@ function createWindow() {
       sandbox: true,
       spellcheck: false,
     },
-  });
+  };
+  if (!profile.nativeTitleBar) {
+    windowOptions.titleBarStyle = "hiddenInset";
+    windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  }
+  mainWindow = new BrowserWindow(windowOptions);
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith(appOrigin)) event.preventDefault();
+    if (!isAllowedRendererUrl(url)) event.preventDefault();
+  });
+  mainWindow.webContents.on("will-redirect", (event, url) => {
+    if (!isAllowedRendererUrl(url)) event.preventDefault();
   });
   mainWindow.webContents.on("dom-ready", () => {
-    void mainWindow.webContents.executeJavaScript("document.documentElement.classList.add('desktop-app')");
+    void mainWindow.webContents.executeJavaScript(
+      `document.documentElement.classList.add("desktop-app", "platform-${profile.platform}")`,
+    );
   });
-  mainWindow.webContents.once("did-finish-load", () => mainWindow.show());
   mainWindow.on("move", scheduleWindowBoundsSave);
   mainWindow.on("resize", scheduleWindowBoundsSave);
   mainWindow.on("close", (event) => {
@@ -211,10 +280,8 @@ function createWindow() {
       mainWindow.hide();
     }
   });
-  mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
-  });
-  void mainWindow.loadURL(appOrigin);
+  mainWindow.once("ready-to-show", () => mainWindow.show());
+  void mainWindow.loadURL(profile.platform === "win32" ? WINDOWS_APP_URL : appOrigin);
 }
 
 function showWindow(asQuickSearch = false) {
@@ -235,11 +302,13 @@ function showWindow(asQuickSearch = false) {
 
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "Clipbox.png")).resize({ width: 18, height: 18 });
-  icon.setTemplateImage(true);
+  if (profile.templateTrayIcon) icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip("Clipbox · ⌥ Space 快速搜索");
+  tray.setToolTip(profile.shortcutLabel ? `Clipbox — ${profile.shortcutLabel} 快速搜索` : "Clipbox");
+  const quickSearchItem = { label: "快速搜索", click: () => showWindow(true) };
+  if (profile.globalShortcut) quickSearchItem.accelerator = profile.globalShortcut;
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "快速搜索", accelerator: "Alt+Space", click: () => showWindow(true) },
+    quickSearchItem,
     { label: "打开 Clipbox", click: () => showWindow(false) },
     { type: "separator" },
     { label: "退出", click: () => { quitting = true; app.quit(); } },
@@ -247,21 +316,42 @@ function createTray() {
   tray.on("click", () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
 }
 
+async function relaunchApplication() {
+  if (quitting) return;
+  saveWindowBounds();
+  quitting = true;
+  globalShortcut.unregisterAll();
+  await stopAutomation();
+  await stopServer();
+  app.relaunch();
+  app.exit(0);
+}
+
 app.setName("Clipbox");
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) app.quit();
-app.on("second-instance", () => showWindow(false));
 app.whenReady().then(async () => {
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === "clipboard-read" || permission === "clipboard-sanitized-write");
+  if (!ownsInstanceLock) return;
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    const clipboardPermission = permission === "clipboard-read" || permission === "clipboard-sanitized-write";
+    return Boolean(clipboardPermission
+      && isAllowedClipboardSource(webContents, requestingOrigin, details.isMainFrame));
+  });
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const clipboardPermission = permission === "clipboard-read" || permission === "clipboard-sanitized-write";
+    callback(Boolean(clipboardPermission
+      && isAllowedClipboardSource(webContents, details.requestingUrl, details.isMainFrame)));
   });
   try {
-    startServer(APP_PORT);
+    startServer(appPort);
+    if (app.isPackaged) await waitForOwnedServer();
     await waitForServer();
+    if (serverStartError || serverProcess.exitCode !== null) throw serverStartError || new Error("Local server exited");
+    serverReady = true;
     createWindow();
     await startAutomation();
     createTray();
-    globalShortcut.register("Alt+Space", () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
+    if (profile.globalShortcut) {
+      globalShortcut.register(profile.globalShortcut, () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
+    }
   } catch {
     dialog.showErrorBox("Clipbox 无法启动", "本地服务未能启动，请重新打开应用。");
     app.quit();
@@ -302,12 +392,14 @@ ipcMain.on("clipbox:relaunch", () => {
 });
 
 ipcMain.on("clipbox:automation-ready", (event) => {
+  if (!profile.supportsAutomation) return;
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents === event.sender) {
     automationRendererReady = true;
   }
 });
 
 ipcMain.on("clipbox:automation-response", (event, message) => {
+  if (!profile.supportsAutomation) return;
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents === event.sender) {
     rendererCommandBridge?.respond(message);
   }
