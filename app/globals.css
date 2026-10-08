@@ -573,3 +573,8 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 :root[data-theme="dark"] .backup-error, :root[data-theme="dark"] .import-errors, :root[data-theme="dark"] .delete-confirm-error { background: var(--danger-bg); }
 :root[data-theme="dark"] .import-folder-list span { background: var(--accent-tint); color: var(--accent-ink); }
 :root[data-theme="dark"] .vault-body { background: var(--card); }
+
+/* Empty and first-run states sit in the middle of the list area. */
+.native-list > .native-empty { flex: 1 1 auto; height: auto; min-height: 240px; padding-bottom: 36px; }
+.native-list > .native-empty.onboarding { min-height: 0; padding: 24px 28px 48px; }
+.native-empty.onboarding span { max-width: 440px; text-wrap: balance; }
