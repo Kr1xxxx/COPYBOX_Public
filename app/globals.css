@@ -223,7 +223,10 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .native-row.selected .row-snippet-number { font-size: 10.5px; }
 .native-row.selected .row-folder { padding: 0 6px; font-size: 10.5px; }
 .row-detail { display: grid; grid-template-rows: 1fr; animation: detail-open .26s cubic-bezier(.2,.8,.2,1) backwards; }
-.row-detail-inner { min-height: 0; padding: 0 12px 10px 34px; display: grid; gap: 9px; align-content: start; animation: detail-clip .26s linear; }
+.row-detail-inner { min-height: 0; padding: 0 12px 10px 34px; display: grid; gap: 9px; align-content: start; animation: detail-clip .26s cubic-bezier(.2,.8,.2,1); }
+.row-detail.closing { pointer-events: none; animation: detail-close .22s cubic-bezier(.2,.8,.2,1) forwards; }
+.row-detail.closing .row-detail-inner { overflow: hidden; animation: detail-clip-close .22s cubic-bezier(.2,.8,.2,1) forwards; }
+.native-row.closing-row .snippet-preview { animation: detail-in .22s ease both; }
 .row-content { max-height: 168px; margin: 0; padding: 10px 12px; overflow: auto; border-radius: 8px; background: var(--content); color: var(--ink); font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: none; user-select: text; }
 .snippet-variable { padding: 1px 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
 .row-secret { min-height: 40px; padding: 5px 5px 5px 12px; display: flex; align-items: center; gap: 10px; border-radius: 8px; background: var(--content); }
@@ -359,7 +362,9 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 @keyframes field-rise { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
 @keyframes refresh-spin { to{transform:rotate(360deg)} }
 @keyframes detail-open { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
-@keyframes detail-clip { from { overflow: hidden; } to { overflow: hidden; } }
+@keyframes detail-close { from { grid-template-rows: 1fr; opacity: 1; } to { grid-template-rows: 0fr; opacity: 0; } }
+@keyframes detail-clip { from { overflow: hidden; padding-bottom: 0; } to { overflow: hidden; padding-bottom: 10px; } }
+@keyframes detail-clip-close { from { overflow: hidden; padding-bottom: 10px; } to { overflow: hidden; padding-bottom: 0; } }
 @keyframes detail-in { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
 
 /* Keep idle windows visually still without suspending storage or local commands. */
@@ -617,6 +622,13 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .settings-folder { border-bottom: 1px solid var(--line-soft); }
 .settings-folder:last-of-type { border-bottom: 0; }
 .settings-folder-row { min-height: 40px; display: flex; align-items: center; gap: 9px; }
+.settings-folder { position: relative; }
+.settings-folder.dragging { z-index: 5; border-radius: 8px; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
+.settings-folder.drag-over::after { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.settings-folder-grip { width: 16px; height: 24px; flex: none; margin-left: -4px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; cursor: grab; touch-action: none; opacity: .55; transition: opacity .14s, background .14s; }
+.settings-folder-grip:hover, .settings-folder-grip:focus-visible { opacity: 1; background: var(--hover); }
+.settings-folder-grip:active { cursor: grabbing; }
+.settings-folder-grip.placeholder { cursor: default; opacity: 0; pointer-events: none; }
 .settings-folder-dot { width: 14px; height: 14px; flex: none; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--border); }
 .settings-folder-dot:hover { transform: scale(1.15); }
 .settings-folder-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
@@ -636,3 +648,6 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .settings-swatches > button.on { box-shadow: 0 0 0 1.5px var(--ink); }
 .settings-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; }
 .settings-folder-fixed { flex: none; padding: 1px 7px; border-radius: 9px; background: var(--fill); color: var(--muted); font-size: 11px; }
+
+/* With many variables the copy button stays reachable at the bottom of the list. */
+.fill-actions { position: sticky; bottom: 0; z-index: 3; margin: 0 -6px; padding: 10px 6px 2px; background: linear-gradient(to top, var(--card) 72%, transparent); }

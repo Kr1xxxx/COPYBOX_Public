@@ -1,7 +1,7 @@
 "use client";
 
 import { copyTextWithExpiry } from "./clipboard";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
 import {
   canReorderCards,
@@ -109,6 +109,7 @@ type ThemeChoice = "system" | "light" | "dark";
 // Windows shows this section as 备注; darwin keeps the original 秘密 wording.
 const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "秘密" : "备注";
 type CloseBehavior = "tray" | "quit";
+const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
@@ -338,6 +339,8 @@ export default function Home() {
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
+  // Cards that just lost the selection keep their detail mounted while it folds away.
+  const [closingIds, setClosingIds] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
   const [toast, setToast] = useState("");
@@ -489,6 +492,38 @@ export default function Home() {
   }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders]);
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
+  const selectedCardId = filtered[safeSelected]?.id || "";
+  const closingAnimationsRef = useRef(new Map<string, Animation[]>());
+
+  // A card that just lost the selection folds its card chrome and title row back
+  // to the plain list look while its detail collapses (see .row-detail.closing).
+  useLayoutEffect(() => {
+    const running = closingAnimationsRef.current;
+    for (const [id, animations] of running) {
+      if (closingIds.includes(id) && id !== selectedCardId) continue;
+      for (const animation of animations) animation.cancel();
+      running.delete(id);
+    }
+    for (const id of closingIds) {
+      if (id === selectedCardId || running.has(id)) continue;
+      const row = document.querySelector<HTMLElement>(`[data-sort-scope="card"][data-sort-id="${CSS.escape(id)}"]`);
+      const line = row?.querySelector<HTMLElement>(".row-line");
+      if (!row || !line || typeof row.animate !== "function") continue;
+      const timing: KeyframeAnimationOptions = { duration: DETAIL_CLOSE_MS, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "forwards" };
+      const plainHeight = row.classList.contains("secret-row") ? "44px" : "52px";
+      const animations = [
+        row.animate([
+          { margin: "2px 0 4px", borderWidth: "1px", borderColor: "#e8e5da", backgroundColor: "var(--card)", boxShadow: "0 1px 2px rgba(31,30,28,.04), 0 8px 20px rgba(31,30,28,.07)" },
+          { margin: "0px", borderWidth: "0px", borderColor: "transparent", backgroundColor: "transparent", boxShadow: "0 0 0 rgba(31,30,28,0)" },
+        ], timing),
+        line.animate([{ height: "38px" }, { height: plainHeight }], timing),
+      ];
+      running.set(id, animations);
+      void animations[0].finished.then(() => {
+        setClosingIds((ids) => ids.filter((value) => value !== id));
+      }).catch(() => undefined);
+    }
+  }, [closingIds, selectedCardId]);
   const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
   const inlineEditing = modalOpen || Boolean(copyRequest) || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
@@ -921,6 +956,10 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: moveName(data.folders[kind], folder, delta) } } }), "目录顺序已更新");
   }
 
+  function settingsFolderReorder(kind: ItemKind, source: string, target: string) {
+    void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: reorderNames(data.folders[kind], source, target) } } }), "目录顺序已更新");
+  }
+
   function buildSettingsFolderGroups(): SettingsFolderGroup[] {
     return (["snippet", "secret"] as const).map((kind) => {
       const colors = { ...buildCategoryColorMap(folders[kind]), ...(folderColors?.[kind] || {}) };
@@ -1148,7 +1187,13 @@ export default function Home() {
 
   // Rows slide to their new places when a different entry opens.
   function moveSelection(update: (value: number) => number) {
+    const leaving = bulkMode ? undefined : filtered[safeSelected]?.id;
     prepareSortAnimation("card");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (leaving && !reduceMotion && update(safeSelected) !== safeSelected) {
+      setClosingIds((ids) => ids.includes(leaving) ? ids : [...ids, leaving]);
+      window.setTimeout(() => setClosingIds((ids) => ids.filter((id) => id !== leaving)), DETAIL_CLOSE_MS + 40);
+    }
     setSelected(update);
   }
 
@@ -1512,10 +1557,11 @@ export default function Home() {
                 const isSelected = safeSelected === index && !bulkMode;
                 const checked = bulkIds.includes(item.id);
                 const revealed = revealedId === item.id;
-                const fillOpen = copyRequest?.item.id === item.id;
+                const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
+                const fillOpen = copyRequest?.item.id === item.id && !closing;
                 const moveTargets = [...activeFolders, ...(isSnippet ? [] : [""])].filter((folder) => folder !== (item.folder || ""));
                 return (
-                  <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected ? "selected" : ""} ${checked ? "checked" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
+                  <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected || closing ? "selected" : ""} ${closing ? "closing-row" : ""} ${checked ? "checked" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
                     <div className="row-line">
                       {bulkMode
                         ? <button type="button" className={`row-check ${checked ? "on" : ""}`} role="checkbox" aria-checked={checked} aria-label={`选择 ${item.label}`} onClick={() => toggleBulk(item.id)}><Icon name="check" /></button>
@@ -1536,7 +1582,7 @@ export default function Home() {
                       {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
                       {copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
-                    {isSelected && <div className="row-detail"><div className="row-detail-inner">
+                    {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
                       {isSnippet ? (!fillOpen && <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
@@ -1581,7 +1627,6 @@ export default function Home() {
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>
             </div>}
             <footer className="status-bar">
-              {appVersion && <span className="status-note"><Icon name="shield" />60 秒后清理剪贴板</span>}
               <span className="spacer" />
               <span><kbd>↑↓</kbd>选择</span>
               <span><kbd>↵</kbd>复制</span>
@@ -1604,6 +1649,7 @@ export default function Home() {
         onFolderDelete={settingsFolderDelete}
         onFolderColor={settingsFolderColor}
         onFolderMove={settingsFolderMove}
+        onFolderReorder={settingsFolderReorder}
         closeBehavior={closeBehavior}
         onCloseBehavior={chooseCloseBehavior}
         trashDays={trashDays}
@@ -1804,14 +1850,27 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
 
 type SettingsFolderGroup = { kind: ItemKind; title: string; folders: { name: string; count: number; color: string; locked: boolean }[] };
 
-function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, onMove }: {
+function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, onMove, onReorder }: {
   groups: SettingsFolderGroup[];
   onAdd: (kind: ItemKind, name: string) => Promise<string>;
   onRename: (kind: ItemKind, from: string, to: string) => Promise<string>;
   onDelete: (kind: ItemKind, folder: string) => Promise<string>;
   onColor: (kind: ItemKind, folder: string, color: string | null) => void;
   onMove: (kind: ItemKind, folder: string, delta: -1 | 1) => void;
+  onReorder: (kind: ItemKind, source: string, target: string) => void;
 }) {
+  const { prepareSortAnimation } = useSortFlipAnimation();
+  // Row ids are "<kind>:<name>"; a drag only counts when both rows belong to the same list.
+  const reorder = usePointerReorder({
+    enabled: true,
+    scope: "settings-folder",
+    onDrop: (sourceId, targetId) => {
+      const kind = sourceId.slice(0, sourceId.indexOf(":")) as ItemKind;
+      if (targetId.slice(0, targetId.indexOf(":")) !== kind) return;
+      prepareSortAnimation("settings-folder");
+      onReorder(kind, sourceId.slice(kind.length + 1), targetId.slice(kind.length + 1));
+    },
+  });
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
   const [adding, setAdding] = useState<{ kind: ItemKind; value: string } | null>(null);
   const [colorKey, setColorKey] = useState("");
@@ -1850,8 +1909,11 @@ function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, onMove }:
             const previous = group.folders[index - 1];
             const next = group.folders[index + 1];
             return (
-              <div className="settings-folder" key={key}>
+              <div className={`settings-folder ${reorder.draggingId === key ? "dragging" : ""} ${reorder.overId === key && reorder.draggingId !== key ? "drag-over" : ""}`} key={key} {...(folder.locked ? {} : { "data-sort-scope": "settings-folder", "data-sort-id": key })}>
                 <div className="settings-folder-row">
+                  {folder.locked || editing?.key === key
+                    ? <span className="settings-folder-grip placeholder" aria-hidden="true" />
+                    : <button type="button" className="settings-folder-grip" aria-label={`拖动排序 ${folder.name}`} title="按住拖动排序" onPointerDown={(event) => reorder.beginPointerDrag(event, key)}><span aria-hidden="true">⠿</span></button>}
                   <button type="button" className="settings-folder-dot" style={{ background: folder.color }} aria-label={`修改颜色 ${folder.name}`} aria-expanded={colorKey === key} onClick={() => setColorKey(colorKey === key ? "" : key)} />
                   {editing?.key === key ? (
                     <form className="settings-folder-form" data-local-esc onSubmit={(event) => { event.preventDefault(); void finish(onRename(group.kind, folder.name, editing.value), () => setEditing(null)); }}>
@@ -1898,7 +1960,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
+function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
@@ -1907,6 +1969,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
   onFolderDelete: (kind: ItemKind, folder: string) => Promise<string>;
   onFolderColor: (kind: ItemKind, folder: string, color: string | null) => void;
   onFolderMove: (kind: ItemKind, folder: string, delta: -1 | 1) => void;
+  onFolderReorder: (kind: ItemKind, source: string, target: string) => void;
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
@@ -1928,7 +1991,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
   useEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => { closeRef.current?.focus(); }, []);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if ((event.target as HTMLElement | null)?.closest?.("[data-local-esc]")) return; event.stopPropagation(); onCloseRef.current(); } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if ((event.target as HTMLElement | null)?.closest?.("[data-local-esc]") || document.querySelector(".settings-folder.dragging")) return; event.stopPropagation(); onCloseRef.current(); } };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
@@ -1950,7 +2013,7 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
               : <div className="settings-row static"><div><strong>数据位置</strong><small>浏览器版保存在本站点的本地存储里，清除站点数据会一并删除</small></div></div>}
           </section>
           <section aria-labelledby="set-folders"><h3 id="set-folders">目录</h3>
-            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} />
+            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
           </section>
           <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>

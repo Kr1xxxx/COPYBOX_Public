@@ -38,3 +38,30 @@ test("settings keeps typing focus: close button is focused once, onClose lives i
   assert.match(page, /const onCloseRef = useRef\(onClose\)/);
   assert.match(page, /useEffect\(\(\) => \{ closeRef\.current\?\.focus\(\); \}, \[\]\);/);
 });
+
+const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+
+test("settings folders can be dragged as well as moved with the arrow buttons", () => {
+  assert.match(page, /scope: "settings-folder"/);
+  assert.match(page, /className="settings-folder-grip"[^>]*onPointerDown=\{\(event\) => reorder\.beginPointerDrag\(event, key\)\}/);
+  assert.match(page, /folder\.locked \? \{\} : \{ "data-sort-scope": "settings-folder"/, "standard folders are neither draggable nor drop targets");
+  assert.match(page, /onMove=\{onFolderMove\} onReorder=\{onFolderReorder\}/);
+  assert.match(page, /document\.querySelector\("\.settings-folder\.dragging"\)/, "Esc cancels the drag, not the dialog");
+  assert.match(css, /\.settings-folder\.dragging/);
+});
+
+test("the card that loses the selection folds away instead of vanishing", () => {
+  assert.match(page, /closingIds/);
+  assert.match(page, /row-detail \$\{closing \? "closing" : ""\}/);
+  assert.match(page, /inert=\{closing\}/);
+  assert.match(css, /\.row-detail\.closing\s*\{[^}]*detail-close/);
+  assert.match(css, /@keyframes detail-close/);
+});
+
+test("the copy bar of the fill panel stays visible when many variables are filled", () => {
+  assert.match(css, /\.fill-actions\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0/);
+});
+
+test("the status bar no longer mentions clearing the clipboard", () => {
+  assert.doesNotMatch(page, /清理剪贴板/);
+});
