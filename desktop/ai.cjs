@@ -46,7 +46,8 @@ function createAiStore({ filePath, fs, safeStorage, fetchImpl = fetch }) {
     return status();
   }
 
-  async function request({ url, body }) {
+  async function request({ url, body, method }) {
+    const get = method === "GET";
     const target = parseEndpoint(url);
     const current = read();
     if (!current) throw new Error("还没有保存 API Key");
@@ -55,9 +56,9 @@ function createAiStore({ filePath, fs, safeStorage, fetchImpl = fetch }) {
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const response = await fetchImpl(target, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${current.key}` },
-        body: typeof body === "string" ? body : JSON.stringify(body),
+        method: get ? "GET" : "POST",
+        headers: { ...(get ? {} : { "content-type": "application/json" }), authorization: `Bearer ${current.key}` },
+        ...(get ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
         signal: controller.signal,
       });
       return { ok: response.ok, status: response.status, text: await response.text() };

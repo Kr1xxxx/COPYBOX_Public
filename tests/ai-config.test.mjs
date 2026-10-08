@@ -53,3 +53,20 @@ test("stored settings are only used while they are complete", () => {
   assert.equal(readAiSettings(storage(null)), null);
   assert.ok(DEFAULT_AI_PROMPTS.polish.trim() && DEFAULT_AI_PROMPTS.organize.trim());
 });
+
+test("every preset has a valid address and the model list address is derived from it", async () => {
+  const { AI_PRESETS, modelsUrl, parseModelsResponse } = await import("../app/ai-config.ts");
+  assert.ok(AI_PRESETS.length >= 6);
+  for (const preset of AI_PRESETS) {
+    assert.ok(parseAiEndpoint(preset.baseUrl), preset.name);
+    assert.ok(chatCompletionsUrl(preset.baseUrl).endsWith("/chat/completions"), preset.name);
+    assert.ok(modelsUrl(preset.baseUrl).endsWith("/models"), preset.name);
+  }
+  assert.equal(new Set(AI_PRESETS.map((preset) => preset.id)).size, AI_PRESETS.length);
+  assert.equal(modelsUrl("https://api.example.com/v1/chat/completions"), "https://api.example.com/v1/models");
+  assert.deepEqual(parseModelsResponse(200, JSON.stringify({ data: [{ id: "b" }, { id: "a" }, { id: "a" }] })), { models: ["a", "b"], error: "" });
+  assert.deepEqual(parseModelsResponse(200, JSON.stringify({ models: [{ name: "models/gemini-x" }] })).models, ["gemini-x"]);
+  assert.match(parseModelsResponse(401, "{}").error, /API Key/);
+  assert.match(parseModelsResponse(404, "{}").error, /手动填写/);
+  assert.match(parseModelsResponse(200, "{}").error, /手动填写/);
+});

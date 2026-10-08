@@ -58,3 +58,14 @@ test("clearing removes the key", () => {
   store.save({ baseUrl: "https://api.example.com/v1", key: "k" });
   assert.deepEqual(store.clear(), { hasKey: false, origin: "" });
 });
+
+test("the model list is fetched with GET and no body", async () => {
+  const calls = [];
+  const { store } = harness(async (url, init) => { calls.push(init); return { ok: true, status: 200, text: async () => "{}" }; });
+  store.save({ baseUrl: "https://api.example.com/v1", key: "sk-1" });
+  await store.request({ url: "https://api.example.com/v1/models", method: "GET" });
+  assert.equal(calls[0].method, "GET");
+  assert.equal(calls[0].body, undefined);
+  assert.equal(calls[0].headers.authorization, "Bearer sk-1");
+  assert.equal(calls[0].headers["content-type"], undefined);
+});

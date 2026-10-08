@@ -8,6 +8,20 @@ export const DEFAULT_AI_PROMPTS: Record<AiRewriteMode, string> = {
   organize: "整理下面这段话术：修正错别字和标点，分段清晰，去掉重复和多余空格。不改变意思，不增删信息，原样保留所有 [方括号] 和 {花括号} 里的变量。只返回整理后的正文，不要解释，不要加引号。",
 };
 
+export type AiPreset = { id: string; name: string; baseUrl: string; model: string };
+
+// Addresses are stable; model names change often, so they are only a starting point and "获取模型" lists what the account really offers.
+export const AI_PRESETS: AiPreset[] = [
+  { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+  { id: "deepseek", name: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-flash" },
+  { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-3.6-flash" },
+  { id: "kimi", name: "Kimi（月之暗面，国内）", baseUrl: "https://api.moonshot.cn/v1", model: "kimi-k3" },
+  { id: "zhipu", name: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash" },
+  { id: "siliconflow", name: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-7B-Instruct" },
+  { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-4o-mini" },
+  { id: "ollama", name: "Ollama（本机）", baseUrl: "http://localhost:11434/v1", model: "" },
+];
+
 export const AI_SETTINGS_KEY = "clipbox.ai-settings.v1";
 
 export function parseAiEndpoint(value: string) {
@@ -38,6 +52,21 @@ export function validateAiSettings(settings: AiSettings, keyReady: boolean) {
   if (!settings.organizePrompt.trim()) return "整理提示词不能为空";
   if (!keyReady) return "请填写 API Key";
   return "";
+}
+
+export function modelsUrl(baseUrl: string) {
+  const chat = chatCompletionsUrl(baseUrl);
+  return chat ? chat.replace(/\/chat\/completions$/, "/models") : "";
+}
+
+export function parseModelsResponse(status: number, text: string): { models: string[]; error: string } {
+  let data: unknown;
+  try { data = JSON.parse(text); } catch { data = null; }
+  const record = data as { data?: { id?: unknown }[]; models?: { name?: unknown; id?: unknown }[] } | null;
+  if (status < 200 || status >= 300) return { models: [], error: status === 401 || status === 403 ? "API Key 不正确或没有权限" : status === 404 ? "这个服务不提供模型列表，请手动填写模型名" : `接口返回 ${status}` };
+  const list = Array.isArray(record?.data) ? record.data : Array.isArray(record?.models) ? record.models : [];
+  const models = Array.from(new Set(list.map((entry) => String((entry as { id?: unknown; name?: unknown }).id ?? (entry as { name?: unknown }).name ?? "").replace(/^models\//, "")).filter(Boolean))).sort();
+  return models.length ? { models, error: "" } : { models: [], error: "没有取到模型列表，请手动填写模型名" };
 }
 
 export function chatRequestBody(model: string, system: string, user: string) {

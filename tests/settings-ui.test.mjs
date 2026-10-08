@@ -83,3 +83,10 @@ test("settings → AI lets people enter their own interface, key and prompts, an
   assert.match(page, /const problem = validateAiSettings\(form, keyReady\)/);
   assert.match(page, /aiRequest\(\{ url, body \}\)/);
 });
+
+test("settings → AI offers common-service presets and can list the models of the account", () => {
+  assert.match(page, /AI_PRESETS\.map\(\(preset\) => <option key=\{preset\.id\}/);
+  assert.match(page, /function applyPreset\(/);
+  assert.match(page, /获取模型/);
+  assert.match(page, /list="ai-model-choices"/);
+});

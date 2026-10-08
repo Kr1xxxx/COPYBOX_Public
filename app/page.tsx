@@ -73,7 +73,7 @@ import {
   snippetSearchText,
   type SnippetImportPreview,
 } from "./snippet-import";
-import { AI_SETTINGS_KEY, DEFAULT_AI_PROMPTS, chatCompletionsUrl, chatRequestBody, parseAiEndpoint, parseChatResponse, readAiSettings, validateAiSettings, type AiSettings } from "./ai-config";
+import { AI_PRESETS, AI_SETTINGS_KEY, DEFAULT_AI_PROMPTS, chatCompletionsUrl, chatRequestBody, modelsUrl, parseAiEndpoint, parseChatResponse, parseModelsResponse, readAiSettings, validateAiSettings, type AiSettings } from "./ai-config";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -152,7 +152,7 @@ declare global {
       aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
       aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
       aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
-      aiRequest?: (payload: { url: string; body: unknown }) => Promise<{ ok: boolean; status: number; text: string }>;
+      aiRequest?: (payload: { url: string; body?: unknown; method?: "GET" | "POST" }) => Promise<{ ok: boolean; status: number; text: string }>;
       relaunch: () => void;
       onFocusSearch: (callback: () => void) => () => void;
       onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
@@ -281,6 +281,22 @@ async function aiChat(settings: AiSettings, system: string, user: string): Promi
     return parseChatResponse(response.status, await response.text());
   } catch (error) {
     return { text: "", error: window.clipboxDesktop ? aiErrorText(error) : "无法连接到接口（浏览器预览可能被跨域限制，桌面版不受影响）" };
+  }
+}
+
+async function aiListModels(baseUrl: string): Promise<{ models: string[]; error: string }> {
+  const url = modelsUrl(baseUrl);
+  try {
+    if (window.clipboxDesktop?.aiRequest) {
+      const response = await window.clipboxDesktop.aiRequest({ url, method: "GET" });
+      return parseModelsResponse(response.status, response.text);
+    }
+    const stored = JSON.parse(localStorage.getItem(AI_WEB_KEY) || "null");
+    if (!stored?.key) return { models: [], error: "请先填写 API Key" };
+    const response = await fetch(url, { headers: { authorization: `Bearer ${stored.key}` } });
+    return parseModelsResponse(response.status, await response.text());
+  } catch (error) {
+    return { models: [], error: window.clipboxDesktop ? aiErrorText(error) : "无法连接到接口（浏览器预览可能被跨域限制，桌面版不受影响）" };
   }
 }
 
@@ -2033,9 +2049,10 @@ function AiSettingsSection({ localAiAvailable }: { localAiAvailable: boolean }) 
   const [keyInput, setKeyInput] = useState("");
   const [status, setStatus] = useState<AiKeyStatus>({ hasKey: false, origin: "" });
   const [touched, setTouched] = useState(false);
-  const [busy, setBusy] = useState<"" | "save" | "test">("");
+  const [busy, setBusy] = useState<"" | "save" | "test" | "models">("");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [savedSettings, setSavedSettings] = useState<AiSettings | null>(() => readAiSettings(localStorage));
+  const [modelChoices, setModelChoices] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
     aiKeyStatus().then((value) => { if (!cancelled) setStatus(value); }).catch(() => undefined);
@@ -2080,6 +2097,34 @@ function AiSettingsSection({ localAiAvailable }: { localAiAvailable: boolean }) 
     setMessage(reply.error ? { tone: "error", text: `连接失败：${reply.error}` } : { tone: "ok", text: "连接成功，接口可以使用" });
   }
 
+  function applyPreset(id: string) {
+    const preset = AI_PRESETS.find((value) => value.id === id);
+    if (!preset) return;
+    setForm((value) => ({ ...value, baseUrl: preset.baseUrl, model: preset.model }));
+    setModelChoices([]);
+    setTouched(true);
+    setMessage({ tone: "ok", text: `已填入 ${preset.name} 的地址${preset.model ? "和常用模型" : ""}，再填 API Key 即可；模型名以官方为准，可点“获取模型”查看你的账号能用哪些` });
+  }
+
+  async function fetchModels() {
+    if (busy) return;
+    if (!parseAiEndpoint(form.baseUrl)) { setMessage({ tone: "error", text: "请先填写正确的接口地址" }); return; }
+    if (!keyReady) { setMessage({ tone: "error", text: "请先填写 API Key" }); return; }
+    setBusy("models");
+    setMessage({ tone: "ok", text: "正在获取模型…" });
+    try {
+      const next = keyInput.trim() ? await aiKeySave(form.baseUrl.trim(), keyInput) : status;
+      setStatus(next);
+      const result = await aiListModels(form.baseUrl.trim());
+      setModelChoices(result.models);
+      setMessage(result.error ? { tone: "error", text: result.error } : { tone: "ok", text: `取到 ${result.models.length} 个模型，点模型框选择` });
+    } catch (error) {
+      setMessage({ tone: "error", text: aiErrorText(error) });
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function clearInterface() {
     setBusy("save");
     try { await aiKeyClear(); } catch { /* the settings below are cleared either way */ }
@@ -2100,14 +2145,20 @@ function AiSettingsSection({ localAiAvailable }: { localAiAvailable: boolean }) 
     <>
       <div className="settings-row static"><div><strong>AI 润色 / AI 整理</strong><small>{summary}</small></div></div>
       <form className="settings-ai-form" onSubmit={(event) => { event.preventDefault(); void save(); }} autoComplete="off">
+        <label className="settings-ai-field"><span>常用服务</span>
+          <select aria-label="常用服务" value="" onChange={(event) => applyPreset(event.target.value)}>
+            <option value="">选择后自动填写地址和模型…</option>
+            {AI_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+          </select>
+        </label>
         <label className="settings-ai-field"><span>接口地址</span><input value={form.baseUrl} onChange={(event) => edit({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" spellCheck={false} /></label>
         <div className="settings-ai-pair">
-          <label className="settings-ai-field"><span>模型</span><input value={form.model} onChange={(event) => edit({ model: event.target.value })} placeholder="例如 gpt-4o-mini" spellCheck={false} /></label>
+          <div className="settings-ai-field"><span><label htmlFor="ai-model">模型</label><button type="button" className="settings-link-button" disabled={Boolean(busy)} onClick={() => void fetchModels()}>{busy === "models" ? "获取中…" : "获取模型"}</button></span><input id="ai-model" value={form.model} list="ai-model-choices" onChange={(event) => edit({ model: event.target.value })} placeholder="例如 gpt-4o-mini" spellCheck={false} /><datalist id="ai-model-choices">{modelChoices.map((name) => <option key={name} value={name} />)}</datalist></div>
           <label className="settings-ai-field"><span>API Key</span><input type="password" value={keyInput} onChange={(event) => { setKeyInput(event.target.value); setTouched(true); setMessage(null); }} placeholder={status.hasKey ? "已保存，留空则保持不变" : "sk-…"} spellCheck={false} autoComplete="new-password" /></label>
         </div>
         <label className="settings-ai-field"><span>润色提示词</span><textarea rows={4} value={form.polishPrompt} onChange={(event) => edit({ polishPrompt: event.target.value })} aria-invalid={!form.polishPrompt.trim()} /></label>
         <label className="settings-ai-field"><span>整理提示词</span><textarea rows={4} value={form.organizePrompt} onChange={(event) => edit({ organizePrompt: event.target.value })} aria-invalid={!form.organizePrompt.trim()} /></label>
-        {(touched && problem) && <p className="settings-error" role="alert">{problem}</p>}
+        {(touched && problem && !message) && <p className="settings-error" role="alert">{problem}</p>}
         {message && <p className={message.tone === "error" ? "settings-error" : "settings-ok"} role="status">{message.text}</p>}
         <div className="settings-ai-actions">
           <button type="submit" className="primary-button" disabled={Boolean(problem) || Boolean(busy)}>{busy === "save" ? "保存中…" : "保存"}</button>

@@ -655,7 +655,7 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 /* Settings → AI: the user's own interface */
 .settings-ai-form { margin: 4px 0 8px; display: grid; gap: 10px; }
 .settings-ai-field { min-width: 0; display: grid; gap: 4px; }
-.settings-ai-field > span { color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.settings-ai-field > span, .settings-ai-field > span > label { color: var(--ink-3); font-size: 12px; font-weight: 600; }
 .settings-ai-field input, .settings-ai-field textarea { width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--content); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
 .settings-ai-field input { height: 32px; padding-block: 0; }
 .settings-ai-field input:focus, .settings-ai-field textarea:focus { outline: 0; border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--ring); }
@@ -664,3 +664,8 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .settings-ai-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .settings-ai-actions .primary-button, .settings-ai-actions .secondary-button { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .settings-ok { margin: 0; color: var(--accent-ink); font-size: 12px; }
+.settings-ai-field select { width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--content); color: var(--ink); font: inherit; font-size: 13px; }
+.settings-ai-field select:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.settings-link-button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--accent-ink); font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.settings-link-button:hover:not(:disabled) { text-decoration: underline; }
+.settings-link-button:disabled { opacity: .5; cursor: default; }
