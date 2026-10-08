@@ -47,10 +47,15 @@ test("settings expose trash management, mini hide policy and launch at login", (
   const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
   assert.match(page, /id="set-trash"/);
   assert.match(page, /清空回收站/);
-  assert.match(page, /id="set-cli"/);
+  assert.doesNotMatch(page, /id="set-cli"/);
+  assert.match(page, /点击窗口关闭按钮时/);
+  assert.match(preload, /setCloseBehavior/);
+  assert.match(main, /clipbox:set-close-behavior/);
+  assert.match(main, /--hidden/);
+  assert.match(main, /classList\.add\('desktop-app', 'platform-\$\{process\.platform\}'\)`/);
   assert.match(page, /迷你窗口复制后/);
   assert.match(preload, /setMiniHidePolicy/);
   assert.match(preload, /setLaunchAtLogin/);
   assert.match(main, /clipbox:set-launch-at-login/);
-  assert.match(main, /app\.setLoginItemSettings\(\{ openAtLogin/);
+  assert.match(main, /app\.setLoginItemSettings\(\{ openAtLogin: Boolean\(enabled\)/);
 });

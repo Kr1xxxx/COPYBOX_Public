@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   didCopy: () => ipcRenderer.send("clipbox:did-copy"),
   setTheme: (theme) => ipcRenderer.send("clipbox:set-theme", theme),
   openDataFolder: () => ipcRenderer.invoke("clipbox:open-data-folder"),
+  setCloseBehavior: (behavior) => ipcRenderer.send("clipbox:set-close-behavior", behavior),
   setMiniHidePolicy: (policy) => ipcRenderer.send("clipbox:set-mini-hide-policy", policy),
   getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),

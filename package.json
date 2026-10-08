@@ -16,6 +16,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "desktop:dev": "npm run build && electron .",
     "desktop:pack": "npm run build && node desktop/prepare-standalone.mjs && electron-builder --mac dir --arm64",
+    "desktop:pack:win": "npm run build && node desktop/prepare-standalone.mjs && electron-builder --win nsis --x64",
     "db:generate": "drizzle-kit generate",
     "test:desktop-idle": "node --test tests/desktop-idle.integration.mjs"
   },
@@ -68,6 +69,17 @@
         "to": "standalone"
       }
     ],
+    "win": {
+      "icon": "desktop/assets/Clipbox.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "desktop/assets/Clipbox.icns",

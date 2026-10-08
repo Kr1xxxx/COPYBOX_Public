@@ -9,7 +9,9 @@ function createClipboardWriter(clipboard) {
     if (delay === 0) return;
     timer = setTimeout(() => {
       timer = undefined;
-      if (clipboard.readText() === text) clipboard.writeText("");
+      if (clipboard.readText() !== text) return;
+      if (typeof clipboard.clear === "function") clipboard.clear();
+      else clipboard.writeText("");
     }, delay * 1000);
     timer.unref?.();
   };

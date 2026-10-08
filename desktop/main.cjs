@@ -26,6 +26,13 @@ let automationServer;
 let rendererCommandBridge;
 let automationRendererReady = false;
 const appOrigin = APP_ORIGIN;
+const isMac = process.platform === "darwin";
+const isWindows = process.platform === "win32";
+// Launch-at-login starts Clipbox quietly in the tray.
+const startHidden = process.argv.includes("--hidden");
+const loginItemOptions = isWindows ? { args: ["--hidden"] } : {};
+let closeBehavior = "tray"; // "tray" | "quit"
+const GLOBAL_HOTKEY = "Alt+Space";
 const WINDOW_STATE_SAVE_DELAY = 180;
 const FULL_TRAFFIC_LIGHTS = { x: 14, y: 19 };
 const MINI_TRAFFIC_LIGHTS = { x: 14, y: 14 };
@@ -265,8 +272,9 @@ function createWindow() {
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#1c1b19" : "#faf9f5",
     title: "Clipbox",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: FULL_TRAFFIC_LIGHTS,
+    icon: path.join(__dirname, "assets", isWindows ? "Clipbox.ico" : "Clipbox.png"),
+    // macOS draws its own traffic lights over the sidebar; Windows keeps the native title bar.
+    ...(isMac ? { titleBarStyle: "hiddenInset", trafficLightPosition: FULL_TRAFFIC_LIGHTS } : { autoHideMenuBar: true }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
@@ -281,9 +289,9 @@ function createWindow() {
     if (!url.startsWith(appOrigin)) event.preventDefault();
   });
   mainWindow.webContents.on("dom-ready", () => {
-    void mainWindow.webContents.executeJavaScript("document.documentElement.classList.add('desktop-app')");
+    void mainWindow.webContents.executeJavaScript(`document.documentElement.classList.add('desktop-app', 'platform-${process.platform}')`);
   });
-  mainWindow.webContents.once("did-finish-load", () => mainWindow.show());
+  mainWindow.webContents.once("did-finish-load", () => { if (!startHidden) mainWindow.show(); });
   mainWindow.webContents.on("did-finish-load", sendWindowMode);
   mainWindow.on("move", scheduleWindowBoundsSave);
   mainWindow.on("move", scheduleMiniPositionSave);
@@ -292,17 +300,22 @@ function createWindow() {
     saveWindowBounds();
     saveMiniPosition();
     if (!quitting) {
+      if (closeBehavior === "quit") {
+        quitting = true;
+        app.quit();
+        return;
+      }
       event.preventDefault();
       mainWindow.hide();
     }
   });
   mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
+    if (!startHidden) mainWindow.show();
   });
   void mainWindow.loadURL(appOrigin);
 }
 
-// ⌥ Space opens the mini window and hides it again after a copy. Other ways
+// Alt+Space opens the mini window and hides it again after a copy. Other ways
 // of opening Clipbox return to the full window.
 function showWindow(asQuickSearch = false) {
   if (!mainWindow) return;
@@ -313,13 +326,14 @@ function showWindow(asQuickSearch = false) {
   mainWindow.webContents.send("clipbox:focus-search");
 }
 
-function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "Clipbox.png")).resize({ width: 18, height: 18 });
-  icon.setTemplateImage(true);
+function createTray(hotkeyRegistered) {
+  const size = isWindows ? 16 : 18;
+  const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "Clipbox.png")).resize({ width: size, height: size });
+  if (isMac) icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip("Clipbox · ⌥ Space 快速搜索");
+  tray.setToolTip(hotkeyRegistered ? `Clipbox · ${GLOBAL_HOTKEY} 快速搜索` : "Clipbox");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "快速搜索", accelerator: "Alt+Space", click: () => showWindow(true) },
+    { label: "快速搜索", ...(hotkeyRegistered ? { accelerator: GLOBAL_HOTKEY } : {}), click: () => showWindow(true) },
     { label: "打开 Clipbox", click: () => showWindow(false) },
     { type: "separator" },
     { label: "退出", click: () => { quitting = true; app.quit(); } },
@@ -335,13 +349,16 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     callback(permission === "clipboard-read" || permission === "clipboard-sanitized-write");
   });
+  if (isWindows) Menu.setApplicationMenu(null);
   try {
     startServer(APP_PORT);
     await waitForServer();
     createWindow();
-    await startAutomation();
-    createTray();
-    globalShortcut.register("Alt+Space", () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
+    // The automation CLI is a macOS/Linux unix-socket helper; Windows does not use it.
+    if (!isWindows) await startAutomation();
+    // Another program (PowerToys Run, for one) may already own the hotkey; the tray still works then.
+    const hotkeyRegistered = globalShortcut.register(GLOBAL_HOTKEY, () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
+    createTray(hotkeyRegistered);
   } catch {
     dialog.showErrorBox("Clipbox 无法启动", "本地服务未能启动，请重新打开应用。");
     app.quit();
@@ -378,6 +395,11 @@ ipcMain.on("clipbox:set-mini-hide-policy", (event, policy) => {
   if (policy === "hotkey" || policy === "always" || policy === "never") miniHidePolicy = policy;
 });
 
+ipcMain.on("clipbox:set-close-behavior", (event, behavior) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return;
+  if (behavior === "tray" || behavior === "quit") closeBehavior = behavior;
+});
+
 ipcMain.on("clipbox:set-theme", (event, theme) => {
   if (!mainWindow || mainWindow.webContents !== event.sender) return;
   if (theme === "system" || theme === "light" || theme === "dark") nativeTheme.themeSource = theme;
@@ -392,13 +414,13 @@ ipcMain.handle("clipbox:open-data-folder", async (event) => {
 
 ipcMain.handle("clipbox:get-launch-at-login", (event) => {
   if (!mainWindow || mainWindow.webContents !== event.sender) return false;
-  return app.getLoginItemSettings().openAtLogin;
+  return app.getLoginItemSettings(loginItemOptions).openAtLogin;
 });
 
 ipcMain.handle("clipbox:set-launch-at-login", (event, enabled) => {
   if (!mainWindow || mainWindow.webContents !== event.sender) throw new Error("Request denied");
-  app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
-  return app.getLoginItemSettings().openAtLogin;
+  app.setLoginItemSettings({ openAtLogin: Boolean(enabled), openAsHidden: true, ...loginItemOptions });
+  return app.getLoginItemSettings(loginItemOptions).openAtLogin;
 });
 
 ipcMain.on("clipbox:set-window-mode", (event, mode) => {

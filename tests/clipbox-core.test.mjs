@@ -21,7 +21,8 @@ const {
   permanentlyDeleteTrashedItem,
   parseRefreshContext,
   normalizeSecretSegments,
-  resolveGeneratedSummary,
+  resolveAiRewrite,
+  tidyText,
   resolveConnectedFocusTarget,
   resolveFocusWrapIndex,
   resolvePostCommitFocusTarget,
@@ -346,30 +347,17 @@ test("rejects malformed or invalid application refresh context", () => {
   assert.equal(parseRefreshContext(JSON.stringify({ activeKind: "secret", activeFolder: 7, productFilter: "全部产品", query: "" })), null);
 });
 
-test("accepts a generated summary only while source and summary are unchanged", () => {
-  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "旧总结", "一二三四五六七八九十十一"), {
-    summary: "一二三四五六七八九十",
-    stale: false,
-    error: "",
-  });
-  assert.deepEqual(resolveGeneratedSummary("原内容", "新内容", "旧总结", "旧总结", "新总结"), {
-    summary: "旧总结",
-    stale: true,
-    error: "",
-  });
-  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "旧总结", ""), {
-    summary: "旧总结",
-    stale: false,
-    error: "暂时无法生成，请手动填写",
-  });
+test("tidyText cleans spacing and blank lines but keeps [变量]", () => {
+  assert.equal(tidyText("Hi  [name] ,thanks!We   will  follow up.\r\n\r\n\r\n\r\n 您好  ，请查收 [quote] 。 "), "Hi [name], thanks! We will follow up.\n\n您好，请查收 [quote]。");
+  assert.equal(tidyText("你 好 世 界 {order}"), "你好世界 {order}");
+  assert.equal(tidyText("https://a.com/x 10:30"), "https://a.com/x 10:30");
 });
 
-test("preserves a manual summary edited while generation is running", () => {
-  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "手动新总结", "AI 总结"), {
-    summary: "手动新总结",
-    stale: true,
-    error: "",
-  });
+test("accepts an AI rewrite only while the content is unchanged", () => {
+  assert.deepEqual(resolveAiRewrite("原内容", "原内容", "  润色后  "), { text: "润色后", stale: false, error: "" });
+  assert.deepEqual(resolveAiRewrite("原内容", "手动改过", "润色后"), { text: "手动改过", stale: true, error: "" });
+  assert.deepEqual(resolveAiRewrite("原内容", "原内容", ""), { text: "原内容", stale: false, error: "暂时无法生成，内容没有改动" });
+  assert.deepEqual(resolveAiRewrite("原内容", "原内容", "原内容"), { text: "原内容", stale: false, error: "已经很整齐了，没有需要改的地方" });
 });
 
 test("disables Home shortcuts while any modal owns interaction", () => {

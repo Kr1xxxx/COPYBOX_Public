@@ -30,7 +30,10 @@ import {
   permanentlyDeleteTrashedItem,
   parseRefreshContext,
   resolveFocusWrapIndex,
-  resolveGeneratedSummary,
+  resolveAiRewrite,
+  tidyText,
+  SNIPPET_NOTE_MAX,
+  type AiRewriteMode,
   resolvePostCommitFocusTarget,
   resolveRefreshedActiveFolder,
   resolveSelectedFolder,
@@ -103,6 +106,8 @@ type DeleteRequest = { item: SecretItem; permanent: boolean };
 type WindowMode = "full" | "mini";
 type MiniHidePolicy = "hotkey" | "always" | "never";
 type ThemeChoice = "system" | "light" | "dark";
+type CloseBehavior = "tray" | "quit";
+const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
@@ -131,6 +136,7 @@ declare global {
       copyText: (text: string, seconds?: number) => Promise<void>;
       didCopy: () => void;
       setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
+      setCloseBehavior?: (behavior: CloseBehavior) => void;
       getLaunchAtLogin?: () => Promise<boolean>;
       setLaunchAtLogin?: (enabled: boolean) => Promise<boolean>;
       setTheme?: (theme: ThemeChoice) => void;
@@ -157,25 +163,6 @@ function timestampNow() {
   return Date.now();
 }
 
-function localSummary(value: string) {
-  const text = value.replace(/\s+/g, " ").trim();
-  const rules: Array<[RegExp, string]> = [
-    [/hair|beautiful|look so good|photo|loved it/i, "夸赞客户美照"],
-    [/thank|appreciate|感谢|谢谢/i, "感谢客户分享"],
-    [/refund|return|退款|退货/i, "退款处理说明"],
-    [/shipping|delivery|tracking|物流|发货/i, "物流进度回复"],
-    [/price|quote|wholesale|报价|批发/i, "报价沟通话术"],
-    [/cooperat|合作|代理|distributor/i, "合作邀约"],
-    [/appointment|booking|预约/i, "预约确认"],
-    [/hello|\bhi\b|你好|您好/i, "客户问候"],
-  ];
-  const matched = rules.find(([pattern]) => pattern.test(text));
-  if (matched) return matched[1];
-  const clause = text.split(/[。！？!?；;\n]/).find((part) => part.trim()) || text;
-  if (Array.from(clause).every((char) => char.charCodeAt(0) <= 127)) return limitChars(clause.split(/\s+/).slice(0, 3).join(" "));
-  return limitChars(clause.replace(/[，,：:“”"'（）()]/g, ""));
-}
-
 const ICON_PATHS: Record<string, React.ReactNode> = {
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
@@ -195,6 +182,11 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   shield: <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3z" />,
   chevron: <path d="m6 9 6 6 6-6" />,
 };
+
+// Shows Ctrl by default and the Command symbol when the desktop shell tags the page as darwin.
+function Keys({ k }: { k: string }) {
+  return <kbd><span className="k-win">Ctrl+{k}</span><span className="k-mac">⌘{k}</span></kbd>;
+}
 
 function Icon({ name, filled = false, className }: { name: keyof typeof ICON_PATHS; filled?: boolean; className?: string }) {
   return (
@@ -229,7 +221,14 @@ function SnippetTitle({ label, query = "" }: { label: string; query?: string }) 
   return <><span className="snippet-title-primary"><Highlight text={primary} query={query} /></span><span className="snippet-title-separator">｜</span><span className="snippet-title-detail"><Highlight text={detail} query={query} /></span></>;
 }
 
-async function aiSummary(value: string) {
+const AI_PROMPTS: Record<AiRewriteMode, string> = {
+  polish: "润色下面这段客服话术：保持原意和原语言，让语气更自然、礼貌、简洁。必须原样保留所有 [方括号] 和 {花括号} 里的变量，不要增加原文没有的信息。只返回润色后的正文，不要解释，不要加引号。",
+  organize: "整理下面这段话术：修正错别字和标点，分段清晰，去掉重复和多余空格。不改变意思，不增删信息，原样保留所有 [方括号] 和 {花括号} 里的变量。只返回整理后的正文，不要解释，不要加引号。",
+};
+
+// Runs on the device's own language model when the browser exposes one. 整理 can
+// still fall back to a rule-based tidy; 润色 genuinely needs a model.
+async function aiRewrite(mode: AiRewriteMode, value: string): Promise<{ text: string; unavailable: boolean }> {
   type LanguageSession = { prompt: (prompt: string) => Promise<string>; destroy?: () => void };
   type LanguageModelAPI = { create: () => Promise<LanguageSession> };
   const model = (window as unknown as { LanguageModel?: LanguageModelAPI }).LanguageModel;
@@ -237,16 +236,16 @@ async function aiSummary(value: string) {
     let session: LanguageSession | undefined;
     try {
       session = await model.create();
-      const result = await session.prompt(`用不超过10个中文字符总结下面这段话术的用途。只返回总结，不要标点和解释：\n${value}`);
-      const cleaned = result.replace(/[\n。！？!?,，：:"“”']/g, "").trim();
-      if (cleaned) return limitChars(cleaned);
+      const result = await session.prompt(`${AI_PROMPTS[mode]}\n\n${value}`);
+      const cleaned = result.replace(/^```[a-z]*\n?|```$/gi, "").trim().replace(/^["“](.*)["”]$/s, "$1").trim();
+      if (cleaned) return { text: mode === "organize" ? tidyText(cleaned) : cleaned, unavailable: false };
     } catch {
-      // Fall through to the private on-device heuristic.
+      // Fall through below.
     } finally {
       session?.destroy?.();
     }
   }
-  return localSummary(value);
+  return mode === "organize" ? { text: tidyText(value), unavailable: false } : { text: "", unavailable: true };
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -983,6 +982,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [closeBehavior, setCloseBehavior] = useState<CloseBehavior>(() => readStoredChoice<CloseBehavior>(CLOSE_BEHAVIOR_KEY, ["tray", "quit"], "tray"));
+  useEffect(() => {
+    window.clipboxDesktop?.setCloseBehavior?.(closeBehavior);
+    // Sent once on start; later changes go through chooseCloseBehavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function chooseCloseBehavior(behavior: CloseBehavior) {
+    setCloseBehavior(behavior);
+    writeStoredChoice(CLOSE_BEHAVIOR_KEY, behavior);
+    window.clipboxDesktop?.setCloseBehavior?.(behavior);
+  }
+
   function chooseMiniHidePolicy(policy: MiniHidePolicy) {
     setMiniHidePolicy(policy);
     writeStoredChoice(MINI_HIDE_KEY, policy);
@@ -1351,7 +1363,7 @@ export default function Home() {
           </div>
           <footer className="status-bar">
             <span><kbd>↵</kbd>复制</span>
-            <span><kbd>⌘E</kbd>编辑</span>
+            <span><Keys k="E" />编辑</span>
             <span className="spacer" />
             <span>{filtered.length} 条</span>
           </footer>
@@ -1406,7 +1418,7 @@ export default function Home() {
               <div className="native-search">
                 <Icon name="search" className="search-glyph" />
                 {searchInput}
-                <kbd>⌘K</kbd>
+                <Keys k="K" />
               </div>
               {canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
@@ -1520,7 +1532,7 @@ export default function Home() {
               <span className="spacer" />
               <span><kbd>↑↓</kbd>选择</span>
               <span><kbd>↵</kbd>复制</span>
-              <span><kbd>⌘E</kbd>编辑</span>
+              <span><Keys k="E" />编辑</span>
             </footer>
           </section>
         </>}
@@ -1533,6 +1545,8 @@ export default function Home() {
         itemCount={items.filter((item) => !isTrashedItem(item)).length}
         miniHidePolicy={miniHidePolicy}
         onMiniHidePolicy={chooseMiniHidePolicy}
+        closeBehavior={closeBehavior}
+        onCloseBehavior={chooseCloseBehavior}
         trashDays={trashDays}
         onTrashDays={chooseTrashDays}
         onEmptyTrash={emptyTrash}
@@ -1672,7 +1686,7 @@ function SnippetFillPanel({ request, onClose, onCopy }: {
         {meta.requiredInputs.length > 0 && <fieldset className="copy-checks"><legend>发送前确认</legend>{meta.requiredInputs.map((input) => <label key={input}><input type="checkbox" checked={checkedInputs.includes(input)} onChange={(event) => setCheckedInputs((current) => event.target.checked ? [...current, input] : current.filter((value) => value !== input))} /><span>已确认 {input}</span></label>)}</fieldset>}
         {meta.requiresVerification && <label className="copy-warning"><input type="checkbox" checked={verificationConfirmed} onChange={(event) => setVerificationConfirmed(event.target.checked)} /><span><strong>发送前核实</strong> 金额、库存、地址或时效已按当前情况检查</span></label>}
         <section className="copy-preview"><h3>{language === "en" ? "英文预览" : "中文预览"}</h3><p lang={language === "en" ? "en" : "zh"}>{filled.text}</p></section>
-        <div className="fill-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={busy}>取消</button><button type="submit" className="primary-button" disabled={busy || !readiness.ready || !source}>{busy ? "正在复制…" : `复制${language === "en" ? "英文" : "中文"}`}<kbd>⌘↵</kbd></button></div>
+        <div className="fill-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={busy}>取消</button><button type="submit" className="primary-button" disabled={busy || !readiness.ready || !source}>{busy ? "正在复制…" : `复制${language === "en" ? "英文" : "中文"}`}<Keys k="↵" /></button></div>
       </form>
     </section>
   );
@@ -1729,11 +1743,6 @@ function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
   );
 }
 
-const CLI_COMMANDS: [string, string][] = [
-  ["clipbox list", "列出话术"], ["clipbox get CB-0003", "读取一条"], ["clipbox add --title … --content …", "新增"],
-  ["clipbox update CB-0003 --content …", "修改"], ["clipbox move CB-0003 --folder …", "移动目录"], ["clipbox delete CB-0003 --confirm", "删除"],
-];
-
 function backupAgeLabel(at: number) {
   if (!at) return "还没有导出过";
   const days = Math.floor((Date.now() - at) / 86_400_000);
@@ -1745,9 +1754,10 @@ function clearLabel(seconds: number) {
   return seconds === 0 ? "不清除" : seconds < 60 ? `${seconds} 秒` : `${seconds / 60} 分钟`;
 }
 
-function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
+function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onImport, onImportSheet, onReload, onMini }: {
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
+  closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
   onClose: () => void; onExport: () => void; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
@@ -1755,6 +1765,8 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
   const [clearSeconds, setClearSeconds] = useState(readClipboardClearSeconds);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [versionCopied, setVersionCopied] = useState(false);
+  const [aiAvailable] = useState(() => typeof window !== "undefined" && "LanguageModel" in window);
   const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -1781,18 +1793,18 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
             {isDesktop
-              ? row("数据位置", "在 Finder 中打开 Clipbox 的本机数据文件夹", onOpenDataFolder, "打开文件夹")
+              ? row("数据位置", "在文件夹中打开 Clipbox 的本机数据", onOpenDataFolder, "打开文件夹")
               : <div className="settings-row static"><div><strong>数据位置</strong><small>浏览器版保存在本站点的本地存储里，清除站点数据会一并删除</small></div></div>}
           </section>
           <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
-            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会在 macOS 切换深浅色时自动变化</small></div>
+            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
               <div className="settings-segment" role="radiogroup" aria-label="主题">
                 {([["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]] as [ThemeChoice, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={theme === value} className={theme === value ? "active" : ""} onClick={() => onTheme(value)}>{label}</button>)}
               </div>
             </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
-            <div className="settings-row"><div><strong>复制后自动清除剪贴板</strong><small>只在剪贴板内容仍是刚复制的那一条时才清除</small></div>
+            <div className="settings-row"><div><strong>复制后自动清除剪贴板</strong><small>仅当剪贴板仍是刚复制的内容才清除；清不掉 Win+V 历史里的副本</small></div>
               <div className="settings-segment" role="radiogroup" aria-label="自动清除剪贴板">
                 {CLIPBOARD_CLEAR_OPTIONS.map((seconds) => <button key={seconds} type="button" role="radio" aria-checked={clearSeconds === seconds} className={clearSeconds === seconds ? "active" : ""} onClick={() => { setClearSeconds(seconds); writeClipboardClearSeconds(seconds); }}>{clearLabel(seconds)}</button>)}
               </div>
@@ -1815,23 +1827,27 @@ function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount,
             {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}
             <div className="settings-row"><div><strong>迷你窗口复制后</strong><small>{isDesktop ? "选择复制后是否自动收起迷你窗口" : "仅桌面版生效"}</small></div>
               <div className="settings-segment" role="radiogroup" aria-label="迷你窗口复制后">
-                {([["hotkey", "⌥Space 呼出时收起"], ["always", "总是收起"], ["never", "不收起"]] as [MiniHidePolicy, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={miniHidePolicy === value} className={miniHidePolicy === value ? "active" : ""} onClick={() => onMiniHidePolicy(value)}>{label}</button>)}
+                {([["hotkey", "快捷键呼出时收起"], ["always", "总是收起"], ["never", "不收起"]] as [MiniHidePolicy, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={miniHidePolicy === value} className={miniHidePolicy === value ? "active" : ""} onClick={() => onMiniHidePolicy(value)}>{label}</button>)}
               </div>
             </div>
-            {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录 macOS 后自动打开 Clipbox</small></div>
+            {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录系统后自动启动，并安静地收在托盘里</small></div>
               <div className="settings-segment" role="radiogroup" aria-label="开机自动启动">
                 {([[false, "关"], [true, "开"]] as [boolean, string][]).map(([value, label]) => <button key={label} type="button" role="radio" aria-checked={launchAtLogin === value} className={launchAtLogin === value ? "active" : ""} onClick={() => { void window.clipboxDesktop?.setLaunchAtLogin?.(value).then(setLaunchAtLogin).catch(() => undefined); }}>{label}</button>)}
               </div>
             </div>}
+            {isDesktop && <div className="settings-row"><div><strong>点击窗口关闭按钮时</strong><small>{closeBehavior === "tray" ? "Clipbox 继续在托盘里运行，可随时呼出" : "直接退出 Clipbox"}</small></div>
+              <div className="settings-segment" role="radiogroup" aria-label="点击窗口关闭按钮时">
+                {([["tray", "收到托盘"], ["quit", "退出"]] as [CloseBehavior, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={closeBehavior === value} className={closeBehavior === value ? "active" : ""} onClick={() => onCloseBehavior(value)}>{label}</button>)}
+              </div>
+            </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
           </section>
-          <section aria-labelledby="set-cli"><h3 id="set-cli">命令行</h3>
-            <p className="settings-note">打开 Clipbox 后，其他本机任务可用 <code>clipbox</code> 命令直接读写话术，修改会立即出现在窗口里。</p>
-            <dl className="settings-keys settings-cli">{CLI_COMMANDS.map(([cmd, what]) => <div key={cmd}><dt><code>{cmd}</code></dt><dd>{what}</dd></div>)}</dl>
-            <p className="settings-note">秘密不能列表、搜索或通过命令修改，只能按 <code>clipbox://secret/…</code> 引用精确读取。</p>
+          <section aria-labelledby="set-ai"><h3 id="set-ai">AI</h3>
+            <div className="settings-row static"><div><strong>AI 润色 / AI 整理</strong><small>{aiAvailable ? "已检测到系统自带的本机 AI，文字不会离开这台电脑" : "这台电脑没有可用的本机 AI：AI 整理会用规则整理，AI 润色暂不可用"}</small></div></div>
           </section>
           <section aria-labelledby="set-about"><h3 id="set-about">关于</h3>
-            <div className="settings-row static"><div><strong>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div></div>
+            <div className="settings-row"><div><strong>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
+              <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipbox ${version || "dev"} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
           </section>
         </div>
       </section>
@@ -1908,20 +1924,20 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
   const [rawProduct, setRawProduct] = useState(item?.snippetMeta?.rawProduct || "");
   const [usageNote, setUsageNote] = useState(item?.snippetMeta?.usageNote || "");
   const [referenceNote, setReferenceNote] = useState(kind === "secret" ? item?.note || "" : "");
-  const [summaryError, setSummaryError] = useState("");
+  const [aiNotice, setAiNotice] = useState("");
+  const [aiUndo, setAiUndo] = useState<string | null>(null);
   const [saveError, setSaveError] = useState("");
   const [referenceStatus, setReferenceStatus] = useState<"idle" | "copied" | "error">("idle");
   const [folder, setFolder] = useState(resolveSelectedFolder(folders, item?.folder || defaultFolder || (kind === "snippet" ? STANDARD_SNIPPET_FOLDERS[0] : ""), kind === "secret"));
   const [color] = useState(item?.color || (kind === "snippet" ? "#ffcfa8" : COLORS[0]));
   const [busy, setBusy] = useState(false);
-  const [summarizing, setSummarizing] = useState(false);
+  const [aiBusy, setAiBusy] = useState<AiRewriteMode | null>(null);
   const [visible, setVisible] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const copyOnSubmitRef = useRef(false);
   const latestContentRef = useRef(secret);
-  const latestSummaryRef = useRef(summary);
 
   useEffect(() => {
     titleInputRef.current?.focus();
@@ -1956,7 +1972,7 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
     const shouldCopy = copyOnSubmitRef.current;
     copyOnSubmitRef.current = false;
     const selectedFolder = resolveSelectedFolder(folders, folder, kind === "secret");
-    const nextSummary = kind === "snippet" ? (structured ? summary.trim() : limitChars(summary)) : "";
+    const nextSummary = kind === "snippet" ? (structured ? summary.trim() : limitChars(summary, SNIPPET_NOTE_MAX)) : "";
     const snippetMeta = structured && item?.snippetMeta ? {
       ...item.snippetMeta,
       stage: selectedFolder,
@@ -2021,29 +2037,35 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
     }
   }
 
-  async function summarize() {
-    const captured = latestContentRef.current.trim();
-    const capturedSummary = latestSummaryRef.current;
-    if (!captured) return;
-    setSummarizing(true);
-    setSummaryError("");
+  async function rewrite(mode: AiRewriteMode) {
+    const captured = latestContentRef.current;
+    if (!captured.trim() || aiBusy) return;
+    setAiBusy(mode);
+    setAiNotice("");
     try {
-      const generated = await aiSummary(captured);
-      const result = resolveGeneratedSummary(
-        captured,
-        latestContentRef.current.trim(),
-        capturedSummary,
-        latestSummaryRef.current,
-        generated,
-      );
-      if (!result.stale) {
-        latestSummaryRef.current = result.summary;
-        setSummary(result.summary);
-        setSummaryError(result.error);
+      const generated = await aiRewrite(mode, captured);
+      if (generated.unavailable) {
+        setAiNotice("这台电脑的系统里没有可用的本机 AI，暂时无法润色；「AI 整理」仍可使用");
+        return;
       }
+      const result = resolveAiRewrite(captured, latestContentRef.current, generated.text);
+      if (result.stale) return;
+      if (result.error) { setAiNotice(result.error); return; }
+      setAiUndo(captured);
+      latestContentRef.current = result.text;
+      setSecret(result.text);
+      setAiNotice(mode === "polish" ? "已润色" : "已整理");
     } finally {
-      setSummarizing(false);
+      setAiBusy(null);
     }
+  }
+
+  function undoRewrite() {
+    if (aiUndo === null) return;
+    latestContentRef.current = aiUndo;
+    setSecret(aiUndo);
+    setAiUndo(null);
+    setAiNotice("");
   }
 
   return (
@@ -2054,7 +2076,7 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
           {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{item.snippetNumber}</b>}
           {kind === "secret" && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
         </div>
-        <span className="inline-editor-hint">{kind === "secret" ? "加密保存在这台设备上" : structured ? "中英文和使用规则一起加密保存" : "总结可手动填写，也可用本机 AI 生成"}</span>
+        <span className="inline-editor-hint">{kind === "secret" ? "加密保存在这台设备上" : structured ? "中英文和使用规则一起加密保存" : "备注只给自己看；内容可用 AI 润色或整理"}</span>
       </header>
       <form ref={formRef} onSubmit={submit}>
           <div className="editor-body">
@@ -2089,15 +2111,15 @@ function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDelete, onS
               <button type="button" className={visible ? "active" : ""} aria-pressed={visible} onClick={() => setVisible(true)}>明文显示</button>
             </div>}
 
-            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? "密码 / 文本" : "话术内容"}</span>{kind === "secret" && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label="秘密第一段" className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label="秘密第二段" className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? "密码 / 文本" : "话术内容"} className={kind === "secret" && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setSummaryError(""); }} placeholder={kind === "secret" ? "输入要保存的密码或文本" : "输入需要反复使用的话术"} rows={6} />}</div></div>
+            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? "密码 / 文本" : "话术内容"}</span>{kind === "secret" && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label="秘密第一段" className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label="秘密第二段" className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? "密码 / 文本" : "话术内容"} className={kind === "secret" && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); }} placeholder={kind === "secret" ? "输入要保存的密码或文本" : "输入需要反复使用的话术"} rows={6} />}</div></div>
+
+            {kind === "snippet" && aiNotice && <small className="ai-notice" role="status">{aiNotice}</small>}
 
             {kind === "snippet" && <div className="native-field summary-field">
-              <label htmlFor="summary-input">{structured ? "核心动作" : "总结"} {!structured && <small>最多 10 字</small>}</label>
+              <label htmlFor="summary-input">{structured ? "核心动作" : "备注"} {!structured && <small>可选，最多 {SNIPPET_NOTE_MAX} 字</small>}</label>
               <div className="summary-control">
-                <input id="summary-input" value={summary} onChange={(event) => { const value = structured ? event.target.value : limitChars(event.target.value); latestSummaryRef.current = value; setSummary(value); setSummaryError(""); }} placeholder={structured ? "例如 发送睫毛报价" : "例如 售后夸赞"} />
-                {!structured && <button type="button" onClick={() => void summarize()} disabled={summarizing || !secret.trim()}>{summarizing ? "总结中…" : "AI 总结"}</button>}
+                <input id="summary-input" value={summary} onChange={(event) => setSummary(structured ? event.target.value : limitChars(event.target.value, SNIPPET_NOTE_MAX))} placeholder={structured ? "例如 发送睫毛报价" : "例如 售后夸赞时用"} />
               </div>
-              {summaryError && <small className="summary-error" role="status">{summaryError}</small>}
             </div>}
             {structured && <details className="structured-details">
               <summary>中文对照与使用规则</summary>

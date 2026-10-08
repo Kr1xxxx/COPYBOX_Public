@@ -438,7 +438,7 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .inline-editor .soft-textarea.secret-segmented textarea { border: 1px solid var(--border); background: var(--card); }
 .inline-editor .snippet-content, .inline-editor .summary-field, .inline-editor .reference-note-field { margin-top: 10px; }
 .inline-editor .summary-control button, .inline-editor .segment-toggle { height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--ink-2); font-size: 12px; font-weight: 600; }
-.inline-editor .segment-toggle { height: 22px; top: -4px; font-size: 11px; }
+.inline-editor .segment-toggle { height: 22px; top: -4px; padding: 0 8px; font-size: 11px; }
 .inline-editor .summary-control button:hover, .inline-editor .segment-toggle:hover, .inline-editor .segment-toggle.active { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); }
 .inline-editor .segmented { width: 220px; height: 28px; margin: 10px 0; background: var(--fill); }
 .inline-editor .segmented button { color: var(--muted); font-size: 11.5px; }
@@ -578,3 +578,15 @@ kbd { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place
 .native-list > .native-empty { flex: 1 1 auto; height: auto; min-height: 240px; padding-bottom: 36px; }
 .native-list > .native-empty.onboarding { min-height: 0; padding: 24px 28px 48px; }
 .native-empty.onboarding span { max-width: 440px; text-wrap: balance; }
+
+/* AI 润色 / 整理 live in the content field header */
+.inline-editor .content-field-head { display: flex; align-items: center; justify-content: space-between; min-height: 22px; }
+.inline-editor .ai-actions { display: inline-flex; gap: 6px; }
+.inline-editor .ai-actions .segment-toggle { position: static; }
+.inline-editor .ai-actions .segment-toggle:disabled { opacity: .5; cursor: default; }
+.inline-editor .ai-notice { display: block; margin-top: 6px; color: var(--muted); font-size: 11.5px; }
+
+/* Ctrl on Windows/Linux, ⌘ on macOS */
+.k-mac { display: none; }
+.platform-darwin .k-mac { display: inline; }
+.platform-darwin .k-win { display: none; }

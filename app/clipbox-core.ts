@@ -228,20 +228,36 @@ export function resolveRefreshedActiveFolder(kind: ItemKind, folders: string[], 
   return kind === "snippet" && resolved === "uncategorized" ? "all" : resolved;
 }
 
-export function resolveGeneratedSummary(
-  startedWithContent: string,
-  currentContent: string,
-  startedWithSummary: string,
-  currentSummary: string,
-  generated: string,
-) {
-  if (startedWithContent !== currentContent || startedWithSummary !== currentSummary) {
-    return { summary: currentSummary, stale: true, error: "" };
-  }
-  const summary = limitChars(generated);
-  return summary
-    ? { summary, stale: false, error: "" }
-    : { summary: currentSummary, stale: false, error: "暂时无法生成，请手动填写" };
+export const SNIPPET_NOTE_MAX = 40;
+
+// Deterministic tidy-up used on its own when no on-device model is available,
+// and after a model rewrite. It never touches [变量] / {变量} tokens.
+export function tidyText(value: string) {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line
+      .replace(/[ \t\u3000]+/g, " ")
+      .trim()
+      .replace(/([\u3400-\u9fff\uff09\u300d\u300f\u201d\u300b])\s+(?=[\u3400-\u9fff\uff08\u300c\u300e\u201c\u300a])/g, "$1")
+      .replace(/\s+([,;!?])/g, "$1")
+      .replace(/\s+:(?=\s|$)/g, ":")
+      .replace(/\s+([\uff0c\u3002\uff01\uff1f\uff1b\uff1a\u3001\uff09\u300d\u300f\u201d\u300b])/g, "$1")
+      .replace(/([\uff08\u300c\u300e\u201c\u300a])\s+/g, "$1")
+      .replace(/([,;!?])(?=[A-Za-z])/g, "$1 "))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export type AiRewriteMode = "polish" | "organize";
+
+export function resolveAiRewrite(startedWithContent: string, currentContent: string, generated: string) {
+  if (startedWithContent !== currentContent) return { text: currentContent, stale: true, error: "" };
+  const text = generated.trim();
+  if (!text) return { text: currentContent, stale: false, error: "暂时无法生成，内容没有改动" };
+  if (text === startedWithContent.trim()) return { text: currentContent, stale: false, error: "已经很整齐了，没有需要改的地方" };
+  return { text, stale: false, error: "" };
 }
 
 export function normalizeFolderName(value: string) {
