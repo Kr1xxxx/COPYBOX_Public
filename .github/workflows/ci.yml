@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    name: lint + tests
+    runs-on: ubuntu-latest
+    env:
+      # Unit tests do not launch Electron, so skip the large binary download.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: browser end-to-end
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The e2e suite only exists once the new UI (PR #1) is merged; skip it before that.
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npm ci
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npx playwright install --with-deps chromium
+      - if: hashFiles('playwright.config.mjs') != ''
+        run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  handoff:
+    name: handoff updated
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-handoff.mjs
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+
+  # D-011: small changes merge themselves once every check is green; big ones wait for the owner.
+  merge-policy:
+    name: merge policy
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [check, e2e, handoff]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Read labels now (not from the event) so a "major" label added after opening still counts.
+      - id: labels
+        run: echo "json=$(gh pr view "$PR" --json labels --jq '[.labels[].name]')" >> "$GITHUB_OUTPUT"
+      - id: size
+        run: node scripts/classify-pr.mjs
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          LABELS: ${{ steps.labels.outputs.json }}
+      - name: Small change → merge
+        if: steps.size.outputs.size == 'small'
+        run: |
+          gh pr edit "$PR" --remove-label needs-owner || true
+          gh pr edit "$PR" --add-label auto-merged
+          gh pr merge "$PR" --merge --delete-branch
+      - name: Big change → wait for the owner
+        if: steps.size.outputs.size == 'big'
+        run: |
+          gh pr edit "$PR" --add-label needs-owner
+          echo "::notice::Waiting for the owner to say 合并 (merge)."
