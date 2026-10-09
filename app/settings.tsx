@@ -56,6 +56,13 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
       <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <header><h2 id="settings-title">设置</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">×</button></header>
         <div className="settings-body">
+          <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
+            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
+              <div className="settings-segment" role="radiogroup" aria-label="主题">
+                {([["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]] as [ThemeChoice, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={theme === value} className={theme === value ? "active" : ""} onClick={() => onTheme(value)}>{label}</button>)}
+              </div>
+            </div>
+          </section>
           <section aria-labelledby="set-data"><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {!PLAIN_NOTES && row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
@@ -68,13 +75,6 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
           </section>
           <section aria-labelledby="set-folders"><h3 id="set-folders">目录</h3>
             <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
-          </section>
-          <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
-            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="主题">
-                {([["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]] as [ThemeChoice, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={theme === value} className={theme === value ? "active" : ""} onClick={() => onTheme(value)}>{label}</button>)}
-              </div>
-            </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
             <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
