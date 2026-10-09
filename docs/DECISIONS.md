@@ -27,6 +27,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-018 | 图片 folders (目录) | Accepted |
 | D-019 | 图片 shown as a 九宫格 (grid) by default | Accepted (columns changed by D-020) |
 | D-020 | 图片 grid is 16宫格 (4 per row), whole picture in the thumbnail, 6% margin on frosted glass | Accepted |
+| D-021 | Motion follows arc-library (components vendored into `app/arc/`, `motion` added) | Accepted |
 
 ---
 
