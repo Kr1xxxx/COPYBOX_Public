@@ -26,6 +26,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 | D-018 | 图片 folders (目录) | Accepted |
 | D-019 | 图片 shown as a 九宫格 (3-column grid) by default | Accepted |
+| D-020 | Version update reminder: tells, never installs; source address not chosen yet | Accepted |
 
 ---
 
@@ -166,3 +167,15 @@ Statuses: Accepted / Superseded / Deprecated.
   row. A `宫格 | 列表` switch (kept per device in `localStorage` key `clipbox.image-view`) brings back the old list. The
   mini window always shows the grid, 3 compact columns, and a tile click copies. Spec: `docs/specs/image-grid.md`.
 - Consequences: a UI preference only; no stored image data changes.
+
+### D-020 Version update reminder (2026-10-09)
+- Context (owner): "版本更新提醒做一下". Employees on an old build never get fixes (D-013: no auto-update).
+- Decision: on launch and then once a day the desktop app reads a small JSON file `{"version","notes","url"}` from an
+  address set in `desktop/update-config.cjs` (or env `CLIPBOX_UPDATE_URL`). If it names a newer version, the full window
+  shows a top banner: version, short notes, `下载` (opens the https link in the browser) and `稍后` (hides that version
+  only, `localStorage` key `clipbox.update-dismissed`). Nothing is downloaded or installed by the app, and the page
+  cannot pass its own link: the main process opens only the link it read itself.
+- The address is empty for now (owner: 先不定), so the check is off and nothing is sent anywhere. The repo is private,
+  so GitHub Releases cannot serve employees without a token; pick a shared link or share drive before turning it on.
+- Consequences: D-013 still holds (no code signing, no auto-install). Publishing the JSON and installer is a release
+  to employees and waits for the owner.

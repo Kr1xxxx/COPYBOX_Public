@@ -9,6 +9,8 @@ const path = require("node:path");
 const { createRendererCommandBridge } = require("./automation-bridge.cjs");
 const { createAutomationServer, installAutomationCli } = require("./automation-server.cjs");
 const { APP_HOST, APP_ORIGIN, APP_PORT } = require("./runtime-config.cjs");
+const { createUpdateChecker } = require("./update-check.cjs");
+const { UPDATE_URL } = require("./update-config.cjs");
 const { createMiniWindowStore, createWindowStateStore, MINI_WINDOW_SIZE, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } = require("./window-state.cjs");
 
 let mainWindow;
@@ -452,6 +454,15 @@ ipcMain.handle("clipbox:ai-clear", (event) => aiStoreFor(event).clear());
 ipcMain.handle("clipbox:ai-request", (event, payload) => aiStoreFor(event).request(payload || {}));
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
+
+const updateChecker = createUpdateChecker({ url: UPDATE_URL, currentVersion: app.getVersion() });
+ipcMain.handle("clipbox:check-update", () => updateChecker.check());
+ipcMain.handle("clipbox:open-update", async () => {
+  const url = updateChecker.getDownloadUrl();
+  if (!url) return false;
+  await shell.openExternal(url);
+  return true;
+});
 
 ipcMain.on("clipbox:relaunch", () => {
   void relaunchApplication();

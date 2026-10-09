@@ -41,6 +41,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 13 | 图片 folders (D-018) | Done | Claude | Store by an Opus worker (`image-store.ts`), UI by a Sonnet worker (`image-library.ts`, `image-folders.tsx`, `image-folders-core.ts`); Merged as PR #25 (2026-10-09). Not yet: drag-sorting folders, image backup |
 | 14 | Web preview tool in the repo (`tools/preview/`, `npm run preview:build` / `preview:serve`) | Done | Claude | Was only in a temp folder; now any session can rebuild the preview with its version number. PR waits for the owner (package.json, eslint config) |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
+| 16 | Version update reminder (D-020) | Done | Claude | `desktop/update-check.cjs`, banner `app/update-notice.tsx`; off until the owner chooses an address (`desktop/update-config.cjs`). Same code on Windows and Mac |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
 

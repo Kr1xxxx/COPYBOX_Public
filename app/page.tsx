@@ -70,6 +70,7 @@ import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
+import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -1455,6 +1456,7 @@ export default function Home() {
           </>}
 
           <section className="content-panel">
+            <UpdateNotice />
             <header className="toolbar drag-region">
               <div className="native-search">
                 <Icon name="search" className="search-glyph" />
