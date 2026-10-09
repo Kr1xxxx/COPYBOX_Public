@@ -45,7 +45,6 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 | `desktop/main.cjs` | Main process: windows, tray, launch at login, IPC |
 | `desktop/preload.cjs` | The `window.clipboxDesktop` bridge — the only way the page reaches the OS |
 | `desktop/ai.cjs` | Stores the AI key with OS encryption (safeStorage) |
-| `desktop/device-key.cjs`, `app/device-key-guard.ts` | Windows: vault device key kept OS-encrypted outside the page storage, with migration (D-012) |
 | `tests/*.test.mjs` | node:test; many are regex assertions on source text |
 | `tests/e2e/` | Browser end-to-end tests; `helpers.mjs` seeds sample data and fakes Windows/macOS |
 | `docs/features.json` | Feature verification list (verified in browser / on Windows / on Mac) |

@@ -17,8 +17,8 @@ export async function seedSnippets(page) {
 }
 
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").
-export async function asDesktop(page, platform, { osKey = false } = {}) {
-  await page.addInitScript(([pl, withOsKey]) => {
+export async function asDesktop(page, platform) {
+  await page.addInitScript((pl) => {
     window.clipboxDesktop = {
       platform: pl,
       copyText: async (text) => { window.__copied = text; },
@@ -29,13 +29,7 @@ export async function asDesktop(page, platform, { osKey = false } = {}) {
       respondAutomationCommand() {},
       automationReady() {},
       aiStatus: async () => ({ hasKey: false, origin: "" }),
-      // Stands in for the OS-encrypted key store of the Windows desktop app (kept per browser tab).
-      ...(withOsKey ? {
-        deviceKeyAvailable: async () => true,
-        deviceKeyGet: async () => JSON.parse(sessionStorage.getItem("fake-os-key") || "null"),
-        deviceKeySet: async (record) => { sessionStorage.setItem("fake-os-key", JSON.stringify(record)); return true; },
-      } : {}),
     };
     document.addEventListener("DOMContentLoaded", () => document.documentElement.classList.add("desktop-app", `platform-${pl}`));
-  }, [platform, osKey]);
+  }, platform);
 }

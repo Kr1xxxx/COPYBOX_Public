@@ -18,9 +18,10 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-009 | Folder rules | Accepted |
 | D-010 | Workflow: PRs only, the owner merges | Superseded by D-011 |
 | D-011 | Small changes merge themselves; big ones wait for the owner's 合并 | Accepted |
-| D-012 | Windows: the vault's device key is protected by OS encryption | Accepted |
+| D-012 | Windows: the vault's device key is protected by OS encryption | Superseded by D-015 |
 | D-013 | No code signing for now (internal tool); auto-update undecided | Accepted |
 | D-014 | No real-device testing round before merging | Accepted |
+| D-015 | Device-key protection removed for now | Accepted |
 
 ---
 
@@ -96,7 +97,7 @@ Statuses: Accepted / Superseded / Deprecated.
 - One change per PR — changes are not batched. Small, frequent PRs are easier to check and to revert; the only cost
   is GitHub Actions minutes (about 5 billed minutes per CI run; the free plan includes 2,000 a month).
 
-### D-012 Device key protected by the OS (2026-10-08)
+### D-012 Device key protected by the OS (2026-10-08) — superseded by D-015
 - Context: the device key sat next to the vault, so anyone who copied the data folder could decrypt it.
 - Decision (owner approved "修法 A"): on Windows the key is encrypted with `safeStorage` (DPAPI) and stored by the main
   process (`desktop/device-key.cjs`, `device-key.json`); the page asks for it through `window.clipboxDesktop`
@@ -117,3 +118,12 @@ Statuses: Accepted / Superseded / Deprecated.
 - Consequences: `docs/features.json` keeps Windows/Mac at `false` (an agent only sets `true` after walking through the
   steps). Anything that only a real machine can show (DPAPI, tray, taskbar, installer) is a known risk, listed in
   `docs/HANDOFF.md`.
+
+### D-015 Device-key protection removed for now (2026-10-08)
+- Context (owner): the encryption could make data unrecoverable, and snippets and notes are not that important; what matters is a good cloud upload (backup) of them.
+- Decision (owner): no encryption of the device key for now; the code from PR #7 is removed. The vault and its device
+  key are stored together again, as before (see README, "Security boundaries").
+- Consequences: a copied data folder can be decrypted. Nothing was released with D-012, so no user data was moved to
+  the protected store; if a build with PR #7 was ever run on a real machine, that vault's key lives only in
+  `device-key.json` and the vault will not open until the encrypted snippet backup is imported. To bring the feature
+  back, restore PR #7 from git history (it includes the migration and tests).
