@@ -4,7 +4,7 @@
 export type ImageView = "grid" | "list";
 
 export const IMAGE_VIEW_KEY = "clipbox.image-view";
-export const IMAGE_GRID_COLUMNS = 3;
+export const IMAGE_GRID_COLUMNS = 4;
 
 type ViewStorage = Pick<Storage, "getItem" | "setItem">;
 
