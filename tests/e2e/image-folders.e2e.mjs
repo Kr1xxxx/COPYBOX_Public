@@ -524,3 +524,12 @@ test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep the
   await expect(folderRow(page, "收款码")).toHaveClass(/active/);
   await expect(rows(page)).toHaveCount(1);
 });
+
+test("全部图片 is not cut off in the sidebar once there are ten or more images", async ({ page }) => {
+  await openImages(page);
+  await addImages(page, Array.from({ length: 12 }, (_, index) => png(`图 ${index + 1}`, 20 + index, 20)));
+  await expect(navCount(page, "全部图片")).toHaveText("12");
+  const label = sidebar(page).locator(".nav-item", { hasText: "全部图片" }).locator(".nav-label");
+  const fits = await label.evaluate((element) => element.scrollWidth <= element.clientWidth);
+  expect(fits).toBe(true);
+});

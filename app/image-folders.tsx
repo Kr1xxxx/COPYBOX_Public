@@ -185,7 +185,7 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
   return (
     <>
       <nav className="nav-list" aria-label="快捷入口">
-        <button type="button" className={`nav-item ${filter === IMAGE_FILTER_ALL ? "active" : ""}`} aria-current={filter === IMAGE_FILTER_ALL ? "page" : undefined} onClick={() => setFilter(IMAGE_FILTER_ALL)}>
+        <button type="button" className={`nav-item image-all ${filter === IMAGE_FILTER_ALL ? "active" : ""}`} aria-current={filter === IMAGE_FILTER_ALL ? "page" : undefined} onClick={() => setFilter(IMAGE_FILTER_ALL)}>
           <span className="nav-icon"><GridGlyph /></span><span className="nav-label">全部图片</span><b>{counts.total}</b>
         </button>
       </nav>

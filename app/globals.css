@@ -101,6 +101,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .nav-icon .icon { width: 15px; height: 15px; }
 .nav-icon .icon.accent { color: var(--accent); }
 .nav-item.active .nav-icon { color: var(--ink-2); }
+/* 全部图片 is four characters wide: without the icon it still fits next to a two- or three-digit count. */
+.nav-item.image-all .nav-icon { display: none; }
 .nav-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-item b { flex: 0 0 auto; color: var(--muted); font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .directory-color-marker { width: 8px; height: 8px; border-radius: 50%; }
