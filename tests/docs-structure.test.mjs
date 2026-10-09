@@ -6,26 +6,41 @@ import { checkHandoff } from "../scripts/check-handoff.mjs";
 const add = (file) => ({ status: "A", file });
 const mod = (file) => ({ status: "M", file });
 
-test("an app change needs a new docs/log note or the old HANDOFF.md update", () => {
-  assert.equal(checkHandoff([mod("app/page.tsx")]).ok, false);
-  assert.equal(checkHandoff([mod("app/page.tsx"), add("docs/log/2026-10-09-grid.md")]).ok, true);
-  assert.equal(checkHandoff([mod("app/page.tsx"), mod("docs/HANDOFF.md")]).ok, true);
+const goodNote = () => "# Title\n\n- Date: 2026-10-09\n- What changed: moved the thing and tested it\n";
+
+test("an app change needs a new docs/log note that says what changed, or the old HANDOFF.md update", () => {
+  const context = { readFile: goodNote };
+  assert.equal(checkHandoff([mod("app/page.tsx")], context).ok, false);
+  assert.equal(checkHandoff([mod("app/page.tsx"), add("docs/log/2026-10-09-grid.md")], context).ok, true);
+  assert.equal(checkHandoff([mod("app/page.tsx"), mod("docs/HANDOFF.md")], context).ok, true);
+});
+
+test("an empty or placeholder note does not count", () => {
+  for (const content of ["", "# Title\n", "- What changed:\n", "- What changed: tbd\n"]) {
+    assert.equal(checkHandoff([mod("app/page.tsx"), add("docs/log/2026-10-09-grid.md")], { readFile: () => content }).ok, false, JSON.stringify(content));
+  }
 });
 
 test("editing an existing note or a badly named file is not a handoff note", () => {
-  assert.equal(checkHandoff([mod("desktop/main.cjs"), mod("docs/log/2026-10-09-grid.md")]).ok, false);
-  assert.equal(checkHandoff([mod("desktop/main.cjs"), add("docs/log/notes.md")]).ok, false);
-  assert.equal(checkHandoff([mod("package.json"), add("docs/log/2026-10-09-Grid.md")]).ok, false);
+  const context = { readFile: goodNote };
+  assert.equal(checkHandoff([mod("desktop/main.cjs"), mod("docs/log/2026-10-09-grid.md")], context).ok, false);
+  assert.equal(checkHandoff([mod("desktop/main.cjs"), add("docs/log/notes.md")], context).ok, false);
+  assert.equal(checkHandoff([mod("package.json"), add("docs/log/2026-10-09-Grid.md")], context).ok, false);
 });
 
 test("PRs without app changes need no note", () => {
   assert.equal(checkHandoff([mod("tests/x.test.mjs")]).ok, true);
 });
 
-test("preview version files are reported so CI can warn", () => {
-  const result = checkHandoff([mod("tools/preview/VERSION"), mod("tools/preview/changelog.json"), mod("README.md")]);
+test("only the preview publisher's PRs may edit the preview version files", () => {
+  const changes = [mod("tools/preview/VERSION"), mod("tools/preview/changelog.json"), mod("README.md")];
+  const result = checkHandoff(changes);
   assert.deepEqual(result.previewFiles, ["tools/preview/VERSION", "tools/preview/changelog.json"]);
+  assert.equal(result.ok, false);
+  assert.equal(checkHandoff(changes, { labels: ["major"] }).ok, false);
+  assert.equal(checkHandoff(changes, { labels: ["preview-publisher"] }).ok, true);
   assert.deepEqual(checkHandoff([mod("README.md")]).previewFiles, []);
+  assert.equal(checkHandoff([mod("README.md")]).ok, true);
 });
 
 test("decision numbers are unique across DECISIONS.md and docs/decisions/", () => {
