@@ -16,6 +16,17 @@ const OWNER_PATHS = [
 // Data storage and encryption: a mistake here can lock users out of their data.
 const STORAGE_WORDS = /localStorage|sessionStorage|indexedDB|encryptVault|decryptVault|crypto\.subtle|PBKDF2|AES-GCM|STORAGE_KEY|DEVICE_KEY|clipbox\.vault|safeStorage/;
 
+// A storage line that was only moved (removed in one place, added unchanged elsewhere, any indentation) is not a
+// storage change. Cancel removed against added lines one-for-one by trimmed text; whatever is left over counts.
+function leftoverStorageLines(changedLines) {
+  const balance = new Map();
+  for (const line of changedLines) {
+    const text = line.slice(1).trim();
+    if (STORAGE_WORDS.test(text)) balance.set(text, (balance.get(text) || 0) + (line[0] === "+" ? 1 : -1));
+  }
+  return [...balance].filter(([, count]) => count !== 0);
+}
+
 /**
  * @param {{ files: { path: string, added: number, deleted: number, status: string }[],
  *           appDiff: string, labels: string[] }} change
@@ -28,7 +39,7 @@ export function classify({ files, appDiff, labels }) {
     if (file.status === "D" && /^(app|tests)\//.test(file.path)) reasons.push(`deletes ${file.path}`);
   }
   const changedLines = appDiff.split("\n").filter((line) => /^[+-](?![+-])/.test(line));
-  if (changedLines.some((line) => STORAGE_WORDS.test(line))) reasons.push("touches data storage or encryption");
+  if (leftoverStorageLines(changedLines).length) reasons.push("touches data storage or encryption");
   const appLines = files.filter((file) => file.path.startsWith("app/")).reduce((sum, file) => sum + file.added + file.deleted, 0);
   if (appLines > APP_LINE_LIMIT) reasons.push(`${appLines} lines of app code changed (limit ${APP_LINE_LIMIT})`);
   const testFiles = files.filter((file) => file.path.startsWith("tests/"));
