@@ -20,6 +20,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-011 | Small changes merge themselves; big ones wait for the owner's 合并 | Accepted |
 | D-012 | Windows: the vault's device key is protected by OS encryption | Accepted |
 | D-013 | No code signing for now (internal tool); auto-update undecided | Accepted |
+| D-014 | No real-device testing round before merging | Accepted |
 
 ---
 
@@ -109,3 +110,10 @@ Statuses: Accepted / Superseded / Deprecated.
 ### D-013 No code signing for now (2026-10-08)
 - Decision: Clipbox is an internal tool; the installers stay unsigned (Windows SmartScreen shows a warning, Mac needs
   right-click → Open). Auto-update is not built. Revisit if it is distributed beyond the company.
+
+### D-014 No real-device testing round (2026-10-08)
+- Decision: the owner does not want a Windows/Mac test round before merging. PR #1 and later PRs merge on green CI and
+  the owner's 合并.
+- Consequences: `docs/features.json` keeps Windows/Mac at `false` (an agent only sets `true` after walking through the
+  steps). Anything that only a real machine can show (DPAPI, tray, taskbar, installer) is a known risk, listed in
+  `docs/HANDOFF.md`.
