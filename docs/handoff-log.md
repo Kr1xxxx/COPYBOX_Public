@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — 话术搜索 (owner: 做第 6 项): `app/snippet-search.ts`; results rank 标题 > 小提示 > 正文, then by copy count (`useCount`, +1 per copy; pinned still first); pinyin and pinyin initials match (`tk` → 退款) via `pinyin-pro` 3.29.4. `useCount` is an optional field on the item, no migration. Tests: `tests/snippet-search.test.mjs`, one e2e in `main-flows`.
 - 2026-10-09 — Claude — Merge policy (owner: 改): PRs with 500+ changed lines in total (all files) are big and wait for 合并; before, docs-only PR #43 (1,180 lines) merged itself because only `app/` lines counted. `scripts/classify-pr.mjs`, test, D-011 addendum, AGENTS.md.
 - 2026-10-09 — Claude — Task 14 (owner: 建立专案, second half): the web preview build is a repo tool now (`tools/preview/`: page shell with Windows/Mac switch, ten simulated test images, `build.mjs`, `serve.mjs`, README, unit tests). Port of the temp Python script to Node by a Sonnet worker, reviewed. The preview page version lives in `tools/preview/VERSION` (v1.01).
 - 2026-10-09 — Claude — Task 15, 图片 九宫格 (D-019, spec `docs/specs/image-grid.md`): 3-column grid by default with a copy button on each tile, detail card as a full-width row, `宫格 | 列表` switch, mini grid. Added to PR #25. Web preview v1.02.

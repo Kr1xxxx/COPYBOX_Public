@@ -53,7 +53,6 @@ import {
   parseSnippetWorkbook,
   PRODUCT_GROUPS,
   resolveSnippetCopySource,
-  snippetSearchText,
   type SnippetImportPreview,
 } from "./snippet-import";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
@@ -70,6 +69,7 @@ import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
+import { searchSnippets } from "./snippet-search";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -426,15 +426,13 @@ export default function Home() {
     const productMatched = activeKind === "snippet" && !trashView
       ? scoped.filter((item) => matchesSnippetProduct(item, productFilter))
       : scoped;
-    const matched = normalized ? productMatched.filter((item) => {
-      const searchable = activeKind === "snippet"
-        ? snippetSearchText(item)
-        : `${item.label} ${item.note} ${item.summary || ""}`;
-      const haystack = searchable.toLowerCase();
+    const isSnippetSearch = Boolean(normalized) && activeKind === "snippet";
+    const matched = isSnippetSearch ? searchSnippets(productMatched, normalized) : normalized ? productMatched.filter((item) => {
+      const haystack = `${item.label} ${item.note} ${item.summary || ""}`.toLowerCase();
       return normalized.split(/\s+/).every((term) => haystack.includes(term));
     }) : productMatched;
     if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, 50);
-    return matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+    return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
   }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders]);
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
@@ -725,7 +723,7 @@ export default function Home() {
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
-    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow() } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
+    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow(), useCount: (value.useCount || 0) + 1 } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
