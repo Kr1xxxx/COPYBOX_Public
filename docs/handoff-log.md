@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 6: updated the `page.tsx` row in AGENTS.md (~1580 lines, lists the split-out UI files). Rulebook change, so the PR waits for the owner's 合并.
 - 2026-10-08 — Claude — Task 6, piece 6: moved `ItemEditor` to `app/item-editor.tsx` (unchanged; `COLORS` moved with it). The test harness (`tests/helpers/page-harness.mjs`) now reads both `page.tsx` and `item-editor.tsx` to find `saveItem`/`submit` by name. `page.tsx` ~1580 lines.
 - 2026-10-08 — Claude — Task 6, piece 5: moved `SettingsDialog` and `backupAgeLabel` to `app/settings.tsx` (unchanged). `page.tsx` ~1820 lines.
 - 2026-10-08 — Claude — Task 6, piece 4: moved `SettingsFolders` to `app/settings-folders.tsx`; `PLAIN_NOTES`/`SECRET_WORD` to `app/platform.ts`; `MiniHidePolicy`/`ThemeChoice`/`CloseBehavior`/`TRASH_DAY_OPTIONS` to `app/preferences.ts`. Source-text tests that look at "the UI" now read all UI files via `tests/helpers/ui-source.mjs` (assertions unchanged). Next: the settings dialog itself.

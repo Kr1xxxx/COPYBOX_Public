@@ -38,7 +38,7 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 
 | Path | What it is |
 | --- | --- |
-| `app/page.tsx` | Main UI (list, inline editor, fill-in variables, settings, mini window); ~2500 lines, search before editing |
+| `app/page.tsx` | Main UI: state, list, mini window; ~1580 lines, search before editing. Parts live next to it: `item-editor.tsx`, `fill-panel.tsx`, `settings.tsx`, `settings-folders.tsx`, `ai-settings.tsx`, `dialogs.tsx` |
 | `app/clipbox-core.ts` | Pure functions (folders, search, bulk actions, `tidyText`); put new logic here, with unit tests |
 | `app/ai-config.ts` | User-configured AI endpoint: presets, validation, request/response parsing |
 | `app/globals.css` | All styles; platform differences via `.platform-darwin` / `.desktop-app:not(.platform-darwin)` |
