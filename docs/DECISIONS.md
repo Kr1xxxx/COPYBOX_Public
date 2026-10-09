@@ -176,7 +176,7 @@ Statuses: Accepted / Superseded / Deprecated.
   (`object-fit: contain`, empty space shows the tile background). The same goes for the small list thumbnail.
 - Tile look (owner: "图片预览这里,就算是正方形,也留边, 背景都做成毛玻璃风", then "留空 6%"): in the grid and the mini grid every
   picture, even a square one, sits 6% in from each edge of its tile (the picture box is 88% of the tile) and is never
-  cropped. Behind it is colourless frosted glass: a neutral translucent surface with a backdrop blur (owner: "做成不带颜色的,纯毛玻璃";
+  cropped. Behind it is colourless frosted glass: a neutral translucent surface with a backdrop blur, a fine grain and an inner highlight, over soft grey blobs so the blur is visible (owner: "做成不带颜色的,纯毛玻璃";
   it first used a blurred copy of the picture, which picked up its colours). The small list thumbnail is unchanged.
 - Consequences: CSS and `IMAGE_GRID_COLUMNS` only; no
   stored image data changes. Tests that expected 3 columns or a cropped thumbnail (`cover`) now expect 4 columns and
