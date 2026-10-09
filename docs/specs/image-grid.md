@@ -1,4 +1,7 @@
-# Spec: 图片 nine-grid (九宫格)
+# Spec: 图片 grid (九宫格, now 16宫格 — D-020)
+
+> D-020 (2026-10-09) changed two things below: **4 columns** instead of 3 (mini window too), and tiles use
+> `object-fit: contain` (the whole picture is visible, no crop). Read "3" as "4" and "cover" as "contain".
 
 Owner request (2026-10-09): "图片哪里给我做成九宫格". Applies to the 图片 section on both platforms. Recorded as D-019.
 
