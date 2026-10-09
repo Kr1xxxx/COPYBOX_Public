@@ -98,10 +98,10 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 The owner never uses the GitHub website; all work goes through agents. CI decides how each PR merges:
 
 - **Small** — merges by itself once every check is green: wording, styling, bug fixes, tests and docs, with at most
-  350 changed lines in `app/` (tests and docs do not count).
+  350 changed lines in `app/` (tests and docs do not count there) and under 500 changed lines in total.
 - **Big** — CI labels it `needs-owner` and stops: anything under `desktop/`, dependencies, CI and scripts, the
   rulebook (`AGENTS.md`, `CONTRIBUTING.md`, `docs/DECISIONS.md`), data storage or encryption, deleted app files,
-  weakened tests, more than 350 lines of app code.
+  weakened tests, more than 350 lines of app code, or 500+ changed lines in total (any file type).
 - New or removed features and layout changes cannot be detected from files: **add the `major` label yourself** when
   you open such a PR (`gh pr edit <n> --add-label major`), right away, before CI finishes.
 - A `needs-owner` PR is merged only after the owner writes 合并 (merge) in the conversation about that PR. Then merge

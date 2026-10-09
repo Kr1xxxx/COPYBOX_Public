@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APP_LINE_LIMIT, classify } from "../scripts/classify-pr.mjs";
+import { APP_LINE_LIMIT, TOTAL_LINE_LIMIT, classify } from "../scripts/classify-pr.mjs";
 
 const file = (path, added = 5, deleted = 0, status = "M") => ({ path, added, deleted, status });
 const run = (files, { appDiff = "", labels = [] } = {}) => classify({ files, appDiff, labels });
@@ -29,7 +29,13 @@ test("storage and encryption changes wait for the owner", () => {
 test("more than the line limit of app code waits for the owner", () => {
   assert.equal(run([file("app/page.tsx", APP_LINE_LIMIT, 0)]).size, "small");
   assert.equal(run([file("app/page.tsx", APP_LINE_LIMIT, 1)]).size, "big");
-  assert.equal(run([file("tests/x.test.mjs", 900)]).size, "small", "tests do not count toward the limit");
+});
+
+test("500 or more changed lines in total wait for the owner, whatever the file type", () => {
+  assert.equal(run([file(".claude/skills/x/SKILL.md", TOTAL_LINE_LIMIT - 1)]).size, "small");
+  assert.equal(run([file(".claude/skills/x/SKILL.md", TOTAL_LINE_LIMIT)]).size, "big");
+  assert.equal(run([file("docs/a.md", 300), file("tests/x.test.mjs", 150, 50)]).size, "big", "docs and tests count toward the total");
+  assert.equal(run([file("tests/x.test.mjs", 900)]).size, "big");
 });
 
 test("deleting app files or loosening tests waits for the owner", () => {
