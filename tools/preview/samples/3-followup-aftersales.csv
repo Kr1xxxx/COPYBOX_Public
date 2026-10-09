@@ -1,0 +1,11 @@
+﻿标题,沟通阶段,具体场景,核心动作,产品/业务,英文即时消息,中文对照,使用备注,可替换变量
+报价后未回复｜温和跟进,客户跟进,报价后未回复,温和跟进,通用,"Hi [Name], just checking in. Did you get a chance to look at the quote? Happy to answer any questions.",你好 [Name]，跟进一下，报价单看过了吗？有任何问题随时问我。,,
+收货后回访｜使用反馈,客户跟进,收货后回访,使用反馈,睫毛,Hi [Name]! Your lashes should have arrived by now. How do your clients like them? 😊,你好 [Name]！睫毛应该已经到了，客人用着感觉怎么样？😊,,
+新品通知｜新品推荐,客户跟进,新品通知,新品推荐,睫毛,New in: our [New product]! Super soft and lightweight. Want me to add a tray to your next order?,上新啦：[New product]！超柔软轻盈。下次订单要不要加一盒试试？,,
+节日促销｜促销通知,客户跟进,节日促销,促销通知,通用,Black Friday sale: [Discount]% off all lashes until [End date]. Message me to place your order early!,黑五促销：全场睫毛 [Discount]% 折扣，截止 [End date]。早下单早发货！,,
+邀请好评｜请求评价,客户跟进,邀请好评,请求评价,平台,"If you're happy with the order, would you mind leaving a short review on [Platform]? It really helps our small team 🙏",如果对订单满意，方便在 [Platform] 留个简短好评吗？对我们小团队帮助很大 🙏,,
+包裹延误｜安抚并查询,售后争议,包裹延误,安抚并查询,物流,I'm sorry your parcel is late. I've contacted [Carrier] and will update you within 24 hours.,抱歉包裹晚到了。我已联系 [Carrier]，24 小时内给您回复进展。,,
+收到破损｜要照片,售后争议,收到破损,要照片,通用,So sorry to hear that! Could you send a photo of the damaged items and the box? I'll arrange a replacement right away.,非常抱歉！麻烦拍一下破损的商品和外箱发给我，我马上安排补发。,,
+卷度发错｜补发或退款,售后争议,卷度发错,补发或退款,睫毛,"You're right, we sent [Wrong curl] curl instead of [Correct curl]. We can send the correct trays free with your next order, or refund $[Refund amount]. Which do you prefer?",您说得对，我们把 [Correct curl] 卷发成了 [Wrong curl] 卷。可以下次订单免费补发正确的，或者退款 $[Refund amount]，您选哪种？,发送前核实退款金额,
+假发掉发｜使用建议,售后争议,假发掉发,使用建议,假发,"A little shedding in the first washes is normal. Please wash with cool water, don't brush it wet, and use a wide-tooth comb. If it continues, send me a short video.",前几次清洗少量掉发是正常的。请用凉水洗，湿的时候别梳，用宽齿梳。如果一直掉，拍个短视频给我。,,
+要求退款｜退款流程,售后争议,要求退款,退款流程,通用,I understand. Please return the unused items to [Return address] within 14 days and we'll refund $[Refund amount] once they arrive.,明白。请在 14 天内把未使用的商品寄回 [Return address]，我们收到后退款 $[Refund amount]。,发送前核实退款金额和地址,
