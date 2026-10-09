@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 11 (owner approved): the merge-policy job merges only the commit its checks ran on (`--match-head-commit`, skips if a newer commit was pushed); AGENTS.md's manual merge command passes `sha=`. Found when #22 was merged with a sync commit whose e2e had not finished (it passed afterwards locally: 16/16).
 - 2026-10-09 — Claude — Fix (Sonnet worker, reviewed): 导入备份 → 合并 now restores an entry whose identical copy sits in the trash (before, it was skipped as a duplicate and the toast said 0). Replace is unchanged. Unit tests + e2e.
 - 2026-10-09 — Claude — Task 6 done (Sonnet worker, reviewed): the `window.clipboxDesktop` type and `WindowMode` moved unchanged to `app/desktop-bridge.ts`; `page.tsx` ~1560 lines.
 - 2026-10-09 — Claude — Owner wrote 全部批准: merged #14 (AGENTS.md row), #15 (备注/秘密 backup export), #16 (coordinator/worker setup), #18 (CI type check), #19 (merge policy ignores code moves); #17 merged itself. Next: a merge-import skips a note whose identical copy sits in the trash; optional: move the `window.clipboxDesktop` type out of `page.tsx`.

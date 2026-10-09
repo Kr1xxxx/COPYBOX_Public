@@ -33,6 +33,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 8 | CI type check of `app/` | Done | Claude | `npm run typecheck` (`tsconfig.typecheck.json`, separate from the build); owner approved |
 | 9 | Merge policy: code moved unchanged is not a storage change | Done | Claude | `scripts/classify-pr.mjs`; edited, new or deleted storage lines still need the owner; owner approved |
 | 10 | 导入备份 → 合并 restores an entry whose identical copy is in the trash | Done | Claude | Was silently skipped as a duplicate; found while building task 5 |
+| 11 | Auto-merge only the commit CI checked | Done | Claude | A push after green CI was merged before its own checks finished (#22); owner approved the fix |
 
 ## Waiting on the owner
 

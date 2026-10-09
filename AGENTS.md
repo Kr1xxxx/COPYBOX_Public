@@ -103,7 +103,8 @@ The owner never uses the GitHub website; all work goes through agents. CI decide
 - New or removed features and layout changes cannot be detected from files: **add the `major` label yourself** when
   you open such a PR (`gh pr edit <n> --add-label major`), right away, before CI finishes.
 - A `needs-owner` PR is merged only after the owner writes 合并 (merge) in the conversation about that PR. Then merge
-  it with `gh api -X PUT repos/Kr1xxxx/Clipbox/pulls/<n>/merge -f merge_method=merge` and log it.
+  it with `gh api -X PUT repos/Kr1xxxx/Clipbox/pulls/<n>/merge -f merge_method=merge -f sha=<head sha>` (the commit
+  whose checks are green) and log it.
 - Tell the owner in Chinese which PRs merged by themselves and which are waiting.
 
 Keep this file under 150 lines. Add a rule only after an agent repeats the same mistake; delete stale rules.
