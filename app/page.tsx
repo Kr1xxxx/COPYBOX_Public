@@ -67,6 +67,7 @@ import { countImagesByFolder, imageFilterTitle, imageFolderColors } from "./imag
 import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
+import { ArcSegmented } from "./arc/segmented";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
@@ -1333,10 +1334,16 @@ export default function Home() {
           : activeFolder.slice(7);
   const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : "搜索标题、编号或内容";
   const kindSwitch = (
-    <div className={`kind-switch ${isMini ? "compact" : ""}`} role="group" aria-label="内容板块">
-      {(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={!imageView && activeKind === kind ? "active" : ""} aria-pressed={!imageView && activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : SECRET_WORD}</button>)}
-      <button type="button" className={imageView ? "active" : ""} aria-pressed={imageView} onClick={showImages}>图片</button>
-    </div>
+    <ArcSegmented
+      className={`kind-switch ${isMini ? "compact" : ""}`}
+      label="内容板块"
+      value={imageView ? "image" : activeKind}
+      onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      options={[
+        ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
+        { value: "image", label: "图片" },
+      ]}
+    />
   );
   const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
@@ -1518,10 +1525,13 @@ export default function Home() {
               <h1>{sectionTitle}</h1>
               <span className="section-count">{imageView ? imageCounts.shown : filtered.length}</span>
               <span className="spacer" />
-              {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <div className="scope-switch" role="group" aria-label="搜索范围">
-                <button type="button" className={searchAllFolders ? "" : "active"} aria-pressed={!searchAllFolders} onClick={() => { setSearchAllFolders(false); setSelected(0); }}>此目录</button>
-                <button type="button" className={searchAllFolders ? "active" : ""} aria-pressed={searchAllFolders} onClick={() => { setSearchAllFolders(true); setSelected(0); }}>全部目录</button>
-              </div>}
+              {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <ArcSegmented
+                className="scope-switch"
+                label="搜索范围"
+                value={searchAllFolders ? "all" : "here"}
+                onSelect={(next) => { setSearchAllFolders(next === "all"); setSelected(0); }}
+                options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
+              />}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
