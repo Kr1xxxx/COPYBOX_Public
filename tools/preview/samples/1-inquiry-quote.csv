@@ -1,0 +1,12 @@
+﻿标题,沟通阶段,具体场景,核心动作,产品/业务,英文即时消息,中文对照,使用备注,可替换变量
+Instagram 来询｜开场问候,询盘接待,Instagram 来询,开场问候,通用,"Hi [Name]! Thanks for messaging us 💕 We make lash extensions, tweezers and hair products. What are you looking for today?",你好 [Name]！感谢留言 💕 我们做嫁接睫毛、镊子和假发产品。今天想了解什么呢？,,
+了解客户类型｜确认客户身份,询盘接待,了解客户类型,确认客户身份,睫毛,"Are you a lash artist, a salon, or do you resell lashes in your own shop? That helps me suggest the right trays and quantities.",请问您是美睫师、美容院，还是自己开店零售？这样我能推荐合适的款式和数量。,,
+要产品目录｜发送目录,询盘接待,要产品目录,发送目录,通用,Here is our latest catalog: [Catalog link]. Prices are on page 2. Let me know which items catch your eye!,这是我们最新的目录：[Catalog link]。价格在第 2 页，看中哪款告诉我！,,
+假发需求｜确认发型长度,询盘接待,假发需求,确认发型长度,假发,"For the wigs, which texture do you need (straight / body wave / deep wave), what length, and which lace (13x4 frontal or 5x5 closure)?",假发方面，请问需要什么纹理（直发 / 大波浪 / 深波浪）、多长，以及哪种蕾丝（13x4 frontal 还是 5x5 closure）？,,
+非工作时间｜自动回复,询盘接待,非工作时间,自动回复,通用,Thanks for your message! We're offline now (Beijing time 9:00–18:00) and will reply first thing tomorrow.,感谢留言！我们现在下班了（北京时间 9:00–18:00），明天一早回复您。,,
+睫毛报价｜阶梯价,报价成交,睫毛报价,阶梯价,睫毛,"Our [Product] trays are $[Price] each for 1–49 pcs, and $[Bulk price] each from 50 pcs. Free shipping over $[Free shipping amount].",[Product] 1–49 盒每盒 $[Price]，50 盒起每盒 $[Bulk price]。满 $[Free shipping amount] 包邮。,发送前核实价格,
+客户嫌贵｜说明价值,报价成交,客户嫌贵,说明价值,睫毛,"I understand! Our lashes use premium PBT fiber, hold their curl after 30+ washes, and every tray is checked by hand. Most artists waste fewer lashes, so each set actually costs less.",理解！我们的睫毛用优质 PBT 纤维，洗 30 次以上不掉卷，每盒都人工检查。很多美睫师反馈浪费更少，算下来每套成本反而更低。,,
+要折扣｜首单优惠,报价成交,要折扣,首单优惠,通用,"Since it's your first order, I can give you [Discount]% off if you order today 😊",因为是首单，今天下单可以给您 [Discount]% 折扣 😊,折扣需主管同意,
+确认订单｜核对订单,报价成交,确认订单,核对订单,通用,"Let me confirm your order: [Order details]. Total: $[Total amount], shipping to [Address]. Is everything correct?",和您确认一下订单：[Order details]。合计 $[Total amount]，寄往 [Address]。信息都对吗？,发送前核实金额和地址,
+付款方式｜付款说明,报价成交,付款方式,付款说明,通用,"You can pay by PayPal, bank transfer or Alibaba Trade Assurance. Which is easiest for you?",可以用 PayPal、银行转账或阿里巴巴信保付款。哪种对您最方便？,,
+已收款｜付款确认,报价成交,已收款,付款确认,通用,"Payment received, thank you [Name]! Your order goes into packing today and I'll send the tracking number once it ships.",已收到款项，谢谢 [Name]！今天就安排打包，发货后发您单号。,,
