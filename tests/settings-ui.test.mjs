@@ -64,8 +64,10 @@ test("the card that loses the selection folds away instead of vanishing", () => 
   assert.match(css, /@keyframes detail-close/);
 });
 
-test("the copy bar of the fill panel stays visible when many variables are filled", () => {
-  assert.match(css, /\.fill-actions\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0/);
+test("variables are highlighted blocks typed in place: the copy bar is the card's own row-actions, no fill page", () => {
+  assert.match(css, /\.var-chip\s*\{/);
+  assert.doesNotMatch(css, /\.fill-actions|\.fill-panel/);
+  assert.doesNotMatch(page, /SnippetFillPanel|prepareCopy|填写变量/);
 });
 
 test("the status bar no longer mentions clearing the clipboard", () => {
@@ -74,7 +76,7 @@ test("the status bar no longer mentions clearing the clipboard", () => {
 
 test("on Windows the 备注 section is plain notes: no masking, reference links or segments", () => {
   assert.match(page, /const PLAIN_NOTES = typeof window === "undefined" \|\| window\.clipboxDesktop\?\.platform !== "darwin"/);
-  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <div className="segmented"', '!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint"']) {
+  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <div className="segmented"', '!isSnippet && !PLAIN_NOTES && <p className="row-hint"']) {
     assert.ok(page.includes(marker), marker);
   }
   assert.match(page, /: PLAIN_NOTES \? <p className="row-content">/);

@@ -33,26 +33,30 @@ test("switching entries folds the old card away gradually instead of removing it
   expect(clip).toBe("padding-box");
 });
 
-test("with many variables the copy bar stays inside the window", async ({ page }) => {
+test("variables are highlighted blocks without brackets and are typed in place", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   const rows = page.locator(".native-row .row-main");
-  for (let i = 0; i < 12; i += 1) {
-    await rows.nth(i).click();
-    await page.waitForTimeout(300);
-    const fill = page.locator(".native-row.selected").getByRole("button", { name: "填写变量" });
-    if (await fill.count()) { await fill.click(); break; }
-  }
-  await expect(page.locator(".fill-panel")).toBeVisible();
-  await page.evaluate(() => {
-    const fields = document.querySelector(".fill-panel .copy-fields");
-    const label = fields.querySelector("label");
-    for (let i = 0; i < 6; i += 1) fields.appendChild(label.cloneNode(true));
-  });
-  const box = await page.evaluate(() => {
-    const list = document.querySelector(".native-list");
-    list.scrollTop = 0;
-    return { bar: document.querySelector(".fill-actions").getBoundingClientRect().bottom, list: list.getBoundingClientRect().bottom };
-  });
-  expect(box.bar).toBeLessThanOrEqual(box.list + 1);
+  await rows.first().click();
+  const row = page.locator(".native-row.selected");
+  // the open card shows fields, not bracketed text, and there is no separate fill page or button
+  await expect(row.locator(".row-content")).not.toContainText("[");
+  await expect(row.getByRole("button", { name: "填写变量" })).toHaveCount(0);
+  await expect(page.locator(".fill-panel")).toHaveCount(0);
+  const name = row.locator("input[data-var=Name]");
+  const widthBefore = (await name.evaluate((input) => input.parentElement.getBoundingClientRect().width));
+  await name.click();
+  await page.keyboard.type("Amanda Rodriguez");
+  const widthAfter = (await name.evaluate((input) => input.parentElement.getBoundingClientRect().width));
+  expect(widthAfter).toBeGreaterThan(widthBefore);
+  // an unfinished variable stops the copy and puts the cursor in the next empty block
+  await row.getByRole("button", { name: "复制", exact: true }).click();
+  await expect(row.locator("input[data-var=Company]")).toBeFocused();
+  await page.keyboard.type("Comely Beauty");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda Rodriguez, thanks for reaching out to Comely Beauty! How can I help you today?");
+  // the closed list shows variables as plain highlighted names too
+  await rows.nth(1).click();
+  await expect(page.locator(".snippet-preview").first()).not.toContainText("[");
 });
 
 test("no keyboard shortcut hints anywhere and Ctrl+E does nothing", async ({ page }) => {

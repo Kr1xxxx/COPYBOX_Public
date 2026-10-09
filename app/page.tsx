@@ -48,11 +48,13 @@ import {
 } from "./clipbox-core";
 import {
   buildSnippetImportPreview,
+  fillSnippetTemplate,
   hasOptionalSnippetPreparation,
   matchesSnippetProduct,
   parseSnippetWorkbook,
   PRODUCT_GROUPS,
   resolveSnippetCopySource,
+  snippetCopyReadiness,
   snippetSearchText,
   type SnippetImportPreview,
 } from "./snippet-import";
@@ -69,7 +71,7 @@ import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
-import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
+import { SnippetFill, SnippetVariableText, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -168,10 +170,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 function SnippetContent({ text, query = "" }: { text: string; query?: string }) {
-  const parts = text.split(/(\[[^\]]+\])/g);
-  return <>{parts.map((part, index) => /^\[[^\]]+\]$/.test(part)
-    ? <mark key={index} className="snippet-variable"><Highlight text={part} query={query} /></mark>
-    : <span key={index}><Highlight text={part} query={query} /></span>)}</>;
+  return <SnippetVariableText text={text} renderText={(part) => <Highlight text={part} query={query} />} />;
 }
 
 function SnippetTitle({ label, query = "" }: { label: string; query?: string }) {
@@ -306,7 +305,8 @@ export default function Home() {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [snippetImport, setSnippetImport] = useState<SnippetImportPreview | null>(null);
   const [snippetImportName, setSnippetImportName] = useState("");
-  const [copyRequest, setCopyRequest] = useState<SnippetCopyRequest | null>(null);
+  const [fill, setFill] = useState<SnippetFillState | null>(null);
+  const [typingVariable, setTypingVariable] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -472,7 +472,7 @@ export default function Home() {
     }
   }, [closingIds, selectedCardId]);
   const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
-  const inlineEditing = modalOpen || Boolean(copyRequest) || Boolean(newFolder) || Boolean(renamingFolder);
+  const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
   const cardDragEnabled = activeFolder !== "trash" && canReorderCards(query, productFilter) && !backgroundInert;
@@ -525,7 +525,7 @@ export default function Home() {
   useEffect(() => {
     cancelCardDrag();
     cancelFolderDrag();
-  }, [activeFolder, activeKind, backupMode, cancelCardDrag, cancelFolderDrag, copyRequest, deleteRequest, newFolder, modalOpen, productFilter, query, snippetImport]);
+  }, [activeFolder, activeKind, backupMode, cancelCardDrag, cancelFolderDrag, typingVariable, deleteRequest, newFolder, modalOpen, productFilter, query, snippetImport]);
 
   async function refreshLocalVault() {
     if (refreshing) return;
@@ -743,15 +743,43 @@ export default function Home() {
     window.clipboxDesktop?.didCopy();
   }
 
+  function fillFor(item: SecretItem) { return fill?.itemId === item.id ? fill : emptyFillState(item); }
+  function updateFill(item: SecretItem) {
+    return (update: (current: SnippetFillState) => SnippetFillState) => setFill((current) => update(current?.itemId === item.id ? current : emptyFillState(item)));
+  }
+
+  // A snippet with variables copies what is typed into its highlighted blocks; the first empty block gets the cursor instead of a half-filled copy.
+  async function copyPrepared(item: SecretItem) {
+    const state = fillFor(item);
+    const source = resolveSnippetCopySource(item, state.language);
+    if (!source) return;
+    const readiness = snippetCopyReadiness(item, state.values, state.checkedInputs, state.verificationConfirmed);
+    if (!readiness.ready) {
+      const index = filtered.findIndex((value) => value.id === item.id);
+      if (index >= 0 && index !== safeSelected) selectRow(index);
+      const missing = readiness.missingPlaceholders;
+      setToast(missing.length > 0 ? `先填写：${missing.join("、")}` : "先勾选“发送前确认”");
+      window.setTimeout(() => setToast(""), 2200);
+      window.setTimeout(() => {
+        const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
+        if (missing.length > 0) Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
+        else row?.querySelector<HTMLInputElement>(".copy-checks input:not(:checked), .copy-warning input:not(:checked)")?.focus();
+      }, 60);
+      return;
+    }
+    await finishCopy(item, fillSnippetTemplate(source, state.values).text);
+  }
+
   async function copy(item: SecretItem, language: CopyLanguage = "en") {
+    if (item.kind === "snippet" && hasOptionalSnippetPreparation(item)) { await copyPrepared(item); return; }
+    await copyRaw(item, language);
+  }
+
+  // The mini window has no place to fill variables, so it copies the text as written.
+  async function copyRaw(item: SecretItem, language: CopyLanguage = "en") {
     const source = resolveSnippetCopySource(item, language);
     if (!source) return;
     await finishCopy(item, source);
-  }
-
-  function prepareCopy(item: SecretItem, language: CopyLanguage = "en") {
-    if (!resolveSnippetCopySource(item, language)) return;
-    setCopyRequest({ item, language });
   }
 
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -1087,7 +1115,7 @@ export default function Home() {
     setNewFolder(null);
     exitBulk();
     if (modalOpen) closeEditor();
-    setCopyRequest(null);
+    setFill(null);
   }
 
   function switchKind(kind: ItemKind) {
@@ -1106,7 +1134,7 @@ export default function Home() {
     setNewFolder(null);
     exitBulk();
     if (modalOpen) closeEditor();
-    setCopyRequest(null);
+    setFill(null);
   }
 
   function selectFolder(folder: string) {
@@ -1117,7 +1145,7 @@ export default function Home() {
     setRevealedId("");
     setFolderMenu("");
     exitBulk();
-    setCopyRequest(null);
+    setFill(null);
   }
 
   // Rows slide to their new places when a different entry opens.
@@ -1132,7 +1160,7 @@ export default function Home() {
   }
 
   function selectRow(index: number) {
-    if (copyRequest && filtered[index]?.id !== copyRequest.item.id) setCopyRequest(null);
+    if (fill && filtered[index]?.id !== fill.itemId) setFill(null);
     if (index !== safeSelected) moveSelection(() => index);
     setRowMenuId("");
     setRevealedId("");
@@ -1389,11 +1417,11 @@ export default function Home() {
               const isSelected = safeSelected === index;
               return (
                 <article key={item.id} data-row-index={index} className={`native-row mini-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""}`}>
-                  <button type="button" className="row-main" onClick={() => { setSelected(index); void copy(item); }} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`}>
+                  <button type="button" className="row-main" onClick={() => { setSelected(index); void copyRaw(item); }} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`}>
                     <i className="row-dot" aria-hidden="true" style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} />
                     <span className="row-copy">
                       <strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
-                      {activeKind === "snippet" && <small className="snippet-preview" lang="en"><Highlight text={item.secret} query={query} /></small>}
+                      {activeKind === "snippet" && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
                     </span>
                     {item.pinned && <Icon name="star" filled className="row-star" />}
                     {copiedId === item.id && <span className="mini-copied">已复制</span>}
@@ -1504,7 +1532,6 @@ export default function Home() {
                 const checked = bulkIds.includes(item.id);
                 const revealed = revealedId === item.id;
                 const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
-                const fillOpen = copyRequest?.item.id === item.id && !closing;
                 const moveTargets = [...activeFolders, ...(isSnippet ? [] : [""])].filter((folder) => folder !== (item.folder || ""));
                 return (
                   <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected || closing ? "selected" : ""} ${closing ? "closing-row" : ""} ${checked ? "checked" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
@@ -1519,7 +1546,7 @@ export default function Home() {
                             {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{item.snippetNumber}</b>}
                             {showFolderChip && item.folder && <small className="row-folder">{item.folder}</small>}
                           </span>
-                          {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><Highlight text={item.secret} query={query} /></small>}
+                          {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
                         </span>
                       </button>
                       {!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
@@ -1529,17 +1556,14 @@ export default function Home() {
                       {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      {isSnippet ? (!fillOpen && <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
                         </div>
                       )}
-                      {fillOpen && copyRequest
-                        ? <SnippetFillPanel request={copyRequest} onClose={() => setCopyRequest(null)} onCopy={async (text) => { await finishCopy(copyRequest.item, text); setCopyRequest(null); }} />
-                        : <div className="row-actions">
-                          <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : "复制"}</button>
-                          {isSnippet && hasOptionalSnippetPreparation(item) && <button type="button" className="secondary-button" onClick={() => prepareCopy(item)}>填写变量</button>}
+                      <div className="row-actions">
+                          <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</button>
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           <span className="spacer" />
@@ -1552,8 +1576,8 @@ export default function Home() {
                               <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); void trashNow(item); }}>移到回收站</button>
                             </div>}
                           </div>
-                        </div>}
-                      {!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
+                        </div>
+                      {!isSnippet && !PLAIN_NOTES && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
                     </div></div>}
                   </article>
                 );
