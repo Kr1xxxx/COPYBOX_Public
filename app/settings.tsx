@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AiSettingsSection } from "./ai-settings";
 import type { ItemKind } from "./clipbox-core";
+import { ArcSegmented } from "./arc/segmented";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup } from "./settings-folders";
@@ -72,9 +73,8 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
           </section>
           <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="主题">
-                {([["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]] as [ThemeChoice, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={theme === value} className={theme === value ? "active" : ""} onClick={() => onTheme(value)}>{label}</button>)}
-              </div>
+              <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
+                options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
             </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
@@ -82,9 +82,8 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
           </section>
           <section aria-labelledby="set-trash"><h3 id="set-trash">回收站</h3>
             <div className="settings-row"><div><strong>自动清理</strong><small>超过期限的已删除内容会被永久删除</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="回收站自动清理">
-                {TRASH_DAY_OPTIONS.map((days) => <button key={days} type="button" role="radio" aria-checked={trashDays === days} className={trashDays === days ? "active" : ""} onClick={() => onTrashDays(days)}>{days === 0 ? "不清理" : `${days} 天`}</button>)}
-              </div>
+              <ArcSegmented className="settings-segment" mode="radio" label="回收站自动清理" value={String(trashDays)} onSelect={(value) => onTrashDays(Number(value))}
+                options={TRASH_DAY_OPTIONS.map((days) => ({ value: String(days), label: days === 0 ? "不清理" : `${days} 天` }))} />
             </div>
             <div className="settings-row"><div><strong>清空回收站</strong><small>{trashCount === 0 ? "回收站是空的" : `永久删除 ${trashCount} 条，无法恢复`}</small></div>
               {confirmEmpty
@@ -95,19 +94,17 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
           <section aria-labelledby="set-window"><h3 id="set-window">窗口</h3>
             {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}
             <div className="settings-row"><div><strong>迷你窗口复制后</strong><small>{isDesktop ? "选择复制后是否自动收起迷你窗口" : "仅桌面版生效"}</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="迷你窗口复制后">
-                {([["hotkey", "从托盘呼出时收起"], ["always", "总是收起"], ["never", "不收起"]] as [MiniHidePolicy, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={miniHidePolicy === value} className={miniHidePolicy === value ? "active" : ""} onClick={() => onMiniHidePolicy(value)}>{label}</button>)}
-              </div>
+              <ArcSegmented className="settings-segment" mode="radio" label="迷你窗口复制后" value={miniHidePolicy} onSelect={(value) => onMiniHidePolicy(value as MiniHidePolicy)}
+                options={[["hotkey", "从托盘呼出时收起"], ["always", "总是收起"], ["never", "不收起"]].map(([value, label]) => ({ value, label }))} />
             </div>
             {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录系统后自动启动，并安静地收在托盘里</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="开机自动启动">
-                {([[false, "关"], [true, "开"]] as [boolean, string][]).map(([value, label]) => <button key={label} type="button" role="radio" aria-checked={launchAtLogin === value} className={launchAtLogin === value ? "active" : ""} onClick={() => { void window.clipboxDesktop?.setLaunchAtLogin?.(value).then(setLaunchAtLogin).catch(() => undefined); }}>{label}</button>)}
-              </div>
+              <ArcSegmented className="settings-segment" mode="radio" label="开机自动启动" value={launchAtLogin ? "on" : "off"}
+                onSelect={(value) => { void window.clipboxDesktop?.setLaunchAtLogin?.(value === "on").then(setLaunchAtLogin).catch(() => undefined); }}
+                options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
             </div>}
             {isDesktop && <div className="settings-row"><div><strong>点击窗口关闭按钮时</strong><small>{closeBehavior === "tray" ? "Clipbox 继续在托盘里运行，可随时呼出" : closeBehavior === "taskbar" ? "窗口缩到任务栏，点任务栏上的图标就能再打开" : "直接退出 Clipbox"}</small></div>
-              <div className="settings-segment" role="radiogroup" aria-label="点击窗口关闭按钮时">
-                {([["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]] as [CloseBehavior, string][]).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={closeBehavior === value} className={closeBehavior === value ? "active" : ""} onClick={() => onCloseBehavior(value)}>{label}</button>)}
-              </div>
+              <ArcSegmented className="settings-segment" mode="radio" label="点击窗口关闭按钮时" value={closeBehavior} onSelect={(value) => onCloseBehavior(value as CloseBehavior)}
+                options={[["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]].map(([value, label]) => ({ value, label }))} />
             </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
           </section>
