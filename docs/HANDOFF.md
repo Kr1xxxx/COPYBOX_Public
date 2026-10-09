@@ -35,6 +35,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 10 | 导入备份 → 合并 restores an entry whose identical copy is in the trash | Done | Claude | Was silently skipped as a duplicate; found while building task 5 |
 | 11 | Auto-merge only the commit CI checked | Done | Claude | A push after green CI was merged before its own checks finished (#22); owner approved the fix |
 | 12 | 图片 section (D-017): Windows 话术 \| 图片, Mac 话术 \| 秘密 \| 图片; copy images | Done | Claude | Spec `docs/specs/image-section.md`; store by an Opus worker, desktop IPC and UI by Sonnet workers; PR waits for the owner's 合并. Not in v1: folders, trash, image backup |
+| 14 | Web preview tool in the repo (`tools/preview/`, `npm run preview:build` / `preview:serve`) | Done | Claude | Was only in a temp folder; now any session can rebuild the preview with its version number. PR waits for the owner (package.json, eslint config) |
 
 ## Waiting on the owner
 

@@ -120,6 +120,8 @@ export async function main(argv = process.argv.slice(2)) {
 
   let patched = 0;
   for (const file of walk(join(out, "assets"))) {
+    // The page never loads these two, and the Artifact service reserves names that start with "_".
+    if (/\/_(build|ssg)Manifest\.js$/.test(file.replaceAll("\\", "/"))) { rmSync(file); continue; }
     if (!/\.(js|css)$/.test(file)) continue;
     const text = readFileSync(file, "utf8");
     let next = relativizeAssets(text);

@@ -27,4 +27,4 @@ The local server sends `charset=utf-8` and `Cache-Control: no-store`, so it beha
   (published path -> file in `dist-preview/`).
 - To update, publish again with the same `url` so the link stays. Files that no longer exist must be passed as `null`.
 - Two gotchas: published folder names must not start with `_` (that is why `_next` becomes `assets`), and every
-  file must be UTF-8.
+  file must be UTF-8. The two Next.js files `_buildManifest.js` and `_ssgManifest.js` are left out on purpose (not needed).
