@@ -28,6 +28,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 6 | Split `app/page.tsx` into component files | In progress | Claude | One piece at a time, tests green after each. Done: AI client (`app/ai-client.ts`), AI settings panel (`app/ai-settings.tsx`), backup, spreadsheet-import and delete-confirm dialogs (`app/dialogs.tsx`), fill-in-variables panel (`app/fill-panel.tsx`). folder management in Settings (`app/settings-folders.tsx`; shared bits in `app/platform.ts` and `app/preferences.ts`). settings dialog (`app/settings.tsx`). item editor (`app/item-editor.tsx`). `page.tsx` row in AGENTS.md updated (PR waits for the owner's 合并). Optional next: move the `window.clipboxDesktop` type out of `page.tsx`. Source-text tests read all UI files through `tests/helpers/ui-source.mjs` |
 | 7 | Alternative to the tray: Windows setting "缩到任务栏" keeps the taskbar button; Dock click already reopens on Mac | Done | Claude | No shortcuts (D-005) |
 | 8 | CI type check of `app/` | Done | Claude | `npm run typecheck` (`tsconfig.typecheck.json`, separate from the build); owner approved |
+| 9 | Merge policy: code moved unchanged is not a storage change | Done | Claude | `scripts/classify-pr.mjs`; edited, new or deleted storage lines still need the owner; owner approved |
 
 ## Waiting on the owner
 

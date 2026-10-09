@@ -43,3 +43,27 @@ test("an agent can mark a change as major", () => {
   assert.equal(result.size, "big");
   assert.match(result.reasons[0], /major/);
 });
+
+test("storage code moved unchanged between files is not a storage change", () => {
+  const moved = "-  localStorage.getItem(KEY)\n+    localStorage.getItem(KEY)";
+  assert.equal(run([file("app/page.tsx", 1, 1), file("app/settings.tsx", 1, 1)], { appDiff: moved }).size, "small");
+});
+
+test("an edited storage line still waits for the owner", () => {
+  const edited = "-  localStorage.setItem(KEY, a)\n+  localStorage.setItem(KEY, b)";
+  assert.equal(run([file("app/page.tsx", 1, 1)], { appDiff: edited }).size, "big");
+});
+
+test("a storage line added twice but removed once still waits for the owner", () => {
+  const copied = "-  localStorage.getItem(KEY)\n+  localStorage.getItem(KEY)\n+    localStorage.getItem(KEY)";
+  assert.equal(run([file("app/page.tsx", 2, 1)], { appDiff: copied }).size, "big");
+});
+
+test("a removed storage line with no matching add still waits for the owner", () => {
+  assert.equal(run([file("app/page.tsx", 0, 1)], { appDiff: "-  localStorage.removeItem(KEY)" }).size, "big");
+});
+
+test("a move plus an unrelated new storage line still waits for the owner", () => {
+  const diff = "-  localStorage.getItem(KEY)\n+    localStorage.getItem(KEY)\n+  sessionStorage.setItem(OTHER, v)";
+  assert.equal(run([file("app/page.tsx", 2, 1)], { appDiff: diff }).size, "big");
+});
