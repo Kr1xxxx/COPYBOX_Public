@@ -1291,7 +1291,7 @@ export default function Home() {
 
   async function prepareSnippetImport(file: File) {
     try {
-      const rows = parseSnippetWorkbook(await file.arrayBuffer(), file.name);
+      const rows = await parseSnippetWorkbook(await file.arrayBuffer(), file.name);
       const preview = buildSnippetImportPreview(rows, itemsRef.current, () => crypto.randomUUID(), timestampNow());
       setSnippetImport(preview);
       setSnippetImportName(file.name);
