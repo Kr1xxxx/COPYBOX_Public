@@ -308,6 +308,8 @@ export default function Home() {
   const [snippetImportName, setSnippetImportName] = useState("");
   const [fill, setFill] = useState<SnippetFillState | null>(null);
   const [typingVariable, setTypingVariable] = useState(false);
+  // Kept in memory only: customer names must not sit in plain browser storage.
+  const [lastValues, setLastValues] = useState<Record<string, string>>({});
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -744,9 +746,9 @@ export default function Home() {
     window.clipboxDesktop?.didCopy();
   }
 
-  function fillFor(item: SecretItem) { return fill?.itemId === item.id ? fill : emptyFillState(item); }
+  function fillFor(item: SecretItem) { return fill?.itemId === item.id ? fill : emptyFillState(item, lastValues); }
   function updateFill(item: SecretItem) {
-    return (update: (current: SnippetFillState) => SnippetFillState) => setFill((current) => update(current?.itemId === item.id ? current : emptyFillState(item)));
+    return (update: (current: SnippetFillState) => SnippetFillState) => setFill((current) => update(current?.itemId === item.id ? current : emptyFillState(item, lastValues)));
   }
 
   // A snippet with variables copies what is typed into its highlighted blocks; the first empty block gets the cursor instead of a half-filled copy.
@@ -769,6 +771,7 @@ export default function Home() {
       return;
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
+    setLastValues((current) => ({ ...current, ...Object.fromEntries(Object.entries(state.values).map(([name, value]) => [name, value.trim()]).filter(([, value]) => value)) }));
   }
 
   async function copy(item: SecretItem, language: CopyLanguage = "en") {

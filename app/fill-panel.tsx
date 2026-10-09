@@ -10,17 +10,23 @@ export type SnippetFillState = {
   values: Record<string, string>;
   checkedInputs: string[];
   verificationConfirmed: boolean;
+  /** Variables that were prefilled from the last copy and not touched yet. */
+  remembered: string[];
 };
 
-export function emptyFillState(item: SecretItem, language: CopyLanguage = "en"): SnippetFillState {
-  return { itemId: item.id, language, values: {}, checkedInputs: [], verificationConfirmed: false };
+// Values typed for earlier copies are offered again, so a variable that repeats (a company, a country) needs no retyping.
+export function emptyFillState(item: SecretItem, remembered: Record<string, string> = {}, language: CopyLanguage = "en"): SnippetFillState {
+  const values: Record<string, string> = {};
+  for (const name of item.snippetMeta?.placeholders || []) if (remembered[name]) values[name] = remembered[name];
+  return { itemId: item.id, language, values, checkedInputs: [], verificationConfirmed: false, remembered: Object.keys(values) };
 }
 
 // A variable shows as a highlighted block without its brackets. Static in the collapsed list, a field in the open card.
-export function SnippetVariableText({ text, renderText, values, onChange, onEnter, onFocusChange }: {
+export function SnippetVariableText({ text, renderText, values, remembered, onChange, onEnter, onFocusChange }: {
   text: string;
   renderText: (text: string) => ReactNode;
   values?: Record<string, string>;
+  remembered?: string[];
   onChange?: (name: string, value: string) => void;
   onEnter?: (name: string) => void;
   onFocusChange?: (focused: boolean) => void;
@@ -33,7 +39,7 @@ export function SnippetVariableText({ text, renderText, values, onChange, onEnte
     if (!values || !onChange) return <mark key={index} className="snippet-variable">{name}</mark>;
     const value = values[name] || "";
     return (
-      <span key={index} className="var-chip" data-filled={value ? "" : undefined}>
+      <span key={index} className="var-chip" data-filled={value ? "" : undefined} data-remembered={remembered?.includes(name) ? "" : undefined} title={remembered?.includes(name) ? "上次填的，点一下可以改" : undefined}>
         {/* The hidden copy of the text gives the field its width, so the block grows while you type. */}
         <span className="var-sizer" aria-hidden="true">{value || name}</span>
         <input
@@ -44,7 +50,7 @@ export function SnippetVariableText({ text, renderText, values, onChange, onEnte
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => onChange(name, event.target.value)}
-          onFocus={() => onFocusChange?.(true)}
+          onFocus={(event) => { onFocusChange?.(true); event.currentTarget.select(); }}
           onBlur={() => onFocusChange?.(false)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); onEnter?.(name); }
@@ -87,7 +93,8 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onFocu
           text={source}
           renderText={renderText}
           values={state.values}
-          onChange={(name, value) => onState((current) => ({ ...current, values: { ...current.values, [name]: value } }))}
+          remembered={state.remembered}
+          onChange={(name, value) => onState((current) => ({ ...current, values: { ...current.values, [name]: value }, remembered: current.remembered.filter((entry) => entry !== name) }))}
           onEnter={next}
           onFocusChange={onFocusChange}
         />

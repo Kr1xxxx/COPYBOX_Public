@@ -59,6 +59,30 @@ test("variables are highlighted blocks without brackets and are typed in place",
   await expect(page.locator(".snippet-preview").first()).not.toContainText("[");
 });
 
+test("a variable remembers the last value, and with one variable Enter copies the finished text", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  await expect(row).toHaveCount(1);
+  // typing then Enter walks through the empty blocks; the last Enter copies
+  await row.locator("input[data-var=Name]").click();
+  await page.keyboard.type("Amanda");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Comely");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda, thanks for reaching out to Comely! How can I help you today?");
+  // another snippet with the same variable starts with the remembered value, marked as remembered
+  await page.locator(".native-row", { hasText: "二次问候" }).locator(".row-main").click();
+  await expect(page.locator(".native-row.selected")).toHaveCount(1);
+  const same = page.locator(".native-row.selected input[data-var=Name]");
+  await expect(same).toHaveValue("Amanda");
+  await expect(same.locator("..")).toHaveAttribute("data-remembered", "");
+  // a snippet with exactly one variable: Enter copies the text right away
+  await same.click();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Amanda");
+});
+
 test("no keyboard shortcut hints anywhere and Ctrl+E does nothing", async ({ page }) => {
   await expect(page.locator("kbd")).toHaveCount(0);
   await page.keyboard.press("Control+e");
