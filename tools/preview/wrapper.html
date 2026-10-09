@@ -1,0 +1,149 @@
+<title>Clipbox 测试版</title>
+<style>
+  :root {
+    --ground: #e9e6e0; --ink: #3a3631; --soft: #7d776d; --line: #d3cec4; --bar: #f4f2ee;
+    --chrome: #f3f1ed; --chrome-line: #d8d3ca; --accent: #b4573a; --accent-ink: #fff;
+    --shadow: 0 1px 2px rgba(40,34,26,.12), 0 18px 48px rgba(40,34,26,.22);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #1c1b19; --ink: #e6e1d8; --soft: #8c867b; --line: #3a3732; --bar: #242220;
+      --chrome: #2a2825; --chrome-line: #3d3a35; --accent: #d9794f; --accent-ink: #1c1b19;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 18px 48px rgba(0,0,0,.55); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #1c1b19; --ink: #e6e1d8; --soft: #8c867b; --line: #3a3732; --bar: #242220;
+    --chrome: #2a2825; --chrome-line: #3d3a35; --accent: #d9794f; --accent-ink: #1c1b19;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 18px 48px rgba(0,0,0,.55); color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--ground); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .page { min-height: 100%; display: flex; flex-direction: column; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 10px 16px; background: var(--bar); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .brand b { font-size: 15px; letter-spacing: .02em; }
+  .brand span { color: var(--soft); font-size: 12.5px; }
+  .brand .ver { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .seg { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--ground); border: 1px solid var(--line); }
+  .seg button { all: unset; box-sizing: border-box; cursor: pointer; padding: 5px 18px; border-radius: 7px; font-size: 13px; color: var(--soft); }
+  .seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .seg button:focus-visible, .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tool { cursor: pointer; font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+  .tool:disabled { opacity: .55; cursor: default; }
+  .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px 16px; }
+  .scroller { max-width: 100%; overflow-x: auto; padding: 4px 10px 22px; }
+  .window { --w: 680px; --h: 620px; width: var(--w); transition: width .22s ease; border-radius: 8px; background: var(--chrome); box-shadow: var(--shadow); border: 1px solid var(--chrome-line); overflow: hidden; }
+  .window[data-mode="mini"] { --w: 360px; --h: 440px; }
+  .window { position: relative; }
+  .window[data-os="mac"] { border-radius: 12px; }
+  .lights { display: none; position: absolute; left: 14px; top: 14px; gap: 8px; pointer-events: none; z-index: 2; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.14); }
+  .lights i:nth-child(2) { background: #febc2e; }
+  .lights i:nth-child(3) { background: #28c840; }
+  .window[data-os="mac"] .lights { display: flex; }
+  .window[data-os="mac"] .titlebar { display: none; }
+  .titlebar { display: flex; align-items: center; justify-content: space-between; height: 32px; padding-left: 12px; font-size: 12px; border-bottom: 1px solid var(--chrome-line); user-select: none; }
+  .titlebar b { font-weight: 600; letter-spacing: .02em; }
+  .controls { display: flex; height: 100%; }
+  .controls i { width: 44px; display: grid; place-items: center; font-style: normal; color: var(--soft); font-size: 13px; }
+  .window iframe { display: block; width: var(--w); height: var(--h); transition: width .22s ease, height .22s ease; border: 0; background: #faf9f6; }
+  .note { margin: 0; max-width: 680px; text-align: center; color: var(--soft); font-size: 12.5px; text-wrap: balance; }
+  .note a { color: var(--accent); }
+  .busy { position: fixed; inset: auto 0 18px 0; display: flex; justify-content: center; pointer-events: none; }
+  .busy[hidden] { display: none; }
+  .busy span { background: rgba(31,30,28,.92); color: #fff; padding: 8px 16px; border-radius: 18px; font-size: 12.5px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+</style>
+<div class="page">
+  <header class="topbar">
+    <div class="brand"><b>Clipbox</b><span class="ver" title="网页测试版的版本号">v__VERSION__</span><span>网页测试版 · 软件窗口之外是预览工具</span></div>
+    <div class="seg" role="radiogroup" aria-label="软件版本">
+      <button type="button" role="radio" aria-checked="true" data-os="win">Windows 版</button>
+      <button type="button" role="radio" aria-checked="false" data-os="mac">Mac 版</button>
+    </div>
+    <button type="button" class="tool" id="reseed">补齐 10 张测试图</button>
+  </header>
+  <main class="stage">
+    <div class="scroller">
+      <div class="window" id="win" data-mode="full" data-os="win">
+        <div class="titlebar"><b>Clipbox</b><span class="controls" aria-hidden="true"><i>&#8212;</i><i>&#9633;</i><i>&#10005;</i></span></div>
+        <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+      <iframe id="app" src="app-win.html" title="Clipbox" allow="clipboard-write; clipboard-read"></iframe>
+      </div>
+    </div>
+    <p class="note" id="note"></p>
+  </main>
+</div>
+<div class="busy" id="busy" hidden><span id="busyText"></span></div>
+<script type="module">
+import { seedTestImages } from "./seed.js";
+const win = document.getElementById("win"), frame = document.getElementById("app"), note = document.getElementById("note");
+const busy = document.getElementById("busy"), busyText = document.getElementById("busyText"), reseed = document.getElementById("reseed");
+const SEEDED = "clipbox-preview:seeded:v1", OS = "clipbox-preview:os";
+let mode = "full", os = "win", seeding = false;
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* optional */ } } };
+
+function renderNote() {
+  const label = os === "mac" ? "Mac 版" : "Windows 版";
+  const size = mode === "mini" ? "迷你窗口 360 × 440（真软件里它会置顶）" : "软件最小窗口 680 × 620，这里就是实际尺寸";
+  note.innerHTML = `${label} · ${size}。数据只存在你这个浏览器里，不会上传。 <a href="app-${os}.html" target="_blank" rel="noopener">在新标签页打开</a>`;
+}
+function show(text) { busyText.textContent = text; busy.hidden = !text; }
+
+function setOs(next, reload = true) {
+  os = next; win.dataset.os = next; mode = "full"; win.dataset.mode = "full";
+  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.os === next)));
+  store.set(OS, next); renderNote();
+  if (reload) frame.src = `app-${next}.html`;
+}
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { if (b.dataset.os !== os) setOs(b.dataset.os); }));
+
+window.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || data.clipbox !== "window-mode") return;
+  mode = data.mode === "mini" ? "mini" : "full"; win.dataset.mode = mode; renderNote();
+});
+
+function appReady() {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      try { const d = frame.contentDocument; if (d && d.querySelector(".app-shell") && frame.contentWindow.localStorage.getItem("clipbox.device-key.v1")) { clearInterval(timer); resolve(frame.contentWindow); } } catch { /* not loaded yet */ }
+      if (Date.now() - started > 20000) { clearInterval(timer); resolve(null); }
+    }, 150);
+  });
+}
+function reloadFrame() { return new Promise((resolve) => { frame.addEventListener("load", () => resolve(), { once: true }); frame.contentWindow.location.reload(); }); }
+async function openImages() {
+  for (let i = 0; i < 20; i += 1) {
+    try {
+      const d = frame.contentDocument; const tab = d && [...d.querySelectorAll(".kind-switch button")].find((x) => x.textContent.trim() === "图片");
+      if (tab && tab.getAttribute("aria-pressed") === "true") return;
+      if (tab) tab.click();
+    } catch { /* frame still loading */ }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+}
+
+async function seed(manual) {
+  if (seeding) return; seeding = true; reseed.disabled = true;
+  try {
+    const w = await appReady(); if (!w) return;
+    const deviceKey = w.localStorage.getItem("clipbox.device-key.v1");
+    const added = await seedTestImages(deviceKey, (n, total, title) => show(`正在放入测试图 ${n} / ${total}：${title}`));
+    show("");
+    store.set(SEEDED, "1");
+    if (added > 0) {
+      // The 图片 page reads the store when it is first opened, so the first run needs no reload; a later top-up does.
+      if (manual) { show("刷新软件…"); await Promise.race([reloadFrame(), new Promise((resolve) => setTimeout(resolve, 4000))]); await appReady(); }
+      await openImages(); show("");
+    }
+    else if (manual) { show("10 张测试图都在了"); setTimeout(() => show(""), 1600); }
+  } catch (error) { show("放入测试图失败：" + (error && error.message ? error.message : "未知原因")); setTimeout(() => show(""), 4000); }
+  finally { seeding = false; reseed.disabled = false; }
+}
+reseed.addEventListener("click", () => seed(true));
+
+setOs(store.get(OS) === "mac" ? "mac" : "win", store.get(OS) === "mac");
+if (!store.get(SEEDED)) seed(false);
+</script>
