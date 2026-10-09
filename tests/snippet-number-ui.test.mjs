@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import test from "node:test";
+import { readUiSource } from "./helpers/ui-source.mjs";
 
-const pageSource = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const pageSource = readUiSource();
 
 test("shows a snippet number only in the opened entry and the editor", () => {
   assert.doesNotMatch(pageSource, /className="snippet-number"/);

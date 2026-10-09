@@ -7,8 +7,12 @@ import * as order from '../../app/clipbox-order.ts';
 import * as automation from '../../app/clipbox-automation.ts';
 
 export async function pageHarness() {
-  const source = fs.readFileSync(new URL('../../app/page.tsx', import.meta.url), 'utf8');
-  const ast = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  // page.tsx is being split into component files; the editor (saveItem, submit) now lives in item-editor.tsx.
+  const sources = ['page.tsx', 'item-editor.tsx'].map(name => {
+    const text = fs.readFileSync(new URL(`../../app/${name}`, import.meta.url), 'utf8');
+    return { name, text, ast: ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX) };
+  });
+  let ast;
   const functions = new Map(), hooks = new Map();
   let automationEffect;
   function visit(node) {
@@ -17,7 +21,7 @@ export async function pageHarness() {
     if (ts.isCallExpression(node) && node.expression.getText(ast) === 'useEffect' && node.arguments[0]?.getText(ast).includes('const remove = window.clipboxDesktop.onAutomationCommand')) automationEffect = node.arguments[0].getText(ast);
     ts.forEachChild(node, visit);
   }
-  visit(ast);
+  for (const source of sources) { ast = source.ast; visit(ast); }
   let edition = {};
   const editionPath = new URL('../../app/clipbox-edition.ts', import.meta.url);
   if (fs.existsSync(editionPath)) edition = await import(editionPath.href);
