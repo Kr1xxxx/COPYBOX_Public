@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 24 (owner: whole picture visible; acceptance finding): the tile copy button is hidden until hover or keyboard focus (always shown at .85 on touch screens). The old e2e line that required it to be always visible changed to match.
 - 2026-10-09 — Claude — Task 19 (acceptance finding on D-020): the 图片 tile glass now reads as frosted glass: unprefixed `backdrop-filter` kept in the built CSS (inside `@supports`, the minifier had dropped it), soft grey blobs behind so the blur shows, a fine colourless grain and an inner highlight; lighter grain in dark mode.
 - 2026-10-09 — Claude — Task 23 (owner bug: the 全部产品 dropdown stayed open): one effect in `page.tsx` closes the 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu on an outside press and on Esc (the 图片 menus already did). New e2e test.
 - 2026-10-09 — Claude — Task 21, step 2 of D-021 (owner: unify motion, less on frequent actions): all segmented controls (话术\|图片, search scope, 宫格\|列表, settings choices, secret display) use `ArcSegmented`: one highlight pill glides to the chosen option (spring, no bounce, none under reduced motion). Markup, classes and aria stay as before. Source-text unit tests that matched the old markup now match the new one (same intent). Steps 3-4 (menus/dialogs; rename, search, drop zone, empty states, counters) not done yet.

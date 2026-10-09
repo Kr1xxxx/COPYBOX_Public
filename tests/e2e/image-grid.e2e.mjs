@@ -68,9 +68,11 @@ test("the copy button on a tile puts a PNG on the clipboard", async ({ page }) =
   await addSix(page);
   const first = tile(page, "图一");
   const copy = first.getByRole("button", { name: "复制 图一" });
-  await expect(copy).toBeVisible();
-  // Always visible, but not at full strength until hovered or focused.
-  expect(Number(await copy.evaluate((button) => getComputedStyle(button).opacity))).toBeGreaterThan(0.5);
+  // Owner: the whole picture stays visible, so the button appears only on hover or keyboard focus.
+  await page.mouse.move(2, 2);
+  await expect(copy).toHaveCSS("opacity", "0");
+  await first.locator(".image-tile-thumb").hover();
+  await expect(copy).toHaveCSS("opacity", "1");
   const corner = await copy.boundingBox();
   const box = await first.locator(".image-tile-thumb").boundingBox();
   expect(corner.x + corner.width).toBeGreaterThan(box.x + box.width - 14);
@@ -389,6 +391,24 @@ test("opening a tile scrolls so the clicked picture is fully visible", async ({ 
     await tile(page, title).getByRole("button", { name: `已展开 ${title}` }).click();
     await expect(card(page)).toHaveCount(0);
   }
+});
+
+test("the tile copy button shows only on hover or keyboard focus, so the whole picture is visible", async ({ page }) => {
+  await openImages(page);
+  await addImages(page, [png("图一", 64, 64), png("图二", 64, 64)]);
+  await expect(tiles(page)).toHaveCount(2);
+  const button = (title) => tile(page, title).locator(".image-tile-copy");
+  await page.mouse.move(2, 2);
+  await expect(button("图一")).toHaveCSS("opacity", "0");
+  await tile(page, "图一").locator(".image-tile-thumb").hover();
+  await expect(button("图一")).toHaveCSS("opacity", "1");
+  await expect(button("图二")).toHaveCSS("opacity", "0");
+  // Keyboard: focusing the button reveals it, and it still copies.
+  await page.mouse.move(2, 2);
+  await button("图二").focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(button("图二")).toHaveCSS("opacity", "1");
 });
 
 test("segmented controls keep one highlight pill that follows the selected option (arc step 2)", async ({ page }) => {
