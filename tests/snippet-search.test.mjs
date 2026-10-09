@@ -35,3 +35,23 @@ test("every term must match and plain text still works", () => {
   assert.deepEqual(ids(searchSnippets(list, "tk refund")), ["a"]);
   assert.deepEqual(ids(searchSnippets(list, "zzz")), []);
 });
+
+test('literal "ok" ranks above pinyin "haokan"', () => {
+  const list = [item("py", "好看的包装"), item("lit", "收到", { secret: "OK, 已收到" })];
+  assert.deepEqual(ids(searchSnippets(list, "ok")), ["lit"]);
+  const both = [item("py", "好看的包装"), item("lit", "收到", { secret: "OK, 已收到" }), item("t", "OK 确认")];
+  assert.deepEqual(ids(searchSnippets(both, "ok")).slice(0, 2), ["t", "lit"]);
+});
+
+test('"an" does not match from the middle of a syllable', () => {
+  const list = [item("a", "先发货"), item("b", "安排发货"), item("c", "Plan B")];
+  const found = ids(searchSnippets(list, "an"));
+  assert.ok(!found.includes("a"));
+  assert.deepEqual(found, ["c", "b"]);
+});
+
+test("partial last syllable still matches (tuik → 退款)", () => {
+  assert.deepEqual(ids(searchSnippets([item("a", "退款说明")], "tuik")), ["a"]);
+  assert.deepEqual(ids(searchSnippets([item("a", "退款说明")], "kuan")), ["a"]);
+  assert.deepEqual(ids(searchSnippets([item("a", "退款说明")], "uik")), []);
+});

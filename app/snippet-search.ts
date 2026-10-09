@@ -9,25 +9,28 @@ const TITLE_WEIGHT = 3;
 const HINT_WEIGHT = 2;
 const BODY_WEIGHT = 1;
 
-type PinyinForms = { full: string; initials: string };
+type PinyinForms = { syllables: string[]; initials: string };
 
 const pinyinCache = new Map<string, PinyinForms>();
 const PINYIN_CACHE_LIMIT = 4000;
+const EMPTY_FORMS: PinyinForms = { syllables: [], initials: "" };
 
 function hasChinese(text: string) {
-  return /[㐀-鿿]/.test(text);
+  return /[\u3400-\u9fff]/.test(text);
 }
 
 function pinyinForms(text: string): PinyinForms {
   const cached = pinyinCache.get(text);
   if (cached) return cached;
-  let forms: PinyinForms = { full: "", initials: "" };
+  let forms = EMPTY_FORMS;
   if (hasChinese(text)) {
     try {
-      const full = pinyin(text, { toneType: "none", type: "array", nonZh: "removed" }) as string[];
-      forms = { full: full.join("").toLowerCase(), initials: full.map((syllable) => syllable[0] || "").join("").toLowerCase() };
+      const syllables = (pinyin(text, { toneType: "none", type: "array", nonZh: "removed" }) as string[])
+        .map((syllable) => syllable.toLowerCase())
+        .filter(Boolean);
+      forms = { syllables, initials: syllables.map((syllable) => syllable[0]).join("") };
     } catch {
-      forms = { full: "", initials: "" };
+      forms = EMPTY_FORMS;
     }
   }
   if (pinyinCache.size >= PINYIN_CACHE_LIMIT) pinyinCache.clear();
@@ -35,11 +38,29 @@ function pinyinForms(text: string): PinyinForms {
   return forms;
 }
 
-function termMatches(text: string, lowered: string, term: string, allowPinyin: boolean) {
-  if (lowered.includes(term)) return true;
-  if (!allowPinyin || !/^[a-z]+$/.test(term)) return false;
+// Pinyin matches only start at a syllable: initials ("tk" in tkxm) or whole syllables
+// ("tuik" in tui-kuan), never from the middle of one ("an" must not hit "xian").
+function pinyinMatches(text: string, term: string) {
   const forms = pinyinForms(text);
-  return forms.initials.includes(term) || forms.full.includes(term);
+  if (forms.initials.includes(term)) return true;
+  for (let start = 0; start < forms.syllables.length; start += 1) {
+    let joined = "";
+    for (let end = start; end < forms.syllables.length && joined.length < term.length; end += 1) {
+      joined += forms.syllables[end];
+      if (joined.startsWith(term)) return true;
+      if (!term.startsWith(joined)) break;
+    }
+  }
+  return false;
+}
+
+const LITERAL_BONUS = 10;
+
+/** Literal hits always outrank pinyin hits: 10 x weight vs weight. */
+function termScore(entry: { text: string; lowered: string; weight: number; pinyin: boolean }, term: string) {
+  if (entry.lowered.includes(term)) return entry.weight * LITERAL_BONUS;
+  if (entry.pinyin && /^[a-z]+$/.test(term) && pinyinMatches(entry.text, term)) return entry.weight;
+  return 0;
 }
 
 type Field = { text: string; lowered: string; weight: number; pinyin: boolean };
@@ -65,9 +86,7 @@ export function snippetSearchScore(item: SecretItem, terms: string[]) {
   let score = 0;
   for (const term of terms) {
     let best = 0;
-    for (const entry of fields) {
-      if (entry.weight > best && termMatches(entry.text, entry.lowered, term, entry.pinyin)) best = entry.weight;
-    }
+    for (const entry of fields) best = Math.max(best, termScore(entry, term));
     if (best === 0) return 0;
     score += best;
   }
