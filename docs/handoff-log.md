@@ -4,6 +4,7 @@ Newest first. One entry per session: date — who (person or agent) — what was
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
 - 2026-10-09 — Claude — Task 6: updated the `page.tsx` row in AGENTS.md (~1580 lines, lists the split-out UI files). Rulebook change, so the PR waits for the owner's 合并.
+- 2026-10-09 — Claude — Task 8 (owner approved): CI runs `npm run typecheck` (`tsc -p tsconfig.typecheck.json`; a separate file so the vinext build is unaffected). Fixed the 3 real errors type-only: `deriveKey` salt type (TS 5.9 `Uint8Array<ArrayBuffer>`), the automation `move` branch used a not-narrowed `folder`; `types: []` keeps Node's `setTimeout` type out of browser code.
 - 2026-10-09 — Claude — Fix: the empty 备注 page on Windows no longer says "默认只复制引用" (only true for Mac 秘密).
 - 2026-10-08 — Claude — Task 6, piece 6: moved `ItemEditor` to `app/item-editor.tsx` (unchanged; `COLORS` moved with it). The test harness (`tests/helpers/page-harness.mjs`) now reads both `page.tsx` and `item-editor.tsx` to find `saveItem`/`submit` by name. `page.tsx` ~1580 lines.
 - 2026-10-08 — Claude — Task 6, piece 5: moved `SettingsDialog` and `backupAgeLabel` to `app/settings.tsx` (unchanged). `page.tsx` ~1820 lines.

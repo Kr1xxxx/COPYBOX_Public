@@ -372,7 +372,6 @@ export function applySnippetAutomationCommand(
     return { data, changed: true, result: { action: "delete", number: command.number } };
   }
 
-  const folder = command.action === "move" ? command.folder : command.folder;
   const updatedMeta = command.action === "update" && (command.folder !== undefined || command.chineseText !== undefined)
     ? {
       ...(target.snippetMeta || defaultSnippetMeta()),
@@ -381,7 +380,7 @@ export function applySnippetAutomationCommand(
     }
     : target.snippetMeta;
   const updated: SecretItem = command.action === "move"
-    ? { ...target, folder, ...(target.snippetMeta ? { snippetMeta: { ...target.snippetMeta, stage: folder } } : {}), updatedAt: now }
+    ? { ...target, folder: command.folder, ...(target.snippetMeta ? { snippetMeta: { ...target.snippetMeta, stage: command.folder } } : {}), updatedAt: now }
     : {
       ...target,
       ...(command.title === undefined ? {} : { label: validateTitle(command.title) }),
