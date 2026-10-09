@@ -446,9 +446,15 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   );
 
   // A tile shows the picture cropped to a square; the object URL is the same one the thumbnail and preview use.
+  // D-022: the picture sits 10% in from every edge (even a square one) on frosted glass: a blurred, enlarged copy of itself
+  // behind a pale sheen. The glass copy is decoration only.
   const tileImage = (meta: ImageMeta) => thumbs[meta.id] && (
-    // eslint-disable-next-line @next/next/no-img-element -- a decrypted object URL, not a file Next could optimise
-    <img src={thumbs[meta.id]} alt="" draggable={false} />
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a decrypted object URL, not a file Next could optimise */}
+      <img className="image-tile-glass" src={thumbs[meta.id]} alt="" aria-hidden="true" draggable={false} />
+      {/* eslint-disable-next-line @next/next/no-img-element -- a decrypted object URL, not a file Next could optimise */}
+      <img className="image-tile-pic" src={thumbs[meta.id]} alt="" draggable={false} />
+    </>
   );
 
   const detail = (meta: ImageMeta) => (

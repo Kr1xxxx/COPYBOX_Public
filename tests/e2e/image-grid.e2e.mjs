@@ -265,7 +265,16 @@ test("extreme pictures neither overflow the window nor the opened card", async (
   expect(await noOverflow()).toEqual({ page: true, list: true });
 
   // Thumbnails show the whole picture, never a crop.
-  for (const img of await page.locator(".image-tile-thumb img").all()) await expect(img).toHaveCSS("object-fit", "contain");
+  for (const img of await page.locator(".image-tile-pic").all()) await expect(img).toHaveCSS("object-fit", "contain");
+  // Every picture, even a square one, keeps a 10% margin on frosted glass.
+  for (const index of [0, 2, 5]) {
+    const thumb = await tiles(page).nth(index).locator(".image-tile-thumb").boundingBox();
+    const pic = await tiles(page).nth(index).locator(".image-tile-pic").boundingBox();
+    expect(Math.abs((pic.x - thumb.x) / thumb.width - 0.1)).toBeLessThan(0.03);
+    expect(Math.abs((pic.y - thumb.y) / thumb.height - 0.1)).toBeLessThan(0.03);
+    expect(Math.abs(pic.width / thumb.width - 0.8)).toBeLessThan(0.03);
+    await expect(tiles(page).nth(index).locator(".image-tile-glass")).toHaveCSS("filter", /blur/);
+  }
   // Every tile is a square whatever the picture's shape, and the four columns are equal.
   for (const thumb of await boxes(page.locator(".image-tile-thumb"))) expect(Math.abs(thumb.width - thumb.height)).toBeLessThan(1.5);
   const all = await boxes(tiles(page));
@@ -296,6 +305,7 @@ test("the mini window shows a four-column grid, no switch, and a click copies", 
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
   await expect(page.locator(".mini-tile")).toHaveCount(5);
+  await page.waitForTimeout(500); // the window resizes and the tiles fade in; measure after they settle
   await expect(page.getByRole("button", { name: "宫格视图" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "列表视图" })).toHaveCount(0);
   const all = await boxes(page.locator(".mini-tile"));

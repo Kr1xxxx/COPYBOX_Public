@@ -27,6 +27,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-018 | 图片 folders (目录) | Accepted |
 | D-019 | 图片 shown as a 九宫格 (grid) by default | Accepted (columns changed by D-020) |
 | D-020 | 图片 grid is 16宫格 (4 per row) and thumbnails show the whole picture | Accepted |
+| D-022 | 图片 tiles: 10% margin on every picture, frosted-glass background | Accepted |
 
 ---
 
@@ -173,3 +174,10 @@ Statuses: Accepted / Superseded / Deprecated.
   (`object-fit: contain`, empty space shows the tile background). The same goes for the small list thumbnail.
 - Consequences: CSS and `IMAGE_GRID_COLUMNS` only; no stored image data changes. Tests that expected 3 columns or a
   cropped thumbnail (`cover`) now expect 4 columns and `contain`, because the owner changed the behaviour.
+
+### D-022 图片 tiles: 10% margin, frosted glass (2026-10-09)
+- Context (owner): "图片预览这里,就算是正方形,也留10%的边, 背景都做成毛玻璃风".
+- Decision (owner): in the grid (and the mini grid) every picture, even a square one, sits 10% in from each edge of its tile
+  (the picture box is 80% of the tile) and is never cropped. Behind it is frosted glass: a blurred, enlarged copy of the same
+  picture under a pale translucent sheen. The small thumbnail of the 列表 view is unchanged.
+- Consequences: CSS and one extra decorative `<img>` per tile (`image-tile-glass`, `aria-hidden`); no stored data changes.

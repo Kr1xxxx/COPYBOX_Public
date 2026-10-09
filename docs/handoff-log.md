@@ -4,6 +4,7 @@ Newest first. One entry per session: date — who (person or agent) — what was
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
 - 2026-10-09 — Claude — Task 14 (owner: 建立专案, second half): the web preview build is a repo tool now (`tools/preview/`: page shell with Windows/Mac switch, ten simulated test images, `build.mjs`, `serve.mjs`, README, unit tests). Port of the temp Python script to Node by a Sonnet worker, reviewed. The preview page version lives in `tools/preview/VERSION` (v1.01).
+- 2026-10-09 — Claude — Task 16b (owner: 10% margin even for squares, frosted-glass background; D-022): tiles show the picture in an 80% box over a blurred copy of itself plus a pale sheen (`image-tile-glass`, `image-tile-pic`). Added to PR #38. Web preview v1.05.
 - 2026-10-09 — Claude — Task 16 (owner: 16宫格, thumbnails show the whole picture; D-020): grid is 4 per row (`IMAGE_GRID_COLUMNS`), tiles and list thumbnails use `object-fit: contain`; tests updated for 4 columns / contain. Web preview v1.03.
 - 2026-10-09 — Claude — Task 15, 图片 九宫格 (D-019, spec `docs/specs/image-grid.md`): 3-column grid by default with a copy button on each tile, detail card as a full-width row, `宫格 | 列表` switch, mini grid. Added to PR #25. Web preview v1.02.
 - 2026-10-09 — Claude — Web preview v1.01: version number top-left of the preview page (owner: +0.01 on every update, say it at the end of each report; rule in `CLAUDE.md`). Fixed 全部图片 being cut off to 全部… once there are ten or more images (icon hidden on that row) + a test.
