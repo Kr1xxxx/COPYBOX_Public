@@ -34,7 +34,7 @@ Last updated: 2026-10-09 (web preview v1.01).
 ## Done recently
 
 Backup export for 备注/秘密 (now 秘密 on macOS only), the page.tsx split, CI type check, merge policy that ignores code
-moves, 图片 section (D-017), 图片 folders (D-018, PR #25 pending the owner's 合并), web preview with Windows/Mac switch.
+moves, 图片 section (D-017), 图片 folders (D-018) and the 图片 九宫格 view (D-019) (both PR #25, merged 2026-10-09), web preview with Windows/Mac switch.
 
 ## How this file is kept
 
