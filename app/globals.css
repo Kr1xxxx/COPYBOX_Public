@@ -613,9 +613,18 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 /* Settings → 目录 */
-.settings-folder-group { margin-bottom: 12px; }
-.settings-folder-head { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.settings-folder-head strong { font-size: 13px; font-weight: 600; }
+/* Each group (话术 / 秘密 / 图片) folds open on click; arc-library's accordion motion (app/arc/collapsible.tsx). */
+.settings-folder-group { border-bottom: 1px solid var(--line-soft); }
+.settings-folder-group:last-of-type { border-bottom: 0; }
+.arc-collapsible-trigger { width: 100%; min-height: 44px; padding: 0; display: flex; align-items: center; gap: 10px; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.arc-collapsible-title { flex: 1 1 auto; font-size: 13px; font-weight: 600; }
+.arc-collapsible-meta { flex: none; color: var(--muted); font-size: 11.5px; }
+.arc-collapsible-icon { flex: none; display: inline-flex; color: var(--muted); transition: color .16s; }
+.arc-collapsible-trigger:hover .arc-collapsible-icon, .arc-collapsible.open .arc-collapsible-icon { color: var(--ink); }
+.arc-collapsible-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.arc-collapsible-panel { overflow: hidden; }
+.arc-collapsible-inner { padding-bottom: 8px; }
+.settings-folder-head { min-height: 34px; display: flex; align-items: center; gap: 10px; }
 .settings-folder { border-bottom: 1px solid var(--line-soft); }
 .settings-folder:last-of-type { border-bottom: 0; }
 .settings-folder-row { min-height: 40px; display: flex; align-items: center; gap: 9px; }
@@ -636,7 +645,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-mini-button:disabled { opacity: .4; cursor: default; }
 .settings-mini-button.danger { color: var(--danger); }
 .settings-folder-form { min-width: 0; flex: 1 1 auto; display: flex; align-items: center; gap: 6px; }
-.settings-folders > .settings-folder-group > .settings-folder-form { padding-bottom: 6px; }
+.settings-folder-group .arc-collapsible-inner > .settings-folder-form { padding-bottom: 6px; }
 .settings-folder-form input { min-width: 0; flex: 1 1 auto; height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--content); color: var(--ink); font: inherit; font-size: 13px; }
 .settings-folder-form input:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 .settings-folder-form .secondary-button { height: 28px; padding: 0 10px; }

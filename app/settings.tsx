@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AiSettingsSection } from "./ai-settings";
-import type { ItemKind } from "./clipbox-core";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
-import { SettingsFolders, type SettingsFolderGroup } from "./settings-folders";
+import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 
 function backupAgeLabel(at: number) {
   if (!at) return "还没有导出过";
@@ -18,12 +17,12 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
-  onFolderAdd: (kind: ItemKind, name: string) => Promise<string>;
-  onFolderRename: (kind: ItemKind, from: string, to: string) => Promise<string>;
-  onFolderDelete: (kind: ItemKind, folder: string) => Promise<string>;
-  onFolderColor: (kind: ItemKind, folder: string, color: string | null) => void;
-  onFolderMove: (kind: ItemKind, folder: string, delta: -1 | 1) => void;
-  onFolderReorder: (kind: ItemKind, source: string, target: string) => void;
+  onFolderAdd: (kind: SettingsFolderKind, name: string) => Promise<string>;
+  onFolderRename: (kind: SettingsFolderKind, from: string, to: string) => Promise<string>;
+  onFolderDelete: (kind: SettingsFolderKind, folder: string) => Promise<string>;
+  onFolderColor: (kind: SettingsFolderKind, folder: string, color: string | null) => void;
+  onFolderMove: (kind: SettingsFolderKind, folder: string, delta: -1 | 1) => void;
+  onFolderReorder: (kind: SettingsFolderKind, source: string, target: string) => void;
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
