@@ -14,7 +14,7 @@
 Merging (D-011): small PRs merge themselves when CI is green; big ones are labelled `needs-owner` and wait for the
 owner to write 合并.
 
-Web preview for the owner: version **v1.01** (shown top-left; +0.01 on every update, then say it at the end of each report).
+Web preview for the owner: version **v1.02** (shown top-left; +0.01 on every update, then say it at the end of each report).
 Windows / Mac switch, ten simulated test images. It is built from the branch under review, not from `main`.
 
 Workflow (`CLAUDE.md`): the main Claude session coordinates; Sonnet workers (`.claude/agents/worker.md`) do pieces in
@@ -39,6 +39,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 11 | Auto-merge only the commit CI checked | Done | Claude | A push after green CI was merged before its own checks finished (#22); owner approved the fix |
 | 12 | 图片 section (D-017): Windows 话术 \| 图片, Mac 话术 \| 秘密 \| 图片; copy images | Done | Claude | Spec `docs/specs/image-section.md`; store by an Opus worker, desktop IPC and UI by Sonnet workers; PR waits for the owner's 合并. Not in v1: folders, trash, image backup |
 | 13 | 图片 folders (D-018) | Done | Claude | Store by an Opus worker (`image-store.ts`), UI by a Sonnet worker (`image-library.ts`, `image-folders.tsx`, `image-folders-core.ts`); PR waits for the owner's 合并. Not yet: drag-sorting folders, image backup |
+| 15 | 图片 九宫格 (D-019) | Done | Claude | Part of PR #25 (not merged yet). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 
 ## Waiting on the owner
 

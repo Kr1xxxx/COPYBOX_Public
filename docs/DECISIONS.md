@@ -25,6 +25,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-016 | Backups stay local files; no cloud or email upload | Accepted |
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 | D-018 | 图片 folders (目录) | Accepted |
+| D-019 | 图片 shown as a 九宫格 (3-column grid) by default | Accepted |
 
 ---
 
@@ -155,3 +156,11 @@ Statuses: Accepted / Superseded / Deprecated.
 - Consequences: the folder name sits inside each image's encrypted record (`ImageMeta.folder`) and the folder list is one
   more encrypted record (`folders`) in the same IndexedDB store; no database version change, vault untouched. An older
   build reading this store would show the folder list as a nameless image, so do not downgrade after using folders.
+
+### D-019 图片 九宫格 (2026-10-09)
+- Context (owner): "图片哪里给我做成九宫格".
+- Decision (owner): the 图片 page shows pictures as a grid of 3 square thumbnails per row (the full window is at least
+  680 px wide). A copy button sits on every tile; clicking a tile opens its detail card as a full-width row under that tile's
+  row. A `宫格 | 列表` switch (kept per device in `localStorage` key `clipbox.image-view`) brings back the old list. The
+  mini window always shows the grid, 3 compact columns, and a tile click copies. Spec: `docs/specs/image-grid.md`.
+- Consequences: a UI preference only; no stored image data changes.
