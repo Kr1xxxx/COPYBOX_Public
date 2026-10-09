@@ -9,7 +9,8 @@ test.beforeEach(async ({ page }) => {
 
 test("folders can be drag-sorted in Settings; standard folders cannot", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
-  const group = dialog.locator(".settings-folder-group").nth(1);
+  // The first group is 话术; the second one (备注/秘密) is only on macOS, so the browser and Windows have one group.
+  const group = dialog.locator(".settings-folder-group").nth(0);
   for (const name of ["甲", "乙", "丙"]) {
     await group.getByRole("button", { name: "新建目录" }).click();
     await group.locator("input[aria-label^=新建]").fill(name);
