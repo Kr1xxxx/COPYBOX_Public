@@ -115,7 +115,7 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
             </div>
           </section>
           <section aria-labelledby="set-security" hidden={tab !== "data"}><h3 id="set-security">安全</h3>
-            <p className="settings-note">所有内容加密后只保存在这台电脑上，别人拿到数据文件也打不开。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
+            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
           </section>
           <section aria-labelledby="set-window" hidden={tab !== "window"}><h3 id="set-window">窗口</h3>
             {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}
