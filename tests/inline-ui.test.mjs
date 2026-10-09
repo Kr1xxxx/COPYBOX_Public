@@ -3,21 +3,22 @@ import fs from "node:fs";
 import test from "node:test";
 
 const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-// BackupDialog and SnippetImportDialog live in app/dialogs.tsx (split out of page.tsx).
+// BackupDialog, SnippetImportDialog and DeleteConfirmDialog live in app/dialogs.tsx; SnippetFillPanel in app/fill-panel.tsx (split out of page.tsx).
 const dialogs = fs.readFileSync(new URL("../app/dialogs.tsx", import.meta.url), "utf8");
+const fillPanel = fs.readFileSync(new URL("../app/fill-panel.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
 const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
 
 test("editing, filling variables and creating folders happen in place, not in popups", () => {
   assert.match(page, /className="inline-editor"/);
-  assert.match(page, /function SnippetFillPanel/);
+  assert.match(fillPanel, /function SnippetFillPanel/);
   assert.doesNotMatch(page, /function FolderDialog|function SnippetCopyDialog|className="editor-backdrop"|className="editor-dialog"/);
   assert.match(page, /className="directory-new"/);
   assert.match(page, /className=\{`native-row selected editing new-row/);
   // only reversible-free flows keep real dialogs
-  for (const dialog of ["DeleteConfirmDialog", "SettingsDialog"]) assert.match(page, new RegExp(`function ${dialog}`));
-  for (const dialog of ["BackupDialog", "SnippetImportDialog"]) assert.match(dialogs, new RegExp(`function ${dialog}`));
+  assert.match(page, /function SettingsDialog/);
+  for (const dialog of ["BackupDialog", "SnippetImportDialog", "DeleteConfirmDialog"]) assert.match(dialogs, new RegExp(`function ${dialog}`));
 });
 
 test("folders can be renamed, recoloured and deleted from the sidebar", () => {

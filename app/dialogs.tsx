@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { resolveFocusWrapIndex, type ImportStrategy, type SnippetImportPreview } from "./clipbox-core";
+import { resolveFocusWrapIndex, type ImportStrategy, type SecretItem } from "./clipbox-core";
+import type { SnippetImportPreview } from "./snippet-import";
 
 export type BackupMode = "export" | "import";
+export type DeleteRequest = { item: SecretItem; permanent: boolean };
 
 function useDialogKeyboard(dialogRef: React.RefObject<HTMLElement | null>, onClose: () => void, disabled = false) {
   useEffect(() => {
@@ -120,6 +122,64 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
           {error && <p className="backup-error">{error}</p>}
           <p className="backup-note">{mode === "export" ? "请妥善保存密码；Clipbox 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
           <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={mode === "import" && strategy === "replace" ? "danger" : "primary"} disabled={busy}>{busy ? (mode === "export" ? "正在加密…" : "正在验证…") : mode === "export" ? "加密并导出" : strategy === "merge" ? "验证并合并" : "验证并覆盖"}</button></div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+export function DeleteConfirmDialog({ request, onClose, onConfirm }: {
+  request: DeleteRequest;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => { cancelRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") || []);
+      const wrapIndex = resolveFocusWrapIndex(focusable.indexOf(document.activeElement as HTMLElement), focusable.length, event.shiftKey);
+      if (wrapIndex >= 0) {
+        event.preventDefault();
+        focusable[wrapIndex].focus();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [busy, onClose]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onConfirm();
+    } catch {
+      setError(request.permanent ? "永久删除失败，内容仍保留在回收站" : "删除失败，内容没有移动");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="delete-confirm-backdrop">
+      <section ref={dialogRef} className={`delete-confirm-dialog ${request.permanent ? "permanent" : ""}`} role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description">
+        <header><span>{request.permanent ? "PERMANENT DELETE" : "MOVE TO TRASH"}</span><h2 id="delete-confirm-title">{request.permanent ? "永久删除这条内容？" : "移入回收站？"}</h2><p id="delete-confirm-description">{request.permanent ? "删除后无法恢复，请确认你不再需要它。" : "内容将从普通目录隐藏，之后可以在回收站恢复。"}</p></header>
+        <form onSubmit={(event) => void submit(event)}>
+          <div className="delete-confirm-item"><strong>{request.item.label}</strong><small>{request.item.folder || "未分类"}</small></div>
+          {error && <p className="delete-confirm-error" role="alert">{error}</p>}
+          <div className="delete-confirm-actions"><button ref={cancelRef} type="button" onClick={onClose} disabled={busy}>取消</button><button className={request.permanent ? "danger" : "primary"} disabled={busy}>{busy ? "正在处理…" : request.permanent ? "永久删除" : "移入回收站"}</button></div>
         </form>
       </section>
     </div>
