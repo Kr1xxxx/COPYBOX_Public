@@ -6,7 +6,7 @@ import { asDesktop } from "./helpers.mjs";
 const png = (name, width = 40, height = 40, color = [90, 140, 220]) => ({ name: `${name}.png`, mimeType: "image/png", buffer: makePng(width, height, color) });
 
 async function openImages(page, platform = "win32") {
-  await asDesktop(page, platform);
+  await asDesktop(page, platform, { imageView: "list" });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();

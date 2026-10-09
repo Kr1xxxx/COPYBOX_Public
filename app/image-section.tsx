@@ -16,12 +16,14 @@ import {
   imageFolderColors,
 } from "./image-folders-core";
 import { readableMessage, type ImageLibrary } from "./image-library";
+import { gridCardInsertIndex, type ImageView } from "./image-view-core";
 import {
   IMAGE_TITLE_MAX,
   IMAGE_TYPES,
   titleFromFileName,
   toPngBytes,
   validateImageFile,
+  type ImageFolder,
   type ImageMeta,
 } from "./image-store";
 
@@ -110,11 +112,92 @@ function ImageDeleteDialog({ target, onClose, onConfirm }: { target: ImageMeta; 
   );
 }
 
-export function ImageSection({ library, query, compact, paused, onToast, onCounts, ref }: {
+type MoveMenuState = { id: string; anchor: "more" | "line"; up: boolean } | null;
+
+// The rename form is the same in the list (inside the row) and in the grid (inside the opened card).
+function ImageRenameForm({ value, inputRef, thumb, onChange, onSubmit, onCancel }: {
+  value: string;
+  inputRef: Ref<HTMLInputElement>;
+  thumb?: React.ReactNode;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <form className="image-rename" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+      {thumb}
+      <input
+        ref={inputRef}
+        value={value}
+        maxLength={IMAGE_TITLE_MAX}
+        aria-label="图片标题"
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onCancel(); } }}
+      />
+      <button type="submit" className="primary-button">保存</button>
+      <button type="button" className="ghost-button" onClick={onCancel}>取消</button>
+    </form>
+  );
+}
+
+// The opened picture: large preview, size, 目录 chip and the actions. The list shows it under the opened row, the grid
+// as a full-width card under the opened tile; both use this one component.
+function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMenu, onToggleMenu, onMove, onCopy, onRename, onDelete }: {
+  meta: ImageMeta;
+  src: string | undefined;
+  copied: boolean;
+  currentFolder: string | null;
+  folders: readonly ImageFolder[];
+  colors: Record<string, string>;
+  moveMenu: MoveMenuState;
+  onToggleMenu: (anchor: "more" | "line", trigger: HTMLElement) => void;
+  onMove: (folder: string | null) => void;
+  onCopy: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const menuHere = moveMenu?.id === meta.id ? moveMenu : null;
+  return (
+    <div className="row-detail"><div className="row-detail-inner">
+      <div className="image-preview">
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a decrypted object URL, not a file Next could optimise
+          <img src={src} alt={meta.title} draggable={false} />
+        ) : <span>正在读取…</span>}
+      </div>
+      <small className="image-facts">{sizeLabel(meta)}</small>
+      <div className="image-folder-line">
+        <span>目录</span>
+        <div className="menu-wrap" data-move-menu>
+          <button type="button" className="image-folder-button" aria-haspopup="menu" aria-expanded={menuHere?.anchor === "line"} aria-label={`目录：${currentFolder ?? "未分类"}，点击移动`} onClick={(event) => onToggleMenu("line", event.currentTarget)}>
+            <i className="menu-dot" aria-hidden="true" style={{ background: currentFolder ? colors[currentFolder] : UNCATEGORIZED_COLOR }} />
+            <span>{currentFolder ?? "未分类"}</span>
+            <ChevronGlyph />
+          </button>
+          {menuHere?.anchor === "line" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={menuHere.up} onMove={onMove} />}
+        </div>
+      </div>
+      <div className="row-actions">
+        <button type="button" className="primary-button" onClick={onCopy}>{copied ? <CheckGlyph /> : <CopyGlyph />}{copied ? "已复制" : "复制"}</button>
+        <button type="button" className="ghost-button" onClick={onRename}>改名</button>
+        <span className="spacer" />
+        <div className="menu-wrap" data-move-menu>
+          <button type="button" className="icon-button" aria-label={`更多操作 ${meta.title}`} aria-haspopup="menu" aria-expanded={menuHere?.anchor === "more"} onClick={(event) => onToggleMenu("more", event.currentTarget)}><MoreGlyph /></button>
+          {menuHere?.anchor === "more" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={menuHere.up} onMove={onMove} />}
+        </div>
+        <button type="button" className="ghost-button danger-text" onClick={onDelete}>删除</button>
+      </div>
+    </div></div>
+  );
+}
+
+export function ImageSection({ library, query, compact, view, paused, onToast, onCounts, ref }: {
   // Images and folders are owned by the page (image-library.ts), so the sidebar and this list never disagree.
   library: ImageLibrary;
   query: string;
   compact: boolean;
+  // 宫格 or 列表 in the full window; the mini window always shows the compact grid.
+  view: ImageView;
   // A dialog is open on top of the page: drops and pastes must not add images behind it.
   paused: boolean;
   onToast: (message: string) => void;
@@ -129,7 +212,7 @@ export function ImageSection({ library, query, compact, paused, onToast, onCount
   const [deleteTarget, setDeleteTarget] = useState<ImageMeta | null>(null);
   const [dragging, setDragging] = useState(false);
   // The "移动到" menu belongs to one row; it opens from the ⋯ button or from the 目录 line.
-  const [moveMenu, setMoveMenu] = useState<{ id: string; anchor: "more" | "line"; up: boolean } | null>(null);
+  const [moveMenu, setMoveMenu] = useState<MoveMenuState>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -362,6 +445,29 @@ export function ImageSection({ library, query, compact, paused, onToast, onCount
     </span>
   );
 
+  // A tile shows the picture cropped to a square; the object URL is the same one the thumbnail and preview use.
+  const tileImage = (meta: ImageMeta) => thumbs[meta.id] && (
+    // eslint-disable-next-line @next/next/no-img-element -- a decrypted object URL, not a file Next could optimise
+    <img src={thumbs[meta.id]} alt="" draggable={false} />
+  );
+
+  const detail = (meta: ImageMeta) => (
+    <ImageDetail
+      meta={meta}
+      src={thumbs[meta.id]}
+      copied={copiedId === meta.id}
+      currentFolder={folderOfMeta(meta)}
+      folders={folders}
+      colors={colors}
+      moveMenu={moveMenu}
+      onToggleMenu={(anchor, trigger) => toggleMoveMenu(meta.id, anchor, trigger)}
+      onMove={(folder) => void moveTo(meta, folder)}
+      onCopy={() => void copyImage(meta)}
+      onRename={() => setRenaming({ id: meta.id, value: meta.title })}
+      onDelete={() => setDeleteTarget(meta)}
+    />
+  );
+
   let body: React.ReactNode;
   if (loadError) {
     body = <div className="native-empty"><strong>{loadError}</strong><button type="button" className="secondary-button" onClick={library.retry}>重试</button></div>;
@@ -391,38 +497,57 @@ export function ImageSection({ library, query, compact, paused, onToast, onCount
       </div>;
   } else if (compact) {
     body = shown.map((meta) => (
-      <article key={meta.id} className={`native-row mini-row image-row ${copiedId === meta.id ? "copied" : ""}`}>
-        <button type="button" className="row-main" onClick={() => void copyImage(meta)} aria-label={copiedId === meta.id ? `已复制 ${meta.title}` : `复制 ${meta.title}`}>
-          {thumb(meta)}
-          <span className="row-copy"><strong>{meta.title}</strong></span>
-          {copiedId === meta.id && <span className="mini-copied">已复制</span>}
+      <article key={meta.id} className={`mini-row image-row image-tile mini-tile ${copiedId === meta.id ? "copied" : ""}`}>
+        <button type="button" className="image-tile-main" onClick={() => void copyImage(meta)} aria-label={copiedId === meta.id ? `已复制 ${meta.title}` : `复制 ${meta.title}`}>
+          <span className="image-tile-thumb">{tileImage(meta)}{copiedId === meta.id && <span className="mini-copied">已复制</span>}</span>
+          <strong className="image-tile-title">{meta.title}</strong>
         </button>
         {copiedId === meta.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
       </article>
     ));
+  } else if (view === "grid") {
+    const tiles = shown.map((meta) => {
+      const open = openId === meta.id;
+      const copied = copiedId === meta.id;
+      return (
+        <div key={meta.id} data-tile-id={meta.id} className={`image-tile ${open ? "selected" : ""} ${copied ? "copied" : ""}`}>
+          <button type="button" className="image-tile-main" onClick={() => toggleRow(meta.id)} aria-expanded={open} aria-label={`${open ? "已展开" : "展开"} ${meta.title}`}>
+            <span className="image-tile-thumb">{tileImage(meta)}</span>
+            <strong className="image-tile-title">{meta.title}</strong>
+          </button>
+          <button type="button" className="image-tile-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}>{copied ? <CheckGlyph /> : <CopyGlyph />}</button>
+          {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
+        </div>
+      );
+    });
+    const openMeta = shown.find((meta) => meta.id === openId);
+    const at = gridCardInsertIndex(shown.findIndex((meta) => meta.id === openId), shown.length);
+    if (openMeta && at >= 0) {
+      const editing = renaming?.id === openMeta.id ? renaming : null;
+      tiles.splice(at, 0, (
+        <article key={`card:${openMeta.id}`} data-image-id={openMeta.id} className="native-row image-row image-card selected">
+          <div className="row-line">
+            {editing ? (
+              <ImageRenameForm value={editing.value} inputRef={renameInputRef} onChange={(value) => setRenaming({ id: openMeta.id, value })} onSubmit={() => void submitRename()} onCancel={() => setRenaming(null)} />
+            ) : (
+              <h2 className="image-card-title">{openMeta.title}</h2>
+            )}
+          </div>
+          {detail(openMeta)}
+        </article>
+      ));
+    }
+    body = tiles;
   } else {
     body = shown.map((meta) => {
       const open = openId === meta.id;
       const copied = copiedId === meta.id;
       const editing = open && renaming?.id === meta.id ? renaming : null;
-      const currentFolder = folderOfMeta(meta);
       return (
         <article key={meta.id} data-image-id={meta.id} className={`native-row image-row ${open ? "selected" : ""} ${copied ? "copied" : ""}`}>
           <div className="row-line">
             {editing ? (
-              <form className="image-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(); }}>
-                {thumb(meta)}
-                <input
-                  ref={renameInputRef}
-                  value={editing.value}
-                  maxLength={IMAGE_TITLE_MAX}
-                  aria-label="图片标题"
-                  onChange={(event) => setRenaming({ id: meta.id, value: event.target.value })}
-                  onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setRenaming(null); } }}
-                />
-                <button type="submit" className="primary-button">保存</button>
-                <button type="button" className="ghost-button" onClick={() => setRenaming(null)}>取消</button>
-              </form>
+              <ImageRenameForm value={editing.value} inputRef={renameInputRef} thumb={thumb(meta)} onChange={(value) => setRenaming({ id: meta.id, value })} onSubmit={() => void submitRename()} onCancel={() => setRenaming(null)} />
             ) : (
               <button type="button" className="row-main" onClick={() => toggleRow(meta.id)} aria-expanded={open} aria-label={`${open ? "已展开" : "展开"} ${meta.title}`}>
                 {thumb(meta)}
@@ -435,40 +560,14 @@ export function ImageSection({ library, query, compact, paused, onToast, onCount
             {!editing && <button type="button" className="native-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>}
             {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
           </div>
-          {open && <div className="row-detail"><div className="row-detail-inner">
-            <div className="image-preview">
-              {thumbs[meta.id] ? (
-                // eslint-disable-next-line @next/next/no-img-element -- a decrypted object URL, not a file Next could optimise
-                <img src={thumbs[meta.id]} alt={meta.title} draggable={false} />
-              ) : <span>正在读取…</span>}
-            </div>
-            <small className="image-facts">{sizeLabel(meta)}</small>
-            <div className="image-folder-line">
-              <span>目录</span>
-              <div className="menu-wrap" data-move-menu>
-                <button type="button" className="image-folder-button" aria-haspopup="menu" aria-expanded={moveMenu?.id === meta.id && moveMenu.anchor === "line"} aria-label={`目录：${currentFolder ?? "未分类"}，点击移动`} onClick={(event) => toggleMoveMenu(meta.id, "line", event.currentTarget)}>
-                  <i className="menu-dot" aria-hidden="true" style={{ background: currentFolder ? colors[currentFolder] : UNCATEGORIZED_COLOR }} />
-                  <span>{currentFolder ?? "未分类"}</span>
-                  <ChevronGlyph />
-                </button>
-                {moveMenu?.id === meta.id && moveMenu.anchor === "line" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={moveMenu.up} onMove={(folder) => void moveTo(meta, folder)} />}
-              </div>
-            </div>
-            <div className="row-actions">
-              <button type="button" className="primary-button" onClick={() => void copyImage(meta)}>{copied ? <CheckGlyph /> : <CopyGlyph />}{copied ? "已复制" : "复制"}</button>
-              <button type="button" className="ghost-button" onClick={() => setRenaming({ id: meta.id, value: meta.title })}>改名</button>
-              <span className="spacer" />
-              <div className="menu-wrap" data-move-menu>
-                <button type="button" className="icon-button" aria-label={`更多操作 ${meta.title}`} aria-haspopup="menu" aria-expanded={moveMenu?.id === meta.id && moveMenu.anchor === "more"} onClick={(event) => toggleMoveMenu(meta.id, "more", event.currentTarget)}><MoreGlyph /></button>
-                {moveMenu?.id === meta.id && moveMenu.anchor === "more" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={moveMenu.up} onMove={(folder) => void moveTo(meta, folder)} />}
-              </div>
-              <button type="button" className="ghost-button danger-text" onClick={() => setDeleteTarget(meta)}>删除</button>
-            </div>
-          </div></div>}
+          {open && detail(meta)}
         </article>
       );
     });
   }
+
+  // Only real pictures lay out as a grid; loading, errors and empty states keep the plain centred layout.
+  const gridShown = !loadError && !!images && shown.length > 0 && (compact || view === "grid");
 
   return (
     <div
@@ -496,7 +595,7 @@ export function ImageSection({ library, query, compact, paused, onToast, onCount
         aria-label="选择图片"
         onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void addFiles(files); }}
       />
-      <div ref={listRef} className={`native-list list-switch image-list ${compact ? "mini-list" : ""}`}>{body}</div>
+      <div ref={listRef} className={`native-list list-switch image-list ${compact ? "mini-list" : ""} ${gridShown ? "image-grid" : ""}`}>{body}</div>
       {dragging && <div className="image-drop-hint" aria-hidden="true">松开即可添加图片</div>}
       {deleteTarget && createPortal(<ImageDeleteDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />, document.body)}
     </div>

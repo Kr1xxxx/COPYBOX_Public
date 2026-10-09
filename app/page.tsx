@@ -65,6 +65,7 @@ import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
 import { imageFilterTitle } from "./image-folders-core";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
+import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
@@ -272,6 +273,7 @@ export default function Home() {
   const [imageView, setImageView] = useState(false);
   const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
   const imageSectionRef = useRef<ImageSectionHandle>(null);
+  const [imageViewMode, setImageViewMode] = useImageView();
   // Images and folders are shared by the sidebar and the list; nothing is read until 图片 is first opened.
   const imageLibrary = useImageLibrary(deviceKey, imageView, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -1381,7 +1383,7 @@ export default function Home() {
               </label>}
             </div>
           </div>
-          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
           {!imageView && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
@@ -1479,8 +1481,9 @@ export default function Home() {
                 </div>}
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
+              {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>
-            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
             {!imageView && <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
               {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
