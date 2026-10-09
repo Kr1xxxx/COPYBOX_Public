@@ -217,7 +217,7 @@ function createDeviceKey() {
   return bytesToBase64(crypto.getRandomValues(new Uint8Array(32)));
 }
 
-async function deriveKey(password: string, salt: Uint8Array, iterations: number) {
+async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
   const material = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
