@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-08 — Claude — Task 6, piece 3: moved `SnippetFillPanel` to `app/fill-panel.tsx` and `DeleteConfirmDialog` to `app/dialogs.tsx` (unchanged; `inline-ui` test reads the new files). Also fixed a wrong type-import path in `dialogs.tsx` (`SnippetImportPreview` is exported by `snippet-import`, not `clipbox-core`) — found with a TypeScript check, harmless at runtime.
 - 2026-10-08 — Claude — Task 6, piece 2: moved `useDialogKeyboard`, `SnippetImportDialog` and `BackupDialog` out of `page.tsx` into `app/dialogs.tsx` (unchanged; the 备注/秘密 word is now a prop). `inline-ui` test reads the new file with the same assertion.
 - 2026-10-08 — Claude — Owner: backups stay local files, no cloud/email upload (D-016).
 - 2026-10-08 — Claude — Owner: "no encryption for now, remove it". Removed the device-key protection of PR #7 (D-015 supersedes D-012); task 4 cancelled. Code is restorable from git history.
