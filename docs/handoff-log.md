@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 6 done (Sonnet worker, reviewed): the `window.clipboxDesktop` type and `WindowMode` moved unchanged to `app/desktop-bridge.ts`; `page.tsx` ~1560 lines.
 - 2026-10-09 — Claude — Owner wrote 全部批准: merged #14 (AGENTS.md row), #15 (备注/秘密 backup export), #16 (coordinator/worker setup), #18 (CI type check), #19 (merge policy ignores code moves); #17 merged itself. Next: a merge-import skips a note whose identical copy sits in the trash; optional: move the `window.clipboxDesktop` type out of `page.tsx`.
 - 2026-10-09 — Claude — Owner: Opus coordinates, Sonnet (medium) workers in git worktrees do the pieces, the coordinator reviews and merges. Set up in `CLAUDE.md`, `.claude/settings.json`, `.claude/agents/worker.md`.
 - 2026-10-09 — Claude — Task 5: Settings → 导出备注备份 (导出秘密备份 on Mac) saves the second section to its own encrypted local file (same `clipbox-secure-backup` v3 format with `scope: "secret"` that the Mac command line already wrote; import already understood it). Replaced `tests/backup-ui.test.mjs`, which forbade the button (from the original macOS design), with a test that snippets and notes stay in separate files. New e2e `tests/e2e/backup.e2e.mjs`. Noticed, not fixed: a merge-import skips a note whose identical copy sits in the trash.
