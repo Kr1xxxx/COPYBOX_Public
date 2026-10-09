@@ -9,7 +9,9 @@ built from that branch's code.
 ## Version
 
 The number in `VERSION` is shown top-left of the page. It goes up by 0.01 with every update, and the owner is told
-the number at the end of every report.
+the number at the end of every report. **Only the preview publisher (the 【話術】 thread) edits `VERSION` and
+`changelog.json`**; feature PRs describe their visible change in their `docs/log/` note instead, and the publisher
+collects those notes into the changelog.
 
 Every bump of `VERSION` also needs a new entry at the top of `changelog.json` (version, date, short plain-Chinese
 items). The preview page shows that file as the 版本更新 panel on the left, newest first, so the owner can see what

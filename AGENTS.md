@@ -46,7 +46,7 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 | `desktop/main.cjs` | Main process: windows, tray, launch at login, IPC |
 | `desktop/preload.cjs` | The `window.clipboxDesktop` bridge — the only way the page reaches the OS |
 | `desktop/ai.cjs` | Stores the AI key with OS encryption (safeStorage) |
-| `tests/*.test.mjs` | node:test; many are regex assertions on source text |
+| `tests/*.test.mjs` | node:test; some still assert on source text — prefer testing behaviour (pure functions, `tests/e2e/`) |
 | `tests/e2e/` | Browser end-to-end tests; `helpers.mjs` seeds sample data and fakes Windows/macOS |
 | `docs/features.json` | Feature verification list (verified in browser / on Windows / on Mac) |
 | `docs/samples/` | Mock snippet spreadsheet — the only data to test with |
@@ -85,13 +85,27 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 
 ## When you finish
 
-1. Update `docs/HANDOFF.md` (status, task board) and add an entry at the top of `docs/handoff-log.md`.
-2. Record new decisions in `docs/DECISIONS.md`; update `docs/features.json` for what you verified.
+1. Add **one new file** `docs/log/YYYY-MM-DD-short-name.md` (template: `docs/log/README.md`). Do not edit
+   `docs/HANDOFF.md`, `docs/handoff-log.md` or the table in `docs/DECISIONS.md` (see "Parallel PRs").
+2. A new decision is a new file `docs/decisions/D-NNN-short-name.md`; update `docs/features.json` for what you verified.
 3. Commit in small steps, push your branch, open a PR using the template. CI fails if `app/`, `desktop/` or
-   `package.json` changed but `docs/HANDOFF.md` did not.
+   `package.json` changed but no new `docs/log/` note was added.
 4. Report to the owner **in Chinese**, in four parts: 做了什么 (what was done) / 没做好的地方 (what is not done well)
    / 需要你做的 (what the owner needs to do) / 建议下一步 (recommended next step). Finish everything that can be
    finished instead of leaving it as a caveat.
+
+## Parallel PRs (several agents at once)
+
+Files that every PR used to edit made parallel PRs conflict. The rule now: **a PR only adds new files for its notes.**
+
+- `tools/preview/VERSION` and `tools/preview/changelog.json` belong to the preview publisher (the 【話術】 thread)
+  alone. Feature PRs never bump the version or edit the changelog; write the "User-visible change" line in your
+  `docs/log/` note and the publisher turns it into a changelog entry. CI warns when a PR edits these files.
+- Handoff notes: one new file per PR in `docs/log/`. Decisions: one new file per decision in `docs/decisions/`.
+  `docs/HANDOFF.md`, `docs/handoff-log.md` and the `docs/DECISIONS.md` table are not edited by feature PRs.
+- `docs/HANDOFF.md` (status) and `docs/ROADMAP.md` are updated only by the coordinator.
+- Before opening a PR run `git fetch origin main && git rebase origin/main`; if you touch `app/page.tsx`, say which
+  part in the PR so others can avoid it.
 
 ## Merging (D-011)
 

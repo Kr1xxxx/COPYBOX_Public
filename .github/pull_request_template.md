@@ -20,6 +20,6 @@
 
 ## Handoff
 
-- [ ] Updated `docs/HANDOFF.md` (task board) and `docs/handoff-log.md`
+- [ ] Added a new note `docs/log/YYYY-MM-DD-short-name.md` (not `HANDOFF.md`; no preview VERSION/changelog edits)
 - [ ] Updated `docs/features.json` for what was actually verified
-- [ ] New product decisions recorded in `docs/DECISIONS.md` (skip if none)
+- [ ] New product decision added as `docs/decisions/D-NNN-short-name.md` (skip if none)
