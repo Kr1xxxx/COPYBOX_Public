@@ -50,3 +50,18 @@ test("macOS: no taskbar option (the Dock icon already reopens the window)", asyn
   const group = await closeOptions(page, "darwin");
   await expect(group.getByRole("radio")).toHaveText(["收到托盘", "退出"]);
 });
+
+test("Windows: the empty 备注 page does not mention copy references", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  await page.getByRole("button", { name: "备注" }).first().click();
+  await expect(page.locator("body")).toContainText("把常用的信息记在这里");
+  await expect(page.locator("body")).not.toContainText("复制引用");
+});
+
+test("macOS: the empty 秘密 page still says only the reference is copied", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await seedSnippets(page);
+  await page.getByRole("button", { name: "秘密" }).first().click();
+  await expect(page.locator("body")).toContainText("默认只复制引用");
+});
