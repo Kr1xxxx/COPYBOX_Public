@@ -42,6 +42,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 14 | Web preview tool in the repo (`tools/preview/`, `npm run preview:build` / `preview:serve`) | Done | Claude | Was only in a temp folder; now any session can rebuild the preview with its version number. PR waits for the owner (package.json, eslint config) |
 | 17 | Motion from arc-library, step 1 of 4 (D-021): copy icon + toast | In progress | Claude | Adds `motion` (needs the owner's 合并). Steps 2-4: switches/segmented/checkboxes; menus/dialogs; rename/search/drop zone/empty pages/counters |
 | 18 | Settings: 自动清理 defaults to 7 天; 目录 groups fold open on click (arc-library accordion motion, `app/arc/collapsible.tsx`); new 图片目录 group (create, rename, colour, delete; no ordering: the image store has none) | Done | Claude | Stacked on PR #39 (uses `motion`); merges after #39. The 7-day default applies to everyone who never picked an option |
+| 19 | Settings two columns (owner approved advisor item 10): groups 外观 / 目录 / 数据 / 窗口 / AI / 关于 on the left, the chosen group on the right (arc-library tabs motion); security note in plain words (no AES-GCM / PBKDF2) | In progress | Claude | Separate PR on top of #41 so it can be reverted alone; 回收站 and 安全 sit under 数据 |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
