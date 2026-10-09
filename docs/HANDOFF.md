@@ -37,6 +37,8 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 12 | 图片 section (D-017): Windows 话术 \| 图片, Mac 话术 \| 秘密 \| 图片; copy images | Done | Claude | Spec `docs/specs/image-section.md`; store by an Opus worker, desktop IPC and UI by Sonnet workers; PR waits for the owner's 合并. Not in v1: folders, trash, image backup |
 | 14 | Web preview tool in the repo (`tools/preview/`, `npm run preview:build` / `preview:serve`) | Done | Claude | Was only in a temp folder; now any session can rebuild the preview with its version number. PR waits for the owner (package.json, eslint config) |
 
+The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
+
 ## Waiting on the owner
 
 - How the company's shared snippet library reaches every employee (today each person imports a spreadsheet).
