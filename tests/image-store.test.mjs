@@ -431,3 +431,77 @@ test("old image records without a folder still list", async () => {
   assert.equal("folder" in image, false);
   assert.deepEqual(await store.listFolders(), []);
 });
+
+// Thumbnails (D-023): a derived, encrypted copy in its own database; the originals are never touched.
+function thumbSetup(makeThumb) {
+  const factory = fakeIndexedDB();
+  const calls = { made: 0 };
+  const open = (key = "device-key-1") => openImageStore(key, {
+    indexedDB: factory,
+    createId: () => "img-1",
+    makeThumb: async (blob) => { calls.made += 1; return makeThumb(blob); },
+  });
+  const thumbRows = () => factory.databases.get("clipbox-image-thumbs")?.data.get("thumbs");
+  return { factory, open, calls, thumbRows, blobRows: () => factory.databases.get("clipbox-images").data.get("blobs") };
+}
+const smallBytes = Uint8Array.from([9, 8, 7, 6, 5, 4, 3, 2, 1, 77, 78, 79]);
+const makeSmall = async () => new Blob([smallBytes], { type: "image/webp" });
+
+test("getThumb makes the thumbnail once, keeps it encrypted, and later reads do not touch the original", async () => {
+  const { open, calls, thumbRows, blobRows } = thumbSetup(makeSmall);
+  const store = await open();
+  await store.add(pngBlob(), "图", null);
+  const originalBefore = JSON.stringify(Array.from(blobRows().values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+
+  const first = await store.getThumb("img-1");
+  assert.equal(first.type, "image/webp");
+  assert.deepEqual(Array.from(new Uint8Array(await first.arrayBuffer())), Array.from(smallBytes));
+  assert.equal(calls.made, 1);
+  const stored = thumbRows().get("img-1");
+  assert.ok(stored, "the thumbnail is stored");
+  assert.ok(!Array.from(new Uint8Array(stored.ciphertext)).join(",").includes(Array.from(smallBytes).join(",")), "stored encrypted, not as plain bytes");
+
+  const second = await store.getThumb("img-1");
+  assert.deepEqual(Array.from(new Uint8Array(await second.arrayBuffer())), Array.from(smallBytes));
+  assert.equal(calls.made, 1, "the second read uses the stored thumbnail");
+  // A new session with the same key reads it too.
+  const again = await (await open()).getThumb("img-1");
+  assert.equal(again.type, "image/webp");
+  assert.equal(calls.made, 1);
+
+  const originalAfter = JSON.stringify(Array.from(blobRows().values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+  assert.equal(originalAfter, originalBefore, "the original image record is untouched");
+  assert.deepEqual(Array.from(new Uint8Array(await (await store.getBlob("img-1")).arrayBuffer())), Array.from(pngBytes));
+});
+
+test("when no smaller copy can be made, getThumb returns the original and stores nothing", async () => {
+  const { open, thumbRows } = thumbSetup(async () => null);
+  const store = await open();
+  await store.add(pngBlob(), "图", null);
+  const thumb = await store.getThumb("img-1");
+  assert.deepEqual(Array.from(new Uint8Array(await thumb.arrayBuffer())), Array.from(pngBytes));
+  assert.equal(thumbRows()?.size ?? 0, 0);
+});
+
+test("a failing thumbnail maker never breaks reading the picture", async () => {
+  const { open } = thumbSetup(async () => { throw new Error("canvas broke"); });
+  const store = await open();
+  await store.add(pngBlob(), "图", null);
+  const thumb = await store.getThumb("img-1");
+  assert.deepEqual(Array.from(new Uint8Array(await thumb.arrayBuffer())), Array.from(pngBytes));
+});
+
+test("remove also deletes the thumbnail, and a thumbnail that cannot be read is made again", async () => {
+  const { open, calls, thumbRows } = thumbSetup(makeSmall);
+  const store = await open();
+  await store.add(pngBlob(), "图", null);
+  await store.getThumb("img-1");
+  // Corrupt the stored thumbnail: it is replaced by a fresh one instead of failing.
+  const row = thumbRows().get("img-1");
+  thumbRows().set("img-1", { ...row, ciphertext: new Uint8Array(row.ciphertext.byteLength).buffer });
+  const repaired = await store.getThumb("img-1");
+  assert.equal(repaired.type, "image/webp");
+  assert.equal(calls.made, 2);
+  await store.remove("img-1");
+  assert.equal(thumbRows().has("img-1"), false);
+});

@@ -203,8 +203,10 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   onCounts: (counts: ImageCounts) => void;
   ref?: Ref<ImageSectionHandle>;
 }) {
-  const { images, folders, filter, ready, loadError, getBlob, markUsed } = library;
+  const { images, folders, filter, ready, loadError, getBlob, getThumb, markUsed } = library;
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  // The opened picture's full-size copy; until it has loaded the detail shows the thumbnail.
+  const [fulls, setFulls] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState("");
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [copiedId, setCopiedId] = useState("");
@@ -218,27 +220,34 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   const mounted = useRef(false);
   const thumbUrls = useRef(new Map<string, string>());
   const thumbPending = useRef(new Set<string>());
+  const fullUrls = useRef(new Map<string, string>());
+  const fullPending = useRef(new Set<string>());
 
   useEffect(() => {
     mounted.current = true;
     const urls = thumbUrls.current;
     const pending = thumbPending.current;
+    const full = fullUrls.current;
+    const fullWaiting = fullPending.current;
     return () => {
       mounted.current = false;
       urls.forEach((url) => URL.revokeObjectURL(url));
       urls.clear();
       pending.clear();
+      full.forEach((url) => URL.revokeObjectURL(url));
+      full.clear();
+      fullWaiting.clear();
       if (copyTimer.current) clearTimeout(copyTimer.current);
     };
   }, []);
 
-  // One decrypted object URL per image serves both the small thumbnail and the larger preview.
+  // Tiles and rows show the small thumbnail (made once, then kept); only an opened picture loads its full-size original.
   useEffect(() => {
     if (!ready || !images) return;
     for (const meta of images) {
       if (thumbUrls.current.has(meta.id) || thumbPending.current.has(meta.id)) continue;
       thumbPending.current.add(meta.id);
-      getBlob(meta.id)
+      getThumb(meta.id)
         .then((blob) => {
           thumbPending.current.delete(meta.id);
           if (!mounted.current || thumbUrls.current.has(meta.id)) return;
@@ -248,7 +257,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
         })
         .catch(() => { thumbPending.current.delete(meta.id); });
     }
-  }, [ready, images, getBlob]);
+  }, [ready, images, getThumb]);
 
   const inFolder = useMemo(() => filterImagesByFolder(images ?? [], filter, folders), [images, filter, folders]);
   const shown = useMemo(() => {
@@ -260,6 +269,19 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   useEffect(() => { onCounts({ total, shown: shown.length }); }, [onCounts, total, shown.length]);
 
   const openId = shown.some((meta) => meta.id === selectedId) ? selectedId : "";
+  useEffect(() => {
+    if (!ready || !openId || fullUrls.current.has(openId) || fullPending.current.has(openId)) return;
+    fullPending.current.add(openId);
+    getBlob(openId)
+      .then((blob) => {
+        fullPending.current.delete(openId);
+        if (!mounted.current || fullUrls.current.has(openId)) return;
+        const url = URL.createObjectURL(blob);
+        fullUrls.current.set(openId, url);
+        setFulls((current) => ({ ...current, [openId]: url }));
+      })
+      .catch(() => { fullPending.current.delete(openId); });
+  }, [ready, openId, getBlob]);
   // The opened row grows downwards; once it has finished opening, scroll so the clicked picture (and as much of its
   // card as fits) is fully visible.
   const listRef = useRef<HTMLDivElement>(null);
@@ -307,6 +329,15 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     };
   }, [menuOpenId]);
   function forgetThumb(id: string) {
+    const fullUrl = fullUrls.current.get(id);
+    if (fullUrl) URL.revokeObjectURL(fullUrl);
+    fullUrls.current.delete(id);
+    setFulls((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
     const url = thumbUrls.current.get(id);
     if (url) URL.revokeObjectURL(url);
     thumbUrls.current.delete(id);
@@ -467,7 +498,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   const detail = (meta: ImageMeta) => (
     <ImageDetail
       meta={meta}
-      src={thumbs[meta.id]}
+      src={fulls[meta.id] ?? thumbs[meta.id]}
       copied={copiedId === meta.id}
       currentFolder={folderOfMeta(meta)}
       folders={folders}
