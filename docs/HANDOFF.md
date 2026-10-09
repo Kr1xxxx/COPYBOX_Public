@@ -44,6 +44,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 17 | Motion from arc-library, step 1 of 4 (D-021): copy icon + toast | In progress | Claude | Adds `motion` (needs the owner's 合并). Steps 2-4: switches/segmented/checkboxes; menus/dialogs; rename/search/drop zone/empty pages/counters |
 | 18 | 图片 detail scrolls so the clicked picture stays fully visible (advisor item 12) | In progress | Claude | `detailScrollDelta` in `image-view-core.ts`; PR stacked on #38 |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
+| 16 | 话术搜索: pinyin + initials, rank by hit place and copy count | Done | Claude | `app/snippet-search.ts`; new dependency `pinyin-pro`; `useCount` on items (optional, no migration) |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
 

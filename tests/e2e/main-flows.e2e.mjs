@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { pinyin } from "pinyin-pro";
 import { seedSnippets } from "./helpers.mjs";
 
 test.beforeEach(async ({ page }) => { await seedSnippets(page); });
@@ -103,4 +104,31 @@ test("the snippet note field is called 小提示", async ({ page }) => {
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   await expect(page.locator(".inline-editor")).toContainText("小提示");
   await expect(page.locator(".inline-editor")).not.toContainText("备注");
+});
+
+test("typing pinyin initials finds Chinese snippets", async ({ page }) => {
+  const search = page.locator("input[placeholder*=搜索]");
+  const total = await page.locator(".native-row").count();
+  await search.fill("zzzzq");
+  await expect(page.locator(".native-row")).toHaveCount(0);
+  const syllables = pinyin("询盘", { toneType: "none", type: "array" });
+  await search.fill(syllables.map((syllable) => syllable[0]).join(""));
+  const found = await page.locator(".native-row").count();
+  expect(found).toBeGreaterThan(0);
+  expect(found).toBeLessThan(total);
+  await expect(page.locator(".native-row").first()).toBeVisible();
+});
+
+test("English word search is a separate mode next to the pinyin one", async ({ page }) => {
+  const search = page.locator("input[placeholder*=搜索]");
+  await search.fill("lashes");
+  const modes = page.getByRole("group", { name: "搜索方式" });
+  await expect(modes).toBeVisible();
+  await modes.getByRole("button", { name: "英文单词" }).click();
+  await expect(search).toHaveAttribute("placeholder", "搜索英文单词");
+  expect(await page.locator(".native-row").count()).toBeGreaterThan(0);
+  await search.fill("zzzzq");
+  await expect(page.locator(".native-row")).toHaveCount(0);
+  await search.fill("");
+  await expect(search).toHaveAttribute("placeholder", "搜索标题、编号或内容");
 });
