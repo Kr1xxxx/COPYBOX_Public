@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import test from "node:test";
+import { readUiSource } from "./helpers/ui-source.mjs";
 
-const pageSource = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const pageSource = readUiSource();
 
 test("the application UI exports snippets but offers no secret export control", () => {
   assert.match(pageSource, /vaultDataForBackupScope\([^)]*, "snippet"\)/);

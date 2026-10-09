@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
+import { readUiSource } from "./helpers/ui-source.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -42,7 +43,7 @@ test("keeps the full window at least 680×620 and switches to a fixed, floating 
 });
 
 test("settings expose trash management, mini hide policy and launch at login", () => {
-  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = readUiSource();
   const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
   const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
   assert.match(page, /id="set-trash"/);
@@ -61,7 +62,7 @@ test("settings expose trash management, mini hide policy and launch at login", (
 });
 
 test("closing can minimise to the Windows taskbar, and any reopen restores a minimised window", () => {
-  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = readUiSource();
   const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
   assert.match(main, /behavior === "taskbar"/);
   assert.match(main, /closeBehavior === "taskbar" && isWindows\) mainWindow\.minimize\(\)/);

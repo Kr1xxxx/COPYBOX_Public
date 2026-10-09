@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
+import { readUiSource } from "./helpers/ui-source.mjs";
 
-const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = readUiSource();
 // BackupDialog, SnippetImportDialog and DeleteConfirmDialog live in app/dialogs.tsx; SnippetFillPanel in app/fill-panel.tsx (split out of page.tsx).
 const dialogs = fs.readFileSync(new URL("../app/dialogs.tsx", import.meta.url), "utf8");
 const fillPanel = fs.readFileSync(new URL("../app/fill-panel.tsx", import.meta.url), "utf8");
