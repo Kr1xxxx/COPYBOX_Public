@@ -22,6 +22,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-013 | No code signing for now (internal tool); auto-update undecided | Accepted |
 | D-014 | No real-device testing round before merging | Accepted |
 | D-015 | Device-key protection removed for now | Accepted |
+| D-016 | Backups stay local files; no cloud or email upload | Accepted |
 
 ---
 
@@ -127,3 +128,11 @@ Statuses: Accepted / Superseded / Deprecated.
   the protected store; if a build with PR #7 was ever run on a real machine, that vault's key lives only in
   `device-key.json` and the vault will not open until the encrypted snippet backup is imported. To bring the feature
   back, restore PR #7 from git history (it includes the migration and tests).
+
+### D-016 Backups stay local (2026-10-08)
+- Context: after removing device-key protection (D-015) the owner wanted "good cloud upload" of snippets and notes.
+  Backing up by email to a fixed company address (`<prefix>@comelylash.com`) was considered; the app has no server
+  and cannot send mail by itself, and sending needs either a mail account in the app or a manual attach.
+- Decision (owner): keep saving the encrypted backup as a local file ("本地保存即可"). No cloud, email or sync feature.
+- Consequences: "no server, no accounts" still holds. Getting the backup file somewhere safe is up to the person
+  (copy it to a synced folder or mail it themselves). Revisit only if the owner asks again.
