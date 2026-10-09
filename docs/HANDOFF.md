@@ -14,7 +14,7 @@
 Merging (D-011): small PRs merge themselves when CI is green; big ones are labelled `needs-owner` and wait for the
 owner to write 合并.
 
-Web preview for the owner: version **v1.04** (shown top-left; +0.01 on every update, then say it at the end of each report).
+Web preview for the owner: version **v1.11** (shown top-left; +0.01 on every update, then say it at the end of each report).
 Windows / Mac switch, ten simulated test images. It is built from the branch under review, not from `main`.
 
 Workflow (`CLAUDE.md`): the main Claude session coordinates; Sonnet workers (`.claude/agents/worker.md`) do pieces in
