@@ -31,6 +31,29 @@
   .seg button:focus-visible, .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .tool { cursor: pointer; font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); }
   .tool:disabled { opacity: .55; cursor: default; }
+  .tools { display: flex; gap: 8px; align-items: center; }
+  .menu-wrap { position: relative; }
+  .menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 250px; padding: 6px; border-radius: 10px; background: var(--bar); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .menu[hidden] { display: none; }
+  .menu button { all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--ink); }
+  .menu button small { display: block; color: var(--soft); font-size: 11.5px; }
+  .menu button:hover, .menu button:focus-visible { background: var(--ground); }
+  .layout { flex: 1; display: flex; align-items: stretch; min-height: 0; }
+  .log { flex: 0 0 260px; box-sizing: border-box; padding: 16px 14px 24px 16px; border-right: 1px solid var(--line); background: var(--bar); overflow-y: auto; max-height: calc(100vh - 53px); position: sticky; top: 0; align-self: flex-start; }
+  .log h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: .04em; color: var(--soft); font-weight: 600; }
+  .log ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .log li b { display: inline-block; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); }
+  .log li.current b { color: var(--accent); }
+  .log li small { margin-left: 6px; color: var(--soft); font-size: 11.5px; }
+  .log li .tag { margin-left: 6px; padding: 0 6px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 11px; }
+  .log ul { margin: 4px 0 0; padding-left: 16px; color: var(--soft); font-size: 12.5px; line-height: 1.5; }
+  .log ul li { margin: 2px 0; }
+  .log .empty { color: var(--soft); font-size: 12.5px; }
+  .layout .stage { min-width: 0; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .log { flex: none; max-height: 220px; position: static; width: 100%; border-right: 0; border-bottom: 1px solid var(--line); }
+  }
   .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px 16px; }
   .scroller { max-width: 100%; overflow-x: auto; padding: 4px 10px 22px; }
   .window { --w: 680px; --h: 620px; width: var(--w); transition: width .22s ease; border-radius: 8px; background: var(--chrome); box-shadow: var(--shadow); border: 1px solid var(--chrome-line); overflow: hidden; }
@@ -61,8 +84,24 @@
       <button type="button" role="radio" aria-checked="true" data-os="win">Windows 版</button>
       <button type="button" role="radio" aria-checked="false" data-os="mac">Mac 版</button>
     </div>
-    <button type="button" class="tool" id="reseed">补齐 10 张测试图</button>
+    <div class="tools">
+      <div class="menu-wrap">
+        <button type="button" class="tool" id="snippetsBtn" aria-haspopup="menu" aria-expanded="false">导入测试话术 ▾</button>
+        <div class="menu" id="snippetsMenu" role="menu" hidden>
+          <button type="button" role="menuitem" data-file="samples/1-inquiry-quote.csv">第 1 组 · 询盘与报价<small>11 条：问候、报价、付款</small></button>
+          <button type="button" role="menuitem" data-file="samples/2-sample-custom-shipping.csv">第 2 组 · 样品、定制、物流<small>11 条：样品、Logo 定制、运费单号</small></button>
+          <button type="button" role="menuitem" data-file="samples/3-followup-aftersales.csv">第 3 组 · 跟进与售后<small>10 条：回访、促销、破损、退款</small></button>
+          <button type="button" role="menuitem" data-file="samples/4-full-test-sheet.csv">第 4 组 · 完整测试表<small>37 行，含 2 行错误和 1 条重复</small></button>
+        </div>
+      </div>
+      <button type="button" class="tool" id="reseed">补齐 10 张测试图</button>
+    </div>
   </header>
+  <div class="layout">
+  <aside class="log" aria-label="版本更新">
+    <h2>版本更新</h2>
+    <ol id="logList"><li class="empty">正在读取…</li></ol>
+  </aside>
   <main class="stage">
     <div class="scroller">
       <div class="window" id="win" data-mode="full" data-os="win">
@@ -73,6 +112,7 @@
     </div>
     <p class="note" id="note"></p>
   </main>
+  </div>
 </div>
 <div class="busy" id="busy" hidden><span id="busyText"></span></div>
 <script type="module">
@@ -144,6 +184,84 @@ async function seed(manual) {
 }
 reseed.addEventListener("click", () => seed(true));
 
+// Test snippets: opens the app's own import dialog with a sample sheet, so the real import flow is what you see.
+const snippetsBtn = document.getElementById("snippetsBtn"), snippetsMenu = document.getElementById("snippetsMenu");
+function setMenu(open) { snippetsMenu.hidden = !open; snippetsBtn.setAttribute("aria-expanded", String(open)); }
+snippetsBtn.addEventListener("click", (event) => { event.stopPropagation(); setMenu(snippetsMenu.hidden); });
+document.addEventListener("click", (event) => { if (!snippetsMenu.contains(event.target)) setMenu(false); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenu(false); });
+async function openSnippets(d) {
+  for (let i = 0; i < 20; i += 1) {
+    const tab = [...d.querySelectorAll(".kind-switch button")].find((x) => x.textContent.trim() === "话术");
+    if (!tab || tab.getAttribute("aria-pressed") === "true") return;
+    tab.click(); await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+async function importSnippets(file, title) {
+  setMenu(false); snippetsBtn.disabled = true;
+  try {
+    show("正在打开导入窗口…");
+    if (mode === "mini") { frame.src = `app-${os}.html`; mode = "full"; win.dataset.mode = "full"; renderNote(); await new Promise((resolve) => setTimeout(resolve, 300)); }
+    const w = await appReady(); if (!w) throw new Error("软件还没加载好");
+    const d = w.document; await openSnippets(d);
+    const input = [...d.querySelectorAll("input[type=file]")].find((x) => (x.accept || "").includes(".csv"));
+    if (!input) throw new Error("找不到导入入口");
+    const response = await fetch(file); if (!response.ok) throw new Error("读取测试表格失败");
+    const blob = await response.blob();
+    const transfer = new w.DataTransfer();
+    transfer.items.add(new w.File([blob], `${title}.csv`, { type: "text/csv" }));
+    input.files = transfer.files;
+    input.dispatchEvent(new w.Event("change", { bubbles: true }));
+    show("");
+  } catch (error) { show("打开导入窗口失败：" + (error && error.message ? error.message : "未知原因")); setTimeout(() => show(""), 4000); }
+  finally { snippetsBtn.disabled = false; }
+}
+snippetsMenu.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => importSnippets(b.dataset.file, b.firstChild.textContent.trim())));
+
+// First visit: groups 1-3 are imported by themselves, so the 话术 list is never empty. The menu stays for re-importing.
+const SNIPPETS_SEEDED = "clipbox-preview:snippets:v1";
+async function autoImportSnippets() {
+  const w = await appReady(); if (!w) return;
+  const items = [...snippetsMenu.querySelectorAll("button")].slice(0, 3);
+  for (const [index, b] of items.entries()) {
+    await importSnippets(b.dataset.file, b.firstChild.textContent.trim());
+    show(`正在放入测试话术 ${index + 1} / ${items.length}`);
+    let confirm = null;
+    for (let i = 0; i < 50 && !confirm; i += 1) {
+      confirm = [...w.document.querySelectorAll("[role=dialog] button.primary")].find((x) => /导入 \d+ 条/.test(x.textContent));
+      if (!confirm) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!confirm) continue;
+    if (confirm.disabled) { w.document.querySelector("[role=dialog] [aria-label=关闭]")?.click(); continue; }
+    confirm.click();
+    for (let i = 0; i < 80 && w.document.querySelector("[role=dialog].snippet-import-dialog"); i += 1) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  show(""); store.set(SNIPPETS_SEEDED, "1");
+}
+
 setOs(store.get(OS) === "mac" ? "mac" : "win", store.get(OS) === "mac");
-if (!store.get(SEEDED)) seed(false);
+// Version log on the left: tools/preview/changelog.json, newest first. Whoever bumps VERSION adds the entry there.
+(async function renderLog() {
+  const list = document.getElementById("logList");
+  try {
+    const response = await fetch("changelog.json", { cache: "no-store" }); if (!response.ok) throw new Error("no log");
+    const entries = await response.json();
+    list.textContent = "";
+    entries.forEach((entry, index) => {
+      const li = document.createElement("li"); if (index === 0) li.className = "current";
+      const head = document.createElement("div");
+      const v = document.createElement("b"); v.textContent = "v" + entry.version; head.append(v);
+      if (index === 0) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "当前"; head.append(t); }
+      if (entry.date) { const d = document.createElement("small"); d.textContent = entry.date; head.append(d); }
+      const ul = document.createElement("ul");
+      (entry.items || []).forEach((text) => { const item = document.createElement("li"); item.textContent = text; ul.append(item); });
+      li.append(head, ul); list.append(li);
+    });
+  } catch { list.innerHTML = '<li class="empty">暂时读不到更新记录</li>'; }
+})();
+
+(async () => {
+  if (!store.get(SEEDED)) await seed(false);
+  if (!store.get(SNIPPETS_SEEDED)) { await autoImportSnippets(); const w = await appReady(); if (w) await openSnippets(w.document); }
+})();
 </script>

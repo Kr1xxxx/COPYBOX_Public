@@ -2,13 +2,18 @@
 
 A browser build of Clipbox for looking at a branch without installing anything. `index.html` shows the real app
 in a frame with a Windows / Mac switch; the desktop shell is faked by a small script, and ten simulated test
-images are added through the app's own image store (`seed.js`). It is a snapshot of the branch being reviewed,
+images are added through the app's own image store (`seed.js`). The 导入测试话术 menu opens the app's real import
+dialog with one of four sample sheets: three short groups in `samples/` and the full test sheet from `docs/samples/`. It is a snapshot of the branch being reviewed,
 built from that branch's code.
 
 ## Version
 
 The number in `VERSION` is shown top-left of the page. It goes up by 0.01 with every update, and the owner is told
 the number at the end of every report.
+
+Every bump of `VERSION` also needs a new entry at the top of `changelog.json` (version, date, short plain-Chinese
+items). The preview page shows that file as the 版本更新 panel on the left, newest first, so the owner can see what
+each version changed.
 
 ## Build and try it
 
