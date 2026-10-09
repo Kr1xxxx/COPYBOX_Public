@@ -20,7 +20,9 @@
     "desktop:pack:win": "npm run build && node desktop/prepare-standalone.mjs && electron-builder --win nsis --x64",
     "db:generate": "drizzle-kit generate",
     "test:desktop-idle": "node --test tests/desktop-idle.integration.mjs",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "preview:build": "node tools/preview/build.mjs",
+    "preview:serve": "node tools/preview/serve.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
