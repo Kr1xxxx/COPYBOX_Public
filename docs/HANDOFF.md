@@ -25,7 +25,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 3 | Merge PR #1 | Done | Claude | Merged 2026-10-08 on the owner's 确认 |
 | 4 | Protect the vault's device key with OS encryption | Cancelled | Owner | Built in PR #7, then removed on the owner's decision (D-015). Can be restored from git history |
 | 5 | Backup/export for the 备注/秘密 section | Todo | — | |
-| 6 | Split `app/page.tsx` into component files | In progress | Claude | One piece at a time, tests green after each. Done: AI client (`app/ai-client.ts`) and AI settings panel (`app/ai-settings.tsx`). Next: backup/import dialogs, settings dialog, item editor. Update the `page.tsx` row in AGENTS.md when the split is finished |
+| 6 | Split `app/page.tsx` into component files | In progress | Claude | One piece at a time, tests green after each. Done: AI client (`app/ai-client.ts`), AI settings panel (`app/ai-settings.tsx`), backup and spreadsheet-import dialogs (`app/dialogs.tsx`). Next: settings dialog, item editor, fill panel. Update the `page.tsx` row in AGENTS.md when the split is finished |
 | 7 | Alternative to the tray: Windows setting "缩到任务栏" keeps the taskbar button; Dock click already reopens on Mac | Done | Claude | No shortcuts (D-005) |
 
 ## Waiting on the owner
