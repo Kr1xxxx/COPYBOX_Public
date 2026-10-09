@@ -283,10 +283,15 @@ button { -webkit-tap-highlight-color: transparent; }
 .mini-copied { flex: 0 0 auto; color: #2f9b62; font-size: 12px; font-weight: 600; }
 .app-shell.mini .status-bar { height: 30px; padding: 0 12px; }
 
-.toast { position: fixed; left: 50%; bottom: 44px; z-index: 120; display: flex; align-items: center; gap: 8px; padding: 9px 15px; border-radius: 20px; background: rgba(31,30,28,.92); color: #fff; box-shadow: 0 13px 35px rgba(31,30,28,.28); backdrop-filter: blur(12px); font-size: 12.5px; transform: translateX(-50%); animation: toast-in .25s cubic-bezier(.2,.9,.2,1) both; white-space: nowrap; }
-.toast span { color: #f3c3ad; }
-.undo-toast button { margin-left: 6px; padding: 2px 9px; border: 0; border-radius: 10px; background: rgba(255,255,255,.14); color: #f3c3ad; font: inherit; font-weight: 600; cursor: pointer; }
-.undo-toast button:hover { background: rgba(255,255,255,.24); }
+/* Toast (app/arc/arc-toast.tsx, arc-library motion): the host only positions; the toast itself is moved by motion. */
+.toast-host { position: fixed; left: 0; right: 0; bottom: 40px; z-index: 120; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; }
+.toast { max-width: min(100%, 26rem); display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 9px; border: 1px solid var(--line); border-radius: 18px; background: color-mix(in oklab, var(--card) 94%, var(--bg)); color: var(--ink); box-shadow: 0 14px 36px rgba(31,30,28,.16), 0 2px 8px rgba(31,30,28,.08); font-size: 13px; line-height: 1.4; pointer-events: auto; }
+.toast-icon { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid color-mix(in oklab, var(--ok) 26%, var(--line)); border-radius: 50%; background: var(--ok-bg); color: var(--ok); }
+.toast-text { position: relative; min-width: 0; display: grid; }
+.toast-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-toast button { margin-left: 2px; padding: 3px 10px; border: 0; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, transform .15s; }
+.undo-toast button:hover { background: var(--accent-soft); }
+.undo-toast button:active { transform: scale(.96); }
 
 /* Editor and dialogs */
 /* Editor */
@@ -346,7 +351,6 @@ button { -webkit-tap-highlight-color: transparent; }
 @keyframes row-in { to { opacity: 1; transform: none; } }
 @keyframes menu-in { from { opacity:0; transform:translateY(-6px) scale(.97) } to { opacity:1; transform:none } }
 @keyframes check-in { from{opacity:0;transform:scale(.4) rotate(-20deg)} to{opacity:1;transform:none} }
-@keyframes toast-in { from{opacity:0;transform:translate(-50%,12px) scale(.95)} to{opacity:1;transform:translateX(-50%)} }
 @keyframes backdrop-in { from{opacity:0} }
 @keyframes dialog-in { from{opacity:0;transform:translateY(14px) scale(.97)} to{opacity:1;transform:none} }
 @keyframes editor-dialog-in { from{opacity:0;transform:translateY(10px) scale(.975)} to{opacity:1;transform:none} }
@@ -545,7 +549,7 @@ button { -webkit-tap-highlight-color: transparent; }
   :root:not([data-theme="light"]) .copied .native-copy, :root:not([data-theme="light"]) .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
   :root:not([data-theme="light"]) .mini-row.selected .row-copy small { color: var(--ink-3); }
   :root:not([data-theme="light"]) .mini-copied { color: var(--ok); }
-  :root:not([data-theme="light"]) .toast { background: rgba(48,46,41,.96); box-shadow: 0 13px 35px rgba(0,0,0,.5); }
+  :root:not([data-theme="light"]) .toast { box-shadow: 0 14px 36px rgba(0,0,0,.5); }
   :root:not([data-theme="light"]) .settings-dialog, :root:not([data-theme="light"]) .backup-dialog, :root:not([data-theme="light"]) .delete-confirm-dialog, :root:not([data-theme="light"]) .snippet-import-dialog, :root:not([data-theme="light"]) .snippet-copy-dialog { background: var(--card); border-color: var(--line); color: var(--ink); }
   :root:not([data-theme="light"]) .settings-backdrop, :root:not([data-theme="light"]) .backup-backdrop, :root:not([data-theme="light"]) .delete-confirm-backdrop, :root:not([data-theme="light"]) .snippet-dialog-backdrop { background: rgba(0,0,0,.6); }
   :root:not([data-theme="light"]) .backup-head h2, :root:not([data-theme="light"]) .delete-confirm-dialog h2, :root:not([data-theme="light"]) .snippet-dialog-head h2, :root:not([data-theme="light"]) .backup-field, :root:not([data-theme="light"]) .backup-strategy legend, :root:not([data-theme="light"]) .backup-strategy button strong, :root:not([data-theme="light"]) .import-preview-list strong, :root:not([data-theme="light"]) .import-section h3, :root:not([data-theme="light"]) .import-errors h3 { color: var(--ink); }
@@ -568,7 +572,7 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .copied .native-copy, :root[data-theme="dark"] .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
 :root[data-theme="dark"] .mini-row.selected .row-copy small { color: var(--ink-3); }
 :root[data-theme="dark"] .mini-copied { color: var(--ok); }
-:root[data-theme="dark"] .toast { background: rgba(48,46,41,.96); box-shadow: 0 13px 35px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .toast { box-shadow: 0 14px 36px rgba(0,0,0,.5); }
 :root[data-theme="dark"] .settings-dialog, :root[data-theme="dark"] .backup-dialog, :root[data-theme="dark"] .delete-confirm-dialog, :root[data-theme="dark"] .snippet-import-dialog, :root[data-theme="dark"] .snippet-copy-dialog { background: var(--card); border-color: var(--line); color: var(--ink); }
 :root[data-theme="dark"] .settings-backdrop, :root[data-theme="dark"] .backup-backdrop, :root[data-theme="dark"] .delete-confirm-backdrop, :root[data-theme="dark"] .snippet-dialog-backdrop { background: rgba(0,0,0,.6); }
 :root[data-theme="dark"] .backup-head h2, :root[data-theme="dark"] .delete-confirm-dialog h2, :root[data-theme="dark"] .snippet-dialog-head h2, :root[data-theme="dark"] .backup-field, :root[data-theme="dark"] .backup-strategy legend, :root[data-theme="dark"] .backup-strategy button strong, :root[data-theme="dark"] .import-preview-list strong, :root[data-theme="dark"] .import-section h3, :root[data-theme="dark"] .import-errors h3 { color: var(--ink); }
