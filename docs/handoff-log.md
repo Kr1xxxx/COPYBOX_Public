@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 9 (owner approved, done by a Sonnet worker, reviewed): the merge policy cancels storage lines removed in one place and added unchanged elsewhere (trimmed text, one-for-one), so file splits are no longer held as storage changes. Checked on history: a855b90 (settings split) was big, is now small.
 - 2026-10-09 — Claude — Task 6: updated the `page.tsx` row in AGENTS.md (~1580 lines, lists the split-out UI files). Rulebook change, so the PR waits for the owner's 合并.
 - 2026-10-09 — Claude — Fix: the empty 备注 page on Windows no longer says "默认只复制引用" (only true for Mac 秘密).
 - 2026-10-08 — Claude — Task 6, piece 6: moved `ItemEditor` to `app/item-editor.tsx` (unchanged; `COLORS` moved with it). The test harness (`tests/helpers/page-harness.mjs`) now reads both `page.tsx` and `item-editor.tsx` to find `saveItem`/`submit` by name. `page.tsx` ~1580 lines.
