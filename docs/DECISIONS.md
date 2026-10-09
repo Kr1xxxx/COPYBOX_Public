@@ -26,8 +26,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 | D-018 | 图片 folders (目录) | Accepted |
 | D-019 | 图片 shown as a 九宫格 (grid) by default | Accepted (columns changed by D-020) |
-| D-020 | 图片 grid is 16宫格 (4 per row) and thumbnails show the whole picture | Accepted |
-| D-022 | 图片 tiles: 6% margin on every picture, frosted-glass background | Accepted |
+| D-020 | 图片 grid is 16宫格 (4 per row), whole picture in the thumbnail, 6% margin on frosted glass | Accepted |
 
 ---
 
@@ -172,13 +171,10 @@ Statuses: Accepted / Superseded / Deprecated.
 - Decision (owner): the grid has **4 tiles per row** (16 tiles = 4 full rows); this replaces the 3 columns of D-019
   (mini window too). Thumbnails are never cropped: the whole picture is shown inside the square tile
   (`object-fit: contain`, empty space shows the tile background). The same goes for the small list thumbnail.
-- Consequences: CSS and `IMAGE_GRID_COLUMNS` only; no stored image data changes. Tests that expected 3 columns or a
-  cropped thumbnail (`cover`) now expect 4 columns and `contain`, because the owner changed the behaviour.
-
-### D-022 图片 tiles: 6% margin, frosted glass (2026-10-09)
-- Context (owner): "图片预览这里,就算是正方形,也留10%的边, 背景都做成毛玻璃风".
-- Decision (owner): in the grid (and the mini grid) every picture, even a square one, sits 6% in from each edge of its tile
-  (the picture box is 88% of the tile) and is never cropped. Behind it is frosted glass: a blurred, enlarged copy of the same
-  picture under a pale translucent sheen. The small thumbnail of the 列表 view is unchanged.
-- Update 2026-10-09 (owner: "图片预览改成留空 6%"): the margin was changed from 10% to 6% (picture box 88%). Everything else in D-022 stands.
-- Consequences: CSS and one extra decorative `<img>` per tile (`image-tile-glass`, `aria-hidden`); no stored data changes.
+- Tile look (owner: "图片预览这里,就算是正方形,也留边, 背景都做成毛玻璃风", then "留空 6%"): in the grid and the mini grid every
+  picture, even a square one, sits 6% in from each edge of its tile (the picture box is 88% of the tile) and is never
+  cropped. Behind it is frosted glass: a blurred, enlarged copy of the same picture under a pale translucent sheen. The small
+  list thumbnail is unchanged.
+- Consequences: CSS, `IMAGE_GRID_COLUMNS` and one extra decorative `<img>` per tile (`image-tile-glass`, `aria-hidden`); no
+  stored image data changes. Tests that expected 3 columns or a cropped thumbnail (`cover`) now expect 4 columns and
+  `contain`, because the owner changed the behaviour.

@@ -715,7 +715,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-tile-main { width: 100%; min-width: 0; padding: 0; display: grid; gap: 6px; border: 0; border-radius: 11px; background: none; color: inherit; text-align: left; cursor: pointer; }
 .image-tile-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .image-tile-thumb { position: relative; width: 100%; aspect-ratio: 1; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--fill); transition: border-color .16s, box-shadow .16s; }
-/* 毛玻璃 (D-022): blurred copy of the picture + pale sheen behind; the picture itself keeps a 6% margin and is never cropped. */
+/* 毛玻璃 (D-020): blurred copy of the picture + pale sheen behind; the picture itself keeps a 6% margin and is never cropped. */
 .image-tile-thumb { isolation: isolate; }
 .image-tile-thumb img { display: block; user-select: none; }
 .image-tile-glass { position: absolute; left: -15%; top: -15%; width: 130%; height: 130%; object-fit: cover; filter: blur(16px) saturate(1.35); opacity: .9; pointer-events: none; }
