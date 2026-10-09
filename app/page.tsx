@@ -57,6 +57,8 @@ import {
   type SnippetImportPreview,
 } from "./snippet-import";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import "./desktop-bridge";
+import type { WindowMode } from "./desktop-bridge";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { SettingsDialog } from "./settings";
@@ -88,7 +90,6 @@ type SecureBackup =
   | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope };
 
 type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope };
-type WindowMode = "full" | "mini";
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -110,34 +111,6 @@ function readStoredChoice<T extends string | number>(key: string, allowed: reado
 
 function writeStoredChoice(key: string, value: string | number) {
   try { localStorage.setItem(key, String(value)); } catch { /* keep the in-memory choice for this session */ }
-}
-
-declare global {
-  interface Window {
-    clipboxDesktop?: {
-      platform?: string;
-      copyText: (text: string) => Promise<void>;
-      didCopy: () => void;
-      setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
-      setCloseBehavior?: (behavior: CloseBehavior) => void;
-      getLaunchAtLogin?: () => Promise<boolean>;
-      setLaunchAtLogin?: (enabled: boolean) => Promise<boolean>;
-      setTheme?: (theme: ThemeChoice) => void;
-      openDataFolder?: () => Promise<string>;
-      getVersion: () => Promise<string>;
-      aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
-      aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
-      aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
-      aiRequest?: (payload: { url: string; body?: unknown; method?: "GET" | "POST" }) => Promise<{ ok: boolean; status: number; text: string }>;
-      relaunch: () => void;
-      onFocusSearch: (callback: () => void) => () => void;
-      onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
-      respondAutomationCommand: (requestId: string, response: unknown) => void;
-      automationReady: () => void;
-      setWindowMode?: (mode: WindowMode) => void;
-      onWindowMode?: (callback: (mode: WindowMode) => void) => () => void;
-    };
-  }
 }
 
 const STORAGE_KEY = "clipbox.vault.v1";
