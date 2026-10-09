@@ -61,6 +61,7 @@ import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
+import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
@@ -117,6 +118,11 @@ const STORAGE_KEY = "clipbox.vault.v1";
 const DEVICE_KEY = "clipbox.device-key.v1";
 const REFRESH_CONTEXT_KEY = "clipbox:refresh-context";
 const ITERATIONS = 310_000;
+
+// parseRefreshContext only knows the text sections; the 图片 flag rides along in the same stored object.
+function readRefreshedImageView(stored: string | null) {
+  try { return JSON.parse(stored || "null")?.imageView === true; } catch { return false; }
+}
 
 function timestampNow() {
   return Date.now();
@@ -259,6 +265,10 @@ export default function Home() {
   const [folders, setFolders] = useState<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
   const [folderColors, setFolderColors] = useState<FolderColors | undefined>(undefined);
   const [activeKind, setActiveKind] = useState<ItemKind>(DEFAULT_ITEM_KIND);
+  // The 图片 section is not an ItemKind: its data lives in its own store, never in the vault.
+  const [imageView, setImageView] = useState(false);
+  const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
+  const imageSectionRef = useRef<ImageSectionHandle>(null);
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -309,6 +319,7 @@ export default function Home() {
   const editorTriggerRef = useRef<HTMLElement | null>(null);
   const pendingEditorFocusRef = useRef<{ trigger: HTMLElement | null } | null>(null);
   const copyFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const referenceFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const itemsRef = useRef<SecretItem[]>([]);
   const foldersRef = useRef<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
@@ -319,7 +330,9 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    const refreshContext = parseRefreshContext(localStorage.getItem(REFRESH_CONTEXT_KEY));
+    const storedContext = localStorage.getItem(REFRESH_CONTEXT_KEY);
+    const refreshContext = parseRefreshContext(storedContext);
+    const refreshedImageView = refreshContext ? readRefreshedImageView(storedContext) : false;
     localStorage.removeItem(REFRESH_CONTEXT_KEY);
 
     function finishOpening(data: VaultData, nextDeviceKey: string) {
@@ -333,10 +346,13 @@ export default function Home() {
       setFolders(data.folders);
       setFolderColors(data.folderColors);
       if (refreshContext) {
-        setActiveKind(refreshContext.activeKind);
-        setActiveFolder(resolveRefreshedActiveFolder(refreshContext.activeKind, data.folders[refreshContext.activeKind], refreshContext.activeFolder));
+        // Windows has no second text section any more: an old context that points at it opens 话术.
+        const restoredKind: ItemKind = PLAIN_NOTES && refreshContext.activeKind === "secret" ? "snippet" : refreshContext.activeKind;
+        setActiveKind(restoredKind);
+        setActiveFolder(resolveRefreshedActiveFolder(restoredKind, data.folders[restoredKind], restoredKind === refreshContext.activeKind ? refreshContext.activeFolder : "all"));
         setProductFilter(refreshContext.productFilter);
         setQuery(refreshContext.query);
+        setImageView(refreshedImageView);
       }
       setLoading(false);
     }
@@ -520,6 +536,7 @@ export default function Home() {
           activeFolder: nextActiveFolder,
           productFilter,
           query,
+          imageView,
         }));
         setToast("正在重新加载…");
         window.clipboxDesktop.relaunch();
@@ -544,6 +561,13 @@ export default function Home() {
     } finally {
       if (!relaunching) setRefreshing(false);
     }
+  }
+
+  // A newer message replaces the older one and its timer, so it is never cut short.
+  function flashToast(message: string, ms = 2200) {
+    if (flashToastTimer.current) clearTimeout(flashToastTimer.current);
+    setToast(message);
+    flashToastTimer.current = setTimeout(() => setToast(""), ms);
   }
 
   function openEditor(item: SecretItem | null) {
@@ -724,6 +748,10 @@ export default function Home() {
   }
 
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (imageView) {
+      if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
+      return;
+    }
     if (event.key === "ArrowDown") { event.preventDefault(); moveSelection((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
     if (event.key === "ArrowUp") { event.preventDefault(); moveSelection((value) => Math.max(0, value - 1)); }
     if (event.key === "Enter" && activeFolder !== "trash" && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
@@ -844,7 +872,7 @@ export default function Home() {
   }
 
   function buildSettingsFolderGroups(): SettingsFolderGroup[] {
-    return (["snippet", "secret"] as const).map((kind) => {
+    return (PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => {
       const colors = { ...buildCategoryColorMap(folders[kind]), ...(folderColors?.[kind] || {}) };
       return {
         kind,
@@ -1039,8 +1067,25 @@ export default function Home() {
     void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) })).catch(() => setToast("收藏保存失败，请重试"));
   }
 
+  function showImages() {
+    if (imageView) return;
+    setImageView(true);
+    setQuery("");
+    setSearchAllFolders(false);
+    setSelected(0);
+    setRowMenuId("");
+    setRevealedId("");
+    setFolderMenu("");
+    setRenamingFolder(null);
+    setNewFolder(null);
+    exitBulk();
+    if (modalOpen) closeEditor();
+    setCopyRequest(null);
+  }
+
   function switchKind(kind: ItemKind) {
-    if (kind === activeKind) return;
+    if (kind === activeKind && !imageView) return;
+    setImageView(false);
     setActiveKind(kind);
     setActiveFolder("all");
     setProductFilter("全部产品");
@@ -1209,6 +1254,7 @@ export default function Home() {
     const importedCount = snippetImport.importableCount;
     setSnippetImport(null);
     setSnippetImportName("");
+    setImageView(false);
     setActiveKind("snippet");
     setActiveFolder("all");
     setProductFilter("全部产品");
@@ -1222,26 +1268,27 @@ export default function Home() {
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipbox…</span></main>;
 
   const isMini = windowMode === "mini";
-  const sectionTitle = activeFolder === "all"
+  const sectionTitle = imageView ? "全部图片" : activeFolder === "all"
     ? (activeKind === "snippet" ? "全部话术" : `全部${SECRET_WORD}`)
     : activeFolder === "pinned" ? "收藏"
       : activeFolder === "recent" ? "最近使用"
       : activeFolder === "trash" ? "回收站"
         : activeFolder === "uncategorized" ? "未分类"
           : activeFolder.slice(7);
-  const searchPlaceholder = activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : "搜索标题、编号或内容";
+  const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : "搜索标题、编号或内容";
   const kindSwitch = (
     <div className={`kind-switch ${isMini ? "compact" : ""}`} role="group" aria-label="内容板块">
-      {(["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={activeKind === kind ? "active" : ""} aria-pressed={activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : SECRET_WORD}</button>)}
+      {(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={!imageView && activeKind === kind ? "active" : ""} aria-pressed={!imageView && activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : SECRET_WORD}</button>)}
+      <button type="button" className={imageView ? "active" : ""} aria-pressed={imageView} onClick={showImages}>图片</button>
     </div>
   );
-  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
+  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = firstRun ? (
     <div className="native-empty onboarding">
       <VaultMark />
       <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
-      <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : (PLAIN_NOTES ? "把常用的信息记在这里，比如地址、账号说明，一键复制。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。")}</span>
+      <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
       <div className="onboarding-actions">
         <button type="button" className="primary-button" onClick={() => openEditor(null)}><Icon name="plus" />新增第一条</button>
         {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={() => spreadsheetFileRef.current?.click()}>导入话术表格</button>}
@@ -1315,7 +1362,7 @@ export default function Home() {
             <div className="native-search">
               <Icon name="search" className="search-glyph" />
               {searchInput}
-              <label className="mini-folder">
+              {!imageView && <label className="mini-folder">
                 <span className="sr-only">目录</span>
                 <select value={activeFolder} onChange={(event) => selectFolder(event.target.value)}>
                   <option value="all">全部</option>
@@ -1325,10 +1372,11 @@ export default function Home() {
                   {activeKind === "secret" && <option value="uncategorized">未分类</option>}
                 </select>
                 <Icon name="chevron" />
-              </label>
+              </label>}
             </div>
           </div>
-          <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
+          {imageView && <ImageSection ref={imageSectionRef} deviceKey={deviceKey} query={query} compact paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+          {!imageView && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
               return (
@@ -1346,18 +1394,20 @@ export default function Home() {
                 </article>
               );
             })}
-          </div>
+          </div>}
           <footer className="status-bar">
             <span className="spacer" />
-            <span>{filtered.length} 条</span>
+            <span>{imageView ? `${imageCounts.shown} 张` : `${filtered.length} 条`}</span>
           </footer>
         </> : <>
           <aside className="sidebar" aria-label="目录">
             <div className="sidebar-top drag-region"><div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div></div>
             {kindSwitch}
             <nav className="nav-list" aria-label="快捷入口">
-              {directoryShortcuts.map((shortcut) => <button key={shortcut.id} type="button" className={`nav-item ${activeFolder === shortcut.id ? "active" : ""}`} onClick={() => selectFolder(shortcut.id)}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{shortcut.count}</b></button>)}
+              {imageView && <button type="button" className="nav-item active" aria-current="page"><span className="nav-icon"><Icon name="grid" className="accent" /></span><span className="nav-label">全部图片</span><b>{imageCounts.total}</b></button>}
+              {!imageView && directoryShortcuts.map((shortcut) => <button key={shortcut.id} type="button" className={`nav-item ${activeFolder === shortcut.id ? "active" : ""}`} onClick={() => selectFolder(shortcut.id)}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{shortcut.count}</b></button>)}
             </nav>
+            {imageView ? <div className="nav-scroll" /> : <>
             <div className="nav-heading">
               <span>目录</span>
               <button ref={folderCreateButtonRef} type="button" onClick={startNewFolder} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
@@ -1375,9 +1425,9 @@ export default function Home() {
                 </form>
               )}
               {activeKind === "secret" && <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>}
-            </div>
+            </div></>}
             <div className="nav-footer">
-              <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length > 0 && <b>{trashedKindItems.length}</b>}</button>
+              {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length > 0 && <b>{trashedKindItems.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
               <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
@@ -1403,27 +1453,30 @@ export default function Home() {
                 <Icon name="search" className="search-glyph" />
                 {searchInput}
               </div>
-              {canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+              {imageView
+                ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
+                : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
             <div className="section-head">
               <h1>{sectionTitle}</h1>
-              <span className="section-count">{filtered.length}</span>
+              <span className="section-count">{imageView ? imageCounts.shown : filtered.length}</span>
               <span className="spacer" />
-              {searching && activeFolder !== "all" && activeFolder !== "trash" && <div className="scope-switch" role="group" aria-label="搜索范围">
+              {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <div className="scope-switch" role="group" aria-label="搜索范围">
                 <button type="button" className={searchAllFolders ? "" : "active"} aria-pressed={!searchAllFolders} onClick={() => { setSearchAllFolders(false); setSelected(0); }}>此目录</button>
                 <button type="button" className={searchAllFolders ? "active" : ""} aria-pressed={searchAllFolders} onClick={() => { setSearchAllFolders(true); setSelected(0); }}>全部目录</button>
               </div>}
-              {activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
-              {activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
+              {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
                 {productMenuOpen && <div className="product-filter-menu" role="menu">
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
                 </div>}
               </div>}
-              {activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
+              {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
             </div>
-            <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
+            {imageView && <ImageSection ref={imageSectionRef} deviceKey={deviceKey} query={query} compact={false} paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+            {!imageView && <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
               {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
                 <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
@@ -1497,7 +1550,7 @@ export default function Home() {
                   </article>
                 );
               })}
-            </div>
+            </div>}
             {bulkMode && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
               <strong>已选 {bulkCount} 条</strong>
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>
@@ -1549,13 +1602,13 @@ export default function Home() {
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}
-        secretWord={SECRET_WORD}
+        secretWord={PLAIN_NOTES ? "" : SECRET_WORD}
         needsPassword={backupMode !== "import" || Boolean(pendingImport?.envelope)}
         onClose={() => { setBackupMode(null); if (backupMode === "import") setPendingImport(null); }}
         onExport={(password) => exportVault(password, backupMode === "export-secret" ? "secret" : "snippet")}
         onImport={applyImport}
       />}
-      {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
+      {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={PLAIN_NOTES ? "" : SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
       {undoTrash && <div className="toast undo-toast" role="status"><span>✓</span>{undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站"}<button type="button" onClick={() => void undoTrashNow()}>撤销</button></div>}
       {toast && !undoTrash && <div className="toast"><span>✓</span>{toast}</div>}
     </main>

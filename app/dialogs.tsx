@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { resolveFocusWrapIndex, type ImportStrategy, type SecretItem } from "./clipbox-core";
 import type { SnippetImportPreview } from "./snippet-import";
 
-// "export" saves the snippets, "export-secret" the 备注/秘密 section; each goes to its own file.
+// "export" saves the snippets, "export-secret" the 秘密 section; each goes to its own file.
+// secretWord is empty where that section does not exist (Windows), so the texts do not mention it.
 export type BackupMode = "export" | "export-secret" | "import";
 export type DeleteRequest = { item: SecretItem; permanent: boolean };
 
@@ -69,7 +70,7 @@ export function SnippetImportDialog({ preview, fileName, secretWord, onClose, on
           <section className="import-section"><h3>将创建或合并的目录</h3><div className="import-folder-list">{preview.folders.map((folder) => <span key={folder}>{folder}</span>)}</div></section>
           <section className="import-section"><h3>内容预览</h3><div className="import-preview-list">{preview.items.slice(0, 5).map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.folder} · {item.summary}</span></div>)}</div></section>
           {preview.errors.length > 0 && <section className="import-errors"><h3>需要跳过的行</h3>{preview.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}{preview.errors.length > 4 && <small>另有 {preview.errors.length - 4} 行</small>}</section>}
-          <p className="import-privacy">表格只在本机解析。导入采用合并方式，不会覆盖{secretWord}或现有话术。</p>
+          <p className="import-privacy">表格只在本机解析。导入采用合并方式，不会覆盖{secretWord ? `${secretWord}或` : ""}现有话术。</p>
         </div>
         <footer className="snippet-dialog-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button type="button" className="primary" onClick={() => void confirm()} disabled={busy || preview.importableCount === 0}>{busy ? "正在加密写入…" : `导入 ${preview.importableCount} 条话术`}</button></footer>
       </section>
@@ -119,7 +120,7 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
           <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
         </header>
         <form className="backup-form" onSubmit={submit}>
-          <p className="backup-intro">{exporting ? `只备份${exportWord}，并使用独立密码加密；${otherWord}不会包含在文件中。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
+          <p className="backup-intro">{exporting ? `只备份${exportWord}，并使用独立密码加密${otherWord ? `；${otherWord}不会包含在文件中` : ""}。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
           {needsPassword && <label className="backup-field"><span>备份密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={exporting ? "至少 8 个字符" : "输入导出时设置的密码"} autoComplete="off" /></label>}
           {exporting && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认备份密码" autoComplete="off" /></label>}
           {mode === "import" && <fieldset className="backup-strategy"><legend>导入方式</legend><div><button type="button" className={strategy === "merge" ? "active" : ""} onClick={() => setStrategy("merge")}><strong>合并</strong><small>保留现有内容并去重</small></button><button type="button" className={strategy === "replace" ? "active danger" : ""} onClick={() => setStrategy("replace")}><strong>覆盖</strong><small>用备份替换当前内容</small></button></div></fieldset>}
