@@ -45,3 +45,6 @@ yarn-error.log*
 # playwright
 /test-results/
 /playwright-report/
+
+# Claude Code worker worktrees
+/.claude/worktrees/

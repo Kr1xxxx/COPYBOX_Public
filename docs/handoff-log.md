@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Owner: Opus coordinates, Sonnet (medium) workers in git worktrees do the pieces, the coordinator reviews and merges. Set up in `CLAUDE.md`, `.claude/settings.json`, `.claude/agents/worker.md`.
 - 2026-10-09 — Claude — Task 5: Settings → 导出备注备份 (导出秘密备份 on Mac) saves the second section to its own encrypted local file (same `clipbox-secure-backup` v3 format with `scope: "secret"` that the Mac command line already wrote; import already understood it). Replaced `tests/backup-ui.test.mjs`, which forbade the button (from the original macOS design), with a test that snippets and notes stay in separate files. New e2e `tests/e2e/backup.e2e.mjs`. Noticed, not fixed: a merge-import skips a note whose identical copy sits in the trash.
 - 2026-10-09 — Claude — Task 6: updated the `page.tsx` row in AGENTS.md (~1580 lines, lists the split-out UI files). Rulebook change, so the PR waits for the owner's 合并.
 - 2026-10-09 — Claude — Task 8 (owner approved): CI runs `npm run typecheck` (`tsc -p tsconfig.typecheck.json`; a separate file so the vinext build is unaffected). Fixed the 3 real errors type-only: `deriveKey` salt type (TS 5.9 `Uint8Array<ArrayBuffer>`), the automation `move` branch used a not-narrowed `folder`; `types: []` keeps Node's `setTimeout` type out of browser code.
