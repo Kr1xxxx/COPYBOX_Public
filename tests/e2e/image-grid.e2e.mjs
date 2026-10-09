@@ -368,3 +368,25 @@ test("the tile's copy icon turns into a check and back, and the toast appears an
   expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(2);
   await expect(toast).toHaveCount(0, { timeout: 6000 });
 });
+
+test("opening a tile scrolls so the clicked picture is fully visible", async ({ page }) => {
+  await openImages(page);
+  await addImages(page, Array.from({ length: 16 }, (_, index) => png(`图${index + 1}`, 300, 3000, [40 + index * 12, 140, 220 - index * 10])));
+  await expect(tiles(page)).toHaveCount(16); // tall pictures: the opened card is taller than the list
+  await expect.poll(() => page.locator(".image-tile-thumb img").evaluateAll((images) => images.every((img) => img.naturalWidth > 0))).toBe(true);
+
+  for (const title of ["图9", "图13", "图16", "图2"]) {
+    await tile(page, title).getByRole("button", { name: `展开 ${title}` }).click();
+    await expect(card(page)).toHaveCount(1);
+    // The clicked tile's picture sits wholly inside the visible list once the scroll has settled.
+    await expect.poll(async () => {
+      const thumb = await tile(page, title).locator(".image-tile-thumb").boundingBox();
+      const list = await page.locator(".image-list").boundingBox();
+      const top = Math.max(0, list.y);
+      const bottom = Math.min(page.viewportSize().height, list.y + list.height);
+      return thumb.y >= top - 1 && thumb.y + thumb.height <= bottom + 1;
+    }, { timeout: 4000 }).toBe(true);
+    await tile(page, title).getByRole("button", { name: `已展开 ${title}` }).click();
+    await expect(card(page)).toHaveCount(0);
+  }
+});
