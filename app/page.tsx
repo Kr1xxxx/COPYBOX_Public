@@ -598,6 +598,24 @@ export default function Home() {
     resolvePostCommitFocusTarget(pending, modalOpen, backgroundInert, searchRef.current)?.focus();
   }, [modalOpen, backgroundInert]);
 
+  // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu close on a click or touch anywhere outside them, and on Esc.
+  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || Boolean(folderMenu);
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const closeAll = () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setFolderMenu(""); setFolderDeleteArm(""); };
+    const outside = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".folder-menu, .folder-more")) return; // the folder menu has its own scrim and toggle
+      if (target?.closest(".product-filter-wrap")) { setRowMenuId(""); setBulkMoveOpen(false); return; }
+      if (target?.closest(".menu-wrap")) { setProductMenuOpen(false); return; }
+      closeAll();
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") closeAll(); };
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
+  }, [dropdownOpen]);
+
   useEffect(() => {
     if (loading) return;
     const shortcut = (event: KeyboardEvent) => {

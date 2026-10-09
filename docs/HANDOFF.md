@@ -44,6 +44,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 17 | Motion from arc-library, step 1 of 4 (D-021): copy icon + toast | In progress | Claude | Adds `motion` (needs the owner's 合并). Steps 2-4: switches/segmented/checkboxes; menus/dialogs; rename/search/drop zone/empty pages/counters |
 | 18 | 图片 detail scrolls so the clicked picture stays fully visible (advisor item 12) | In progress | Claude | `detailScrollDelta` in `image-view-core.ts`; PR stacked on #38 |
 | 20 | Settings: 自动清理 defaults to 7 天; 目录 groups fold open on click (arc-library accordion motion, `app/arc/collapsible.tsx`); new 图片目录 group (create, rename, colour, delete; no ordering: the image store has none) | Done | Claude | Stacked on PR #39 (uses `motion`); merges after #39. The 7-day default applies to everyone who never picked an option |
+| 23 | Dropdowns (全部产品, row menu, bulk 移动到, folder menu) close on outside click and Esc | In progress | Claude | Lock reported the 全部产品 filter stayed open |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
