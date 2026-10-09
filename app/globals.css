@@ -715,12 +715,12 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-tile-main { width: 100%; min-width: 0; padding: 0; display: grid; gap: 6px; border: 0; border-radius: 11px; background: none; color: inherit; text-align: left; cursor: pointer; }
 .image-tile-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .image-tile-thumb { position: relative; width: 100%; aspect-ratio: 1; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--fill); transition: border-color .16s, box-shadow .16s; }
-/* 毛玻璃 (D-022): blurred copy of the picture + pale sheen behind; the picture itself keeps a 10% margin and is never cropped. */
+/* 毛玻璃 (D-022): blurred copy of the picture + pale sheen behind; the picture itself keeps a 6% margin and is never cropped. */
 .image-tile-thumb { isolation: isolate; }
 .image-tile-thumb img { display: block; user-select: none; }
 .image-tile-glass { position: absolute; left: -15%; top: -15%; width: 130%; height: 130%; object-fit: cover; filter: blur(16px) saturate(1.35); opacity: .9; pointer-events: none; }
 .image-tile-thumb::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: linear-gradient(145deg, rgba(255,255,255,.46), rgba(255,255,255,.16)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); backdrop-filter: blur(4px) saturate(1.1); pointer-events: none; }
-.image-tile-pic { position: absolute; left: 10%; top: 10%; width: 80%; height: 80%; z-index: 2; object-fit: contain; filter: drop-shadow(0 2px 5px rgba(31,30,28,.22)); }
+.image-tile-pic { position: absolute; left: 6%; top: 6%; width: 88%; height: 88%; z-index: 2; object-fit: contain; filter: drop-shadow(0 2px 5px rgba(31,30,28,.22)); }
 .image-tile-thumb .mini-copied { z-index: 3; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .image-tile-thumb::after { background: linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.04)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); } }
 :root[data-theme="dark"] .image-tile-thumb::after { background: linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.04)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }

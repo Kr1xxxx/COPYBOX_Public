@@ -266,13 +266,13 @@ test("extreme pictures neither overflow the window nor the opened card", async (
 
   // Thumbnails show the whole picture, never a crop.
   for (const img of await page.locator(".image-tile-pic").all()) await expect(img).toHaveCSS("object-fit", "contain");
-  // Every picture, even a square one, keeps a 10% margin on frosted glass.
+  // Every picture, even a square one, keeps a 6% margin on frosted glass.
   for (const index of [0, 2, 5]) {
     const thumb = await tiles(page).nth(index).locator(".image-tile-thumb").boundingBox();
     const pic = await tiles(page).nth(index).locator(".image-tile-pic").boundingBox();
-    expect(Math.abs((pic.x - thumb.x) / thumb.width - 0.1)).toBeLessThan(0.03);
-    expect(Math.abs((pic.y - thumb.y) / thumb.height - 0.1)).toBeLessThan(0.03);
-    expect(Math.abs(pic.width / thumb.width - 0.8)).toBeLessThan(0.03);
+    expect(Math.abs((pic.x - thumb.x) / thumb.width - 0.06)).toBeLessThan(0.03);
+    expect(Math.abs((pic.y - thumb.y) / thumb.height - 0.06)).toBeLessThan(0.03);
+    expect(Math.abs(pic.width / thumb.width - 0.88)).toBeLessThan(0.03);
     await expect(tiles(page).nth(index).locator(".image-tile-glass")).toHaveCSS("filter", /blur/);
   }
   // Every tile is a square whatever the picture's shape, and the four columns are equal.
