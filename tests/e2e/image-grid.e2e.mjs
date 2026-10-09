@@ -273,7 +273,10 @@ test("extreme pictures neither overflow the window nor the opened card", async (
     expect(Math.abs((pic.x - thumb.x) / thumb.width - 0.06)).toBeLessThan(0.03);
     expect(Math.abs((pic.y - thumb.y) / thumb.height - 0.06)).toBeLessThan(0.03);
     expect(Math.abs(pic.width / thumb.width - 0.88)).toBeLessThan(0.03);
-    await expect(tiles(page).nth(index).locator(".image-tile-glass")).toHaveCSS("filter", /blur/);
+    // The glass is colourless: no copy of the picture behind it, only a neutral translucent surface.
+    await expect(tiles(page).nth(index).locator(".image-tile-glass")).toHaveCount(0);
+    const glass = await tiles(page).nth(index).locator(".image-tile-thumb").evaluate((el) => getComputedStyle(el, "::after").backgroundImage);
+    expect(glass).toMatch(/gradient/);
   }
   // Every tile is a square whatever the picture's shape, and the four columns are equal.
   for (const thumb of await boxes(page.locator(".image-tile-thumb"))) expect(Math.abs(thumb.width - thumb.height)).toBeLessThan(1.5);
