@@ -41,11 +41,12 @@ export type ImageLibrary = {
   getBlob: (id: string) => Promise<Blob>;
   markUsed: (id: string) => Promise<void>;
   // The folder actions show their own toast. They return whether the change was made.
+  // `onError` (Settings) receives the failure message instead of the toast, to show it next to the form.
   moveImage: (id: string, folder: string | null) => Promise<boolean>;
-  createFolder: (name: string) => Promise<string | null>;
-  renameFolder: (from: string, to: string) => Promise<string | null>;
-  setFolderColor: (name: string, color: string) => Promise<boolean>;
-  deleteFolder: (name: string) => Promise<boolean>;
+  createFolder: (name: string, onError?: (message: string) => void) => Promise<string | null>;
+  renameFolder: (from: string, to: string, onError?: (message: string) => void) => Promise<string | null>;
+  setFolderColor: (name: string, color: string, onError?: (message: string) => void) => Promise<boolean>;
+  deleteFolder: (name: string, onError?: (message: string) => void) => Promise<boolean>;
 };
 
 // `enabled` turns on once the 图片 section is first opened; nothing is read before that.
@@ -124,19 +125,19 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  async function createFolder(name: string) {
+  async function createFolder(name: string, onError = toast) {
     try {
       const next = await (await loadStore(deviceKey)).createFolder(name);
       setFolders(next);
       toast("目录已创建");
       return next[next.length - 1].name;
     } catch (error) {
-      toast(readableMessage(error, "创建失败，请重试"));
+      onError(readableMessage(error, "创建失败，请重试"));
       return null;
     }
   }
 
-  async function renameFolder(from: string, to: string) {
+  async function renameFolder(from: string, to: string, onError = toast) {
     const name = normalizeFolderName(to);
     try {
       const next = await (await loadStore(deviceKey)).renameFolder(from, to);
@@ -147,23 +148,23 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
       if (name !== from) toast("目录已重命名");
       return name;
     } catch (error) {
-      toast(readableMessage(error, "重命名失败，请重试"));
+      onError(readableMessage(error, "重命名失败，请重试"));
       return null;
     }
   }
 
-  async function setFolderColor(name: string, color: string) {
+  async function setFolderColor(name: string, color: string, onError = toast) {
     try {
       setFolders(await (await loadStore(deviceKey)).setFolderColor(name, color));
       toast("颜色已更新");
       return true;
     } catch (error) {
-      toast(readableMessage(error, "颜色没有保存，请重试"));
+      onError(readableMessage(error, "颜色没有保存，请重试"));
       return false;
     }
   }
 
-  async function deleteFolder(name: string) {
+  async function deleteFolder(name: string, onError = toast) {
     try {
       setFolders(await (await loadStore(deviceKey)).deleteFolder(name));
       setImages((current) => current?.map((meta) => meta.folder === name ? { ...meta, folder: undefined } : meta) ?? current);
@@ -171,7 +172,7 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
       toast(`已删除目录「${name}」`);
       return true;
     } catch (error) {
-      toast(readableMessage(error, "删除失败，图片没有改动"));
+      onError(readableMessage(error, "删除失败，图片没有改动"));
       return false;
     }
   }

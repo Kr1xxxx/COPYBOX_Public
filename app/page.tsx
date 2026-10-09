@@ -59,15 +59,16 @@ import {
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
-import { imageFilterTitle } from "./image-folders-core";
+import { countImagesByFolder, imageFilterTitle, imageFolderColors } from "./image-folders-core";
+import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
-import type { SettingsFolderGroup } from "./settings-folders";
+import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
@@ -275,8 +276,9 @@ export default function Home() {
   const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
   const imageSectionRef = useRef<ImageSectionHandle>(null);
   const [imageViewMode, setImageViewMode] = useImageView();
-  // Images and folders are shared by the sidebar and the list; nothing is read until 图片 is first opened.
-  const imageLibrary = useImageLibrary(deviceKey, imageView, flashToast);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
+  const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -288,7 +290,6 @@ export default function Home() {
   const [copiedId, setCopiedId] = useState("");
   const [copiedReferenceId, setCopiedReferenceId] = useState("");
   const [, setMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [newFolder, setNewFolder] = useState<{ name: string; error: string } | null>(null);
   const [renamingFolder, setRenamingFolder] = useState<{ from: string; value: string; error: string } | null>(null);
   const [folderMenu, setFolderMenu] = useState("");
@@ -846,44 +847,62 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  // Folder editing from Settings works on either kind, not just the open tab.
-  async function settingsFolderRename(kind: ItemKind, from: string, to: string) {
+  // Folder editing from Settings works on either kind, not just the open tab, and on 图片 folders (their own store).
+  // The image library reports a failure through `onError`; Settings shows it next to the form.
+  async function imageFolderTask(run: (onError: (message: string) => void) => Promise<unknown>) {
+    let failure = "";
+    const result = await run((message) => { failure = message; });
+    return result === null || result === false ? failure || "没有保存，请重试" : "";
+  }
+
+  async function settingsFolderRename(kind: SettingsFolderKind, from: string, to: string) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.renameFolder(from, to, onError));
     const error = await commitFolderChange((data) => renameFolder(data, kind, from, to), "目录已重命名");
     if (!error && activeKind === kind && activeFolder === `folder:${from}`) setActiveFolder(`folder:${normalizeFolderName(to)}`);
     return error;
   }
 
-  async function settingsFolderDelete(kind: ItemKind, folder: string) {
+  async function settingsFolderDelete(kind: SettingsFolderKind, folder: string) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.deleteFolder(folder, onError));
     const error = await commitFolderChange((data) => deleteFolder(data, kind, folder), `已删除目录「${folder}」`);
     if (!error && activeKind === kind && activeFolder === `folder:${folder}`) selectFolder("all");
     return error;
   }
 
-  async function settingsFolderAdd(kind: ItemKind, name: string) {
+  async function settingsFolderAdd(kind: SettingsFolderKind, name: string) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.createFolder(name, onError));
     const result = addFolder(foldersRef.current, kind, name);
     if (!result.folder) return "请输入目录名称";
     if (!result.created) return "已有同名目录";
     return commitFolderChange((data) => ({ data: { ...data, folders: addFolder(data.folders, kind, name).folders } }), "目录已创建");
   }
 
-  function settingsFolderColor(kind: ItemKind, folder: string, color: string | null) {
+  function settingsFolderColor(kind: SettingsFolderKind, folder: string, color: string | null) {
+    if (kind === "image") { if (color) void imageLibrary.setFolderColor(folder, color); return; }
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  function settingsFolderMove(kind: ItemKind, folder: string, delta: -1 | 1) {
+  // Image folders have no saved order (not sortable in Settings), so only the vault kinds move.
+  function settingsFolderMove(kind: SettingsFolderKind, folder: string, delta: -1 | 1) {
+    if (kind === "image") return;
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: moveName(data.folders[kind], folder, delta) } } }), "目录顺序已更新");
   }
 
-  function settingsFolderReorder(kind: ItemKind, source: string, target: string) {
+  function settingsFolderReorder(kind: SettingsFolderKind, source: string, target: string) {
+    if (kind === "image") return;
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: reorderNames(data.folders[kind], source, target) } } }), "目录顺序已更新");
   }
 
   function buildSettingsFolderGroups(): SettingsFolderGroup[] {
-    return (PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => {
+    const textGroups = (PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind): SettingsFolderGroup => {
       const colors = { ...buildCategoryColorMap(folders[kind]), ...(folderColors?.[kind] || {}) };
       return {
         kind,
         title: kind === "snippet" ? "话术目录" : `${SECRET_WORD}目录`,
+        unit: "条",
+        nameMax: 30,
+        sortable: true,
+        autoColor: true,
         folders: folders[kind].map((name) => ({
           name,
           count: items.filter((item) => !isTrashedItem(item) && (item.kind || "secret") === kind && item.folder === name).length,
@@ -892,6 +911,17 @@ export default function Home() {
         })),
       };
     });
+    const imageCountsByFolder = countImagesByFolder(imageLibrary.images ?? [], imageLibrary.folders).byFolder;
+    const imageColors = imageFolderColors(imageLibrary.folders);
+    return [...textGroups, {
+      kind: "image",
+      title: "图片目录",
+      unit: "张",
+      nameMax: IMAGE_FOLDER_NAME_MAX,
+      sortable: false,
+      autoColor: false,
+      folders: imageLibrary.folders.map(({ name }) => ({ name, count: imageCountsByFolder[name] ?? 0, color: imageColors[name] || UNCATEGORIZED_COLOR, locked: false })),
+    }];
   }
 
   function requestTrash(item: SecretItem) {
@@ -979,7 +1009,7 @@ export default function Home() {
   }
 
   const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
-  const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, 0));
+  const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
   useEffect(() => {
     window.clipboxDesktop?.setMiniHidePolicy?.(miniHidePolicy);
     // Only tell the desktop shell about the stored choice once on start; later changes go through chooseMiniHidePolicy.
