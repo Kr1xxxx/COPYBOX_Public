@@ -432,7 +432,7 @@ test("old image records without a folder still list", async () => {
   assert.deepEqual(await store.listFolders(), []);
 });
 
-// Thumbnails (D-023): a derived, encrypted copy in its own database; the originals are never touched.
+// Thumbnails (D-024): a derived, encrypted copy in its own database; the originals are never touched.
 function thumbSetup(makeThumb) {
   const factory = fakeIndexedDB();
   const calls = { made: 0 };

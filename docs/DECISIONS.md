@@ -29,7 +29,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-020 | 图片 grid is 16宫格 (4 per row), whole picture in the thumbnail, 6% margin on frosted glass | Accepted |
 | D-021 | Motion follows arc-library (components vendored into `app/arc/`, `motion` added) | Accepted |
 | D-022 | Trash auto-cleanup defaults to 7 days for everyone | Accepted |
-| D-023 | 图片 thumbnails: small encrypted copies kept in their own database | Accepted |
+| D-024 | 图片 thumbnails: small encrypted copies kept in their own database | Accepted |
 
 ---
 
@@ -203,7 +203,7 @@ Statuses: Accepted / Superseded / Deprecated.
   is deleted for good on the next start (accepted by the owner). Anyone who picked 不清理, 30 天 or 90 天 earlier keeps that choice.
 - Consequences: `DEFAULT_TRASH_DAYS = 7` in `app/preferences.ts` is the single place to change it. No migration, no notice.
 
-### D-023 图片 thumbnails (2026-10-09)
+### D-024 图片 thumbnails (2026-10-09)
 - Context (owner, advisor item 9: "做一下 ... 如果不好看我会回退"): opening the 图片 page decrypted every original at full size.
 - Decision (owner): keep a small thumbnail per image. It is derived data: a copy at most 320 px on the longest side (WebP),
   encrypted with the same key and the same scheme as the images (AES-GCM, record id bound in), stored in its **own**
