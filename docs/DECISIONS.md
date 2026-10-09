@@ -97,6 +97,8 @@ Statuses: Accepted / Superseded / Deprecated.
   (anything in `desktop/`, dependencies, CI/scripts, the rulebook, storage/encryption, deleted app files, weakened
   tests, over 350 app lines, or labelled `major` by the agent for new/removed features and layout changes) is
   labelled `needs-owner` and merged only after the owner writes 合并 in the conversation.
+- Addendum (2026-10-09, owner): any PR with 500 or more changed lines in total (all files, tests and docs included)
+  is also **big**. The first rule only counted `app/`, so a 1,180-line docs-only PR (#43) merged itself.
 - Consequences: agents report which PRs merged by themselves. The owner raised the limit to 350 lines (2026-10-08); it is based on this project's history:
   real small fixes were 5–40 lines, features 100–1000+. Every merge can be reverted.
 - One change per PR — changes are not batched. Small, frequent PRs are easier to check and to revert; the only cost
