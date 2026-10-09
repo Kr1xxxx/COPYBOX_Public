@@ -71,6 +71,7 @@ import {
   type SnippetImportPreview,
 } from "./snippet-import";
 import { aiRewrite } from "./ai-client";
+import { deviceKeyProtectionAvailable, openGuardedVault, type KeyRecord } from "./device-key-guard";
 import { AiSettingsSection } from "./ai-settings";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
@@ -147,6 +148,9 @@ declare global {
       setTheme?: (theme: ThemeChoice) => void;
       openDataFolder?: () => Promise<string>;
       getVersion: () => Promise<string>;
+      deviceKeyAvailable?: () => Promise<boolean>;
+      deviceKeyGet?: () => Promise<KeyRecord | null>;
+      deviceKeySet?: (record: KeyRecord) => Promise<boolean>;
       aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
       aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
       aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
@@ -284,7 +288,26 @@ async function decryptVault(envelope: VaultEnvelope, password: string) {
   return normalizeVaultData(parsed);
 }
 
+// With OS protection (Windows desktop) the device key lives in the desktop shell, not in this storage.
+async function openVaultWithProtectedKey() {
+  const opened = await openGuardedVault<VaultData, VaultEnvelope>({
+    bridge: window.clipboxDesktop!,
+    storage: localStorage,
+    vaultKey: STORAGE_KEY,
+    legacyKeyKey: DEVICE_KEY,
+    decrypt: decryptVault,
+    encrypt: (data, key) => encryptVault(data, key),
+    createKey: createDeviceKey,
+    createEmpty: () => synchronizeVaultData([], EMPTY_FOLDER_REGISTRY, 1),
+  });
+  return { data: opened.data, deviceKey: opened.key };
+}
+
 async function readLocalEncryptedVault() {
+  if (await deviceKeyProtectionAvailable(window.clipboxDesktop)) {
+    if (!localStorage.getItem(STORAGE_KEY)) throw new Error("Local vault is unavailable");
+    return openVaultWithProtectedKey();
+  }
   const raw = localStorage.getItem(STORAGE_KEY);
   const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
   if (!raw || !storedDeviceKey) throw new Error("Local vault is unavailable");
@@ -392,6 +415,18 @@ export default function Home() {
     }
 
     async function openVault() {
+      if (await deviceKeyProtectionAvailable(window.clipboxDesktop)) {
+        try {
+          const openedVault = await openVaultWithProtectedKey();
+          finishOpening(openedVault.data, openedVault.deviceKey);
+        } catch {
+          if (!cancelled) {
+            setStartupError("本地数据读取失败，原数据和密钥已保留。请重试；如仍失败，请先备份应用数据再排查。");
+            setLoading(false);
+          }
+        }
+        return;
+      }
       const raw = localStorage.getItem(STORAGE_KEY);
       const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
       if (!raw) {

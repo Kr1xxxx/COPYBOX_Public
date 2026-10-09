@@ -3,6 +3,8 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-08 — Claude — Owner confirmed: PR #1 (new UI) merged into `main`; PR #7 retargeted to `main`. Owner waived real-device testing (D-014); tasks 1-2 cancelled, 3 done.
+- 2026-10-08 — Claude — Task 4 (owner approved): Windows device key now lives in an OS-encrypted file (`desktop/device-key.cjs`, `app/device-key-guard.ts`), old vaults migrate and are re-encrypted; D-012, D-013 (no signing). Tested with fake key store, unit tests and simulated e2e; not on real Windows. PRs #5 and #6 merged into `ui-redesign-h`; merging PR #1 into `main` is waiting for the owner's explicit 合并.
 - 2026-10-09 — Claude — Task 6, piece 1: moved the AI request code and the AI settings panel out of `page.tsx` into `app/ai-client.ts` and `app/ai-settings.tsx` (code moved unchanged; the two settings tests now read the new files with the same assertions). `page.tsx` ~2500 → ~2270 lines.
 - 2026-10-09 — Claude — Task 7: Windows close option "缩到任务栏" (minimise instead of hide, so the taskbar button stays); a minimised window is restored by tray/second launch/Dock. Verified in unit + simulated e2e only; needs a Windows check. Next: task 6 (split page.tsx).
 - 2026-10-08 — Claude — Synced PR #1 (`ui-redesign-h`) with `main` after PR #2; no conflicts, tests green. PR #1

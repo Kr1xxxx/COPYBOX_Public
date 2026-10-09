@@ -18,6 +18,9 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-009 | Folder rules | Accepted |
 | D-010 | Workflow: PRs only, the owner merges | Superseded by D-011 |
 | D-011 | Small changes merge themselves; big ones wait for the owner's 合并 | Accepted |
+| D-012 | Windows: the vault's device key is protected by OS encryption | Accepted |
+| D-013 | No code signing for now (internal tool); auto-update undecided | Accepted |
+| D-014 | No real-device testing round before merging | Accepted |
 
 ---
 
@@ -92,3 +95,25 @@ Statuses: Accepted / Superseded / Deprecated.
   real small fixes were 5–40 lines, features 100–1000+. Every merge can be reverted.
 - One change per PR — changes are not batched. Small, frequent PRs are easier to check and to revert; the only cost
   is GitHub Actions minutes (about 5 billed minutes per CI run; the free plan includes 2,000 a month).
+
+### D-012 Device key protected by the OS (2026-10-08)
+- Context: the device key sat next to the vault, so anyone who copied the data folder could decrypt it.
+- Decision (owner approved "修法 A"): on Windows the key is encrypted with `safeStorage` (DPAPI) and stored by the main
+  process (`desktop/device-key.cjs`, `device-key.json`); the page asks for it through `window.clipboxDesktop`
+  (`app/device-key-guard.ts`). An existing vault is migrated on first start by re-encrypting it with a fresh key; every
+  step is repeatable after a crash and the old key is deleted only once the new vault opens. No start-up password.
+- Not on macOS yet: an unsigned Mac app can lose access to its Keychain item after an update (D-013). macOS and the
+  browser keep the old behaviour.
+- Consequences: if Windows loses its key (admin password reset, restored profile) the vault cannot be opened, so the
+  snippet backup matters. A key that is unreadable is an error, never "no key yet" — the vault is never replaced.
+
+### D-013 No code signing for now (2026-10-08)
+- Decision: Clipbox is an internal tool; the installers stay unsigned (Windows SmartScreen shows a warning, Mac needs
+  right-click → Open). Auto-update is not built. Revisit if it is distributed beyond the company.
+
+### D-014 No real-device testing round (2026-10-08)
+- Decision: the owner does not want a Windows/Mac test round before merging. PR #1 and later PRs merge on green CI and
+  the owner's 合并.
+- Consequences: `docs/features.json` keeps Windows/Mac at `false` (an agent only sets `true` after walking through the
+  steps). Anything that only a real machine can show (DPAPI, tray, taskbar, installer) is a known risk, listed in
+  `docs/HANDOFF.md`.
