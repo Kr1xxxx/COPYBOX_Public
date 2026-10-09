@@ -2,7 +2,8 @@
 
 A browser build of Clipbox for looking at a branch without installing anything. `index.html` shows the real app
 in a frame with a Windows / Mac switch; the desktop shell is faked by a small script, and ten simulated test
-images are added through the app's own image store (`seed.js`). It is a snapshot of the branch being reviewed,
+images are added through the app's own image store (`seed.js`). The 导入测试话术 menu opens the app's real import
+dialog with one of four sample sheets: three short groups in `samples/` and the full test sheet from `docs/samples/`. It is a snapshot of the branch being reviewed,
 built from that branch's code.
 
 ## Version
