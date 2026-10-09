@@ -101,6 +101,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .nav-icon .icon { width: 15px; height: 15px; }
 .nav-icon .icon.accent { color: var(--accent); }
 .nav-item.active .nav-icon { color: var(--ink-2); }
+/* 全部图片 is four characters wide: without the icon it still fits next to a two- or three-digit count. */
+.nav-item.image-all .nav-icon { display: none; }
 .nav-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-item b { flex: 0 0 auto; color: var(--muted); font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .directory-color-marker { width: 8px; height: 8px; border-radius: 50%; }
@@ -672,9 +674,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-section { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .image-thumb { width: 32px; height: 32px; flex: 0 0 auto; margin-right: 10px; overflow: hidden; display: grid; place-items: center; border-radius: 7px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line-soft); }
 .image-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.image-row .row-detail-inner { padding-left: 12px; }
+.image-row .row-detail-inner { padding-left: 12px; grid-template-columns: minmax(0, 1fr); }
 .native-row.image-row.selected .row-line { height: 44px; }
-.image-preview { min-height: 80px; max-height: min(260px, 42vh); padding: 8px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; background: var(--content); color: var(--muted); font-size: 12.5px; }
+.image-preview { min-height: 80px; grid-template-columns: minmax(0, 1fr); max-height: min(260px, 42vh); padding: 8px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; background: var(--content); color: var(--muted); font-size: 12.5px; }
 .image-preview img { max-width: 100%; max-height: min(244px, 42vh - 16px); display: block; object-fit: contain; border-radius: 4px; user-select: none; }
 .image-facts { margin-top: -3px; color: var(--muted); font-size: 12px; }
 .image-rename { flex: 1 1 auto; min-width: 0; padding: 0 2px 0 4px; display: flex; align-items: center; gap: 6px; }
@@ -687,3 +689,54 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-row .secondary-button.danger-text, .image-row .ghost-button.danger-text { color: var(--danger); }
 .mini-row .image-thumb { width: 30px; height: 30px; margin-right: 0; }
 .image-loading { height: 160px; }
+
+/* 图片 folders: the 目录 line, the "移动到" menu and the empty-folder hint */
+.image-folder-line { margin-top: -3px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.image-folder-line .menu-wrap { min-width: 0; max-width: 100%; }
+.image-folder-button { max-width: 100%; height: 24px; padding: 0 6px 0 8px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink-2); font-size: 12px; cursor: pointer; }
+.image-folder-button:hover, .image-folder-button[aria-expanded="true"] { background: var(--hover); color: var(--ink); }
+.image-folder-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.image-folder-button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-folder-button .icon { width: 11px; height: 11px; flex: 0 0 auto; }
+.image-move-menu { max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+.image-folder-line .image-move-menu { left: 0; right: auto; top: 30px; }
+.image-move-menu.up { top: auto; bottom: 34px; }
+.image-folder-line .image-move-menu.up { bottom: 30px; }
+.image-move-menu .menu-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-empty { margin: 4px 9px 6px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.directory-row:has(.folder-more[aria-expanded="true"]) .directory-main b { opacity: 0; }
+
+/* 图片 grid view (docs/specs/image-grid.md): 3 equal columns; the opened picture's card spans all of them. */
+.native-list.image-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-content: start; align-items: start; padding-top: 4px; }
+.image-view-switch { margin-left: 4px; }
+.image-view-switch button { width: 30px; padding: 0; display: grid; place-items: center; }
+.image-view-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.image-tile { position: relative; min-width: 0; }
+.image-tile-main { width: 100%; min-width: 0; padding: 0; display: grid; gap: 6px; border: 0; border-radius: 11px; background: none; color: inherit; text-align: left; cursor: pointer; }
+.image-tile-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.image-tile-thumb { position: relative; width: 100%; aspect-ratio: 1; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--fill); transition: border-color .16s, box-shadow .16s; }
+.image-tile-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; user-select: none; }
+.image-tile-title { min-width: 0; padding: 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 12.5px; font-weight: 500; line-height: 1.3; }
+.image-tile-main:hover .image-tile-thumb { border-color: var(--border); box-shadow: 0 2px 8px rgba(31,30,28,.1); }
+.image-tile.selected .image-tile-thumb { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px var(--ring); }
+.image-tile.selected .image-tile-title { color: var(--ink); font-weight: 600; }
+.image-tile-copy { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--card); color: var(--ink-2); box-shadow: 0 1px 4px rgba(31,30,28,.18); cursor: pointer; opacity: .7; transition: opacity .14s, background .14s, color .14s, transform .14s; }
+.image-tile:hover .image-tile-copy, .image-tile-copy:hover, .image-tile-copy:focus-visible { opacity: 1; }
+.image-tile-copy:hover { color: var(--ink); }
+.image-tile-copy:active { transform: scale(.88); }
+.image-tile-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.image-tile-copy .icon { width: 15px; height: 15px; }
+.image-tile.copied .image-tile-copy { opacity: 1; background: var(--ok-bg); color: var(--ok); }
+.native-list.image-grid > .image-card { grid-column: 1 / -1; margin: 0; }
+.image-card .row-line { height: auto; min-height: 40px; padding: 4px 12px 0; }
+.image-card .image-card-title { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.image-card .image-rename { padding: 0; }
+.image-card .row-detail-inner { padding-top: 2px; }
+/* Mini window: 3 compact columns, a click copies. */
+.mini-list.image-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 6px 8px 8px; }
+.mini-tile { position: relative; min-width: 0; }
+.mini-tile .image-tile-main { gap: 4px; border-radius: 9px; }
+.mini-tile .image-tile-thumb { border-radius: 8px; }
+.mini-tile .image-tile-title { font-size: 11px; }
+.mini-tile .mini-copied { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 2px 0; border-radius: 6px; background: var(--ok-bg); color: var(--ok); text-align: center; font-size: 11px; }
+.mini-tile.copied .image-tile-thumb { border-color: var(--ok); }

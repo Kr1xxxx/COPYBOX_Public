@@ -17,7 +17,9 @@ export async function seedSnippets(page) {
 }
 
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").
-export async function asDesktop(page, platform) {
+// `imageView: "list"` starts the 图片 section in the list view (the default is the grid), for tests about list rows.
+export async function asDesktop(page, platform, { imageView } = {}) {
+  if (imageView) await page.addInitScript((view) => { try { localStorage.setItem("clipbox.image-view", view); } catch { /* optional */ } }, imageView);
   await page.addInitScript((pl) => {
     window.clipboxDesktop = {
       platform: pl,
