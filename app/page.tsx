@@ -1268,7 +1268,7 @@ export default function Home() {
     <div className="native-empty onboarding">
       <VaultMark />
       <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
-      <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
+      <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : (PLAIN_NOTES ? "把常用的信息记在这里，比如地址、账号说明，一键复制。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。")}</span>
       <div className="onboarding-actions">
         <button type="button" className="primary-button" onClick={() => openEditor(null)}><Icon name="plus" />新增第一条</button>
         {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={() => spreadsheetFileRef.current?.click()}>导入话术表格</button>}
