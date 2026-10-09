@@ -489,6 +489,14 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-chip[data-remembered] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .var-chip[data-remembered]:focus-within { box-shadow: 0 0 0 2px var(--accent); }
 .var-chip[data-filled] { background: color-mix(in srgb, var(--accent-soft) 70%, var(--card)); }
+.var-memory { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 26px; }
+.var-memory-option { animation: var-memory-in .16s cubic-bezier(.22,1,.36,1); }
+.var-memory-label { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.var-memory-option { max-width: 100%; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.var-memory-option:hover, .var-memory-option[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.var-memory-option:active { scale: .96; }
+@keyframes var-memory-in { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .var-memory-option { animation: none; transition: none; } .var-memory-option:active { scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .var-chip { transition: none; } .var-chip:active { scale: 1; } }
 
 .nav-item .directory-main { width: 100%; }
