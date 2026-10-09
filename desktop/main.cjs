@@ -1,5 +1,5 @@
 const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
-const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
+const { createClipboardWriter, createImageClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { createAiStore } = require("./ai.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
@@ -432,6 +432,11 @@ const writeClipboard = createClipboardWriter(clipboard);
 ipcMain.handle("clipbox:copy-text", (event, text) => {
   if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Clipboard request denied");
   writeClipboard(text);
+});
+const writeImageClipboard = createImageClipboardWriter(clipboard, nativeImage);
+ipcMain.handle("clipbox:copy-image", (event, bytes) => {
+  if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Clipboard request denied");
+  writeImageClipboard(bytes);
 });
 
 // The user's own AI interface; the key stays here and is never handed to the page.
