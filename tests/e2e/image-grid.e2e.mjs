@@ -39,7 +39,7 @@ async function addSix(page, names = ["图一", "图二", "图三", "图四", "�
   await expect.poll(() => page.locator(".image-tile-thumb img").evaluateAll((images) => images.every((img) => img.naturalWidth > 0))).toBe(true);
 }
 
-test("the default view is a grid of square tiles, three to a row", async ({ page }) => {
+test("the default view is a grid of square tiles, four to a row (16 tiles = 4 full rows)", async ({ page }) => {
   await openImages(page);
   await addSix(page);
   await expect(page.locator(".image-grid")).toBeVisible();
@@ -47,13 +47,14 @@ test("the default view is a grid of square tiles, three to a row", async ({ page
   const all = await boxes(tiles(page));
   expect(all[0].y).toBeCloseTo(all[1].y, 0);
   expect(all[1].y).toBeCloseTo(all[2].y, 0);
-  expect(all[3].y).toBeGreaterThan(all[0].y + all[0].width * 0.9);
-  expect(all[3].y).toBeCloseTo(all[4].y, 0);
+  expect(all[2].y).toBeCloseTo(all[3].y, 0);
+  expect(all[4].y).toBeGreaterThan(all[0].y + all[0].width * 0.9);
+  expect(all[4].y).toBeCloseTo(all[5].y, 0);
   expect(all[0].x).toBeLessThan(all[1].x);
-  expect(all[1].x).toBeLessThan(all[2].x);
-  expect(all[3].x).toBeCloseTo(all[0].x, 0);
+  expect(all[2].x).toBeLessThan(all[3].x);
+  expect(all[4].x).toBeCloseTo(all[0].x, 0);
   expect(all[1].width).toBeCloseTo(all[0].width, 0);
-  expect(all[2].width).toBeCloseTo(all[0].width, 0);
+  expect(all[3].width).toBeCloseTo(all[0].width, 0);
   const thumbs = await boxes(page.locator(".image-tile-thumb"));
   for (const thumb of thumbs) expect(Math.abs(thumb.width - thumb.height)).toBeLessThan(1.5);
   // The title sits under the picture on one line.
@@ -96,12 +97,12 @@ test("clicking a tile opens a full-width card under its row; another tile moves 
   await page.waitForTimeout(500); // the card opens with a short animation
   const allTiles = await boxes(tiles(page));
   const open = await card(page).boundingBox();
-  const rowOne = allTiles.slice(0, 3);
-  const rowTwo = allTiles.slice(3, 6);
+  const rowOne = allTiles.slice(0, 4);
+  const rowTwo = allTiles.slice(4, 6);
   expect(open.y).toBeGreaterThan(Math.max(...rowOne.map((box) => box.y + box.height)) - 1);
   expect(Math.min(...rowTwo.map((box) => box.y))).toBeGreaterThan(open.y + open.height - 1);
-  // The card is as wide as the three columns together.
-  expect(Math.abs(open.width - (rowOne[2].x + rowOne[2].width - rowOne[0].x))).toBeLessThan(2);
+  // The card is as wide as the four columns together.
+  expect(Math.abs(open.width - (rowOne[3].x + rowOne[3].width - rowOne[0].x))).toBeLessThan(2);
   expect(Math.abs(open.x - rowOne[0].x)).toBeLessThan(2);
   await expect(card(page).locator(".image-preview img")).toBeVisible();
   for (const name of ["复制", "改名", "删除"]) await expect(card(page).getByRole("button", { name, exact: true })).toBeVisible();
@@ -116,7 +117,7 @@ test("clicking a tile opens a full-width card under its row; another tile moves 
   await page.waitForTimeout(500);
   const moved = await card(page).boundingBox();
   const rows = await boxes(tiles(page));
-  expect(moved.y).toBeGreaterThan(Math.max(...rows.slice(3, 6).map((box) => box.y + box.height)) - 1);
+  expect(moved.y).toBeGreaterThan(Math.max(...rows.slice(4, 6).map((box) => box.y + box.height)) - 1);
   expect(moved.y).toBeGreaterThan(open.y);
 
   await mainButton(tiles(page).nth(4)).click();
@@ -232,8 +233,7 @@ test("folders and search filter the grid", async ({ page }) => {
   await expect(page.locator(".section-head h1")).toHaveText("收款码");
   await expect(tiles(page)).toHaveCount(4);
   const inFolder = await boxes(tiles(page));
-  expect(inFolder[0].y).toBeCloseTo(inFolder[2].y, 0);
-  expect(inFolder[3].y).toBeGreaterThan(inFolder[0].y + 40);
+  expect(inFolder[0].y).toBeCloseTo(inFolder[3].y, 0); // four per row
 
   await page.getByPlaceholder("搜索图片标题").fill("码二");
   await expect(tiles(page)).toHaveCount(1);
@@ -264,10 +264,24 @@ test("extreme pictures neither overflow the window nor the opened card", async (
   });
   expect(await noOverflow()).toEqual({ page: true, list: true });
 
-  // Every tile is a square whatever the picture's shape, and the three columns are equal.
+  // Thumbnails show the whole picture, never a crop.
+  for (const img of await page.locator(".image-tile-pic").all()) await expect(img).toHaveCSS("object-fit", "contain");
+  // Every picture, even a square one, keeps a 6% margin on frosted glass.
+  for (const index of [0, 2, 5]) {
+    const thumb = await tiles(page).nth(index).locator(".image-tile-thumb").boundingBox();
+    const pic = await tiles(page).nth(index).locator(".image-tile-pic").boundingBox();
+    expect(Math.abs((pic.x - thumb.x) / thumb.width - 0.06)).toBeLessThan(0.03);
+    expect(Math.abs((pic.y - thumb.y) / thumb.height - 0.06)).toBeLessThan(0.03);
+    expect(Math.abs(pic.width / thumb.width - 0.88)).toBeLessThan(0.03);
+    // The glass is colourless: no copy of the picture behind it, only a neutral translucent surface.
+    await expect(tiles(page).nth(index).locator(".image-tile-glass")).toHaveCount(0);
+    const glass = await tiles(page).nth(index).locator(".image-tile-thumb").evaluate((el) => getComputedStyle(el, "::after").backgroundImage);
+    expect(glass).toMatch(/gradient/);
+  }
+  // Every tile is a square whatever the picture's shape, and the four columns are equal.
   for (const thumb of await boxes(page.locator(".image-tile-thumb"))) expect(Math.abs(thumb.width - thumb.height)).toBeLessThan(1.5);
   const all = await boxes(tiles(page));
-  expect(Math.max(...all.slice(0, 3).map((box) => box.width)) - Math.min(...all.slice(0, 3).map((box) => box.width))).toBeLessThan(1.5);
+  expect(Math.max(...all.slice(0, 4).map((box) => box.width)) - Math.min(...all.slice(0, 4).map((box) => box.width))).toBeLessThan(1.5);
 
   for (const [index, title] of [[0, "图1"], [1, "图2"], [3, "图4"], [10, "图11"]]) {
     await tile(page, title).getByRole("button", { name: `展开 ${title}` }).click();
@@ -286,7 +300,7 @@ test("extreme pictures neither overflow the window nor the opened card", async (
   }
 });
 
-test("the mini window shows a three-column grid, no switch, and a click copies", async ({ browser }) => {
+test("the mini window shows a four-column grid, no switch, and a click copies", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 680, height: 620 }, locale: "zh-CN" });
   const page = await context.newPage();
   await openImages(page);
@@ -294,14 +308,15 @@ test("the mini window shows a three-column grid, no switch, and a click copies",
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
   await expect(page.locator(".mini-tile")).toHaveCount(5);
+  await page.waitForTimeout(500); // the window resizes and the tiles fade in; measure after they settle
   await expect(page.getByRole("button", { name: "宫格视图" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "列表视图" })).toHaveCount(0);
   const all = await boxes(page.locator(".mini-tile"));
   expect(all[0].y).toBeCloseTo(all[1].y, 0);
-  expect(all[1].y).toBeCloseTo(all[2].y, 0);
-  expect(all[3].y).toBeGreaterThan(all[0].y + 30);
-  expect(Math.abs(all[3].x - all[0].x)).toBeLessThan(2);
-  expect(all[2].x + all[2].width).toBeLessThanOrEqual(360);
+  expect(all[2].y).toBeCloseTo(all[3].y, 0);
+  expect(all[4].y).toBeGreaterThan(all[0].y + 30);
+  expect(Math.abs(all[4].x - all[0].x)).toBeLessThan(2);
+  expect(all[3].x + all[3].width).toBeLessThanOrEqual(360);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   expect(Number.parseFloat(await page.locator(".mini-tile .image-tile-title").first().evaluate((title) => getComputedStyle(title).fontSize))).toBe(11);
   await page.getByPlaceholder("搜索图片").fill("图三");
@@ -314,11 +329,11 @@ test("the mini window shows a three-column grid, no switch, and a click copies",
 
 test("macOS shows the grid too, with the switch", async ({ page }) => {
   await openImages(page, "darwin");
-  await addSix(page, ["图一", "图二", "图三", "图四"]);
+  await addSix(page, ["图一", "图二", "图三", "图四", "图五"]);
   await expect(page.getByRole("button", { name: "宫格视图" })).toHaveAttribute("aria-pressed", "true");
   const all = await boxes(tiles(page));
-  expect(all[0].y).toBeCloseTo(all[2].y, 0);
-  expect(all[3].y).toBeGreaterThan(all[0].y + 40);
+  expect(all[0].y).toBeCloseTo(all[3].y, 0);
+  expect(all[4].y).toBeGreaterThan(all[0].y + 40);
   await tile(page, "图四").getByRole("button", { name: "展开 图四" }).click();
   await expect(card(page)).toHaveCount(1);
   await card(page).getByRole("button", { name: "复制", exact: true }).click();

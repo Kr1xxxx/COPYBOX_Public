@@ -25,7 +25,9 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-016 | Backups stay local files; no cloud or email upload | Accepted |
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 | D-018 | 图片 folders (目录) | Accepted |
-| D-019 | 图片 shown as a 九宫格 (3-column grid) by default | Accepted |
+| D-019 | 图片 shown as a 九宫格 (grid) by default | Accepted (columns changed by D-020) |
+| D-020 | 图片 grid is 16宫格 (4 per row), whole picture in the thumbnail, 6% margin on frosted glass | Accepted |
+| D-021 | Motion follows arc-library (components vendored into `app/arc/`, `motion` added) | Accepted |
 
 ---
 
@@ -167,6 +169,18 @@ Statuses: Accepted / Superseded / Deprecated.
   mini window always shows the grid, 3 compact columns, and a tile click copies. Spec: `docs/specs/image-grid.md`.
 - Consequences: a UI preference only; no stored image data changes.
 
+### D-020 图片 16宫格, whole picture in the thumbnail (2026-10-09)
+- Context (owner): "帮我做成 16 宫格,外加缩略图不要做自适应,要做能看到图片全部的大小".
+- Decision (owner): the grid has **4 tiles per row** (16 tiles = 4 full rows); this replaces the 3 columns of D-019
+  (mini window too). Thumbnails are never cropped: the whole picture is shown inside the square tile
+  (`object-fit: contain`, empty space shows the tile background). The same goes for the small list thumbnail.
+- Tile look (owner: "图片预览这里,就算是正方形,也留边, 背景都做成毛玻璃风", then "留空 6%"): in the grid and the mini grid every
+  picture, even a square one, sits 6% in from each edge of its tile (the picture box is 88% of the tile) and is never
+  cropped. Behind it is colourless frosted glass: a neutral translucent surface with a backdrop blur (owner: "做成不带颜色的,纯毛玻璃";
+  it first used a blurred copy of the picture, which picked up its colours). The small list thumbnail is unchanged.
+- Consequences: CSS and `IMAGE_GRID_COLUMNS` only; no
+  stored image data changes. Tests that expected 3 columns or a cropped thumbnail (`cover`) now expect 4 columns and
+  `contain`, because the owner changed the behaviour.
 ### D-021 Motion follows arc-library (2026-10-09)
 - Context (owner): "动效优先使用 https://github.com/kuratlielia/arc-library.git 中的 UI 组件"; asked which parts could be replaced and chose
   "全面换" (replace everything that can be) on the decision card.
