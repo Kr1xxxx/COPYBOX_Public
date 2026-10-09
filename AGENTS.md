@@ -27,6 +27,7 @@ Stack: Electron 37 (`desktop/`, CommonJS) + React 19 + vinext 1.0 beta (Next-sty
 npm install
 npm run dev              # browser dev server, http://localhost:3000
 npm run lint             # must pass
+npm run typecheck        # TypeScript check of app/ (tsconfig.typecheck.json); must pass
 npm test                 # build + unit/source tests (tests/*.test.mjs)
 npm run test:e2e         # build + browser end-to-end tests (tests/e2e/, Playwright, 680×620 window)
 npm run desktop:dev      # run the desktop app locally
@@ -61,7 +62,7 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 ## Boundaries
 
 **Always**
-- Pass `npm run lint` and `npm test` before committing; after UI changes also run `npm run test:e2e` and look at
+- Pass `npm run lint`, `npm run typecheck` and `npm test` before committing; after UI changes also run `npm run test:e2e` and look at
   the page yourself.
 - Add tests with every feature; put user-visible behaviour in `tests/e2e/`.
 - Write user-visible text in short, plain Chinese without technical terms.

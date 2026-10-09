@@ -100,9 +100,10 @@ clipbox secret get "clipbox://secret/<ID>" --json
 The `--json` response contains the secret; the calling task should pass it straight to the target API and never
 print it. Secrets cannot be listed, searched, bulk-read or modified through the command.
 
-There is no in-app button for a secrets backup. When the user explicitly asks, a helper task can pass a separate
-password on standard input and write the encrypted file for the current user; the command never prints the
-secret or ciphertext and never overwrites an existing file:
+Settings → 数据 has 导出秘密备份 (导出备注备份 on Windows): it saves the second section to its own encrypted file
+with a separate password, never mixed with snippets. A helper task can write the same file from the command line:
+it passes the password on standard input, never prints the secret or ciphertext and never overwrites an existing
+file:
 
 ```bash
 printf '%s' '{"password":"at-least-eight-characters"}' | clipbox secret export --output "/target/clipbox-secrets.json" --stdin --confirm
