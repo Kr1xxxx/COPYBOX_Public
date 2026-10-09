@@ -30,7 +30,7 @@ test("settings shows the version and the editor calls the snippet note 小提示
 
 test("the secrets section is called 备注 on Windows and 秘密 on macOS", () => {
   assert.match(page, /const SECRET_WORD = .*platform === "darwin" \? "秘密" : "备注"/);
-  assert.match(page, /\{kind === "snippet" \? "话术" : SECRET_WORD\}/);
+  assert.match(page, /label: kind === "snippet" \? "话术" : SECRET_WORD/);
 });
 
 test("settings can create, rename, recolour, reorder and delete folders for both kinds", () => {
@@ -74,7 +74,7 @@ test("the status bar no longer mentions clearing the clipboard", () => {
 
 test("on Windows the 备注 section is plain notes: no masking, reference links or segments", () => {
   assert.match(page, /const PLAIN_NOTES = typeof window === "undefined" \|\| window\.clipboxDesktop\?\.platform !== "darwin"/);
-  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <div className="segmented"', '!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint"']) {
+  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <ArcSegmented className="segmented"', '!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint"']) {
     assert.ok(page.includes(marker), marker);
   }
   assert.match(page, /: PLAIN_NOTES \? <p className="row-content">/);
