@@ -4,10 +4,13 @@
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 export const IMAGE_TITLE_MAX = 40;
+export const IMAGE_FOLDER_MAX = 30;
+export const IMAGE_FOLDER_NAME_MAX = 20;
 
 const DB_NAME = "clipbox-images";
 const DB_VERSION = 1;
 const SETTINGS_ID = "settings";
+const FOLDERS_ID = "folders";
 const ITERATIONS = 310_000;
 
 export type ImageMeta = {
@@ -20,15 +23,24 @@ export type ImageMeta = {
   createdAt: number;
   updatedAt: number;
   lastUsedAt?: number;
+  folder?: string;
 };
+
+export type ImageFolder = { name: string; color?: string };
 
 export type ImageStore = {
   list(): Promise<ImageMeta[]>;
-  add(file: Blob, title: string): Promise<ImageMeta>;
+  add(file: Blob, title: string, folder?: string | null): Promise<ImageMeta>;
   rename(id: string, title: string): Promise<ImageMeta>;
   remove(id: string): Promise<void>;
   getBlob(id: string): Promise<Blob>;
   markUsed(id: string): Promise<void>;
+  moveImage(id: string, folder: string | null): Promise<ImageMeta>;
+  listFolders(): Promise<ImageFolder[]>;
+  createFolder(name: string): Promise<ImageFolder[]>;
+  renameFolder(from: string, to: string): Promise<ImageFolder[]>;
+  setFolderColor(name: string, color: string): Promise<ImageFolder[]>;
+  deleteFolder(name: string): Promise<ImageFolder[]>;
 };
 
 export type ImageStoreOptions = {
@@ -44,6 +56,18 @@ type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 export function normalizeImageTitle(raw: string, fallback: string): string {
   const title = raw.trim().replace(/\s+/g, " ");
   return Array.from(title || fallback.trim()).slice(0, IMAGE_TITLE_MAX).join("");
+}
+
+function collapseSpaces(raw: string) {
+  return raw.trim().replace(/\s+/g, " ");
+}
+
+export function normalizeFolderName(raw: string): string {
+  return Array.from(collapseSpaces(raw)).slice(0, IMAGE_FOLDER_NAME_MAX).join("");
+}
+
+function isReservedId(id: string) {
+  return id === SETTINGS_ID || id === FOLDERS_ID;
 }
 
 export function titleFromFileName(name: string): string {
@@ -174,7 +198,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
   }
 
   async function readMeta(id: string): Promise<ImageMeta> {
-    if (id === SETTINGS_ID) throw new Error("找不到这张图片");
+    if (isReservedId(id)) throw new Error("找不到这张图片");
     const record = (await request(db.transaction("meta").objectStore("meta").get(id))) as MetaRecord | undefined;
     if (!record) throw new Error("找不到这张图片");
     return unsealMeta(record);
@@ -188,18 +212,70 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
     await done;
   }
 
+  async function readFolders(): Promise<ImageFolder[]> {
+    const record = (await request(db.transaction("meta").objectStore("meta").get(FOLDERS_ID))) as MetaRecord | undefined;
+    if (!record) return [];
+    const plaintext = await unseal(key, "meta", { ...record, ciphertext: base64ToBytes(record.ciphertext) });
+    return (JSON.parse(new TextDecoder().decode(plaintext)) as { folders: ImageFolder[] }).folders;
+  }
+
+  async function sealFolders(folders: ImageFolder[]): Promise<MetaRecord> {
+    const record = await seal(key, "meta", FOLDERS_ID, new TextEncoder().encode(JSON.stringify({ folders })));
+    return { ...record, ciphertext: bytesToBase64(new Uint8Array(record.ciphertext)) };
+  }
+
+  // Encrypt everything first, then put it all in one transaction (it would commit while awaiting encryption).
+  async function writeMetaRecords(records: MetaRecord[]) {
+    const tx = db.transaction("meta", "readwrite");
+    const done = finished(tx);
+    const store = tx.objectStore("meta");
+    for (const record of records) store.put(record);
+    await done;
+  }
+
+  function findFolder(folders: ImageFolder[], name: string): ImageFolder {
+    const wanted = normalizeFolderName(name).toLowerCase();
+    const folder = folders.find((entry) => entry.name.toLowerCase() === wanted);
+    if (!wanted || !folder) throw new Error("找不到这个目录");
+    return folder;
+  }
+
+  function checkFolderName(raw: string, folders: ImageFolder[], except?: ImageFolder): string {
+    const name = normalizeFolderName(raw);
+    if (!name) throw new Error("目录名不能为空");
+    if (Array.from(collapseSpaces(raw)).length > IMAGE_FOLDER_NAME_MAX) throw new Error(`目录名最多 ${IMAGE_FOLDER_NAME_MAX} 个字`);
+    if (folders.some((entry) => entry !== except && entry.name.toLowerCase() === name.toLowerCase())) throw new Error("目录名已存在");
+    return name;
+  }
+
+  async function folderNameFor(folder: string | null | undefined): Promise<string | undefined> {
+    if (folder == null) return undefined;
+    return findFolder(await readFolders(), folder).name;
+  }
+
+  async function listImages(): Promise<ImageMeta[]> {
+    const records = (await request(db.transaction("meta").objectStore("meta").getAll())) as Array<MetaRecord | SettingsRecord>;
+    return Promise.all(records.filter((record): record is MetaRecord => !isReservedId(record.id)).map(unsealMeta));
+  }
+
+  // Rewrites the folder registry and, in the same transaction, every image whose folder changes.
+  async function updateFolders(folders: ImageFolder[], retag?: (meta: ImageMeta) => ImageMeta | null) {
+    const changed = retag ? (await listImages()).map(retag).filter((meta): meta is ImageMeta => meta !== null) : [];
+    const records = await Promise.all(changed.map(sealMeta));
+    records.push(await sealFolders(folders));
+    await writeMetaRecords(records);
+    return folders;
+  }
+
   return {
     async list() {
-      const records = (await request(db.transaction("meta").objectStore("meta").getAll())) as Array<MetaRecord | SettingsRecord>;
-      const metas = await Promise.all(
-        records.filter((record): record is MetaRecord => record.id !== SETTINGS_ID).map(unsealMeta),
-      );
-      return metas.sort((a, b) => b.createdAt - a.createdAt);
+      return (await listImages()).sort((a, b) => b.createdAt - a.createdAt);
     },
 
-    async add(file, title) {
+    async add(file, title, folder) {
       const problem = validateImageFile(file);
       if (problem) throw new Error(problem);
+      const folderName = await folderNameFor(folder);
       const { width, height } = await readImageSize(file);
       const time = now();
       const meta: ImageMeta = {
@@ -211,6 +287,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
         height,
         createdAt: time,
         updatedAt: time,
+        ...(folderName ? { folder: folderName } : {}),
       };
       // Encrypt before opening the transaction: IndexedDB commits a transaction that waits on other promises.
       const metaRecord = await sealMeta(meta);
@@ -231,7 +308,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
     },
 
     async remove(id) {
-      if (id === SETTINGS_ID) throw new Error("找不到这张图片");
+      if (isReservedId(id)) throw new Error("找不到这张图片");
       const tx = db.transaction(["meta", "blobs"], "readwrite");
       const done = finished(tx);
       tx.objectStore("meta").delete(id);
@@ -249,6 +326,52 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
     async markUsed(id) {
       const meta = await readMeta(id);
       await writeMeta({ ...meta, lastUsedAt: now() });
+    },
+
+    async moveImage(id, folder) {
+      const meta = await readMeta(id);
+      const folderName = await folderNameFor(folder);
+      const moved: ImageMeta = { ...meta, folder: folderName, updatedAt: now() };
+      if (!folderName) delete moved.folder;
+      await writeMeta(moved);
+      return moved;
+    },
+
+    listFolders: readFolders,
+
+    async createFolder(raw) {
+      const folders = await readFolders();
+      const name = checkFolderName(raw, folders);
+      if (folders.length >= IMAGE_FOLDER_MAX) throw new Error(`目录最多 ${IMAGE_FOLDER_MAX} 个`);
+      return updateFolders([...folders, { name }]);
+    },
+
+    async renameFolder(from, to) {
+      const folders = await readFolders();
+      const target = findFolder(folders, from);
+      const name = checkFolderName(to, folders, target);
+      const time = now();
+      return updateFolders(
+        folders.map((entry) => (entry === target ? { ...entry, name } : entry)),
+        (meta) => (meta.folder === target.name ? { ...meta, folder: name, updatedAt: time } : null),
+      );
+    },
+
+    async setFolderColor(name, color) {
+      if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error("颜色不对");
+      const folders = await readFolders();
+      const target = findFolder(folders, name);
+      return updateFolders(folders.map((entry) => (entry === target ? { ...entry, color } : entry)));
+    },
+
+    async deleteFolder(name) {
+      const folders = await readFolders();
+      const target = findFolder(folders, name);
+      const time = now();
+      return updateFolders(
+        folders.filter((entry) => entry !== target),
+        ({ folder, ...rest }) => (folder === target.name ? { ...rest, updatedAt: time } : null),
+      );
     },
   };
 }

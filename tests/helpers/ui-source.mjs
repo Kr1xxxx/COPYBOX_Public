@@ -2,7 +2,7 @@ import fs from "node:fs";
 
 // page.tsx is being split into component files. Source-text tests that care about "the UI" read all of them,
 // so an assertion keeps working when a piece moves from one file to another.
-const FILES = ["page.tsx", "item-editor.tsx", "settings-folders.tsx", "settings.tsx", "dialogs.tsx", "fill-panel.tsx", "image-section.tsx", "ai-settings.tsx", "ai-client.ts", "platform.ts", "preferences.ts", "desktop-bridge.ts"];
+const FILES = ["page.tsx", "item-editor.tsx", "settings-folders.tsx", "settings.tsx", "dialogs.tsx", "fill-panel.tsx", "image-section.tsx", "image-folders.tsx", "image-library.ts", "image-folders-core.ts", "ai-settings.tsx", "ai-client.ts", "platform.ts", "preferences.ts", "desktop-bridge.ts"];
 
 export function readUiSource() {
   return FILES

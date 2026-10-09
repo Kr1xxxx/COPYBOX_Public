@@ -8,7 +8,7 @@ const JPG_FILE = fileURLToPath(new URL("../fixtures/sample-photo.jpg", import.me
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 
 async function openApp(page, platform = "win32") {
-  await asDesktop(page, platform);
+  await asDesktop(page, platform, { imageView: "list" });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
 }
