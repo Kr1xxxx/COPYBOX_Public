@@ -6,7 +6,7 @@ Details live in `docs/`; this file only holds what you need every time.
 ## Project
 
 A local, encrypted copy box: it stores "snippets" (话术 — canned customer-service replies) and a second section
-(called 备注 "notes" on Windows, 秘密 "secrets" on macOS). One click copies an entry.
+(秘密 "secrets", macOS only) and 图片 (images, both platforms; D-017). One click copies an entry.
 **Windows first**; macOS ships Apple-silicon (arm64) only. The UI is entirely in Chinese. Data stays on the
 device: no server, no accounts.
 
@@ -55,7 +55,9 @@ npm run desktop:pack     # macOS arm64 .app, run on a Mac → release/mac-arm64/
 ## Platform differences
 
 - `window.clipboxDesktop.platform === "darwin"` → 秘密 (masked content, copy reference, split segments);
-  any other platform → 备注, plain text (`PLAIN_NOTES`).
+  any other platform (`PLAIN_NOTES`) → no second text section; sections are 话术 | 图片.
+- 图片 (`app/image-section.tsx`, `app/image-store.ts`) is not an `ItemKind`: images live in their own encrypted IndexedDB
+  store, never in the vault.
 - macOS: hidden title bar with traffic lights. Windows: native frame, tray, silent launch at login (`--hidden`).
 - The command-line automation server only starts on macOS/Linux.
 

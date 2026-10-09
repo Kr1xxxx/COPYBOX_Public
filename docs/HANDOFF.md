@@ -34,6 +34,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 9 | Merge policy: code moved unchanged is not a storage change | Done | Claude | `scripts/classify-pr.mjs`; edited, new or deleted storage lines still need the owner; owner approved |
 | 10 | 导入备份 → 合并 restores an entry whose identical copy is in the trash | Done | Claude | Was silently skipped as a duplicate; found while building task 5 |
 | 11 | Auto-merge only the commit CI checked | Done | Claude | A push after green CI was merged before its own checks finished (#22); owner approved the fix |
+| 12 | 图片 section (D-017): Windows 话术 \| 图片, Mac 话术 \| 秘密 \| 图片; copy images | Done | Claude | Spec `docs/specs/image-section.md`; store by an Opus worker, desktop IPC and UI by Sonnet workers; PR waits for the owner's 合并. Not in v1: folders, trash, image backup |
 
 ## Waiting on the owner
 
@@ -42,5 +43,6 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 
 ## Known risks
 
+- Images (D-017) are not in any backup file yet; clearing app data loses them. Copying an image on a real Windows machine is untested (D-014).
 - The product is mainly for Windows but has never run on a real Windows machine (testing waived, D-014); the first real use is the real test, so keep the encrypted snippet backup. The vault and its key are stored together (D-015).
 - Many unit tests assert on source text and break on refactors; `tests/e2e/` is the reference for behaviour.
