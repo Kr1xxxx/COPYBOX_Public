@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AiSettingsSection } from "./ai-settings";
-import type { ItemKind } from "./clipbox-core";
 import { ArcSegmented } from "./arc/segmented";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
-import { SettingsFolders, type SettingsFolderGroup } from "./settings-folders";
+import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 
 function backupAgeLabel(at: number) {
   if (!at) return "还没有导出过";
@@ -19,12 +18,12 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
-  onFolderAdd: (kind: ItemKind, name: string) => Promise<string>;
-  onFolderRename: (kind: ItemKind, from: string, to: string) => Promise<string>;
-  onFolderDelete: (kind: ItemKind, folder: string) => Promise<string>;
-  onFolderColor: (kind: ItemKind, folder: string, color: string | null) => void;
-  onFolderMove: (kind: ItemKind, folder: string, delta: -1 | 1) => void;
-  onFolderReorder: (kind: ItemKind, source: string, target: string) => void;
+  onFolderAdd: (kind: SettingsFolderKind, name: string) => Promise<string>;
+  onFolderRename: (kind: SettingsFolderKind, from: string, to: string) => Promise<string>;
+  onFolderDelete: (kind: SettingsFolderKind, folder: string) => Promise<string>;
+  onFolderColor: (kind: SettingsFolderKind, folder: string, color: string | null) => void;
+  onFolderMove: (kind: SettingsFolderKind, folder: string, delta: -1 | 1) => void;
+  onFolderReorder: (kind: SettingsFolderKind, source: string, target: string) => void;
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
@@ -58,6 +57,12 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
       <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <header><h2 id="settings-title">设置</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">×</button></header>
         <div className="settings-body">
+          <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
+            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
+              <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
+                options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
+            </div>
+          </section>
           <section aria-labelledby="set-data"><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {!PLAIN_NOTES && row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
@@ -70,12 +75,6 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
           </section>
           <section aria-labelledby="set-folders"><h3 id="set-folders">目录</h3>
             <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
-          </section>
-          <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
-            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
-              <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
-                options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
-            </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
             <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
