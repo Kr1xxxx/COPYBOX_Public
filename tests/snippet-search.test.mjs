@@ -55,3 +55,20 @@ test("partial last syllable still matches (tuik → 退款)", () => {
   assert.deepEqual(ids(searchSnippets([item("a", "退款说明")], "kuan")), ["a"]);
   assert.deepEqual(ids(searchSnippets([item("a", "退款说明")], "uik")), []);
 });
+
+import { searchSnippetsEnglish } from "../app/snippet-search.ts";
+
+test("English search looks at the English message by word, whole word first", () => {
+  const list = [
+    item("prefix", "甲", { secret: "Your refunded amount is ready" }),
+    item("whole", "乙", { secret: "We will refund you today" }),
+    item("zh", "refund 退款", { secret: "Hello there" }),
+  ];
+  assert.deepEqual(ids(searchSnippetsEnglish(list, "refund")), ["whole", "prefix"]);
+  assert.deepEqual(ids(searchSnippetsEnglish(list, "ok")), []);
+  assert.deepEqual(ids(searchSnippetsEnglish(list, "will today")), ["whole"]);
+});
+
+test("English search does not use pinyin", () => {
+  assert.deepEqual(ids(searchSnippetsEnglish([item("a", "好看的包装", { secret: "Nice box" })], "haokan")), []);
+});

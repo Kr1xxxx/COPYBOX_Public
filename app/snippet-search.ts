@@ -109,3 +109,34 @@ export function searchSnippets(items: SecretItem[], query: string): SecretItem[]
     || a.index - b.index);
   return scored.map((entry) => entry.item);
 }
+
+// English search: a separate mode that looks only at the English message, by word
+// (whole word beats word start); no pinyin involved.
+function englishWordScore(english: string, term: string) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(english)) return 2;
+  if (new RegExp(`(^|[^a-z0-9])${escaped}`).test(english)) return 1;
+  return 0;
+}
+
+export function searchSnippetsEnglish(items: SecretItem[], query: string): SecretItem[] {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return items;
+  const scored: { item: SecretItem; score: number; index: number }[] = [];
+  items.forEach((item, index) => {
+    const english = (item.secret || "").toLowerCase();
+    let score = 0;
+    for (const term of terms) {
+      const hit = englishWordScore(english, term);
+      if (!hit) { score = 0; break; }
+      score += hit;
+    }
+    if (score > 0) scored.push({ item, score, index });
+  });
+  scored.sort((a, b) =>
+    Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned))
+    || b.score - a.score
+    || (b.item.useCount || 0) - (a.item.useCount || 0)
+    || a.index - b.index);
+  return scored.map((entry) => entry.item);
+}

@@ -90,3 +90,17 @@ test("typing pinyin initials finds Chinese snippets", async ({ page }) => {
   expect(found).toBeLessThan(total);
   await expect(page.locator(".native-row").first()).toBeVisible();
 });
+
+test("English word search is a separate mode next to the pinyin one", async ({ page }) => {
+  const search = page.locator("input[placeholder*=搜索]");
+  await search.fill("lashes");
+  const modes = page.getByRole("group", { name: "搜索方式" });
+  await expect(modes).toBeVisible();
+  await modes.getByRole("button", { name: "英文单词" }).click();
+  await expect(search).toHaveAttribute("placeholder", "搜索英文单词");
+  expect(await page.locator(".native-row").count()).toBeGreaterThan(0);
+  await search.fill("zzzzq");
+  await expect(page.locator(".native-row")).toHaveCount(0);
+  await search.fill("");
+  await expect(search).toHaveAttribute("placeholder", "搜索标题、编号或内容");
+});
