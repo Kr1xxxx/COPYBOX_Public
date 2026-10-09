@@ -50,7 +50,7 @@ const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf
 test("settings folders can be dragged as well as moved with the arrow buttons", () => {
   assert.match(page, /scope: "settings-folder"/);
   assert.match(page, /className="settings-folder-grip"[^>]*onPointerDown=\{\(event\) => reorder\.beginPointerDrag\(event, key\)\}/);
-  assert.match(page, /folder\.locked \? \{\} : \{ "data-sort-scope": "settings-folder"/, "standard folders are neither draggable nor drop targets");
+  assert.match(page, /folder\.locked \|\| !group\.sortable \? \{\} : \{ "data-sort-scope": "settings-folder"/, "standard folders and image folders (no saved order) are neither draggable nor drop targets");
   assert.match(page, /onMove=\{onFolderMove\} onReorder=\{onFolderReorder\}/);
   assert.match(page, /document\.querySelector\("\.settings-folder\.dragging"\)/, "Esc cancels the drag, not the dialog");
   assert.match(css, /\.settings-folder\.dragging/);
@@ -110,4 +110,19 @@ test("there are no keyboard-shortcut hints or modifier shortcuts anywhere", () =
   assert.doesNotMatch(css, /(^|\n)kbd \{|\.k-mac|\.k-win|\.enter-key/);
   const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
   assert.doesNotMatch(main, /globalShortcut|GLOBAL_HOTKEY|accelerator/);
+});
+
+test("settings → 目录: each group folds open on click and 图片目录 can be edited there", () => {
+  assert.match(page, /<ArcCollapsible className="settings-folder-group"/);
+  const collapsible = fs.readFileSync(new URL("../app/arc/collapsible.tsx", import.meta.url), "utf8");
+  assert.match(collapsible, /defaultOpen = false/, "collapsed by default");
+  assert.match(collapsible, /aria-expanded=\{open\}/);
+  assert.match(page, /title: "图片目录"/);
+  assert.match(page, /useImageLibrary\(deviceKey, imageView \|\| settingsOpen, flashToast\)/);
+});
+
+test("deleted items are cleared after 7 days until another option is picked", () => {
+  assert.match(page, /readStoredChoice<number>\(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS\)/);
+  const preferences = fs.readFileSync(new URL("../app/preferences.ts", import.meta.url), "utf8");
+  assert.match(preferences, /export const DEFAULT_TRASH_DAYS = 7;/);
 });
