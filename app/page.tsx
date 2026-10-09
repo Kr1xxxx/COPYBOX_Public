@@ -79,8 +79,12 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SnippetFill, SnippetVariableText, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 =======
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
+<<<<<<< HEAD
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 >>>>>>> origin/claude/snippet-search-ranking
+=======
+import { UpdateNotice } from "./update-notice";
+>>>>>>> origin/claude/update-reminder
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -1494,6 +1498,7 @@ export default function Home() {
           </>}
 
           <section className="content-panel">
+            <UpdateNotice />
             <header className="toolbar drag-region">
               <div className="native-search">
                 <Icon name="search" className="search-glyph" />

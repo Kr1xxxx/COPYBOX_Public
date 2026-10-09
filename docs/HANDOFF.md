@@ -14,7 +14,7 @@
 Merging (D-011): small PRs merge themselves when CI is green; big ones are labelled `needs-owner` and wait for the
 owner to write 合并.
 
-Web preview for the owner: version **v1.12** (shown top-left; +0.01 on every update, then say it at the end of each report).
+Web preview for the owner: version **v1.10** (shown top-left; +0.01 on every update, then say it at the end of each report).
 Windows / Mac switch, ten simulated test images. It is built from the branch under review, not from `main`.
 
 Workflow (`CLAUDE.md`): the main Claude session coordinates; Sonnet workers (`.claude/agents/worker.md`) do pieces in
@@ -42,9 +42,8 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 14 | Web preview tool in the repo (`tools/preview/`, `npm run preview:build` / `preview:serve`) | Done | Claude | Was only in a temp folder; now any session can rebuild the preview with its version number. PR waits for the owner (package.json, eslint config) |
 | 16 | 图片 16宫格 + full-picture thumbnails (D-020) | Done | Claude | 4 per row, `object-fit: contain`; PR waits for review by CI/owner |
 | 17 | Motion from arc-library, step 1 of 4 (D-021): copy icon + toast | In progress | Claude | Adds `motion` (needs the owner's 合并). Steps 2-4: switches/segmented/checkboxes; menus/dialogs; rename/search/drop zone/empty pages/counters |
-| 18 | 图片 detail scrolls so the clicked picture stays fully visible (advisor item 12) | In progress | Claude | `detailScrollDelta` in `image-view-core.ts`; PR stacked on #38 |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
-| 16 | 话术搜索: pinyin + initials, rank by hit place and copy count | Done | Claude | `app/snippet-search.ts`; new dependency `pinyin-pro`; `useCount` on items (optional, no migration) |
+| 18 | Version update reminder (D-023) | Done | Claude | `desktop/update-check.cjs`, banner `app/update-notice.tsx`; off until the owner chooses an address (`desktop/update-config.cjs`). Same code on Windows and Mac |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
 
