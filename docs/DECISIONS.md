@@ -24,6 +24,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-015 | Device-key protection removed for now | Accepted |
 | D-016 | Backups stay local files; no cloud or email upload | Accepted |
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
+| D-018 | 图片 folders (目录) | Accepted |
 
 ---
 
@@ -145,3 +146,12 @@ Statuses: Accepted / Superseded / Deprecated.
 - Consequences: images live in their own encrypted IndexedDB store (`clipbox-images`), keyed from the vault's device key;
   the vault and `clipbox.vault.v1` are unchanged. v1 has no folders, trash or image backup — images are not in any backup
   file yet, so clearing app data loses them. Old Windows 备注 entries, if any, stay in the vault but are not shown.
+
+### D-018 图片 folders (2026-10-09)
+- Context (owner): "图片目录页做出来" — the first version of 图片 (D-017) had no folders.
+- Decision (owner): 图片 gets 目录 like 话术: a sidebar with 全部图片, user-made folders (rename, colour, delete) and 未分类;
+  images are moved with `移动到`; adding while a folder is open puts the image there. Deleting a folder never deletes
+  images. Folders are kept in creation order (no drag-sorting yet). Spec: `docs/specs/image-folders.md`.
+- Consequences: the folder name sits inside each image's encrypted record (`ImageMeta.folder`) and the folder list is one
+  more encrypted record (`folders`) in the same IndexedDB store; no database version change, vault untouched. An older
+  build reading this store would show the folder list as a nameless image, so do not downgrade after using folders.
