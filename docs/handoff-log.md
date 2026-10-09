@@ -4,6 +4,7 @@ Newest first. One entry per session: date — who (person or agent) — what was
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
 - 2026-10-09 — Claude — Task 5: Settings → 导出备注备份 (导出秘密备份 on Mac) saves the second section to its own encrypted local file (same `clipbox-secure-backup` v3 format with `scope: "secret"` that the Mac command line already wrote; import already understood it). Replaced `tests/backup-ui.test.mjs`, which forbade the button (from the original macOS design), with a test that snippets and notes stay in separate files. New e2e `tests/e2e/backup.e2e.mjs`. Noticed, not fixed: a merge-import skips a note whose identical copy sits in the trash.
+- 2026-10-09 — Claude — Task 6: updated the `page.tsx` row in AGENTS.md (~1580 lines, lists the split-out UI files). Rulebook change, so the PR waits for the owner's 合并.
 - 2026-10-09 — Claude — Fix: the empty 备注 page on Windows no longer says "默认只复制引用" (only true for Mac 秘密).
 - 2026-10-08 — Claude — Task 6, piece 6: moved `ItemEditor` to `app/item-editor.tsx` (unchanged; `COLORS` moved with it). The test harness (`tests/helpers/page-harness.mjs`) now reads both `page.tsx` and `item-editor.tsx` to find `saveItem`/`submit` by name. `page.tsx` ~1580 lines.
 - 2026-10-08 — Claude — Task 6, piece 5: moved `SettingsDialog` and `backupAgeLabel` to `app/settings.tsx` (unchanged). `page.tsx` ~1820 lines.
