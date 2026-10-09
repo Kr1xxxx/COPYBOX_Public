@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Merge policy (owner: 改): PRs with 500+ changed lines in total (all files) are big and wait for 合并; before, docs-only PR #43 (1,180 lines) merged itself because only `app/` lines counted. `scripts/classify-pr.mjs`, test, D-011 addendum, AGENTS.md.
 - 2026-10-09 — Claude — Task 14 (owner: 建立专案, second half): the web preview build is a repo tool now (`tools/preview/`: page shell with Windows/Mac switch, ten simulated test images, `build.mjs`, `serve.mjs`, README, unit tests). Port of the temp Python script to Node by a Sonnet worker, reviewed. The preview page version lives in `tools/preview/VERSION` (v1.01).
 - 2026-10-09 — Claude — Task 17, step 1 of D-021 (owner: motion from arc-library, 全面换): `motion` 13.4.0 added; `app/arc/` holds the copy icon (drawn check) and the toast (spring rise, soft text swap, optional 撤销 action), used by the 图片 copy buttons and all toasts. New e2e for both. Next: step 2 (switches, segmented controls, checkboxes). Web preview v1.04.
 - 2026-10-09 — Claude — Task 15, 图片 九宫格 (D-019, spec `docs/specs/image-grid.md`): 3-column grid by default with a copy button on each tile, detail card as a full-width row, `宫格 | 列表` switch, mini grid. Added to PR #25. Web preview v1.02.

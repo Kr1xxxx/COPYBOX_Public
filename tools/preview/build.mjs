@@ -142,6 +142,7 @@ export async function main(argv = process.argv.slice(2)) {
   writeFileSync(join(out, "index.html"), renderWrapper(readFileSync(join(here, "wrapper.html"), "utf8"), version));
   cpSync(join(here, "seed.js"), join(out, "seed.js"));
   cpSync(join(here, "samples"), join(out, "samples"), { recursive: true });
+  cpSync(join(here, "changelog.json"), join(out, "changelog.json"));
   cpSync(join(repo, "docs/samples/clipbox-test-snippets.csv"), join(out, "samples/4-full-test-sheet.csv"));
 
   const source = readFileSync(join(repo, "app/image-store.ts"), "utf8");

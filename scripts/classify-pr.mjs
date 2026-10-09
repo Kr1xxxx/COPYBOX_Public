@@ -5,6 +5,8 @@ import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const APP_LINE_LIMIT = 350;
+// Owner rule (2026-10-09): 500 or more changed lines in the whole PR, any file type, wait for the owner.
+export const TOTAL_LINE_LIMIT = 500;
 
 // Files that change how the product or the process works — always the owner's call.
 const OWNER_PATHS = [
@@ -42,6 +44,8 @@ export function classify({ files, appDiff, labels }) {
   if (leftoverStorageLines(changedLines).length) reasons.push("touches data storage or encryption");
   const appLines = files.filter((file) => file.path.startsWith("app/")).reduce((sum, file) => sum + file.added + file.deleted, 0);
   if (appLines > APP_LINE_LIMIT) reasons.push(`${appLines} lines of app code changed (limit ${APP_LINE_LIMIT})`);
+  const totalLines = files.reduce((sum, file) => sum + file.added + file.deleted, 0);
+  if (totalLines >= TOTAL_LINE_LIMIT) reasons.push(`${totalLines} lines changed in total (limit under ${TOTAL_LINE_LIMIT})`);
   const testFiles = files.filter((file) => file.path.startsWith("tests/"));
   const testNet = testFiles.reduce((sum, file) => sum + file.added - file.deleted, 0);
   if (testNet < -10) reasons.push(`removes ${-testNet} more test lines than it adds`);
