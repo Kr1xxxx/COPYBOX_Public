@@ -3,6 +3,8 @@ import fs from "node:fs";
 import test from "node:test";
 
 const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+// BackupDialog and SnippetImportDialog live in app/dialogs.tsx (split out of page.tsx).
+const dialogs = fs.readFileSync(new URL("../app/dialogs.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
 const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
@@ -14,7 +16,8 @@ test("editing, filling variables and creating folders happen in place, not in po
   assert.match(page, /className="directory-new"/);
   assert.match(page, /className=\{`native-row selected editing new-row/);
   // only reversible-free flows keep real dialogs
-  for (const dialog of ["BackupDialog", "SnippetImportDialog", "DeleteConfirmDialog", "SettingsDialog"]) assert.match(page, new RegExp(`function ${dialog}`));
+  for (const dialog of ["DeleteConfirmDialog", "SettingsDialog"]) assert.match(page, new RegExp(`function ${dialog}`));
+  for (const dialog of ["BackupDialog", "SnippetImportDialog"]) assert.match(dialogs, new RegExp(`function ${dialog}`));
 });
 
 test("folders can be renamed, recoloured and deleted from the sidebar", () => {

@@ -3,6 +3,9 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-08 — Claude — Task 6, piece 2: moved `useDialogKeyboard`, `SnippetImportDialog` and `BackupDialog` out of `page.tsx` into `app/dialogs.tsx` (unchanged; the 备注/秘密 word is now a prop). `inline-ui` test reads the new file with the same assertion.
+- 2026-10-08 — Claude — Owner: backups stay local files, no cloud/email upload (D-016).
+- 2026-10-08 — Claude — Owner: "no encryption for now, remove it". Removed the device-key protection of PR #7 (D-015 supersedes D-012); task 4 cancelled. Code is restorable from git history.
 - 2026-10-08 — Claude — Owner confirmed: PR #1 (new UI) merged into `main`; PR #7 retargeted to `main`. Owner waived real-device testing (D-014); tasks 1-2 cancelled, 3 done.
 - 2026-10-08 — Claude — Task 4 (owner approved): Windows device key now lives in an OS-encrypted file (`desktop/device-key.cjs`, `app/device-key-guard.ts`), old vaults migrate and are re-encrypted; D-012, D-013 (no signing). Tested with fake key store, unit tests and simulated e2e; not on real Windows. PRs #5 and #6 merged into `ui-redesign-h`; merging PR #1 into `main` is waiting for the owner's explicit 合并.
 - 2026-10-09 — Claude — Task 6, piece 1: moved the AI request code and the AI settings panel out of `page.tsx` into `app/ai-client.ts` and `app/ai-settings.tsx` (code moved unchanged; the two settings tests now read the new files with the same assertions). `page.tsx` ~2500 → ~2270 lines.

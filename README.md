@@ -120,21 +120,15 @@ no index of secrets and cannot read the device key. The interface closes when Cl
 
 ## Security boundaries
 
-**Windows desktop app:** the device key that decrypts the vault is encrypted with Windows (DPAPI) and kept in
-`device-key.json` in the app data folder. Copying the data folder to another computer or another Windows account
-does not open the vault. An older vault is moved over on first start: it is re-encrypted with a fresh key and the
-old key is deleted. Limits: another program running as the same Windows user can still ask Windows for the key, and
-fragments of the old key and old vault may linger in the browser storage files until they are cleaned up. If Windows
-loses its own key (user password reset by an administrator, profile restored from backup), the vault can no longer be
-opened — keep the encrypted snippet backup.
-
-**macOS and the browser preview:** the vault and its device key are both stored in the app's local data, so anyone
+The vault and the device key that decrypts it are both stored in Clipbox's local application data, so anyone
 who can read that folder can decrypt the vault. Back up snippets and secrets separately before clearing app data.
 Backup passwords are independent of the device key and cannot be recovered. Password-free startup favours
 convenience on a personal device and does not protect against other programs or malware that can read the
 current user's data, so do not use Clipbox as the only store for high-value secrets such as wallet seed phrases.
 
-The installers are not code-signed and do not update themselves (internal tool, D-013).
+Protecting the device key with the operating system (Windows DPAPI) was built and then removed on the owner's
+decision (D-015); it can be brought back from git history (PR #7). The installers are not code-signed and do not
+update themselves (internal tool, D-013).
 
 ## Checks
 

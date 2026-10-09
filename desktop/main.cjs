@@ -1,7 +1,6 @@
 const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
 const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { createAiStore } = require("./ai.cjs");
-const { createDeviceKeyStore } = require("./device-key.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
@@ -446,17 +445,6 @@ ipcMain.handle("clipbox:ai-status", (event) => aiStoreFor(event).status());
 ipcMain.handle("clipbox:ai-save", (event, settings) => aiStoreFor(event).save(settings || {}));
 ipcMain.handle("clipbox:ai-clear", (event) => aiStoreFor(event).clear());
 ipcMain.handle("clipbox:ai-request", (event, payload) => aiStoreFor(event).request(payload || {}));
-
-// The vault's device key, encrypted by the OS (Windows). Only the app's own main frame may ask.
-let deviceKeyStore;
-function deviceKeyStoreFor(event) {
-  if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Request denied");
-  deviceKeyStore ||= createDeviceKeyStore({ filePath: path.join(app.getPath("userData"), "device-key.json"), fs, safeStorage });
-  return deviceKeyStore;
-}
-ipcMain.handle("clipbox:device-key-available", (event) => deviceKeyStoreFor(event).available());
-ipcMain.handle("clipbox:device-key-get", (event) => deviceKeyStoreFor(event).get());
-ipcMain.handle("clipbox:device-key-set", (event, record) => deviceKeyStoreFor(event).set(record));
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
 

@@ -71,8 +71,8 @@ import {
   type SnippetImportPreview,
 } from "./snippet-import";
 import { aiRewrite } from "./ai-client";
-import { deviceKeyProtectionAvailable, openGuardedVault, type KeyRecord } from "./device-key-guard";
 import { AiSettingsSection } from "./ai-settings";
+import { BackupDialog, SnippetImportDialog, type BackupMode } from "./dialogs";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -99,7 +99,6 @@ type SecureBackup =
   | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope };
 
 type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope };
-type BackupMode = "export" | "import";
 type CopyLanguage = "en" | "zh";
 type SnippetCopyRequest = { item: SecretItem; language: CopyLanguage };
 type DeleteRequest = { item: SecretItem; permanent: boolean };
@@ -148,9 +147,6 @@ declare global {
       setTheme?: (theme: ThemeChoice) => void;
       openDataFolder?: () => Promise<string>;
       getVersion: () => Promise<string>;
-      deviceKeyAvailable?: () => Promise<boolean>;
-      deviceKeyGet?: () => Promise<KeyRecord | null>;
-      deviceKeySet?: (record: KeyRecord) => Promise<boolean>;
       aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
       aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
       aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
@@ -288,26 +284,7 @@ async function decryptVault(envelope: VaultEnvelope, password: string) {
   return normalizeVaultData(parsed);
 }
 
-// With OS protection (Windows desktop) the device key lives in the desktop shell, not in this storage.
-async function openVaultWithProtectedKey() {
-  const opened = await openGuardedVault<VaultData, VaultEnvelope>({
-    bridge: window.clipboxDesktop!,
-    storage: localStorage,
-    vaultKey: STORAGE_KEY,
-    legacyKeyKey: DEVICE_KEY,
-    decrypt: decryptVault,
-    encrypt: (data, key) => encryptVault(data, key),
-    createKey: createDeviceKey,
-    createEmpty: () => synchronizeVaultData([], EMPTY_FOLDER_REGISTRY, 1),
-  });
-  return { data: opened.data, deviceKey: opened.key };
-}
-
 async function readLocalEncryptedVault() {
-  if (await deviceKeyProtectionAvailable(window.clipboxDesktop)) {
-    if (!localStorage.getItem(STORAGE_KEY)) throw new Error("Local vault is unavailable");
-    return openVaultWithProtectedKey();
-  }
   const raw = localStorage.getItem(STORAGE_KEY);
   const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
   if (!raw || !storedDeviceKey) throw new Error("Local vault is unavailable");
@@ -415,18 +392,6 @@ export default function Home() {
     }
 
     async function openVault() {
-      if (await deviceKeyProtectionAvailable(window.clipboxDesktop)) {
-        try {
-          const openedVault = await openVaultWithProtectedKey();
-          finishOpening(openedVault.data, openedVault.deviceKey);
-        } catch {
-          if (!cancelled) {
-            setStartupError("本地数据读取失败，原数据和密钥已保留。请重试；如仍失败，请先备份应用数据再排查。");
-            setLoading(false);
-          }
-        }
-        return;
-      }
       const raw = localStorage.getItem(STORAGE_KEY);
       const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
       if (!raw) {
@@ -1627,83 +1592,16 @@ export default function Home() {
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}
+        secretWord={SECRET_WORD}
         needsPassword={backupMode === "export" || Boolean(pendingImport?.envelope)}
         onClose={() => { setBackupMode(null); if (backupMode === "import") setPendingImport(null); }}
         onExport={exportVault}
         onImport={applyImport}
       />}
-      {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
+      {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
       {undoTrash && <div className="toast undo-toast" role="status"><span>✓</span>{undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站"}<button type="button" onClick={() => void undoTrashNow()}>撤销</button></div>}
       {toast && !undoTrash && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
-  );
-}
-
-function useDialogKeyboard(dialogRef: React.RefObject<HTMLElement | null>, onClose: () => void, disabled = false) {
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !disabled) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("input:not(:disabled), button:not(:disabled), select:not(:disabled), textarea:not(:disabled)") || []);
-      const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-      const wrapIndex = resolveFocusWrapIndex(currentIndex, focusable.length, event.shiftKey);
-      if (wrapIndex >= 0) {
-        event.preventDefault();
-        focusable[wrapIndex].focus();
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [dialogRef, disabled, onClose]);
-}
-
-function SnippetImportDialog({ preview, fileName, onClose, onImport }: {
-  preview: SnippetImportPreview;
-  fileName: string;
-  onClose: () => void;
-  onImport: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false);
-  const dialogRef = useRef<HTMLElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useDialogKeyboard(dialogRef, onClose, busy);
-  useEffect(() => { closeRef.current?.focus(); }, []);
-
-  async function confirm() {
-    setBusy(true);
-    try {
-      await onImport();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="snippet-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-      <section ref={dialogRef} className="snippet-import-dialog" role="dialog" aria-modal="true" aria-labelledby="snippet-import-title">
-        <header className="snippet-dialog-head">
-          <div><p>LOCAL SPREADSHEET</p><h2 id="snippet-import-title">导入话术表格</h2><small title={fileName}>{fileName}</small></div>
-          <button ref={closeRef} type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
-        </header>
-        <div className="snippet-import-body">
-          <div className="import-metrics" aria-label="导入统计">
-            <div><strong>{preview.totalCount}</strong><span>读取</span></div>
-            <div className="positive"><strong>{preview.importableCount}</strong><span>可导入</span></div>
-            <div><strong>{preview.duplicateCount}</strong><span>重复</span></div>
-            <div className={preview.errorCount ? "warning" : ""}><strong>{preview.errorCount}</strong><span>错误</span></div>
-          </div>
-          <section className="import-section"><h3>将创建或合并的目录</h3><div className="import-folder-list">{preview.folders.map((folder) => <span key={folder}>{folder}</span>)}</div></section>
-          <section className="import-section"><h3>内容预览</h3><div className="import-preview-list">{preview.items.slice(0, 5).map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.folder} · {item.summary}</span></div>)}</div></section>
-          {preview.errors.length > 0 && <section className="import-errors"><h3>需要跳过的行</h3>{preview.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}{preview.errors.length > 4 && <small>另有 {preview.errors.length - 4} 行</small>}</section>}
-          <p className="import-privacy">表格只在本机解析。导入采用合并方式，不会覆盖{SECRET_WORD}或现有话术。</p>
-        </div>
-        <footer className="snippet-dialog-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button type="button" className="primary" onClick={() => void confirm()} disabled={busy || preview.importableCount === 0}>{busy ? "正在加密写入…" : `导入 ${preview.importableCount} 条话术`}</button></footer>
-      </section>
-    </div>
   );
 }
 
@@ -1751,57 +1649,6 @@ function SnippetFillPanel({ request, onClose, onCopy }: {
         <div className="fill-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={busy}>取消</button><button type="submit" className="primary-button" disabled={busy || !readiness.ready || !source}>{busy ? "正在复制…" : `复制${language === "en" ? "英文" : "中文"}`}</button></div>
       </form>
     </section>
-  );
-}
-
-function BackupDialog({ mode, needsPassword, onClose, onExport, onImport }: {
-  mode: BackupMode;
-  needsPassword: boolean;
-  onClose: () => void;
-  onExport: (password: string) => Promise<void>;
-  onImport: (password: string, strategy: ImportStrategy) => Promise<void>;
-}) {
-  const [password, setPassword] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [strategy, setStrategy] = useState<ImportStrategy>("merge");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    if (needsPassword && !password) return setError("请输入备份密码");
-    if (mode === "export" && password.length < 8) return setError("备份密码至少需要 8 个字符");
-    if (mode === "export" && password !== confirmation) return setError("两次输入的密码不一致");
-    setBusy(true);
-    try {
-      if (mode === "export") await onExport(password);
-      else await onImport(password, strategy);
-    } catch {
-      setError(mode === "import" ? "备份密码不正确，或文件已经损坏" : "导出失败，请重试");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-      <section className="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
-        <header className="backup-head">
-          <div><p>{mode === "export" ? "SNIPPET EXPORT" : "SAFE IMPORT"}</p><h2 id="backup-title">{mode === "export" ? "导出话术备份" : "导入备份"}</h2></div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
-        </header>
-        <form className="backup-form" onSubmit={submit}>
-          <p className="backup-intro">{mode === "export" ? `只备份话术，并使用独立密码加密；${SECRET_WORD}不会包含在文件中。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
-          {needsPassword && <label className="backup-field"><span>备份密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "export" ? "至少 8 个字符" : "输入导出时设置的密码"} autoComplete="off" /></label>}
-          {mode === "export" && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认备份密码" autoComplete="off" /></label>}
-          {mode === "import" && <fieldset className="backup-strategy"><legend>导入方式</legend><div><button type="button" className={strategy === "merge" ? "active" : ""} onClick={() => setStrategy("merge")}><strong>合并</strong><small>保留现有内容并去重</small></button><button type="button" className={strategy === "replace" ? "active danger" : ""} onClick={() => setStrategy("replace")}><strong>覆盖</strong><small>用备份替换当前内容</small></button></div></fieldset>}
-          {error && <p className="backup-error">{error}</p>}
-          <p className="backup-note">{mode === "export" ? "请妥善保存密码；Clipbox 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
-          <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={mode === "import" && strategy === "replace" ? "danger" : "primary"} disabled={busy}>{busy ? (mode === "export" ? "正在加密…" : "正在验证…") : mode === "export" ? "加密并导出" : strategy === "merge" ? "验证并合并" : "验证并覆盖"}</button></div>
-        </form>
-      </section>
-    </div>
   );
 }
 
