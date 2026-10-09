@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
+import { readUiSource } from "./helpers/ui-source.mjs";
 
-const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = readUiSource();
 // The AI settings panel and the AI request code live in their own files (split out of page.tsx).
 const aiSettings = fs.readFileSync(new URL("../app/ai-settings.tsx", import.meta.url), "utf8");
 const aiClient = fs.readFileSync(new URL("../app/ai-client.ts", import.meta.url), "utf8");
