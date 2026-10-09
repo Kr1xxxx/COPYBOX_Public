@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "release/**",
     "next-env.d.ts",
+    ".claude/worktrees/**",
   ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
