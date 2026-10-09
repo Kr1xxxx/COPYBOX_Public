@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { resolveFocusWrapIndex, type ImportStrategy, type SecretItem } from "./clipbox-core";
 import type { SnippetImportPreview } from "./snippet-import";
 
-export type BackupMode = "export" | "import";
+// "export" saves the snippets, "export-secret" the 备注/秘密 section; each goes to its own file.
+export type BackupMode = "export" | "export-secret" | "import";
 export type DeleteRequest = { item: SecretItem; permanent: boolean };
 
 function useDialogKeyboard(dialogRef: React.RefObject<HTMLElement | null>, onClose: () => void, disabled = false) {
@@ -89,16 +90,19 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
   const [strategy, setStrategy] = useState<ImportStrategy>("merge");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const exporting = mode !== "import";
+  const exportWord = mode === "export-secret" ? secretWord : "话术";
+  const otherWord = mode === "export-secret" ? "话术" : secretWord;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
     if (needsPassword && !password) return setError("请输入备份密码");
-    if (mode === "export" && password.length < 8) return setError("备份密码至少需要 8 个字符");
-    if (mode === "export" && password !== confirmation) return setError("两次输入的密码不一致");
+    if (exporting && password.length < 8) return setError("备份密码至少需要 8 个字符");
+    if (exporting && password !== confirmation) return setError("两次输入的密码不一致");
     setBusy(true);
     try {
-      if (mode === "export") await onExport(password);
+      if (exporting) await onExport(password);
       else await onImport(password, strategy);
     } catch {
       setError(mode === "import" ? "备份密码不正确，或文件已经损坏" : "导出失败，请重试");
@@ -111,17 +115,17 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
     <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section className="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
         <header className="backup-head">
-          <div><p>{mode === "export" ? "SNIPPET EXPORT" : "SAFE IMPORT"}</p><h2 id="backup-title">{mode === "export" ? "导出话术备份" : "导入备份"}</h2></div>
+          <div><p>{mode === "export" ? "SNIPPET EXPORT" : mode === "export-secret" ? "NOTES EXPORT" : "SAFE IMPORT"}</p><h2 id="backup-title">{exporting ? `导出${exportWord}备份` : "导入备份"}</h2></div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
         </header>
         <form className="backup-form" onSubmit={submit}>
-          <p className="backup-intro">{mode === "export" ? `只备份话术，并使用独立密码加密；${secretWord}不会包含在文件中。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
-          {needsPassword && <label className="backup-field"><span>备份密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "export" ? "至少 8 个字符" : "输入导出时设置的密码"} autoComplete="off" /></label>}
-          {mode === "export" && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认备份密码" autoComplete="off" /></label>}
+          <p className="backup-intro">{exporting ? `只备份${exportWord}，并使用独立密码加密；${otherWord}不会包含在文件中。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>
+          {needsPassword && <label className="backup-field"><span>备份密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={exporting ? "至少 8 个字符" : "输入导出时设置的密码"} autoComplete="off" /></label>}
+          {exporting && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认备份密码" autoComplete="off" /></label>}
           {mode === "import" && <fieldset className="backup-strategy"><legend>导入方式</legend><div><button type="button" className={strategy === "merge" ? "active" : ""} onClick={() => setStrategy("merge")}><strong>合并</strong><small>保留现有内容并去重</small></button><button type="button" className={strategy === "replace" ? "active danger" : ""} onClick={() => setStrategy("replace")}><strong>覆盖</strong><small>用备份替换当前内容</small></button></div></fieldset>}
           {error && <p className="backup-error">{error}</p>}
-          <p className="backup-note">{mode === "export" ? "请妥善保存密码；Clipbox 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
-          <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={mode === "import" && strategy === "replace" ? "danger" : "primary"} disabled={busy}>{busy ? (mode === "export" ? "正在加密…" : "正在验证…") : mode === "export" ? "加密并导出" : strategy === "merge" ? "验证并合并" : "验证并覆盖"}</button></div>
+          <p className="backup-note">{exporting ? "请妥善保存密码；Clipbox 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
+          <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={mode === "import" && strategy === "replace" ? "danger" : "primary"} disabled={busy}>{busy ? (exporting ? "正在加密…" : "正在验证…") : exporting ? "加密并导出" : strategy === "merge" ? "验证并合并" : "验证并覆盖"}</button></div>
         </form>
       </section>
     </div>

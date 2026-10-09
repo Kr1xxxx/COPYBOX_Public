@@ -1140,19 +1140,25 @@ export default function Home() {
     document.querySelector(`[data-row-index="${safeSelected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [safeSelected, windowMode, activeFolder, activeKind]);
 
-  async function exportVault(password: string) {
+  async function exportVault(password: string, scope: BackupScope) {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current };
-    const snippetData = vaultDataForBackupScope(currentData, "snippet");
-    const envelope = await encryptVault(snippetData, password);
-    const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope: "snippet", createdAt: Date.now(), envelope };
+    const scopedData = vaultDataForBackupScope(currentData, scope);
+    const envelope = await encryptVault(scopedData, password);
+    const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope, createdAt: Date.now(), envelope };
     const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `clipbox-snippets-${new Date().toISOString().slice(0, 10)}.json`;
+    const fileWord = scope === "snippet" ? "snippets" : PLAIN_NOTES ? "notes" : "secrets";
+    anchor.download = `clipbox-${fileWord}-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     setBackupMode(null);
+    if (scope === "secret") {
+      setToast(`${SECRET_WORD}备份已导出`);
+      window.setTimeout(() => setToast(""), 2200);
+      return;
+    }
     try { localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); } catch { /* optional hint only */ }
     setLastBackupAt(Date.now());
     setToast("话术备份已导出");
@@ -1561,6 +1567,7 @@ export default function Home() {
         onOpenDataFolder={openDataFolder}
         onClose={() => setSettingsOpen(false)}
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
+        onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
         onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
@@ -1570,9 +1577,9 @@ export default function Home() {
       {backupMode && <BackupDialog
         mode={backupMode}
         secretWord={SECRET_WORD}
-        needsPassword={backupMode === "export" || Boolean(pendingImport?.envelope)}
+        needsPassword={backupMode !== "import" || Boolean(pendingImport?.envelope)}
         onClose={() => { setBackupMode(null); if (backupMode === "import") setPendingImport(null); }}
-        onExport={exportVault}
+        onExport={(password) => exportVault(password, backupMode === "export-secret" ? "secret" : "snippet")}
         onImport={applyImport}
       />}
       {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
