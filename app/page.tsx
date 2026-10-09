@@ -72,9 +72,9 @@ import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
-import { SnippetFill, SnippetVariableText, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
+import { SnippetFill, SnippetVariableText, emptyFillState, latestValues, rememberValues, type ValueMemory, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -312,7 +312,8 @@ export default function Home() {
   const [fill, setFill] = useState<SnippetFillState | null>(null);
   const [typingVariable, setTypingVariable] = useState(false);
   // Kept in memory only: customer names must not sit in plain browser storage.
-  const [lastValues, setLastValues] = useState<Record<string, string>>({});
+  const [valueMemory, setValueMemory] = useState<ValueMemory>({});
+  const lastValues = latestValues(valueMemory);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -753,8 +754,8 @@ export default function Home() {
   }
 
   // A snippet with variables copies what is typed into its highlighted blocks; the first empty block gets the cursor instead of a half-filled copy.
-  async function copyPrepared(item: SecretItem) {
-    const state = fillFor(item);
+  async function copyPrepared(item: SecretItem, pickedValues?: Record<string, string>) {
+    const state = pickedValues ? { ...fillFor(item), values: pickedValues } : fillFor(item);
     const source = resolveSnippetCopySource(item, state.language);
     if (!source) return;
     const readiness = snippetCopyReadiness(item, state.values, state.checkedInputs, state.verificationConfirmed);
@@ -772,7 +773,7 @@ export default function Home() {
       return;
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
-    setLastValues((current) => ({ ...current, ...Object.fromEntries(Object.entries(state.values).map(([name, value]) => [name, value.trim()]).filter(([, value]) => value)) }));
+    setValueMemory((current) => rememberValues(current, state.values));
   }
 
   async function copy(item: SecretItem, language: CopyLanguage = "en") {
@@ -1595,7 +1596,7 @@ export default function Home() {
                       {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} memory={valueMemory} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={(picked) => void (picked ? copyPrepared(item, picked) : copy(item))} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>

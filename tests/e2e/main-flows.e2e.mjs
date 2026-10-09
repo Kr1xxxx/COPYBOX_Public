@@ -84,6 +84,32 @@ test("a variable remembers the last value, and with one variable Enter copies th
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Amanda");
 });
 
+test("a block offers its last three values; clicking one fills it and copies when nothing else is missing", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  for (const [name, company] of [["Amanda", "Comely"], ["Bella", "Comely"], ["Cara", "Comely"], ["Dana", "Comely"]]) {
+    await row.locator("input[data-var=Name]").fill(name);
+    await row.locator("input[data-var=Company]").fill(company);
+    await row.locator("input[data-var=Company]").press("Enter");
+    await expect.poll(() => page.evaluate(() => window.__copied)).toContain(name);
+  }
+  // only the newest three are offered, newest first
+  await row.locator("input[data-var=Name]").click();
+  const options = row.locator(".var-memory-option");
+  await expect(options).toHaveText(["Dana", "Cara", "Bella"]);
+  // every other block is filled, so one click fills and copies
+  await options.nth(2).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Bella, thanks for reaching out to Comely! How can I help you today?");
+  // the copy moved Bella to the front: [Bella, Dana, Cara]; with another block empty, a click only fills and moves on
+  await row.locator("input[data-var=Company]").fill("");
+  await row.locator("input[data-var=Name]").click();
+  await row.locator(".var-memory-option").nth(1).click();
+  await expect(row.locator("input[data-var=Name]")).toHaveValue("Dana");
+  await expect(row.locator("input[data-var=Company]")).toBeFocused();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
+});
+
 test("no keyboard shortcut hints anywhere and Ctrl+E does nothing", async ({ page }) => {
   await expect(page.locator("kbd")).toHaveCount(0);
   await page.keyboard.press("Control+e");
