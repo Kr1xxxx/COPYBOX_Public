@@ -7,33 +7,26 @@ import { useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEve
 import { createPortal } from "react-dom";
 import { resolveFocusWrapIndex } from "./clipbox-core";
 import "./desktop-bridge";
+import { UNCATEGORIZED_COLOR } from "./category-colors";
+import { ImageMoveMenu, MoreGlyph, ChevronGlyph } from "./image-folders";
+import {
+  IMAGE_FILTER_ALL,
+  filterImagesByFolder,
+  folderOfImageFilter,
+  imageFolderColors,
+} from "./image-folders-core";
+import { readableMessage, type ImageLibrary } from "./image-library";
 import {
   IMAGE_TITLE_MAX,
   IMAGE_TYPES,
-  openImageStore,
   titleFromFileName,
   toPngBytes,
   validateImageFile,
   type ImageMeta,
-  type ImageStore,
 } from "./image-store";
 
 export type ImageSectionHandle = { openPicker: () => void };
 export type ImageCounts = { total: number; shown: number };
-
-const LOAD_FAILED = "图片读取失败，原数据没有改动。";
-
-// The key is derived once per session: reopening the section reuses the same store.
-const storeCache = new Map<string, Promise<ImageStore>>();
-function loadStore(deviceKey: string) {
-  let opened = storeCache.get(deviceKey);
-  if (!opened) {
-    opened = openImageStore(deviceKey);
-    storeCache.set(deviceKey, opened);
-    opened.catch(() => storeCache.delete(deviceKey));
-  }
-  return opened;
-}
 
 function pastedTitle(now = new Date()) {
   const two = (value: number) => String(value).padStart(2, "0");
@@ -50,10 +43,6 @@ function titleForFile(file: File, pasted: boolean) {
 function sizeLabel(meta: ImageMeta) {
   const kb = meta.size < 1024 * 1024 ? `${Math.max(1, Math.round(meta.size / 1024))} KB` : `${(meta.size / 1024 / 1024).toFixed(1)} MB`;
   return meta.width > 0 && meta.height > 0 ? `${meta.width}×${meta.height} · ${kb}` : kb;
-}
-
-function readableMessage(error: unknown, fallback: string) {
-  return error instanceof Error && /[一-鿿]/.test(error.message) ? error.message : fallback;
 }
 
 function hasFiles(event: DragEvent) {
@@ -121,8 +110,9 @@ function ImageDeleteDialog({ target, onClose, onConfirm }: { target: ImageMeta; 
   );
 }
 
-export function ImageSection({ deviceKey, query, compact, paused, onToast, onCounts, ref }: {
-  deviceKey: string;
+export function ImageSection({ library, query, compact, paused, onToast, onCounts, ref }: {
+  // Images and folders are owned by the page (image-library.ts), so the sidebar and this list never disagree.
+  library: ImageLibrary;
   query: string;
   compact: boolean;
   // A dialog is open on top of the page: drops and pastes must not add images behind it.
@@ -131,16 +121,15 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
   onCounts: (counts: ImageCounts) => void;
   ref?: Ref<ImageSectionHandle>;
 }) {
-  const [store, setStore] = useState<ImageStore | null>(null);
-  const [images, setImages] = useState<ImageMeta[] | null>(null);
-  const [loadError, setLoadError] = useState("");
-  const [reloadTick, setReloadTick] = useState(0);
+  const { images, folders, filter, ready, loadError, getBlob, markUsed } = library;
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState("");
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [copiedId, setCopiedId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ImageMeta | null>(null);
   const [dragging, setDragging] = useState(false);
+  // The "移动到" menu belongs to one row; it opens from the ⋯ button or from the 目录 line.
+  const [moveMenu, setMoveMenu] = useState<{ id: string; anchor: "more" | "line"; up: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,31 +150,13 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
     };
   }, []);
 
-  useEffect(() => {
-    if (!deviceKey) return;
-    let cancelled = false;
-    loadStore(deviceKey)
-      .then(async (opened) => {
-        const list = await opened.list();
-        if (cancelled) return;
-        setStore(opened);
-        // An image added while the list was still loading is already in state: keep it.
-        setImages((current) => current
-          ? [...current, ...list.filter((meta) => !current.some((value) => value.id === meta.id))].sort((a, b) => b.createdAt - a.createdAt)
-          : list);
-        setLoadError("");
-      })
-      .catch(() => { if (!cancelled) setLoadError(LOAD_FAILED); });
-    return () => { cancelled = true; };
-  }, [deviceKey, reloadTick]);
-
   // One decrypted object URL per image serves both the small thumbnail and the larger preview.
   useEffect(() => {
-    if (!store || !images) return;
+    if (!ready || !images) return;
     for (const meta of images) {
       if (thumbUrls.current.has(meta.id) || thumbPending.current.has(meta.id)) continue;
       thumbPending.current.add(meta.id);
-      store.getBlob(meta.id)
+      getBlob(meta.id)
         .then((blob) => {
           thumbPending.current.delete(meta.id);
           if (!mounted.current || thumbUrls.current.has(meta.id)) return;
@@ -195,12 +166,14 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
         })
         .catch(() => { thumbPending.current.delete(meta.id); });
     }
-  }, [store, images]);
+  }, [ready, images, getBlob]);
 
+  const inFolder = useMemo(() => filterImagesByFolder(images ?? [], filter, folders), [images, filter, folders]);
   const shown = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return (images ?? []).filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
-  }, [images, query]);
+    return inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
+  }, [inFolder, query]);
+  const colors = useMemo(() => imageFolderColors(folders), [folders]);
   const total = images?.length ?? 0;
   useEffect(() => { onCounts({ total, shown: shown.length }); }, [onCounts, total, shown.length]);
 
@@ -221,6 +194,25 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
     renameInputRef.current?.select();
   }, [renamingId]);
 
+  const menuOpenId = moveMenu?.id;
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest("[data-move-menu]")) setMoveMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setMoveMenu(null);
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePress, true);
+    window.addEventListener("keydown", closeOnEscape, true);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePress, true);
+      window.removeEventListener("keydown", closeOnEscape, true);
+    };
+  }, [menuOpenId]);
   function forgetThumb(id: string) {
     const url = thumbUrls.current.get(id);
     if (url) URL.revokeObjectURL(url);
@@ -235,14 +227,8 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
 
   async function addFiles(files: File[], pasted = false) {
     if (files.length === 0) return;
-    // The chooser may be used before the list has finished loading: wait for the store instead of refusing.
-    let target: ImageStore;
-    try {
-      target = store ?? await loadStore(deviceKey);
-    } catch {
-      onToast(LOAD_FAILED);
-      return;
-    }
+    // Images go into the folder that is open; in 全部图片 and 未分类 they stay without a folder.
+    const folder = folderOfImageFilter(filter);
     let added = 0;
     let rejected = 0;
     let firstProblem = "";
@@ -250,16 +236,13 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
       const problem = validateImageFile(file);
       if (problem) { rejected += 1; firstProblem ||= problem; continue; }
       try {
-        const meta = await target.add(file, titleForFile(file, pasted));
-        if (!mounted.current) return;
-        setImages((current) => [meta, ...(current ?? [])]);
+        await library.addImage(file, titleForFile(file, pasted), folder);
         added += 1;
       } catch (error) {
         rejected += 1;
         firstProblem ||= readableMessage(error, "图片保存失败，请重试");
       }
     }
-    if (!mounted.current) return;
     if (added === 0) onToast(firstProblem);
     else if (rejected > 0) onToast(`已添加 ${added} 张，有 ${rejected} 张没有添加：${firstProblem}`);
     else onToast(added === 1 ? "图片已加密保存" : `已添加 ${added} 张图片`);
@@ -307,9 +290,9 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
   }), []);
 
   async function copyImage(meta: ImageMeta) {
-    if (!store) return;
+    if (!ready) return;
     try {
-      const png = await toPngBytes(await store.getBlob(meta.id));
+      const png = await toPngBytes(await getBlob(meta.id));
       if (window.clipboxDesktop?.copyImage) {
         await window.clipboxDesktop.copyImage(png);
       } else {
@@ -324,14 +307,13 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
     setCopiedId(meta.id);
     if (copyTimer.current) clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopiedId(""), 1250);
-    store.markUsed(meta.id).catch(() => undefined);
+    markUsed(meta.id).catch(() => undefined);
   }
 
   async function submitRename() {
-    if (!store || !renaming) return;
+    if (!renaming) return;
     try {
-      const updated = await store.rename(renaming.id, renaming.value);
-      setImages((current) => current?.map((meta) => meta.id === updated.id ? updated : meta) ?? current);
+      await library.rename(renaming.id, renaming.value);
       setRenaming(null);
       onToast("已改名");
     } catch {
@@ -340,11 +322,10 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
   }
 
   async function confirmDelete() {
-    if (!store || !deleteTarget) return;
+    if (!deleteTarget) return;
     const id = deleteTarget.id;
-    await store.remove(id);
+    await library.remove(id);
     forgetThumb(id);
-    setImages((current) => current?.filter((meta) => meta.id !== id) ?? current);
     setDeleteTarget(null);
     setSelectedId("");
     onToast("图片已删除");
@@ -352,8 +333,25 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
 
   function toggleRow(id: string) {
     setRenaming(null);
+    setMoveMenu(null);
     setSelectedId((current) => current === id ? "" : id);
   }
+
+  function toggleMoveMenu(id: string, anchor: "more" | "line", trigger: HTMLElement) {
+    const rect = trigger.getBoundingClientRect();
+    const room = window.innerHeight - rect.bottom;
+    const wanted = Math.min(260, (folders.length + 2) * 30 + 16);
+    const up = room < wanted + 8 && rect.top > room;
+    setMoveMenu((current) => current?.id === id && current.anchor === anchor ? null : { id, anchor, up });
+  }
+
+  async function moveTo(meta: ImageMeta, folder: string | null) {
+    setMoveMenu(null);
+    await library.moveImage(meta.id, folder);
+  }
+
+  // An image whose folder is gone counts as 未分类 (the library never leaves one, but a stale name must not show up).
+  const folderOfMeta = (meta: ImageMeta) => meta.folder && folders.some((entry) => entry.name === meta.folder) ? meta.folder : null;
 
   const thumb = (meta: ImageMeta) => (
     <span className="image-thumb" aria-hidden="true">
@@ -366,10 +364,10 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
 
   let body: React.ReactNode;
   if (loadError) {
-    body = <div className="native-empty"><strong>{loadError}</strong><button type="button" className="secondary-button" onClick={() => setReloadTick((tick) => tick + 1)}>重试</button></div>;
+    body = <div className="native-empty"><strong>{loadError}</strong><button type="button" className="secondary-button" onClick={library.retry}>重试</button></div>;
   } else if (!images) {
     body = <div className="native-empty image-loading"><span>正在读取图片…</span></div>;
-  } else if (total === 0) {
+  } else if (total === 0 && filter === IMAGE_FILTER_ALL) {
     body = compact ? (
       <div className="native-empty"><strong>还没有图片</strong><span>回到完整窗口添加第一张</span></div>
     ) : (
@@ -384,7 +382,13 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
       </div>
     );
   } else if (shown.length === 0) {
-    body = <div className="native-empty"><strong>没有匹配的图片</strong><span>换个词搜索试试</span></div>;
+    const folderName = folderOfImageFilter(filter);
+    body = query.trim() || inFolder.length > 0
+      ? <div className="native-empty"><strong>没有匹配的图片</strong><span>换个词搜索试试</span></div>
+      : <div className="native-empty">
+        <strong>{folderName ? "这个目录还是空的" : "没有未分类的图片"}</strong>
+        <span>{compact ? "回到完整窗口添加图片" : folderName ? "点右上角的「新增图片」，会放进这个目录" : "新增的图片会先放在这里"}</span>
+      </div>;
   } else if (compact) {
     body = shown.map((meta) => (
       <article key={meta.id} className={`native-row mini-row image-row ${copiedId === meta.id ? "copied" : ""}`}>
@@ -401,6 +405,7 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
       const open = openId === meta.id;
       const copied = copiedId === meta.id;
       const editing = open && renaming?.id === meta.id ? renaming : null;
+      const currentFolder = folderOfMeta(meta);
       return (
         <article key={meta.id} data-image-id={meta.id} className={`native-row image-row ${open ? "selected" : ""} ${copied ? "copied" : ""}`}>
           <div className="row-line">
@@ -438,10 +443,25 @@ export function ImageSection({ deviceKey, query, compact, paused, onToast, onCou
               ) : <span>正在读取…</span>}
             </div>
             <small className="image-facts">{sizeLabel(meta)}</small>
+            <div className="image-folder-line">
+              <span>目录</span>
+              <div className="menu-wrap" data-move-menu>
+                <button type="button" className="image-folder-button" aria-haspopup="menu" aria-expanded={moveMenu?.id === meta.id && moveMenu.anchor === "line"} aria-label={`目录：${currentFolder ?? "未分类"}，点击移动`} onClick={(event) => toggleMoveMenu(meta.id, "line", event.currentTarget)}>
+                  <i className="menu-dot" aria-hidden="true" style={{ background: currentFolder ? colors[currentFolder] : UNCATEGORIZED_COLOR }} />
+                  <span>{currentFolder ?? "未分类"}</span>
+                  <ChevronGlyph />
+                </button>
+                {moveMenu?.id === meta.id && moveMenu.anchor === "line" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={moveMenu.up} onMove={(folder) => void moveTo(meta, folder)} />}
+              </div>
+            </div>
             <div className="row-actions">
               <button type="button" className="primary-button" onClick={() => void copyImage(meta)}>{copied ? <CheckGlyph /> : <CopyGlyph />}{copied ? "已复制" : "复制"}</button>
               <button type="button" className="ghost-button" onClick={() => setRenaming({ id: meta.id, value: meta.title })}>改名</button>
               <span className="spacer" />
+              <div className="menu-wrap" data-move-menu>
+                <button type="button" className="icon-button" aria-label={`更多操作 ${meta.title}`} aria-haspopup="menu" aria-expanded={moveMenu?.id === meta.id && moveMenu.anchor === "more"} onClick={(event) => toggleMoveMenu(meta.id, "more", event.currentTarget)}><MoreGlyph /></button>
+                {moveMenu?.id === meta.id && moveMenu.anchor === "more" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={moveMenu.up} onMove={(folder) => void moveTo(meta, folder)} />}
+              </div>
               <button type="button" className="ghost-button danger-text" onClick={() => setDeleteTarget(meta)}>删除</button>
             </div>
           </div></div>}

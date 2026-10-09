@@ -61,6 +61,9 @@ import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
+import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
+import { imageFilterTitle } from "./image-folders-core";
+import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup } from "./settings-folders";
@@ -269,6 +272,8 @@ export default function Home() {
   const [imageView, setImageView] = useState(false);
   const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
   const imageSectionRef = useRef<ImageSectionHandle>(null);
+  // Images and folders are shared by the sidebar and the list; nothing is read until 图片 is first opened.
+  const imageLibrary = useImageLibrary(deviceKey, imageView, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -1268,7 +1273,7 @@ export default function Home() {
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipbox…</span></main>;
 
   const isMini = windowMode === "mini";
-  const sectionTitle = imageView ? "全部图片" : activeFolder === "all"
+  const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
     ? (activeKind === "snippet" ? "全部话术" : `全部${SECRET_WORD}`)
     : activeFolder === "pinned" ? "收藏"
       : activeFolder === "recent" ? "最近使用"
@@ -1362,6 +1367,7 @@ export default function Home() {
             <div className="native-search">
               <Icon name="search" className="search-glyph" />
               {searchInput}
+              {imageView && <ImageFolderSelect library={imageLibrary} />}
               {!imageView && <label className="mini-folder">
                 <span className="sr-only">目录</span>
                 <select value={activeFolder} onChange={(event) => selectFolder(event.target.value)}>
@@ -1375,7 +1381,7 @@ export default function Home() {
               </label>}
             </div>
           </div>
-          {imageView && <ImageSection ref={imageSectionRef} deviceKey={deviceKey} query={query} compact paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
           {!imageView && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
@@ -1403,11 +1409,10 @@ export default function Home() {
           <aside className="sidebar" aria-label="目录">
             <div className="sidebar-top drag-region"><div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div></div>
             {kindSwitch}
+            {imageView ? <ImageFolderNav library={imageLibrary} /> : <>
             <nav className="nav-list" aria-label="快捷入口">
-              {imageView && <button type="button" className="nav-item active" aria-current="page"><span className="nav-icon"><Icon name="grid" className="accent" /></span><span className="nav-label">全部图片</span><b>{imageCounts.total}</b></button>}
-              {!imageView && directoryShortcuts.map((shortcut) => <button key={shortcut.id} type="button" className={`nav-item ${activeFolder === shortcut.id ? "active" : ""}`} onClick={() => selectFolder(shortcut.id)}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{shortcut.count}</b></button>)}
+              {directoryShortcuts.map((shortcut) => <button key={shortcut.id} type="button" className={`nav-item ${activeFolder === shortcut.id ? "active" : ""}`} onClick={() => selectFolder(shortcut.id)}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{shortcut.count}</b></button>)}
             </nav>
-            {imageView ? <div className="nav-scroll" /> : <>
             <div className="nav-heading">
               <span>目录</span>
               <button ref={folderCreateButtonRef} type="button" onClick={startNewFolder} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
@@ -1475,7 +1480,7 @@ export default function Home() {
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
             </div>
-            {imageView && <ImageSection ref={imageSectionRef} deviceKey={deviceKey} query={query} compact={false} paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
             {!imageView && <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
               {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
