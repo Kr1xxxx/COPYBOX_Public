@@ -22,6 +22,7 @@ export async function asDesktop(page, platform) {
     window.clipboxDesktop = {
       platform: pl,
       copyText: async (text) => { window.__copied = text; },
+      copyImage: async (png) => { window.__copiedImage = Array.from(png.slice(0, 8)); window.__copiedImageLength = png.length; },
       didCopy() {},
       getVersion: async () => "0.0.0-test",
       onFocusSearch: () => () => {},

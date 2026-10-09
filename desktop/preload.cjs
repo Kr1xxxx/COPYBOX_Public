@@ -34,6 +34,7 @@ window.addEventListener("DOMContentLoaded", () => {
 contextBridge.exposeInMainWorld("clipboxDesktop", {
   platform: process.platform,
   copyText: (text) => ipcRenderer.invoke("clipbox:copy-text", text),
+  copyImage: (png) => ipcRenderer.invoke("clipbox:copy-image", png),
   didCopy: () => ipcRenderer.send("clipbox:did-copy"),
   setTheme: (theme) => ipcRenderer.send("clipbox:set-theme", theme),
   openDataFolder: () => ipcRenderer.invoke("clipbox:open-data-folder"),

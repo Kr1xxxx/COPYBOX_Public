@@ -1,9 +1,9 @@
 # Clipbox
 
 Clipbox is a local, encrypted copy box that opens instantly. It has two sections: 话术 (snippets — canned
-customer-service replies) and a second section that is called 备注 on Windows and 秘密 on macOS.
+customer-service replies) a 图片 section for copying images, and on macOS a 秘密 section.
 
-> On Windows, 备注 is plain-text notes (content shown directly, no masking, references or segments).
+> On Windows the sections are 话术 and 图片; the former plain-text 备注 section was replaced by 图片 (D-017).
 > On macOS, 秘密 keeps masked content and copy-by-reference.
 
 ## Working on this repository
@@ -70,7 +70,7 @@ and stores data in Clipbox's own macOS application-data folder.
 - No keyboard shortcut hints or modifier shortcuts
 - Animations pause when the desktop window is unfocused, minimised or hidden, and after 30 s without input;
   the vault and local commands keep working
-- The UI only exports the snippet backup; 秘密/备注 has no export button
+- The UI exports the snippet backup and, on macOS, a separate 秘密 backup; images (图片) are not in any backup yet
 - Backups are encrypted with their own password and never contain the device key; imports are decrypted and
   validated first, then merged or replaced; older backups are still accepted
 - No accounts, no server, no remote database
@@ -100,7 +100,7 @@ clipbox secret get "clipbox://secret/<ID>" --json
 The `--json` response contains the secret; the calling task should pass it straight to the target API and never
 print it. Secrets cannot be listed, searched, bulk-read or modified through the command.
 
-Settings → 数据 has 导出秘密备份 (导出备注备份 on Windows): it saves the second section to its own encrypted file
+On macOS, Settings → 数据 has 导出秘密备份: it saves the 秘密 section to its own encrypted file
 with a separate password, never mixed with snippets. A helper task can write the same file from the command line:
 it passes the password on standard input, never prints the secret or ciphertext and never overwrites an existing
 file:

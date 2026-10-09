@@ -58,8 +58,8 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
         <header><h2 id="settings-title">设置</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">×</button></header>
         <div className="settings-body">
           <section aria-labelledby="set-data"><h3 id="set-data">数据</h3>
-            {row("导出话术备份", `用独立密码加密，不包含${SECRET_WORD} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
-            {row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
+            {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
+            {!PLAIN_NOTES && row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
             {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
             {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
@@ -78,7 +78,7 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
             </div>
           </section>
           <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
-            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{SECRET_WORD}不会进入话术备份{PLAIN_NOTES ? "。" : `，复制${SECRET_WORD}默认只给出引用。`}</p>
+            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
           </section>
           <section aria-labelledby="set-trash"><h3 id="set-trash">回收站</h3>
             <div className="settings-row"><div><strong>自动清理</strong><small>超过期限的已删除内容会被永久删除</small></div>

@@ -9,7 +9,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | --- | --- | --- |
 | D-001 | Windows first | Accepted |
 | D-002 | macOS ships Apple silicon (arm64) only | Accepted |
-| D-003 | Second section: plain-text 备注 on Windows, 秘密 on macOS | Accepted |
+| D-003 | Second section: plain-text 备注 on Windows, 秘密 on macOS | Superseded by D-017 (Windows part) |
 | D-004 | UI layout "H" | Accepted |
 | D-005 | No keyboard shortcuts at all | Accepted |
 | D-006 | No auto-clear clipboard; no command-line help in Settings | Accepted |
@@ -23,6 +23,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-014 | No real-device testing round before merging | Accepted |
 | D-015 | Device-key protection removed for now | Accepted |
 | D-016 | Backups stay local files; no cloud or email upload | Accepted |
+| D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 
 ---
 
@@ -136,3 +137,11 @@ Statuses: Accepted / Superseded / Deprecated.
 - Decision (owner): keep saving the encrypted backup as a local file ("本地保存即可"). No cloud, email or sync feature.
 - Consequences: "no server, no accounts" still holds. Getting the backup file somewhere safe is up to the person
   (copy it to a synced folder or mail it themselves). Revisit only if the owner asks again.
+
+### D-017 图片 section (2026-10-09)
+- Context (owner): "单独复制图片的功能 … 把备注直接改成复制图片". No 备注 entries are in use.
+- Decision (owner): Windows shows 话术 | 图片 — the 备注 section is gone. macOS keeps 秘密 and adds 图片: 话术 | 秘密 | 图片.
+  An image is copied as the picture itself (PNG). Spec: `docs/specs/image-section.md`.
+- Consequences: images live in their own encrypted IndexedDB store (`clipbox-images`), keyed from the vault's device key;
+  the vault and `clipbox.vault.v1` are unchanged. v1 has no folders, trash or image backup — images are not in any backup
+  file yet, so clearing app data loses them. Old Windows 备注 entries, if any, stay in the vault but are not shown.

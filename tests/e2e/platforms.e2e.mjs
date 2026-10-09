@@ -1,21 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { asDesktop, seedSnippets } from "./helpers.mjs";
 
-test("Windows: the second section is plain-text 备注 and there is no empty title band", async ({ page }) => {
+test("Windows: the second section is 图片 (no 备注) and there is no empty title band", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);
   expect(await page.locator(".sidebar-top").evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(20);
-  await page.getByRole("button", { name: "备注" }).first().click();
-  await page.getByRole("button", { name: /新增/ }).first().click();
-  const editor = page.locator(".inline-editor");
-  await expect(editor).toContainText("备注内容");
-  await expect(editor).not.toContainText("被什么引用");
-  await expect(editor).not.toContainText("隐藏内容");
-  await editor.locator("input").first().fill("公司地址");
-  await editor.locator("textarea").first().fill("台北市信义区 123 号");
-  await editor.locator(".editor-save").first().click();
-  await page.locator(".native-row .row-main").first().click();
-  await expect(page.locator(".native-row.selected")).toContainText("台北市信义区 123 号");
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片"]);
+  await page.getByRole("button", { name: "图片" }).first().click();
+  await expect(page.getByRole("button", { name: "新增图片" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("备注");
   await expect(page.locator(".native-reference")).toHaveCount(0);
 });
 
@@ -51,12 +44,13 @@ test("macOS: no taskbar option (the Dock icon already reopens the window)", asyn
   await expect(group.getByRole("radio")).toHaveText(["收到托盘", "退出"]);
 });
 
-test("Windows: the empty 备注 page does not mention copy references", async ({ page }) => {
+test("Windows: the empty 图片 page does not mention copy references", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);
-  await page.getByRole("button", { name: "备注" }).first().click();
-  await expect(page.locator("body")).toContainText("把常用的信息记在这里");
+  await page.getByRole("button", { name: "图片" }).first().click();
+  await expect(page.locator("body")).toContainText("把常发的图片存进来，一键复制。");
   await expect(page.locator("body")).not.toContainText("复制引用");
+  await expect(page.locator("body")).not.toContainText("备注");
 });
 
 test("macOS: the empty 秘密 page still says only the reference is copied", async ({ page }) => {

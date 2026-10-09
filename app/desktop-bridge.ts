@@ -5,6 +5,7 @@ export type WindowMode = "full" | "mini";
 export type ClipboxDesktop = {
   platform?: string;
   copyText: (text: string) => Promise<void>;
+  copyImage?: (png: Uint8Array) => Promise<void>;
   didCopy: () => void;
   setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;

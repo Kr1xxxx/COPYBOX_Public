@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CATEGORY_PALETTE } from "./category-colors";
 import type { ItemKind } from "./clipbox-core";
-import { SECRET_WORD } from "./platform";
+import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 
@@ -107,7 +107,7 @@ export function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, on
         </div>
       ))}
       {error && <p className="settings-error" role="alert">{error}</p>}
-      <p className="settings-note">标准话术目录固定，只能改颜色。话术目录里还有内容时不能删除；{SECRET_WORD}目录删除后，里面的内容会移到未分类。</p>
+      <p className="settings-note">标准话术目录固定，只能改颜色。话术目录里还有内容时不能删除{PLAIN_NOTES ? "。" : `；${SECRET_WORD}目录删除后，里面的内容会移到未分类。`}</p>
     </div>
   );
 }
