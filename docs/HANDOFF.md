@@ -3,7 +3,7 @@
 > The single "where are we now". Update it before you stop working; the session log lives in
 > `docs/handoff-log.md`. Keep this file under 100 lines.
 
-## Status (2026-10-08)
+## Status (2026-10-09)
 
 - Repository: https://github.com/Kr1xxxx/Clipbox
 - `main` has the new UI ("H") since PR #1 was merged on the owner's word. Start from `main`.
