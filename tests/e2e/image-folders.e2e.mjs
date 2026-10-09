@@ -401,11 +401,11 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
   await expect(rows(page)).toHaveCount(4);
   await expect.poll(() => page.locator(".image-thumb img").count()).toBe(4);
 
-  // Thumbnails are cropped squares.
+  // Thumbnails are squares that show the whole picture (never cropped).
   for (const thumb of await page.locator(".image-thumb").all()) {
     const box = await thumb.boundingBox();
     expect(Math.abs(box.width - box.height)).toBeLessThan(0.5); // sub-pixel noise while the row slides in
-    await expect(thumb.locator("img")).toHaveCSS("object-fit", "cover");
+    await expect(thumb.locator("img")).toHaveCSS("object-fit", "contain");
   }
 
   for (const { name, width, height } of cases) {

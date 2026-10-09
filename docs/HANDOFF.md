@@ -40,7 +40,9 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 12 | 图片 section (D-017): Windows 话术 \| 图片, Mac 话术 \| 秘密 \| 图片; copy images | Done | Claude | Spec `docs/specs/image-section.md`; store by an Opus worker, desktop IPC and UI by Sonnet workers; PR waits for the owner's 合并. Not in v1: folders, trash, image backup |
 | 13 | 图片 folders (D-018) | Done | Claude | Store by an Opus worker (`image-store.ts`), UI by a Sonnet worker (`image-library.ts`, `image-folders.tsx`, `image-folders-core.ts`); Merged as PR #25 (2026-10-09). Not yet: drag-sorting folders, image backup |
 | 14 | Web preview tool in the repo (`tools/preview/`, `npm run preview:build` / `preview:serve`) | Done | Claude | Was only in a temp folder; now any session can rebuild the preview with its version number. PR waits for the owner (package.json, eslint config) |
+| 16 | 图片 16宫格 + full-picture thumbnails (D-020) | Done | Claude | 4 per row, `object-fit: contain`; PR waits for review by CI/owner |
 | 17 | Motion from arc-library, step 1 of 4 (D-021): copy icon + toast | In progress | Claude | Adds `motion` (needs the owner's 合并). Steps 2-4: switches/segmented/checkboxes; menus/dialogs; rename/search/drop zone/empty pages/counters |
+| 18 | 图片 detail scrolls so the clicked picture stays fully visible (advisor item 12) | In progress | Claude | `detailScrollDelta` in `image-view-core.ts`; PR stacked on #38 |
 | 18 | Settings: 自动清理 defaults to 7 天; 目录 groups fold open on click (arc-library accordion motion, `app/arc/collapsible.tsx`); new 图片目录 group (create, rename, colour, delete; no ordering: the image store has none) | Done | Claude | Stacked on PR #39 (uses `motion`); merges after #39. The 7-day default applies to everyone who never picked an option |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 

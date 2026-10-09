@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   IMAGE_VIEW_KEY,
+  detailScrollDelta,
   gridCardInsertIndex,
+  IMAGE_GRID_COLUMNS,
   parseImageView,
   readImageView,
   writeImageView,
@@ -51,11 +53,10 @@ test("unavailable storage never throws and falls back to the grid", () => {
 });
 
 test("the detail card goes after the last tile of the selected tile's row", () => {
-  // 10 tiles: rows are 0-2, 3-5, 6-8, 9.
-  assert.deepEqual([0, 1, 2].map((i) => gridCardInsertIndex(i, 10)), [3, 3, 3]);
-  assert.deepEqual([3, 4, 5].map((i) => gridCardInsertIndex(i, 10)), [6, 6, 6]);
-  assert.deepEqual([6, 7, 8].map((i) => gridCardInsertIndex(i, 10)), [9, 9, 9]);
-  assert.equal(gridCardInsertIndex(9, 10), 10);
+  // 10 tiles in 4 columns: rows are 0-3, 4-7, 8-9.
+  assert.deepEqual([0, 1, 2, 3].map((i) => gridCardInsertIndex(i, 10)), [4, 4, 4, 4]);
+  assert.deepEqual([4, 5, 6, 7].map((i) => gridCardInsertIndex(i, 10)), [8, 8, 8, 8]);
+  assert.deepEqual([8, 9].map((i) => gridCardInsertIndex(i, 10)), [10, 10]);
 });
 
 test("the card position is clamped to a short last row and ignores a missing selection", () => {
@@ -66,4 +67,13 @@ test("the card position is clamped to a short last row and ignores a missing sel
   assert.equal(gridCardInsertIndex(5, 5), -1);
   assert.equal(gridCardInsertIndex(0, 0), -1);
   assert.equal(gridCardInsertIndex(3, 7, 2), 4);
+  assert.equal(IMAGE_GRID_COLUMNS, 4);
+});
+
+test("the detail scroll keeps the clicked picture in view", () => {
+  // view 100..500 (pad 6 -> 106..494)
+  assert.equal(detailScrollDelta(100, 500, 200, 400), 0); // everything already visible
+  assert.equal(detailScrollDelta(100, 500, 300, 600), 106); // card sticks out below: scroll down just enough
+  assert.equal(detailScrollDelta(100, 500, 90, 300), -16); // picture cut off above: scroll up
+  assert.equal(detailScrollDelta(100, 500, 300, 900), 194); // card taller than the view: picture goes to the top
 });

@@ -686,7 +686,7 @@ button { -webkit-tap-highlight-color: transparent; }
 /* 图片 section */
 .image-section { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .image-thumb { width: 32px; height: 32px; flex: 0 0 auto; margin-right: 10px; overflow: hidden; display: grid; place-items: center; border-radius: 7px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line-soft); }
-.image-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.image-thumb img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .image-row .row-detail-inner { padding-left: 12px; grid-template-columns: minmax(0, 1fr); }
 .native-row.image-row.selected .row-line { height: 44px; }
 .image-preview { min-height: 80px; grid-template-columns: minmax(0, 1fr); max-height: min(260px, 42vh); padding: 8px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; background: var(--content); color: var(--muted); font-size: 12.5px; }
@@ -719,8 +719,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .menu-empty { margin: 4px 9px 6px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .directory-row:has(.folder-more[aria-expanded="true"]) .directory-main b { opacity: 0; }
 
-/* 图片 grid view (docs/specs/image-grid.md): 3 equal columns; the opened picture's card spans all of them. */
-.native-list.image-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-content: start; align-items: start; padding-top: 4px; }
+/* 图片 grid view (docs/specs/image-grid.md): 4 equal columns (16 tiles = 4 rows of 4), whole picture shown (contain); the opened picture's card spans all of them. */
+.native-list.image-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-content: start; align-items: start; padding-top: 4px; }
 .image-view-switch { margin-left: 4px; }
 .image-view-switch button { width: 30px; padding: 0; display: grid; place-items: center; }
 .image-view-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -728,7 +728,14 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-tile-main { width: 100%; min-width: 0; padding: 0; display: grid; gap: 6px; border: 0; border-radius: 11px; background: none; color: inherit; text-align: left; cursor: pointer; }
 .image-tile-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .image-tile-thumb { position: relative; width: 100%; aspect-ratio: 1; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--fill); transition: border-color .16s, box-shadow .16s; }
-.image-tile-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; user-select: none; }
+/* 毛玻璃 (D-020): a colourless frosted-glass surface (neutral tint + backdrop blur, no picture colours); the picture keeps a 6% margin and is never cropped. */
+.image-tile-thumb { isolation: isolate; }
+.image-tile-thumb img { display: block; user-select: none; }
+.image-tile-thumb::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: linear-gradient(145deg, rgba(255,255,255,.62), rgba(255,255,255,.3)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), inset 0 1px 6px rgba(255,255,255,.5); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); pointer-events: none; }
+.image-tile-pic { position: absolute; left: 6%; top: 6%; width: 88%; height: 88%; z-index: 2; object-fit: contain; filter: drop-shadow(0 2px 5px rgba(31,30,28,.22)); }
+.image-tile-thumb .mini-copied { z-index: 3; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .image-tile-thumb::after { background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.06)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 6px rgba(255,255,255,.08); } }
+:root[data-theme="dark"] .image-tile-thumb::after { background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.06)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 6px rgba(255,255,255,.08); }
 .image-tile-title { min-width: 0; padding: 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 12.5px; font-weight: 500; line-height: 1.3; }
 .image-tile-main:hover .image-tile-thumb { border-color: var(--border); box-shadow: 0 2px 8px rgba(31,30,28,.1); }
 .image-tile.selected .image-tile-thumb { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px var(--ring); }
@@ -737,6 +744,16 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-tile:hover .image-tile-copy, .image-tile-copy:hover, .image-tile-copy:focus-visible { opacity: 1; }
 .image-tile-copy:hover { color: var(--ink); }
 .image-tile-copy:active { transform: scale(.88); }
+/* Motion (owner: prefer motion): tiles fade in one after another and the picture eases up on hover. Opacity and the picture
+   inside the tile only, so tile boxes never move. prefers-reduced-motion turns it all off (rule above). */
+@keyframes tile-fade { from { opacity: 0; } to { opacity: 1; } }
+.image-tile, .mini-tile { animation: tile-fade .32s ease-out backwards; }
+.image-tile:nth-child(4n+2), .mini-tile:nth-child(4n+2) { animation-delay: .04s; }
+.image-tile:nth-child(4n+3), .mini-tile:nth-child(4n+3) { animation-delay: .08s; }
+.image-tile:nth-child(4n), .mini-tile:nth-child(4n) { animation-delay: .12s; }
+.image-tile-pic { transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.image-tile-main:hover .image-tile-pic { transform: scale(1.06); }
+.image-tile-main:active .image-tile-pic { transform: scale(.97); }
 .image-tile-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .image-tile-copy .icon { width: 15px; height: 15px; }
 .image-tile.copied .image-tile-copy { opacity: 1; background: var(--ok-bg); color: var(--ok); }
@@ -745,8 +762,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-card .image-card-title { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.4; }
 .image-card .image-rename { padding: 0; }
 .image-card .row-detail-inner { padding-top: 2px; }
-/* Mini window: 3 compact columns, a click copies. */
-.mini-list.image-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 6px 8px 8px; }
+/* Mini window: 4 compact columns, a click copies. */
+.mini-list.image-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 6px 8px 8px; }
 .mini-tile { position: relative; min-width: 0; }
 .mini-tile .image-tile-main { gap: 4px; border-radius: 9px; }
 .mini-tile .image-tile-thumb { border-radius: 8px; }
