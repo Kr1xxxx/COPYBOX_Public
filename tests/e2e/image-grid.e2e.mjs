@@ -404,3 +404,19 @@ test("the tile copy button shows only on hover or keyboard focus, so the whole p
   await page.keyboard.press("Shift+Tab");
   await expect(button("图二")).toHaveCSS("opacity", "1");
 });
+
+test("segmented controls keep one highlight pill that follows the selected option (arc step 2)", async ({ page }) => {
+  await openImages(page);
+  const pillInActive = async (control) => {
+    await expect(control.locator(".arc-seg-pill")).toHaveCount(1);
+    await expect(control.locator("button.active .arc-seg-pill")).toHaveCount(1);
+  };
+  await pillInActive(page.locator(".kind-switch"));
+  await pillInActive(page.locator(".image-view-switch"));
+  await page.getByRole("button", { name: "列表视图" }).click();
+  await pillInActive(page.locator(".image-view-switch"));
+  await expect(page.getByRole("button", { name: "列表视图" })).toHaveAttribute("aria-pressed", "true");
+  await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
+  await pillInActive(page.locator(".kind-switch"));
+  await expect(page.locator(".kind-switch").getByRole("button", { name: "话术" })).toHaveAttribute("aria-pressed", "true");
+});

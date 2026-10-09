@@ -772,3 +772,14 @@ button { -webkit-tap-highlight-color: transparent; }
 .mini-tile .image-tile-title { font-size: 11px; }
 .mini-tile .mini-copied { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 2px 0; border-radius: 6px; background: var(--ok-bg); color: var(--ok); text-align: center; font-size: 11px; }
 .mini-tile.copied .image-tile-thumb { border-color: var(--ok); }
+
+/* Segmented controls (app/arc/segmented.tsx): the highlight is one pill that glides between options. The active button keeps its
+   `active` class but no longer paints its own background; the pill paints it, in the colours each control had before. */
+.arc-seg button { position: relative; isolation: isolate; }
+.arc-seg button.active { background: transparent; box-shadow: none; }
+.arc-seg .arc-seg-label { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; }
+.arc-seg-pill { position: absolute; inset: 0; z-index: 0; border-radius: inherit; background: var(--card); box-shadow: 0 1px 2px rgba(31,30,28,.1), 0 0 0 .5px rgba(31,30,28,.06); pointer-events: none; }
+.settings-segment .arc-seg-pill { background: var(--bg); box-shadow: 0 1px 3px rgba(31,30,28,.14); }
+.scope-switch .arc-seg-pill { box-shadow: 0 1px 2px rgba(31,30,28,.14); }
+.segmented .arc-seg-pill { background: white; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.inline-editor .segmented .arc-seg-pill { background: var(--card); }
