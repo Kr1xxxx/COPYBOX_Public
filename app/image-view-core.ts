@@ -31,3 +31,17 @@ export function gridCardInsertIndex(selectedIndex: number, length: number, colum
   if (selectedIndex < 0 || selectedIndex >= length) return -1;
   return Math.min(Math.ceil((selectedIndex + 1) / columns) * columns, length);
 }
+
+/**
+ * How far to scroll (positive = down) so the clicked picture stays fully visible once its detail card has opened.
+ * Prefers showing the whole span from the picture to the end of the card; when that is taller than the view, the
+ * picture goes to the top so it is never pushed out of sight.
+ */
+export function detailScrollDelta(viewTop: number, viewBottom: number, itemTop: number, endBottom: number, pad = 6): number {
+  const top = viewTop + pad;
+  const bottom = viewBottom - pad;
+  if (endBottom - itemTop > bottom - top) return itemTop - top;
+  if (itemTop < top) return itemTop - top;
+  if (endBottom > bottom) return endBottom - bottom;
+  return 0;
+}

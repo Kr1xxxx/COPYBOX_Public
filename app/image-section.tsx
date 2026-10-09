@@ -17,7 +17,7 @@ import {
   imageFolderColors,
 } from "./image-folders-core";
 import { readableMessage, type ImageLibrary } from "./image-library";
-import { gridCardInsertIndex, type ImageView } from "./image-view-core";
+import { detailScrollDelta, gridCardInsertIndex, type ImageView } from "./image-view-core";
 import {
   IMAGE_TITLE_MAX,
   IMAGE_TYPES,
@@ -260,12 +260,23 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   useEffect(() => { onCounts({ total, shown: shown.length }); }, [onCounts, total, shown.length]);
 
   const openId = shown.some((meta) => meta.id === selectedId) ? selectedId : "";
-  // The opened row grows downwards; once it has finished opening, bring all of it into view.
+  // The opened row grows downwards; once it has finished opening, scroll so the clicked picture (and as much of its
+  // card as fits) is fully visible.
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!openId) return;
     const timer = setTimeout(() => {
-      listRef.current?.querySelector(`[data-image-id="${CSS.escape(openId)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const list = listRef.current;
+      const id = CSS.escape(openId);
+      const card = list?.querySelector(`[data-image-id="${id}"]`);
+      if (!list || !card) return;
+      const tile = list.querySelector(`[data-tile-id="${id}"]`);
+      // The list itself or the page scrolls, depending on the window height: use whichever the picture is in.
+      let scroller: HTMLElement | null = list;
+      while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+      const view = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+      const delta = detailScrollDelta(view.top, view.bottom, (tile ?? card).getBoundingClientRect().top, card.getBoundingClientRect().bottom);
+      if (Math.abs(delta) > 1) (scroller ?? window).scrollBy({ top: delta, behavior: "smooth" });
     }, 280);
     return () => clearTimeout(timer);
   }, [openId]);
