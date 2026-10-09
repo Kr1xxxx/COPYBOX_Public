@@ -25,7 +25,8 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-016 | Backups stay local files; no cloud or email upload | Accepted |
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 | D-018 | 图片 folders (目录) | Accepted |
-| D-019 | 图片 shown as a 九宫格 (3-column grid) by default | Accepted |
+| D-019 | 图片 shown as a 九宫格 (grid) by default | Accepted (columns changed by D-020) |
+| D-020 | 图片 grid is 16宫格 (4 per row) and thumbnails show the whole picture | Accepted |
 
 ---
 
@@ -164,3 +165,11 @@ Statuses: Accepted / Superseded / Deprecated.
   row. A `宫格 | 列表` switch (kept per device in `localStorage` key `clipbox.image-view`) brings back the old list. The
   mini window always shows the grid, 3 compact columns, and a tile click copies. Spec: `docs/specs/image-grid.md`.
 - Consequences: a UI preference only; no stored image data changes.
+
+### D-020 图片 16宫格, whole picture in the thumbnail (2026-10-09)
+- Context (owner): "帮我做成 16 宫格,外加缩略图不要做自适应,要做能看到图片全部的大小".
+- Decision (owner): the grid has **4 tiles per row** (16 tiles = 4 full rows); this replaces the 3 columns of D-019
+  (mini window too). Thumbnails are never cropped: the whole picture is shown inside the square tile
+  (`object-fit: contain`, empty space shows the tile background). The same goes for the small list thumbnail.
+- Consequences: CSS and `IMAGE_GRID_COLUMNS` only; no stored image data changes. Tests that expected 3 columns or a
+  cropped thumbnail (`cover`) now expect 4 columns and `contain`, because the owner changed the behaviour.
