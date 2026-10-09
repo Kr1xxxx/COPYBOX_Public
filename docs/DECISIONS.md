@@ -176,3 +176,11 @@ Statuses: Accepted / Superseded / Deprecated.
   search, drop zone, empty pages, counters.
 - Consequences: package.json and the lock file change (owner's 合并 needed for every step). `prefers-reduced-motion` is honoured by
   every vendored component. Tests that read class names keep working because the old class names stay on the elements.
+
+### D-022 Trash auto-cleanup defaults to 7 days for everyone (2026-10-09)
+- Context (owner): "自动清理默认七天". The default used to be 不清理 (`clipbox.trash-retention-days` unset). Asked whether people
+  who never chose a setting should keep 不清理 or move to 7 days, the owner chose 「全部 7 天」 and confirmed it in this thread
+  ("確認全部 7 天").
+- Decision (owner): everyone who never picked a cleanup period moves to 7 天, existing users included. Trash older than 7 days
+  is deleted for good on the next start (accepted by the owner). Anyone who picked 不清理, 30 天 or 90 天 earlier keeps that choice.
+- Consequences: `DEFAULT_TRASH_DAYS = 7` in `app/preferences.ts` is the single place to change it. No migration, no notice.
