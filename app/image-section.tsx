@@ -3,6 +3,7 @@
 // The 图片 section: list, viewer, add (file chooser, drop, paste), rename, delete and copy.
 // Images live in the encrypted store from image-store.ts; nothing here touches the vault.
 
+import { ArcCopyIcon } from "./arc/copy-icon";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEvent, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { resolveFocusWrapIndex } from "./clipbox-core";
@@ -55,8 +56,6 @@ function Glyph({ children }: { children: React.ReactNode }) {
   return <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{children}</svg>;
 }
 const PlusGlyph = () => <Glyph><path d="M12 5v14M5 12h14" /></Glyph>;
-const CheckGlyph = () => <Glyph><path d="m5 12.5 4.5 4.5L19 7.5" /></Glyph>;
-const CopyGlyph = () => <Glyph><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></Glyph>;
 const PictureGlyph = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#29292c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="14" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 17 4.5-4.5 3.5 3.5 2.5-2.5L20 17" /></svg>;
 
 function ImageDeleteDialog({ target, onClose, onConfirm }: { target: ImageMeta; onClose: () => void; onConfirm: () => Promise<void> }) {
@@ -178,7 +177,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
         </div>
       </div>
       <div className="row-actions">
-        <button type="button" className="primary-button" onClick={onCopy}>{copied ? <CheckGlyph /> : <CopyGlyph />}{copied ? "已复制" : "复制"}</button>
+        <button type="button" className="primary-button" onClick={onCopy}><ArcCopyIcon copied={copied} />{copied ? "已复制" : "复制"}</button>
         <button type="button" className="ghost-button" onClick={onRename}>改名</button>
         <span className="spacer" />
         <div className="menu-wrap" data-move-menu>
@@ -518,7 +517,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
             <span className="image-tile-thumb">{tileImage(meta)}</span>
             <strong className="image-tile-title">{meta.title}</strong>
           </button>
-          <button type="button" className="image-tile-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}>{copied ? <CheckGlyph /> : <CopyGlyph />}</button>
+          <button type="button" className="image-tile-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}><ArcCopyIcon copied={copied} size={15} /></button>
           {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
         </div>
       );

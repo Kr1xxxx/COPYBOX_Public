@@ -1,5 +1,6 @@
 "use client";
 
+import { ArcToast } from "./arc/arc-toast";
 import { copyTextWithExpiry } from "./clipboard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
@@ -1617,8 +1618,11 @@ export default function Home() {
         onImport={applyImport}
       />}
       {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={PLAIN_NOTES ? "" : SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
-      {undoTrash && <div className="toast undo-toast" role="status"><span>✓</span>{undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站"}<button type="button" onClick={() => void undoTrashNow()}>撤销</button></div>}
-      {toast && !undoTrash && <div className="toast"><span>✓</span>{toast}</div>}
+      <ArcToast
+        message={undoTrash ? (undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站") : toast}
+        className={undoTrash ? "undo-toast" : undefined}
+        action={undoTrash ? { label: "撤销", onClick: () => void undoTrashNow() } : undefined}
+      />
     </main>
   );
 }
