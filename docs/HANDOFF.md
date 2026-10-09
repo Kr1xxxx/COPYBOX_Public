@@ -41,6 +41,8 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 13 | 图片 folders (D-018) | Done | Claude | Store by an Opus worker (`image-store.ts`), UI by a Sonnet worker (`image-library.ts`, `image-folders.tsx`, `image-folders-core.ts`); PR waits for the owner's 合并. Not yet: drag-sorting folders, image backup |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Part of PR #25 (not merged yet). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 
+The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
+
 ## Waiting on the owner
 
 - How the company's shared snippet library reaches every employee (today each person imports a spreadsheet).
