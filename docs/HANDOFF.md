@@ -32,6 +32,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 7 | Alternative to the tray: Windows setting "缩到任务栏" keeps the taskbar button; Dock click already reopens on Mac | Done | Claude | No shortcuts (D-005) |
 | 8 | CI type check of `app/` | Done | Claude | `npm run typecheck` (`tsconfig.typecheck.json`, separate from the build); owner approved |
 | 9 | Merge policy: code moved unchanged is not a storage change | Done | Claude | `scripts/classify-pr.mjs`; edited, new or deleted storage lines still need the owner; owner approved |
+| 10 | 导入备份 → 合并 restores an entry whose identical copy is in the trash | Done | Claude | Was silently skipped as a duplicate; found while building task 5 |
 
 ## Waiting on the owner
 

@@ -516,12 +516,27 @@ export function mergeImportedVaultData(
     };
   }
 
-  const signatures = new Set(current.items.map((item) => `${item.kind || "secret"}\u0000${item.label}\u0000${item.secret}`));
+  const itemSignature = (item: SecretItem) => `${item.kind || "secret"}\u0000${item.label}\u0000${item.secret}`;
+  const signatures = new Set(current.items.map(itemSignature));
+  // Signatures whose only current copies are in the trash: an active incoming copy restores one of them.
+  const activeSignatures = new Set(current.items.filter((item) => !isTrashedItem(item)).map(itemSignature));
+  const restorableIds = new Map<string, string>();
+  for (const item of current.items) {
+    const signature = itemSignature(item);
+    if (isTrashedItem(item) && !activeSignatures.has(signature) && !restorableIds.has(signature)) restorableIds.set(signature, item.id);
+  }
+  const restoredIds = new Set<string>();
   const ids = new Set(current.items.map((item) => item.id));
   const currentSnippetNumbers = new Set(current.items.flatMap((item) => item.snippetNumber ? [item.snippetNumber] : []));
   const items = source.items
     .filter((item) => {
-      const signature = `${item.kind || "secret"}\u0000${item.label}\u0000${item.secret}`;
+      const signature = itemSignature(item);
+      const restorableId = restorableIds.get(signature);
+      if (restorableId && !isTrashedItem(item)) {
+        restorableIds.delete(signature);
+        restoredIds.add(restorableId);
+        return false;
+      }
       if (signatures.has(signature)) return false;
       signatures.add(signature);
       return true;
@@ -539,15 +554,16 @@ export function mergeImportedVaultData(
       return { ...candidate, id };
     });
 
+  const currentItems = restoredIds.size ? restoreTrashedItems(current.items, [...restoredIds]) : current.items;
   const data = normalizeVaultData({
-    items: [...items, ...current.items],
+    items: [...items, ...currentItems],
     folders: mergeFolderRegistries(current.folders, source.folders),
     nextSnippetNumber: Math.max(current.nextSnippetNumber, source.nextSnippetNumber),
     folderColors: mergeFolderColors(current.folderColors, source.folderColors),
   });
   return {
     data,
-    importedCount: items.length,
+    importedCount: items.length + restoredIds.size,
   };
 }
 

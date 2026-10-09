@@ -199,6 +199,47 @@ test("merges imported items and per-kind folders without duplicate content", () 
   });
 });
 
+const mergeBase = { id: "m1", label: "地址", secret: "台北", note: "", color: "#fff", kind: "snippet", folder: "客服", createdAt: 1, updatedAt: 1 };
+
+test("merge import restores a trashed entry whose identical copy is in the backup", () => {
+  const current = normalizeVaultData({ items: [{ ...mergeBase, deletedAt: 50 }] });
+  const incoming = normalizeVaultData({ items: [{ ...mergeBase, id: "other" }] });
+  const result = mergeImportedVaultData(current, incoming, "merge", () => "fresh-id");
+  assert.equal(result.importedCount, 1);
+  assert.equal(result.data.items.length, current.items.length);
+  const restored = result.data.items.find((item) => item.id === "m1");
+  assert.ok(restored);
+  assert.equal(isTrashedItem(restored), false);
+  assert.equal("deletedAt" in restored, false);
+  assert.equal(restored.snippetNumber, current.items[0].snippetNumber);
+  assert.equal(restored.folder, "客服");
+});
+
+test("merge import still skips an entry that is already active", () => {
+  const current = normalizeVaultData({ items: [mergeBase] });
+  const incoming = normalizeVaultData({ items: [{ ...mergeBase, id: "other" }] });
+  const result = mergeImportedVaultData(current, incoming, "merge", () => "fresh-id");
+  assert.equal(result.importedCount, 0);
+  assert.deepEqual(result.data.items.map((item) => item.id), ["m1"]);
+});
+
+test("merge import restores nothing when an active copy exists beside a trashed one", () => {
+  const current = normalizeVaultData({ items: [mergeBase, { ...mergeBase, id: "m2", deletedAt: 50 }] });
+  const incoming = normalizeVaultData({ items: [{ ...mergeBase, id: "other" }] });
+  const result = mergeImportedVaultData(current, incoming, "merge", () => "fresh-id");
+  assert.equal(result.importedCount, 0);
+  assert.equal(isTrashedItem(result.data.items.find((item) => item.id === "m2")), true);
+  assert.equal(isTrashedItem(result.data.items.find((item) => item.id === "m1")), false);
+});
+
+test("merge import keeps skipping a trashed incoming entry that matches a trashed current one", () => {
+  const current = normalizeVaultData({ items: [{ ...mergeBase, deletedAt: 50 }] });
+  const incoming = normalizeVaultData({ items: [{ ...mergeBase, id: "other", deletedAt: 60 }] });
+  const result = mergeImportedVaultData(current, incoming, "merge", () => "fresh-id");
+  assert.equal(result.importedCount, 0);
+  assert.deepEqual(result.data.items.map((item) => [item.id, item.deletedAt]), [["m1", 50]]);
+});
+
 test("replace import discards current items and directories", () => {
   const incoming = normalizeVaultData({ items: [], folders: { secret: ["空秘密"], snippet: ["空话术"] } });
   const result = mergeImportedVaultData(normalizeVaultData(legacyItems), incoming, "replace", () => "unused");
