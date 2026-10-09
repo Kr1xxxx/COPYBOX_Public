@@ -32,9 +32,20 @@ window.addEventListener("DOMContentLoaded", () => {
 
 
 contextBridge.exposeInMainWorld("clipboxDesktop", {
+  platform: process.platform,
   copyText: (text) => ipcRenderer.invoke("clipbox:copy-text", text),
   didCopy: () => ipcRenderer.send("clipbox:did-copy"),
+  setTheme: (theme) => ipcRenderer.send("clipbox:set-theme", theme),
+  openDataFolder: () => ipcRenderer.invoke("clipbox:open-data-folder"),
+  setCloseBehavior: (behavior) => ipcRenderer.send("clipbox:set-close-behavior", behavior),
+  setMiniHidePolicy: (policy) => ipcRenderer.send("clipbox:set-mini-hide-policy", policy),
+  getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
+  setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),
   getVersion: () => ipcRenderer.invoke("clipbox:get-version"),
+  aiStatus: () => ipcRenderer.invoke("clipbox:ai-status"),
+  aiSave: (settings) => ipcRenderer.invoke("clipbox:ai-save", settings),
+  aiClear: () => ipcRenderer.invoke("clipbox:ai-clear"),
+  aiRequest: (payload) => ipcRenderer.invoke("clipbox:ai-request", payload),
   relaunch: () => ipcRenderer.send("clipbox:relaunch"),
   onFocusSearch: (callback) => {
     const listener = () => callback();
@@ -50,4 +61,10 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
     ipcRenderer.send("clipbox:automation-response", { requestId, response });
   },
   automationReady: () => ipcRenderer.send("clipbox:automation-ready"),
+  setWindowMode: (mode) => ipcRenderer.send("clipbox:set-window-mode", mode === "mini" ? "mini" : "full"),
+  onWindowMode: (callback) => {
+    const listener = (_event, mode) => callback(mode === "mini" ? "mini" : "full");
+    ipcRenderer.on("clipbox:window-mode", listener);
+    return () => ipcRenderer.removeListener("clipbox:window-mode", listener);
+  },
 });

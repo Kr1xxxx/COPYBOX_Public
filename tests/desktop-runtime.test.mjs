@@ -24,3 +24,51 @@ test("restores and persists normal window bounds across desktop restarts", () =>
   assert.match(source, /windowStateStore\.save\(mainWindow\.getNormalBounds\(\)\)/);
   assert.match(source, /saveWindowBounds\(\);\s+quitting = true;/);
 });
+
+test("keeps the full window at least 680×620 and switches to a fixed, floating mini window", () => {
+  const source = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+
+  assert.match(source, /minWidth: MIN_WINDOW_WIDTH,\s+minHeight: MIN_WINDOW_HEIGHT,/);
+  assert.match(source, /mainWindow\.setBounds\(\{ \.\.\.position, \.\.\.MINI_WINDOW_SIZE \}\)/);
+  assert.match(source, /mainWindow\.setResizable\(false\)/);
+  assert.match(source, /mainWindow\.setAlwaysOnTop\(true, "floating"\)/);
+  assert.match(source, /mainWindow\.setMinimumSize\(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT\)/);
+  assert.match(source, /miniHidePolicy === "always" \|\| miniAutoHide\) setTimeout/);
+  assert.match(source, /miniHidePolicy === "never"\) return/);
+  assert.match(source, /mainWindow\.webContents !== event\.sender\) return;/);
+  assert.match(preload, /setWindowMode: \(mode\) => ipcRenderer\.send\("clipbox:set-window-mode"/);
+  assert.match(preload, /ipcRenderer\.on\("clipbox:window-mode", listener\)/);
+});
+
+test("settings expose trash management, mini hide policy and launch at login", () => {
+  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  assert.match(page, /id="set-trash"/);
+  assert.match(page, /清空回收站/);
+  assert.doesNotMatch(page, /id="set-cli"/);
+  assert.match(page, /点击窗口关闭按钮时/);
+  assert.match(preload, /setCloseBehavior/);
+  assert.match(main, /clipbox:set-close-behavior/);
+  assert.match(main, /--hidden/);
+  assert.match(main, /classList\.add\('desktop-app', 'platform-\$\{process\.platform\}'\)`/);
+  assert.match(page, /迷你窗口复制后/);
+  assert.match(preload, /setMiniHidePolicy/);
+  assert.match(preload, /setLaunchAtLogin/);
+  assert.match(main, /clipbox:set-launch-at-login/);
+  assert.match(main, /app\.setLoginItemSettings\(\{ openAtLogin: Boolean\(enabled\)/);
+});
+
+test("closing can minimise to the Windows taskbar, and any reopen restores a minimised window", () => {
+  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  assert.match(main, /behavior === "taskbar"/);
+  assert.match(main, /closeBehavior === "taskbar" && isWindows\) mainWindow\.minimize\(\)/);
+  assert.match(main, /if \(mainWindow\.isMinimized\(\)\) mainWindow\.restore\(\)/);
+  // Dock click on macOS and a second launch on Windows both go through showWindow.
+  assert.match(main, /app\.on\("activate"[\s\S]*?showWindow\(false\)/);
+  assert.match(main, /app\.on\("second-instance", \(\) => showWindow\(false\)\)/);
+  assert.match(page, /缩到任务栏/);
+  assert.match(page, /platform === "win32" \? \[\["taskbar"/);
+});

@@ -1,6 +1,6 @@
 export const UNCATEGORIZED_COLOR = "#C7C7CC";
 
-const CATEGORY_PALETTE = [
+export const CATEGORY_PALETTE = [
   "#F06F7D",
   "#FF806B",
   "#F4B64A",

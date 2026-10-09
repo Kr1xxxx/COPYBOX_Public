@@ -1,5 +1,6 @@
-const { app, clipboard, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, Tray } = require("electron");
+const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
 const { createClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
+const { createAiStore } = require("./ai.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
@@ -8,21 +9,33 @@ const path = require("node:path");
 const { createRendererCommandBridge } = require("./automation-bridge.cjs");
 const { createAutomationServer, installAutomationCli } = require("./automation-server.cjs");
 const { APP_HOST, APP_ORIGIN, APP_PORT } = require("./runtime-config.cjs");
-const { createWindowStateStore } = require("./window-state.cjs");
+const { createMiniWindowStore, createWindowStateStore, MINI_WINDOW_SIZE, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } = require("./window-state.cjs");
 
 let mainWindow;
 let serverProcess;
 let tray;
 let quitting = false;
+// quickMode means the window is showing the compact mini layout.
 let quickMode = false;
+let miniAutoHide = false;
 let normalWindowBounds;
 let saveWindowTimer;
+let saveMiniTimer;
 let windowStateStore;
+let miniWindowStore;
 let automationServer;
 let rendererCommandBridge;
 let automationRendererReady = false;
 const appOrigin = APP_ORIGIN;
+const isMac = process.platform === "darwin";
+const isWindows = process.platform === "win32";
+// Launch-at-login starts Clipbox quietly in the tray.
+const startHidden = process.argv.includes("--hidden");
+const loginItemOptions = isWindows ? { args: ["--hidden"] } : {};
+let closeBehavior = "tray"; // "tray" | "taskbar" (Windows) | "quit"
 const WINDOW_STATE_SAVE_DELAY = 180;
+const FULL_TRAFFIC_LIGHTS = { x: 14, y: 19 };
+const MINI_TRAFFIC_LIGHTS = { x: 14, y: 14 };
 
 function serverEntry() {
   if (!app.isPackaged) {
@@ -147,7 +160,6 @@ async function relaunchApplication() {
   if (quitting) return;
   saveWindowBounds();
   quitting = true;
-  globalShortcut.unregisterAll();
   await stopAutomation();
   await stopServer();
   app.relaunch();
@@ -169,22 +181,99 @@ function scheduleWindowBoundsSave() {
   saveWindowTimer = setTimeout(saveWindowBounds, WINDOW_STATE_SAVE_DELAY);
 }
 
+function saveMiniPosition() {
+  clearTimeout(saveMiniTimer);
+  saveMiniTimer = undefined;
+  if (!quickMode || !mainWindow || mainWindow.isDestroyed() || !miniWindowStore) return;
+  const { x, y } = mainWindow.getBounds();
+  miniWindowStore.save({ x, y });
+}
+
+function scheduleMiniPositionSave() {
+  if (!quickMode) return;
+  clearTimeout(saveMiniTimer);
+  saveMiniTimer = setTimeout(saveMiniPosition, WINDOW_STATE_SAVE_DELAY);
+}
+
+function sendWindowMode() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("clipbox:window-mode", quickMode ? "mini" : "full");
+}
+
+function setTrafficLights(position) {
+  if (typeof mainWindow?.setWindowButtonPosition === "function") mainWindow.setWindowButtonPosition(position);
+}
+
+// The mini window keeps the top-right corner of the full window, unless the
+// person has already placed it somewhere else.
+function defaultMiniPosition() {
+  const bounds = normalWindowBounds?.x === undefined ? mainWindow.getBounds() : normalWindowBounds;
+  return { x: Math.round(bounds.x + bounds.width - MINI_WINDOW_SIZE.width), y: Math.round(bounds.y) };
+}
+
+function enterMiniMode(autoHide) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (quickMode) {
+    miniAutoHide = autoHide;
+    sendWindowMode();
+    return;
+  }
+  saveWindowBounds();
+  quickMode = true;
+  miniAutoHide = autoHide;
+  if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  const position = miniWindowStore?.load() || defaultMiniPosition();
+  mainWindow.setMinimumSize(MINI_WINDOW_SIZE.width, MINI_WINDOW_SIZE.height);
+  mainWindow.setBounds({ ...position, ...MINI_WINDOW_SIZE });
+  mainWindow.setResizable(false);
+  mainWindow.setMaximizable(false);
+  mainWindow.setFullScreenable(false);
+  mainWindow.setAlwaysOnTop(true, "floating");
+  setTrafficLights(MINI_TRAFFIC_LIGHTS);
+  sendWindowMode();
+}
+
+function enterFullMode() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!quickMode) {
+    sendWindowMode();
+    return;
+  }
+  saveMiniPosition();
+  quickMode = false;
+  miniAutoHide = false;
+  mainWindow.setAlwaysOnTop(false);
+  mainWindow.setResizable(true);
+  mainWindow.setMaximizable(true);
+  mainWindow.setFullScreenable(true);
+  mainWindow.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
+  if (normalWindowBounds) mainWindow.setBounds(normalWindowBounds);
+  setTrafficLights(FULL_TRAFFIC_LIGHTS);
+  sendWindowMode();
+}
+
 function createWindow() {
   automationRendererReady = false;
   windowStateStore = createWindowStateStore({
     filePath: path.join(app.getPath("userData"), "window-state.json"),
     getWorkAreas: () => screen.getAllDisplays().map((display) => display.workArea),
   });
+  miniWindowStore = createMiniWindowStore({
+    filePath: path.join(app.getPath("userData"), "mini-window-state.json"),
+    getWorkAreas: () => screen.getAllDisplays().map((display) => display.workArea),
+  });
   normalWindowBounds = windowStateStore.load();
   mainWindow = new BrowserWindow({
     ...normalWindowBounds,
-    minWidth: 500,
-    minHeight: 520,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
     show: false,
-    backgroundColor: "#070707",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1c1b19" : "#faf9f5",
     title: "Clipbox",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
+    icon: path.join(__dirname, "assets", isWindows ? "Clipbox.ico" : "Clipbox.png"),
+    // macOS draws its own traffic lights over the sidebar; Windows keeps the native title bar.
+    ...(isMac ? { titleBarStyle: "hiddenInset", trafficLightPosition: FULL_TRAFFIC_LIGHTS } : { autoHideMenuBar: true }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
@@ -199,47 +288,54 @@ function createWindow() {
     if (!url.startsWith(appOrigin)) event.preventDefault();
   });
   mainWindow.webContents.on("dom-ready", () => {
-    void mainWindow.webContents.executeJavaScript("document.documentElement.classList.add('desktop-app')");
+    void mainWindow.webContents.executeJavaScript(`document.documentElement.classList.add('desktop-app', 'platform-${process.platform}')`);
   });
-  mainWindow.webContents.once("did-finish-load", () => mainWindow.show());
+  mainWindow.webContents.once("did-finish-load", () => { if (!startHidden) mainWindow.show(); });
+  mainWindow.webContents.on("did-finish-load", sendWindowMode);
   mainWindow.on("move", scheduleWindowBoundsSave);
+  mainWindow.on("move", scheduleMiniPositionSave);
   mainWindow.on("resize", scheduleWindowBoundsSave);
   mainWindow.on("close", (event) => {
     saveWindowBounds();
+    saveMiniPosition();
     if (!quitting) {
+      if (closeBehavior === "quit") {
+        quitting = true;
+        app.quit();
+        return;
+      }
       event.preventDefault();
-      mainWindow.hide();
+      // "taskbar" keeps the taskbar button, so a click on it brings the window back; "tray" hides it completely.
+      if (closeBehavior === "taskbar" && isWindows) mainWindow.minimize();
+      else mainWindow.hide();
     }
   });
   mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
+    if (!startHidden) mainWindow.show();
   });
   void mainWindow.loadURL(appOrigin);
 }
 
+// A tray click or "快速搜索" opens the mini window and (by setting) hides it again
+// after a copy. Other ways of opening Clipbox return to the full window.
 function showWindow(asQuickSearch = false) {
   if (!mainWindow) return;
-  const wasQuickMode = quickMode;
-  if (asQuickSearch && !wasQuickMode) saveWindowBounds();
-  quickMode = asQuickSearch;
-  if (asQuickSearch) {
-    const bounds = mainWindow.getBounds();
-    mainWindow.setBounds({ ...bounds, width: Math.max(520, Math.min(bounds.width, 680)), height: Math.max(540, Math.min(bounds.height, 680)) });
-  } else if (wasQuickMode && normalWindowBounds) {
-    mainWindow.setBounds(normalWindowBounds);
-  }
+  if (asQuickSearch) enterMiniMode(true);
+  else enterFullMode();
+  if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
   mainWindow.webContents.send("clipbox:focus-search");
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "Clipbox.png")).resize({ width: 18, height: 18 });
-  icon.setTemplateImage(true);
+  const size = isWindows ? 16 : 18;
+  const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "Clipbox.png")).resize({ width: size, height: size });
+  if (isMac) icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip("Clipbox · ⌥ Space 快速搜索");
+  tray.setToolTip("Clipbox");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "快速搜索", accelerator: "Alt+Space", click: () => showWindow(true) },
+    { label: "快速搜索", click: () => showWindow(true) },
     { label: "打开 Clipbox", click: () => showWindow(false) },
     { type: "separator" },
     { label: "退出", click: () => { quitting = true; app.quit(); } },
@@ -255,13 +351,14 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     callback(permission === "clipboard-read" || permission === "clipboard-sanitized-write");
   });
+  if (isWindows) Menu.setApplicationMenu(null);
   try {
     startServer(APP_PORT);
     await waitForServer();
     createWindow();
-    await startAutomation();
+    // The automation CLI is a macOS/Linux unix-socket helper; Windows does not use it.
+    if (!isWindows) await startAutomation();
     createTray();
-    globalShortcut.register("Alt+Space", () => mainWindow?.isVisible() ? mainWindow.hide() : showWindow(true));
   } catch {
     dialog.showErrorBox("Clipbox 无法启动", "本地服务未能启动，请重新打开应用。");
     app.quit();
@@ -278,15 +375,57 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  saveMiniPosition();
   saveWindowBounds();
   quitting = true;
-  globalShortcut.unregisterAll();
   void stopAutomation();
   if (serverProcess && !serverProcess.killed) serverProcess.kill("SIGTERM");
 });
 
+let miniHidePolicy = "hotkey"; // "hotkey" | "always" | "never"
+
 ipcMain.on("clipbox:did-copy", () => {
-  if (quickMode) setTimeout(() => mainWindow?.hide(), 1200);
+  if (!quickMode || miniHidePolicy === "never") return;
+  if (miniHidePolicy === "always" || miniAutoHide) setTimeout(() => mainWindow?.hide(), 1200);
+});
+
+ipcMain.on("clipbox:set-mini-hide-policy", (event, policy) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return;
+  if (policy === "hotkey" || policy === "always" || policy === "never") miniHidePolicy = policy;
+});
+
+ipcMain.on("clipbox:set-close-behavior", (event, behavior) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return;
+  if (behavior === "tray" || behavior === "quit" || behavior === "taskbar") closeBehavior = behavior;
+});
+
+ipcMain.on("clipbox:set-theme", (event, theme) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return;
+  if (theme === "system" || theme === "light" || theme === "dark") nativeTheme.themeSource = theme;
+});
+
+ipcMain.handle("clipbox:open-data-folder", async (event) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) throw new Error("Request denied");
+  const failure = await shell.openPath(app.getPath("userData"));
+  if (failure) throw new Error(failure);
+  return app.getPath("userData");
+});
+
+ipcMain.handle("clipbox:get-launch-at-login", (event) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) return false;
+  return app.getLoginItemSettings(loginItemOptions).openAtLogin;
+});
+
+ipcMain.handle("clipbox:set-launch-at-login", (event, enabled) => {
+  if (!mainWindow || mainWindow.webContents !== event.sender) throw new Error("Request denied");
+  app.setLoginItemSettings({ openAtLogin: Boolean(enabled), openAsHidden: true, ...loginItemOptions });
+  return app.getLoginItemSettings(loginItemOptions).openAtLogin;
+});
+
+ipcMain.on("clipbox:set-window-mode", (event, mode) => {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents !== event.sender) return;
+  if (mode === "mini") enterMiniMode(false);
+  else enterFullMode();
 });
 
 const writeClipboard = createClipboardWriter(clipboard);
@@ -294,6 +433,18 @@ ipcMain.handle("clipbox:copy-text", (event, text) => {
   if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Clipboard request denied");
   writeClipboard(text);
 });
+
+// The user's own AI interface; the key stays here and is never handed to the page.
+let aiStore;
+function aiStoreFor(event) {
+  if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Request denied");
+  aiStore ||= createAiStore({ filePath: path.join(app.getPath("userData"), "ai-key.json"), fs, safeStorage });
+  return aiStore;
+}
+ipcMain.handle("clipbox:ai-status", (event) => aiStoreFor(event).status());
+ipcMain.handle("clipbox:ai-save", (event, settings) => aiStoreFor(event).save(settings || {}));
+ipcMain.handle("clipbox:ai-clear", (event) => aiStoreFor(event).clear());
+ipcMain.handle("clipbox:ai-request", (event, payload) => aiStoreFor(event).request(payload || {}));
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
 

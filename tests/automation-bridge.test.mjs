@@ -70,6 +70,7 @@ test("preload exposes only narrow automation receive and response methods", () =
   };
   const sandbox = {
     window: new EventTarget(),
+    process: { platform: "win32" },
     require: (name) => {
       assert.equal(name, "electron");
       return {

@@ -42,7 +42,8 @@ export type SecretItem = {
 };
 
 export type FolderRegistry = Record<ItemKind, string[]>;
-export type VaultData = { items: SecretItem[]; folders: FolderRegistry; nextSnippetNumber: number };
+export type FolderColors = Record<ItemKind, Record<string, string>>;
+export type VaultData = { items: SecretItem[]; folders: FolderRegistry; nextSnippetNumber: number; folderColors?: FolderColors };
 export type ImportStrategy = "merge" | "replace";
 export type BackupScope = ItemKind;
 export type RefreshContext = {
@@ -66,16 +67,26 @@ export function selectItemsByTrashState(
   return items.filter((item) => (item.kind || "secret") === kind && isTrashedItem(item) === trashed);
 }
 
+// "all" and "trash" list every entry of the selected state; folders filter by name.
+export function itemMatchesActiveFolder(item: SecretItem, activeFolder: string) {
+  if (activeFolder === "all" || activeFolder === "trash") return true;
+  if (activeFolder === "pinned") return Boolean(item.pinned);
+  if (activeFolder === "recent") return typeof item.lastUsedAt === "number" && item.lastUsedAt > 0;
+  if (activeFolder === "uncategorized") return !item.folder?.trim();
+  return item.folder === activeFolder.slice(7);
+}
+
 export function buildDirectoryShortcuts(items: SecretItem[], kind: ItemKind) {
   const activeItems = selectItemsByTrashState(items, kind, "active");
   return [
     { id: "all", label: kind === "snippet" ? "全部话术" : "全部", count: activeItems.length },
     { id: "pinned", label: "收藏", count: activeItems.filter((item) => item.pinned).length },
+    { id: "recent", label: "最近使用", count: activeItems.filter((item) => itemMatchesActiveFolder(item, "recent")).length },
   ];
 }
 
 export function canAddItemInFolder(activeFolder: string) {
-  return activeFolder !== "pinned" && activeFolder !== "trash";
+  return activeFolder !== "pinned" && activeFolder !== "recent" && activeFolder !== "trash";
 }
 
 export function moveItemToTrash(items: SecretItem[], id: string, deletedAt: number) {
@@ -161,19 +172,6 @@ export function modalInteractionState(
   return { homeShortcutsEnabled, backgroundInert: !homeShortcutsEnabled };
 }
 
-export type HomeShortcutAction = "search" | "add" | "edit";
-
-export function homeShortcutAction(
-  key: string,
-  commandKey: boolean,
-  itemEditorOpen: boolean,
-  folderDialogOpen: boolean,
-  backupDialogOpen: boolean,
-): HomeShortcutAction | null {
-  if (!commandKey || !canHandleHomeShortcuts(itemEditorOpen, folderDialogOpen, backupDialogOpen)) return null;
-  return ({ k: "search", n: "add", e: "edit" } as const)[key.toLowerCase() as "k" | "n" | "e"] || null;
-}
-
 export function resolveFocusWrapIndex(currentIndex: number, count: number, backward: boolean) {
   if (count <= 0) return -1;
   if (currentIndex < 0) return backward ? count - 1 : 0;
@@ -207,7 +205,7 @@ export function resolveSelectedFolder(folders: string[], requested: string, allo
 }
 
 export function resolveRefreshedFolder(folders: string[], activeFolder: string) {
-  if (activeFolder === "all" || activeFolder === "pinned" || activeFolder === "uncategorized" || activeFolder === "trash") return activeFolder;
+  if (activeFolder === "all" || activeFolder === "pinned" || activeFolder === "recent" || activeFolder === "uncategorized" || activeFolder === "trash") return activeFolder;
   if (activeFolder.startsWith("folder:") && folders.includes(activeFolder.slice(7))) return activeFolder;
   return "all";
 }
@@ -217,20 +215,37 @@ export function resolveRefreshedActiveFolder(kind: ItemKind, folders: string[], 
   return kind === "snippet" && resolved === "uncategorized" ? "all" : resolved;
 }
 
-export function resolveGeneratedSummary(
-  startedWithContent: string,
-  currentContent: string,
-  startedWithSummary: string,
-  currentSummary: string,
-  generated: string,
-) {
-  if (startedWithContent !== currentContent || startedWithSummary !== currentSummary) {
-    return { summary: currentSummary, stale: true, error: "" };
-  }
-  const summary = limitChars(generated);
-  return summary
-    ? { summary, stale: false, error: "" }
-    : { summary: currentSummary, stale: false, error: "暂时无法生成，请手动填写" };
+export const SNIPPET_NOTE_MAX = 40;
+
+// Deterministic tidy-up used on its own when no on-device model is available,
+// and after a model rewrite. It never touches [变量] / {变量} tokens.
+export function tidyText(value: string) {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line
+      .replace(/[ \t\u3000]+/g, " ")
+      .trim()
+      .replace(/([\u3400-\u9fff\uff09\u300d\u300f\u201d\u300b])\s+(?=[\u3400-\u9fff\uff08\u300c\u300e\u201c\u300a])/g, "$1")
+      .replace(/\s+([,;!?])/g, "$1")
+      .replace(/\s+:(?=\s|$)/g, ":")
+      .replace(/\s+\.(?=\s|$)/g, ".")
+      .replace(/\s+([\uff0c\u3002\uff01\uff1f\uff1b\uff1a\u3001\uff09\u300d\u300f\u201d\u300b])/g, "$1")
+      .replace(/([\uff08\u300c\u300e\u201c\u300a])\s+/g, "$1")
+      .replace(/([,;!?])(?=[A-Za-z])/g, "$1 "))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export type AiRewriteMode = "polish" | "organize";
+
+export function resolveAiRewrite(startedWithContent: string, currentContent: string, generated: string) {
+  if (startedWithContent !== currentContent) return { text: currentContent, stale: true, error: "" };
+  const text = generated.trim();
+  if (!text) return { text: currentContent, stale: false, error: "暂时无法生成，内容没有改动" };
+  if (text === startedWithContent.trim()) return { text: currentContent, stale: false, error: "已经很整齐了，没有需要改的地方" };
+  return { text, stale: false, error: "" };
 }
 
 export function normalizeFolderName(value: string) {
@@ -290,18 +305,147 @@ export function normalizeVaultData(payload: unknown): VaultData {
     .map((item) => item.folder || "");
 
   const numbered = normalizeSnippetNumbers(normalizedItems, requestedNext);
+  const folders = {
+    secret: normalizeFolderList(supplied?.secret, extracted("secret")),
+    snippet: normalizeSnippetFolderList(supplied?.snippet, extracted("snippet")),
+  };
+  const suppliedColors = !Array.isArray(payload) && payload && typeof payload === "object"
+    ? (payload as Partial<VaultData>).folderColors
+    : undefined;
+  const folderColors = normalizeFolderColors(suppliedColors, folders);
   return {
     items: numbered.items,
-    folders: {
-      secret: normalizeFolderList(supplied?.secret, extracted("secret")),
-      snippet: normalizeSnippetFolderList(supplied?.snippet, extracted("snippet")),
-    },
+    folders,
     nextSnippetNumber: numbered.nextSnippetNumber,
+    ...(folderColors ? { folderColors } : {}),
   };
 }
 
-export function synchronizeVaultData(items: SecretItem[], folders: FolderRegistry, nextSnippetNumber = 1): VaultData {
-  return normalizeVaultData({ items, folders, nextSnippetNumber });
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function normalizeFolderColors(value: unknown, folders: FolderRegistry): FolderColors | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const result: FolderColors = { secret: {}, snippet: {} };
+  let any = false;
+  for (const kind of ["secret", "snippet"] as const) {
+    const source = (value as Partial<FolderColors>)[kind];
+    if (!source || typeof source !== "object") continue;
+    for (const [folder, color] of Object.entries(source)) {
+      if (typeof color === "string" && HEX_COLOR.test(color) && folders[kind].includes(folder)) {
+        result[kind][folder] = color;
+        any = true;
+      }
+    }
+  }
+  return any ? result : undefined;
+}
+
+function isStandardSnippetFolder(kind: ItemKind, folder: string) {
+  return kind === "snippet" && (STANDARD_SNIPPET_FOLDERS as readonly string[]).includes(folder);
+}
+
+export function folderEditBlocker(kind: ItemKind, folder: string) {
+  return isStandardSnippetFolder(kind, folder) ? "标准话术目录不能改名或删除，但可以改颜色" : "";
+}
+
+export function renameFolder(data: VaultData, kind: ItemKind, from: string, rawTo: string): { data: VaultData; error?: string } {
+  const to = normalizeFolderName(rawTo);
+  if (!data.folders[kind].includes(from)) return { data, error: "目录不存在" };
+  const blocker = folderEditBlocker(kind, from);
+  if (blocker) return { data, error: blocker };
+  if (!to) return { data, error: "请输入目录名称" };
+  if (to === from) return { data };
+  if (data.folders[kind].includes(to)) return { data, error: "已有同名目录" };
+  const colors = data.folderColors?.[kind] || {};
+  const nextColors = { ...colors };
+  if (nextColors[from]) { nextColors[to] = nextColors[from]; delete nextColors[from]; }
+  return {
+    data: normalizeVaultData({
+      ...data,
+      folders: { ...data.folders, [kind]: data.folders[kind].map((folder) => folder === from ? to : folder) },
+      items: data.items.map((item) => (item.kind || "secret") === kind && item.folder === from
+        ? { ...item, folder: to, snippetMeta: item.snippetMeta ? { ...item.snippetMeta, stage: to } : item.snippetMeta }
+        : item),
+      folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors },
+    }),
+  };
+}
+
+// Snippets always need a folder, so a snippet folder can only be removed once it is empty;
+// secrets fall back to "uncategorized".
+export function deleteFolder(data: VaultData, kind: ItemKind, folder: string): { data: VaultData; moved: number; error?: string } {
+  if (!data.folders[kind].includes(folder)) return { data, moved: 0, error: "目录不存在" };
+  const blocker = folderEditBlocker(kind, folder);
+  if (blocker) return { data, moved: 0, error: blocker };
+  const inFolder = data.items.filter((item) => (item.kind || "secret") === kind && item.folder === folder);
+  if (kind === "snippet" && inFolder.length > 0) return { data, moved: 0, error: `目录里还有 ${inFolder.length} 条话术，请先移走再删除` };
+  const nextColors = { ...(data.folderColors?.[kind] || {}) };
+  delete nextColors[folder];
+  return {
+    moved: inFolder.length,
+    data: normalizeVaultData({
+      ...data,
+      folders: { ...data.folders, [kind]: data.folders[kind].filter((value) => value !== folder) },
+      items: data.items.map((item) => (item.kind || "secret") === kind && item.folder === folder ? { ...item, folder: "" } : item),
+      folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors },
+    }),
+  };
+}
+
+export function setFolderColor(data: VaultData, kind: ItemKind, folder: string, color: string | null): VaultData {
+  if (!data.folders[kind].includes(folder)) return data;
+  const nextColors = { ...(data.folderColors?.[kind] || {}) };
+  if (color && HEX_COLOR.test(color)) nextColors[folder] = color.toLowerCase();
+  else delete nextColors[folder];
+  return normalizeVaultData({ ...data, folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors } });
+}
+
+export function moveItemsToFolder(items: SecretItem[], ids: readonly string[], folder: string, now: number) {
+  const set = new Set(ids);
+  return items.map((item) => set.has(item.id) && !isTrashedItem(item)
+    ? { ...item, folder, updatedAt: now, snippetMeta: item.snippetMeta ? { ...item.snippetMeta, stage: folder } : item.snippetMeta }
+    : item);
+}
+
+export function moveItemsToTrash(items: SecretItem[], ids: readonly string[], deletedAt: number) {
+  const set = new Set(ids);
+  return items.map((item) => set.has(item.id) && !isTrashedItem(item) ? { ...item, deletedAt } : item);
+}
+
+export function restoreTrashedItems(items: SecretItem[], ids: readonly string[]) {
+  const set = new Set(ids);
+  return items.map((item) => {
+    if (!set.has(item.id) || !isTrashedItem(item)) return item;
+    const restored = { ...item };
+    delete restored.deletedAt;
+    return restored;
+  });
+}
+
+// Splits text into plain and matching pieces for search highlighting; every whitespace-separated term counts.
+export function splitSearchHighlight(text: string, query: string): { text: string; hit: boolean }[] {
+  const terms = Array.from(new Set(query.trim().toLowerCase().split(/\s+/).filter(Boolean)));
+  if (!text || terms.length === 0) return [{ text, hit: false }];
+  const lower = text.toLowerCase();
+  const marks = new Array<boolean>(text.length).fill(false);
+  for (const term of terms) {
+    let index = lower.indexOf(term);
+    while (index >= 0) {
+      for (let i = index; i < index + term.length && i < marks.length; i += 1) marks[i] = true;
+      index = lower.indexOf(term, index + term.length);
+    }
+  }
+  const pieces: { text: string; hit: boolean }[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const last = pieces[pieces.length - 1];
+    if (last && last.hit === marks[i]) last.text += text[i];
+    else pieces.push({ text: text[i], hit: marks[i] });
+  }
+  return pieces;
+}
+
+export function synchronizeVaultData(items: SecretItem[], folders: FolderRegistry, nextSnippetNumber = 1, folderColors?: FolderColors): VaultData {
+  return normalizeVaultData({ items, folders, nextSnippetNumber, folderColors });
 }
 
 export function addFolder(registry: FolderRegistry, kind: ItemKind, rawName: string) {
@@ -343,6 +487,9 @@ export function vaultDataForBackupScope(data: VaultData, scope: BackupScope): Va
       snippet: scope === "snippet" ? normalized.folders.snippet : [...STANDARD_SNIPPET_FOLDERS],
     },
     nextSnippetNumber: scope === "snippet" ? normalized.nextSnippetNumber : 1,
+    ...(normalized.folderColors?.[scope] && Object.keys(normalized.folderColors[scope]).length
+      ? { folderColors: { secret: {}, snippet: {}, [scope]: normalized.folderColors[scope] } as FolderColors }
+      : {}),
   };
 }
 
@@ -361,8 +508,10 @@ export function mergeImportedVaultData(
       ? { secret: source.folders.secret, snippet: current.folders.snippet }
       : { secret: current.folders.secret, snippet: source.folders.snippet };
     const nextSnippetNumber = scope === "snippet" ? source.nextSnippetNumber : current.nextSnippetNumber;
+    const otherKind = scope === "secret" ? "snippet" : "secret";
+    const folderColors: FolderColors = { secret: {}, snippet: {}, [otherKind]: current.folderColors?.[otherKind] || {}, [scope]: source.folderColors?.[scope] || {} };
     return {
-      data: normalizeVaultData({ items: [...source.items, ...retained], folders, nextSnippetNumber }),
+      data: normalizeVaultData({ items: [...source.items, ...retained], folders, nextSnippetNumber, folderColors }),
       importedCount: source.items.length,
     };
   }
@@ -394,9 +543,18 @@ export function mergeImportedVaultData(
     items: [...items, ...current.items],
     folders: mergeFolderRegistries(current.folders, source.folders),
     nextSnippetNumber: Math.max(current.nextSnippetNumber, source.nextSnippetNumber),
+    folderColors: mergeFolderColors(current.folderColors, source.folderColors),
   });
   return {
     data,
     importedCount: items.length,
+  };
+}
+
+function mergeFolderColors(current?: FolderColors, incoming?: FolderColors): FolderColors | undefined {
+  if (!current && !incoming) return undefined;
+  return {
+    secret: { ...(incoming?.secret || {}), ...(current?.secret || {}) },
+    snippet: { ...(incoming?.snippet || {}), ...(current?.snippet || {}) },
   };
 }

@@ -33,7 +33,7 @@ export async function pageHarness() {
     } },
     cancelled: false, loading: false, setLoading: () => {}, setStartupError: message => { c.startupError = message; },
     setCapabilities: () => {}, setActiveKind: () => {}, finishOpening: data => { c.opened = data; },
-    useCallback: fn => fn, setItems: () => {}, setFolders: () => {}, setToast: () => {}, setSelected: () => {}, closeEditor: () => {},
+    useCallback: fn => fn, setItems: () => {}, setFolders: () => {}, setFolderColors: () => {}, folderColorsRef: { current: undefined }, setToast: () => {}, setSelected: () => {}, closeEditor: () => {},
     itemsRef: { current: [] }, foldersRef: { current: core.EMPTY_FOLDER_REGISTRY }, nextSnippetNumberRef: { current: 1 },
     persistQueueRef: { current: Promise.resolve() }, automationQueueRef: { current: Promise.resolve() },
     deviceKey: 'synthetic-device-key', capabilitiesRef: { current: caps }, capabilities: caps,
@@ -50,7 +50,7 @@ export async function pageHarness() {
   for (const name of ['bytesToBase64', 'base64ToBytes', 'createDeviceKey', 'deriveKey', 'encryptVault', 'decryptVault', 'readLocalEncryptedVault', 'openVault', 'saveItem', 'submit']) run(functions.get(name));
   for (const name of ['readVault', 'enqueueVaultTask', 'writeVault', 'persist']) if (hooks.has(name)) run(`globalThis.${name} = ${hooks.get(name)}`);
   const clipboard = new URL('../../app/clipboard.ts', import.meta.url);
-  if (fs.existsSync(clipboard)) run(fs.readFileSync(clipboard, 'utf8').replace('export async function', 'async function'));
+  if (fs.existsSync(clipboard)) run(fs.readFileSync(clipboard, 'utf8').replace(/^export /gm, ''));
   run(`(${automationEffect})()`);
   return { c, storage, writes, responses, copyCalls, rejectNextWrite: () => { rejectWrite = true; } };
 }

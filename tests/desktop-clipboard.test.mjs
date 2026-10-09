@@ -3,24 +3,14 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
-test('desktop copy expires after 60 seconds, without a renderer or focused window', async (t) => {
+test('desktop copy writes the text and never clears the clipboard later', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { createClipboardWriter } = require('../desktop/clipboard.cjs');
   let text = '';
   const write = createClipboardWriter({ writeText: value => { text = value; }, readText: () => text });
   write('synthetic');
-  t.mock.timers.tick(59_999); assert.equal(text, 'synthetic');
-  t.mock.timers.tick(1); assert.equal(text, '');
-});
-
-test('a new copy gets its own expiry and never erases another app’s text', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const { createClipboardWriter } = require('../desktop/clipboard.cjs');
-  let text = '';
-  const write = createClipboardWriter({ writeText: value => { text = value; }, readText: () => text });
-  write('first'); t.mock.timers.tick(30_000); write('second');
-  t.mock.timers.tick(30_000); assert.equal(text, 'second');
-  text = 'external clipboard'; t.mock.timers.tick(30_000); assert.equal(text, 'external clipboard');
+  t.mock.timers.tick(600_000);
+  assert.equal(text, 'synthetic');
   assert.throws(() => write(null), /text/i);
 });
 

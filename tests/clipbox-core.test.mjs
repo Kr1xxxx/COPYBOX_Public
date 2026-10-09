@@ -10,7 +10,6 @@ const {
   canHandleHomeShortcuts,
   combineSecretSegments,
   DEFAULT_ITEM_KIND,
-  homeShortcutAction,
   isTrashedItem,
   limitChars,
   mergeFolderRegistries,
@@ -21,7 +20,8 @@ const {
   permanentlyDeleteTrashedItem,
   parseRefreshContext,
   normalizeSecretSegments,
-  resolveGeneratedSummary,
+  resolveAiRewrite,
+  tidyText,
   resolveConnectedFocusTarget,
   resolveFocusWrapIndex,
   resolvePostCommitFocusTarget,
@@ -287,10 +287,12 @@ test("builds all and favorite shortcuts for the active content kind", () => {
   assert.deepEqual(buildDirectoryShortcuts(items, "snippet"), [
     { id: "all", label: "全部话术", count: 2 },
     { id: "pinned", label: "收藏", count: 1 },
+    { id: "recent", label: "最近使用", count: 0 },
   ]);
   assert.deepEqual(buildDirectoryShortcuts(items, "secret"), [
     { id: "all", label: "全部", count: 1 },
     { id: "pinned", label: "收藏", count: 1 },
+    { id: "recent", label: "最近使用", count: 0 },
   ]);
 });
 
@@ -344,30 +346,18 @@ test("rejects malformed or invalid application refresh context", () => {
   assert.equal(parseRefreshContext(JSON.stringify({ activeKind: "secret", activeFolder: 7, productFilter: "全部产品", query: "" })), null);
 });
 
-test("accepts a generated summary only while source and summary are unchanged", () => {
-  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "旧总结", "一二三四五六七八九十十一"), {
-    summary: "一二三四五六七八九十",
-    stale: false,
-    error: "",
-  });
-  assert.deepEqual(resolveGeneratedSummary("原内容", "新内容", "旧总结", "旧总结", "新总结"), {
-    summary: "旧总结",
-    stale: true,
-    error: "",
-  });
-  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "旧总结", ""), {
-    summary: "旧总结",
-    stale: false,
-    error: "暂时无法生成，请手动填写",
-  });
+test("tidyText cleans spacing and blank lines but keeps [变量]", () => {
+  assert.equal(tidyText("Hi  [name] ,thanks!We   will  follow up.\r\n\r\n\r\n\r\n 您好  ，请查收 [quote] 。 "), "Hi [name], thanks! We will follow up.\n\n您好，请查收 [quote]。");
+  assert.equal(tidyText("We will reply soon . Thanks ."), "We will reply soon. Thanks.");
+  assert.equal(tidyText("你 好 世 界 {order}"), "你好世界 {order}");
+  assert.equal(tidyText("https://a.com/x 10:30"), "https://a.com/x 10:30");
 });
 
-test("preserves a manual summary edited while generation is running", () => {
-  assert.deepEqual(resolveGeneratedSummary("原内容", "原内容", "旧总结", "手动新总结", "AI 总结"), {
-    summary: "手动新总结",
-    stale: true,
-    error: "",
-  });
+test("accepts an AI rewrite only while the content is unchanged", () => {
+  assert.deepEqual(resolveAiRewrite("原内容", "原内容", "  润色后  "), { text: "润色后", stale: false, error: "" });
+  assert.deepEqual(resolveAiRewrite("原内容", "手动改过", "润色后"), { text: "手动改过", stale: true, error: "" });
+  assert.deepEqual(resolveAiRewrite("原内容", "原内容", ""), { text: "原内容", stale: false, error: "暂时无法生成，内容没有改动" });
+  assert.deepEqual(resolveAiRewrite("原内容", "原内容", "原内容"), { text: "原内容", stale: false, error: "已经很整齐了，没有需要改的地方" });
 });
 
 test("disables Home shortcuts while any modal owns interaction", () => {
@@ -375,16 +365,6 @@ test("disables Home shortcuts while any modal owns interaction", () => {
   assert.equal(canHandleHomeShortcuts(true, false, false), false);
   assert.equal(canHandleHomeShortcuts(false, true, false), false);
   assert.equal(canHandleHomeShortcuts(false, false, true), false);
-});
-
-test("rejects every wired Home command and desktop search while an editor owns interaction", () => {
-  for (const [key, expected] of [["k", "search"], ["n", "add"], ["e", "edit"]]) {
-    assert.equal(homeShortcutAction(key, true, false, false, false), expected);
-    assert.equal(homeShortcutAction(key, true, true, false, false), null);
-  }
-  assert.equal(homeShortcutAction("k", true, false, true, false), null);
-  assert.equal(homeShortcutAction("k", true, false, false, true), null);
-  assert.equal(homeShortcutAction("k", false, false, false, false), null);
 });
 
 test("keeps the background inert for every modal state", () => {
@@ -421,4 +401,80 @@ test("waits for modal teardown before resolving a disconnected opener fallback",
   assert.equal(resolvePostCommitFocusTarget(null, false, false, searchFallback), null);
   assert.equal(resolvePostCommitFocusTarget({ trigger: removedOpener }, false, false, searchFallback), searchFallback);
   assert.equal(resolvePostCommitFocusTarget({ trigger: connectedOpener }, false, false, searchFallback), connectedOpener);
+});
+
+test("the trash view lists trashed entries from every folder", () => {
+  const items = [
+    { id: "a", label: "A", secret: "a", note: "", color: "", kind: "snippet", folder: "售后争议", deletedAt: 5, createdAt: 1, updatedAt: 1 },
+    { id: "b", label: "B", secret: "b", note: "", color: "", kind: "snippet", folder: "", deletedAt: 6, createdAt: 1, updatedAt: 1 },
+    { id: "c", label: "C", secret: "c", note: "", color: "", kind: "snippet", folder: "售后争议", createdAt: 1, updatedAt: 1 },
+  ];
+  const trashed = core.selectItemsByTrashState(items, "snippet", "trash");
+  assert.deepEqual(trashed.filter((item) => core.itemMatchesActiveFolder(item, "trash")).map((item) => item.id), ["a", "b"]);
+  assert.equal(core.itemMatchesActiveFolder(items[2], "folder:售后争议"), true);
+  assert.equal(core.itemMatchesActiveFolder(items[2], "folder:询盘接待"), false);
+  assert.equal(core.itemMatchesActiveFolder(items[1], "uncategorized"), true);
+  assert.equal(core.itemMatchesActiveFolder({ ...items[2], pinned: true }, "pinned"), true);
+});
+
+const mk = (id, kind, folder, extra = {}) => ({ id, label: id, secret: "x", note: "", color: "#fff", kind, folder, createdAt: 1, updatedAt: 1, ...extra });
+const baseVault = () => core.normalizeVaultData({
+  items: [mk("s1", "secret", "AWS"), mk("s2", "secret", "AWS", { deletedAt: 5 }), mk("s3", "secret", ""), mk("n1", "snippet", "询盘接待")],
+  folders: { secret: ["AWS", "GitHub"], snippet: [...standardSnippetFolders, "自定义"] },
+});
+
+test("renames a folder everywhere, including colors and trashed items", () => {
+  const colored = core.setFolderColor(baseVault(), "secret", "AWS", "#F06F7D");
+  const { data, error } = core.renameFolder(colored, "secret", "AWS", " 云服务 ");
+  assert.equal(error, undefined);
+  assert.deepEqual(data.folders.secret, ["云服务", "GitHub"]);
+  assert.equal(data.items.find((i) => i.id === "s1").folder, "云服务");
+  assert.equal(data.items.find((i) => i.id === "s2").folder, "云服务");
+  assert.equal(data.folderColors.secret["云服务"], "#f06f7d");
+  assert.equal(data.folderColors.secret.AWS, undefined);
+  assert.match(core.renameFolder(colored, "secret", "AWS", "GitHub").error, /同名/);
+  assert.match(core.renameFolder(colored, "snippet", "询盘接待", "新名").error, /标准话术目录/);
+});
+
+test("deleting a secret folder moves its items to uncategorized; snippet folders must be empty", () => {
+  const { data, moved } = core.deleteFolder(baseVault(), "secret", "AWS");
+  assert.equal(moved, 2);
+  assert.deepEqual(data.folders.secret, ["GitHub"]);
+  assert.equal(data.items.find((i) => i.id === "s1").folder, "");
+  const withSnippet = core.normalizeVaultData({ ...baseVault(), items: [...baseVault().items, mk("n2", "snippet", "自定义")] });
+  assert.match(core.deleteFolder(withSnippet, "snippet", "自定义").error, /还有 1 条/);
+  assert.deepEqual(core.deleteFolder(baseVault(), "snippet", "自定义").data.folders.snippet, standardSnippetFolders);
+  assert.match(core.deleteFolder(baseVault(), "snippet", "询盘接待").error, /标准话术目录/);
+});
+
+test("folder colors survive normalization, scoped backups and merges but drop for missing folders", () => {
+  const vault = core.setFolderColor(core.setFolderColor(baseVault(), "snippet", "询盘接待", "#62C483"), "secret", "GitHub", "#4DBFC4");
+  assert.equal(core.normalizeVaultData(vault).folderColors.snippet["询盘接待"], "#62c483");
+  assert.deepEqual(core.vaultDataForBackupScope(vault, "secret").folderColors, { secret: { GitHub: "#4dbfc4" }, snippet: {} });
+  const merged = core.mergeImportedVaultData(baseVault(), core.vaultDataForBackupScope(vault, "secret"), "merge", () => "id").data;
+  assert.equal(merged.folderColors.secret.GitHub, "#4dbfc4");
+  assert.equal(core.setFolderColor(vault, "secret", "GitHub", null).folderColors?.secret?.GitHub, undefined);
+  assert.equal(core.normalizeVaultData({ ...vault, folders: { ...vault.folders, secret: [] } }).folderColors?.secret?.GitHub, undefined);
+  assert.equal("folderColors" in baseVault(), false);
+});
+
+test("bulk helpers move, trash and restore only the chosen active items", () => {
+  const items = baseVault().items;
+  const moved = core.moveItemsToFolder(items, ["s1", "s2", "n1"], "GitHub", 9);
+  assert.equal(moved.find((i) => i.id === "s1").folder, "GitHub");
+  assert.equal(moved.find((i) => i.id === "s2").folder, "AWS");
+  assert.equal(moved.find((i) => i.id === "n1").snippetMeta, undefined);
+  const trashed = core.moveItemsToTrash(items, ["s1", "s3"], 7);
+  assert.equal(trashed.filter((i) => i.deletedAt === 7).length, 2);
+  assert.equal(core.restoreTrashedItems(trashed, ["s1"]).find((i) => i.id === "s1").deletedAt, undefined);
+});
+
+test("recent folder lists used items and search highlighting splits on every term", () => {
+  assert.equal(core.itemMatchesActiveFolder(mk("a", "secret", "", { lastUsedAt: 3 }), "recent"), true);
+  assert.equal(core.itemMatchesActiveFolder(mk("a", "secret", ""), "recent"), false);
+  assert.equal(core.canAddItemInFolder("recent"), false);
+  assert.deepEqual(core.splitSearchHighlight("Quote follow-up", "quote UP"), [
+    { text: "Quote", hit: true }, { text: " follow-", hit: false }, { text: "up", hit: true },
+  ]);
+  assert.deepEqual(core.splitSearchHighlight("abc", ""), [{ text: "abc", hit: false }]);
 });
