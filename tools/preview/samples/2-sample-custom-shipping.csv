@@ -1,0 +1,12 @@
+﻿标题,沟通阶段,具体场景,核心动作,产品/业务,英文即时消息,中文对照,使用备注,可替换变量
+要样品｜样品政策,产品样品,要样品,样品政策,睫毛,"Yes, we offer samples! A mixed sample box (5 trays) is $[Sample fee] including shipping, and we refund it on your first bulk order.",可以寄样！混合样品盒（5 盒）$[Sample fee] 含运费，下大货时退还样品费。,,
+镊子款式｜介绍款式,产品样品,镊子款式,介绍款式,镊子,"Our best sellers are the 90° L-shape for volume fans and the straight fine-tip for isolation. Both are stainless steel, hand-finished, with a protective cap.",卖得最好的是做开花用的 90° L 型，和分离用的直头细尖款。都是不锈钢、手工打磨，带保护帽。,,
+问库存｜库存确认,产品样品,问库存,库存确认,睫毛,"[Product] in [Curl] curl, [Length] mm is in stock: [Stock quantity] trays ready to ship.",[Product] [Curl] 卷 [Length] mm 有现货：[Stock quantity] 盒可立即发货。,发送前核实库存,
+洗发水成分｜成分说明,产品样品,洗发水成分,成分说明,洗发水,"Our lash shampoo is sulfate-free and oil-free, so it's safe for extensions and won't weaken the glue.",我们的睫毛洗发水无硫酸盐、无油，嫁接睫毛可放心用，不会影响胶水。,,
+定制 Logo｜收集 Logo 文件,定制生产,定制 Logo,收集 Logo 文件,Logo/包装,"We can put your logo on the trays, boxes and tweezers. Please send your logo file (AI or PDF preferred) and I'll make a free mockup.",睫毛盘、包装盒和镊子都可以印您的 Logo。请发 Logo 文件（最好是 AI 或 PDF），我免费出效果图。,,
+包装起订量｜说明起订量,定制生产,包装起订量,说明起订量,包装盒,Custom packaging starts at [MOQ] pcs per design. Printing takes about [Production days] days after you approve the mockup.,定制包装每款 [MOQ] 个起订。效果图确认后大约 [Production days] 天印好。,,
+效果图确认｜确认效果图,定制生产,效果图确认,确认效果图,Logo,"Here is your mockup 👇 Please check the logo size, color and spelling. Once you say OK, we start production.",效果图在下面 👇 请检查 Logo 大小、颜色和拼写。您确认 OK 后我们就开始生产。,,
+生产进度｜进度更新,定制生产,生产进度,进度更新,通用,Quick update: your order is [Progress]% done and on track to ship on [Ship date].,进度更新：您的订单已完成 [Progress]%，预计 [Ship date] 按时发货。,,
+运费询问｜报运费,物流清关,运费询问,报运费,物流,"Shipping to [Country] by DHL is $[Shipping cost] and takes 5–7 working days. FedEx express is $[Express cost], 3–5 days.",寄到 [Country] 走 DHL 运费 $[Shipping cost]，5–7 个工作日。FedEx 快线 $[Express cost]，3–5 天。,发送前核实运费,
+已发货｜发送单号,物流清关,已发货,发送单号,物流,Your parcel has shipped! 📦 Tracking number: [Tracking number]. You can follow it here: [Tracking link],包裹已发出！📦 单号：[Tracking number]，可以在这里查：[Tracking link],,
+关税说明｜说明税费,物流清关,关税说明,说明税费,清关,Import duties follow your country's rules and are paid by the receiver. For [Country] it's usually around [Duty rate]% of the order value.,进口关税按您国家规定，由收件人支付。[Country] 一般约为货值的 [Duty rate]%。,,

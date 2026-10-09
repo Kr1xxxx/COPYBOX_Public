@@ -31,6 +31,13 @@
   .seg button:focus-visible, .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .tool { cursor: pointer; font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); }
   .tool:disabled { opacity: .55; cursor: default; }
+  .tools { display: flex; gap: 8px; align-items: center; }
+  .menu-wrap { position: relative; }
+  .menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 250px; padding: 6px; border-radius: 10px; background: var(--bar); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .menu[hidden] { display: none; }
+  .menu button { all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--ink); }
+  .menu button small { display: block; color: var(--soft); font-size: 11.5px; }
+  .menu button:hover, .menu button:focus-visible { background: var(--ground); }
   .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px 16px; }
   .scroller { max-width: 100%; overflow-x: auto; padding: 4px 10px 22px; }
   .window { --w: 680px; --h: 620px; width: var(--w); transition: width .22s ease; border-radius: 8px; background: var(--chrome); box-shadow: var(--shadow); border: 1px solid var(--chrome-line); overflow: hidden; }
@@ -61,7 +68,18 @@
       <button type="button" role="radio" aria-checked="true" data-os="win">Windows 版</button>
       <button type="button" role="radio" aria-checked="false" data-os="mac">Mac 版</button>
     </div>
-    <button type="button" class="tool" id="reseed">补齐 10 张测试图</button>
+    <div class="tools">
+      <div class="menu-wrap">
+        <button type="button" class="tool" id="snippetsBtn" aria-haspopup="menu" aria-expanded="false">导入测试话术 ▾</button>
+        <div class="menu" id="snippetsMenu" role="menu" hidden>
+          <button type="button" role="menuitem" data-file="samples/1-inquiry-quote.csv">第 1 组 · 询盘与报价<small>11 条：问候、报价、付款</small></button>
+          <button type="button" role="menuitem" data-file="samples/2-sample-custom-shipping.csv">第 2 组 · 样品、定制、物流<small>11 条：样品、Logo 定制、运费单号</small></button>
+          <button type="button" role="menuitem" data-file="samples/3-followup-aftersales.csv">第 3 组 · 跟进与售后<small>10 条：回访、促销、破损、退款</small></button>
+          <button type="button" role="menuitem" data-file="samples/4-full-test-sheet.csv">第 4 组 · 完整测试表<small>37 行，含 2 行错误和 1 条重复</small></button>
+        </div>
+      </div>
+      <button type="button" class="tool" id="reseed">补齐 10 张测试图</button>
+    </div>
   </header>
   <main class="stage">
     <div class="scroller">
@@ -143,6 +161,40 @@ async function seed(manual) {
   finally { seeding = false; reseed.disabled = false; }
 }
 reseed.addEventListener("click", () => seed(true));
+
+// Test snippets: opens the app's own import dialog with a sample sheet, so the real import flow is what you see.
+const snippetsBtn = document.getElementById("snippetsBtn"), snippetsMenu = document.getElementById("snippetsMenu");
+function setMenu(open) { snippetsMenu.hidden = !open; snippetsBtn.setAttribute("aria-expanded", String(open)); }
+snippetsBtn.addEventListener("click", (event) => { event.stopPropagation(); setMenu(snippetsMenu.hidden); });
+document.addEventListener("click", (event) => { if (!snippetsMenu.contains(event.target)) setMenu(false); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenu(false); });
+async function openSnippets(d) {
+  for (let i = 0; i < 20; i += 1) {
+    const tab = [...d.querySelectorAll(".kind-switch button")].find((x) => x.textContent.trim() === "话术");
+    if (!tab || tab.getAttribute("aria-pressed") === "true") return;
+    tab.click(); await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+async function importSnippets(file, title) {
+  setMenu(false); snippetsBtn.disabled = true;
+  try {
+    show("正在打开导入窗口…");
+    if (mode === "mini") { frame.src = `app-${os}.html`; mode = "full"; win.dataset.mode = "full"; renderNote(); await new Promise((resolve) => setTimeout(resolve, 300)); }
+    const w = await appReady(); if (!w) throw new Error("软件还没加载好");
+    const d = w.document; await openSnippets(d);
+    const input = [...d.querySelectorAll("input[type=file]")].find((x) => (x.accept || "").includes(".csv"));
+    if (!input) throw new Error("找不到导入入口");
+    const response = await fetch(file); if (!response.ok) throw new Error("读取测试表格失败");
+    const blob = await response.blob();
+    const transfer = new w.DataTransfer();
+    transfer.items.add(new w.File([blob], `${title}.csv`, { type: "text/csv" }));
+    input.files = transfer.files;
+    input.dispatchEvent(new w.Event("change", { bubbles: true }));
+    show("");
+  } catch (error) { show("打开导入窗口失败：" + (error && error.message ? error.message : "未知原因")); setTimeout(() => show(""), 4000); }
+  finally { snippetsBtn.disabled = false; }
+}
+snippetsMenu.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => importSnippets(b.dataset.file, b.firstChild.textContent.trim())));
 
 setOs(store.get(OS) === "mac" ? "mac" : "win", store.get(OS) === "mac");
 if (!store.get(SEEDED)) seed(false);
