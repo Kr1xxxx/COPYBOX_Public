@@ -164,3 +164,15 @@ Statuses: Accepted / Superseded / Deprecated.
   row. A `宫格 | 列表` switch (kept per device in `localStorage` key `clipbox.image-view`) brings back the old list. The
   mini window always shows the grid, 3 compact columns, and a tile click copies. Spec: `docs/specs/image-grid.md`.
 - Consequences: a UI preference only; no stored image data changes.
+
+### D-021 Motion follows arc-library (2026-10-09)
+- Context (owner): "动效优先使用 https://github.com/kuratlielia/arc-library.git 中的 UI 组件"; asked which parts could be replaced and chose
+  "全面换" (replace everything that can be) on the decision card.
+- Decision (owner): animated UI is taken from arc-library (MIT) instead of hand-written CSS animation. Components are copied as
+  source into `app/arc/` (with `LICENSE-arc-library.txt`), adapted to Clipbox's colours and Chinese text; they use the `motion`
+  package (new dependency, exact version 13.4.0). `lucide-react` is not added: Clipbox's own icons are used. Not taken over:
+  command palette and shortcut recorder (D-005, no shortcuts).
+- Plan, one PR per step: 1 copy icon + toast; 2 switches, segmented controls, checkboxes; 3 menus and dialogs; 4 rename,
+  search, drop zone, empty pages, counters.
+- Consequences: package.json and the lock file change (owner's 合并 needed for every step). `prefers-reduced-motion` is honoured by
+  every vendored component. Tests that read class names keep working because the old class names stay on the elements.
