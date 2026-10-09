@@ -324,3 +324,26 @@ test("macOS shows the grid too, with the switch", async ({ page }) => {
   await card(page).getByRole("button", { name: "复制", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual(PNG_SIGNATURE);
 });
+
+// Motion from arc-library (D-021): the copy icon swaps to a drawn check, the toast sits above the bottom edge and sinks away.
+test("the tile's copy icon turns into a check and back, and the toast appears and leaves", async ({ page }) => {
+  await openImages(page);
+  await addSix(page, ["图一", "图二"]);
+  const copy = tile(page, "图一").locator(".image-tile-copy");
+  await expect(copy.locator('.arc-copy-icon [data-state="idle"]')).toHaveCount(1);
+  await copy.click();
+  await expect(copy.locator('.arc-copy-icon [data-state="copied"] path')).toHaveCount(1);
+  await expect(copy.locator('.arc-copy-icon [data-state="idle"]')).toHaveCount(1, { timeout: 4000 });
+
+  await tile(page, "图二").getByRole("button", { name: "展开 图二" }).click();
+  await card(page).getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "永久删除" }).click();
+  const toast = page.locator(".toast");
+  await expect(toast).toContainText("图片已删除");
+  await page.waitForTimeout(500); // the toast rises with a short spring
+  const box = await toast.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box.y + box.height).toBeLessThan(viewport.height - 20);
+  expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(2);
+  await expect(toast).toHaveCount(0, { timeout: 6000 });
+});
