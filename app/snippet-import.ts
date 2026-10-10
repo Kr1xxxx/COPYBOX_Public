@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import { readSpreadsheet, type SheetTable } from "./spreadsheet-read.ts";
 import type { SecretItem, SnippetMeta } from "./clipbox-core";
 import { normalizeImportedSnippetFolder, orderStandardSnippetFolders } from "./snippet-folders.ts";
 
@@ -23,40 +23,43 @@ export type SnippetImportPreview = {
   items: SecretItem[];
 };
 
-function sheetRows(sheet: XLSX.WorkSheet) {
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "", raw: false })
+// First row = column names, like a spreadsheet header. Repeated or empty names get a suffix so no column is lost.
+function sheetRows(table: SheetTable) {
+  const [headerRow = [], ...dataRows] = table.rows;
+  const keys: string[] = [];
+  const used = new Set<string>();
+  headerRow.forEach((cell, index) => {
+    const base = cell.trim() || "__EMPTY";
+    let key = base;
+    for (let n = 1; used.has(key); n += 1) key = `${base}_${n}`;
+    used.add(key);
+    keys[index] = key;
+  });
+  return dataRows
+    .map((cells) => {
+      const row: Record<string, unknown> = {};
+      keys.forEach((key, index) => { row[key] = cells[index] ?? ""; });
+      return row;
+    })
     .filter((row) => Object.values(row).some((value) => text(value) !== ""));
 }
 
-function missingColumns(rows: Record<string, unknown>[], sheet: XLSX.WorkSheet) {
-  const headerRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: false });
-  const headers = new Set((headerRows[0] || []).map(text));
-  if (rows.length > 0) Object.keys(rows[0]).forEach((key) => headers.add(key));
+function missingColumns(table: SheetTable) {
+  const headers = new Set((table.rows[0] || []).map(text));
   return REQUIRED_SNIPPET_COLUMNS.filter((column) => !headers.has(column));
 }
 
-export function parseSnippetWorkbook(buffer: ArrayBuffer, fileName: string) {
-  const extension = fileName.toLocaleLowerCase().split(".").pop();
-  if (extension !== "xlsx" && extension !== "csv") throw new Error("仅支持 XLSX 和 CSV 文件");
-  const workbook = extension === "csv"
-    ? XLSX.read(new TextDecoder("utf-8").decode(buffer), { type: "string", cellDates: false })
-    : XLSX.read(buffer, { type: "array", cellDates: false });
-  if (workbook.SheetNames.length === 0) throw new Error("表格中没有可读取的工作表");
+export async function parseSnippetWorkbook(buffer: ArrayBuffer, fileName: string) {
+  const tables = await readSpreadsheet(buffer, fileName);
+  if (tables.length === 0) throw new Error("表格中没有可读取的工作表");
 
-  let sheetName = workbook.SheetNames.includes("话术库") ? "话术库" : "";
-  if (!sheetName) {
-    sheetName = workbook.SheetNames.find((name) => {
-      const sheet = workbook.Sheets[name];
-      return missingColumns(sheetRows(sheet), sheet).length === 0;
-    }) || "";
-  }
-  if (!sheetName) throw new Error(`缺少必需列：${REQUIRED_SNIPPET_COLUMNS.join("、")}`);
+  const table = tables.find((candidate) => candidate.name === "话术库")
+    || tables.find((candidate) => missingColumns(candidate).length === 0);
+  if (!table) throw new Error(`缺少必需列：${REQUIRED_SNIPPET_COLUMNS.join("、")}`);
 
-  const sheet = workbook.Sheets[sheetName];
-  const rows = sheetRows(sheet);
-  const missing = missingColumns(rows, sheet);
+  const missing = missingColumns(table);
   if (missing.length > 0) throw new Error(`缺少必需列：${missing.join("、")}`);
-  return rows;
+  return sheetRows(table);
 }
 
 function text(value: unknown) {
@@ -251,10 +254,13 @@ export function snippetCopyReadiness(
   values: Record<string, string>,
   checkedInputs: string[],
   verificationConfirmed: boolean,
+  language?: "en" | "zh",
 ) {
   const meta = item.snippetMeta;
   if (!meta) return { ready: true, missingPlaceholders: [], missingChecks: [], needsVerification: false };
-  const missingPlaceholders = meta.placeholders.filter((name) => !values[name]?.trim());
+  // The English and Chinese texts can use different variable names; only the ones in the text being copied need a value.
+  const needed = language ? extractPlaceholders(resolveSnippetCopySource(item, language)) : meta.placeholders;
+  const missingPlaceholders = needed.filter((name) => !values[name]?.trim());
   const checked = new Set(checkedInputs);
   const missingChecks = meta.requiredInputs.filter((name) => !checked.has(name));
   const needsVerification = meta.requiresVerification && !verificationConfirmed;

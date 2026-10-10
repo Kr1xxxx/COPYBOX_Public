@@ -29,4 +29,4 @@ company 话术 can create it from their own app with 导出为公司话术库文
 - Change an entry by keeping its `id` and changing its text. Removing an entry from the file only marks it
   「公司已停用」 on every device.
 - Samples: `docs/samples/shared-library-v1.json` and `-v2.json` (v2 changes two entries, drops one, adds one).
-- Rules and why: D-025 in `docs/DECISIONS.md`; code in `app/shared-library.ts`.
+- Rules and why: D-026 in `docs/decisions/`; code in `app/shared-library.ts`.
