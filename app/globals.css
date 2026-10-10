@@ -286,7 +286,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .mini-row.selected .row-main { align-items: flex-start; padding-top: 9px; padding-bottom: 10px; }
 .mini-row.selected .row-dot { margin-top: 6px; }
 .mini-row.selected .row-copy small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; color: #4a3f38; line-height: 1.5; }
-.mini-copied { flex: 0 0 auto; color: #2f9b62; font-size: 12px; font-weight: 600; }
+.mini-copied { flex: 0 0 auto; color: #1c6f43; font-size: 12px; font-weight: 600; }
 .app-shell.mini .status-bar { height: 30px; padding: 0 12px; }
 
 /* Toast (app/arc/arc-toast.tsx, arc-library motion): the host only positions; the toast itself is moved by motion. */

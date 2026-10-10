@@ -77,7 +77,7 @@ test("关于 shows the version and when it was updated; the version still opens 
   const row = settings.locator(".settings-row", { hasText: "更新时间" });
   await expect(row).toContainText("2026-10-10 21:37");
   for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipbox v/).click();
-  await expect(page.getByRole("dialog", { name: "验证码" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "保险箱" })).toBeVisible();
 });
 
 

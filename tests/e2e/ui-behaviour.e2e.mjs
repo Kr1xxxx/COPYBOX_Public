@@ -58,14 +58,15 @@ test.describe("snippet list", () => {
     await plain.nth(3).locator(".row-main").click();
     const primary = page.locator(".native-row.selected").locator(".primary-button.copy-main").first();
     await expect(primary).toBeVisible();
-    const before = await primary.boundingBox();
+    // the opening card is still settling (another one folds away), so wait until the button has a stable box
+    let before = null;
+    await expect.poll(async () => { const first = await primary.boundingBox(); await page.waitForTimeout(120); const second = await primary.boundingBox(); before = second; return Boolean(first && second && first.y === second.y && first.width === second.width); }).toBe(true);
     await primary.click();
     await expect(primary).toHaveAttribute("data-copied", "");
     await expect(primary).toHaveAccessibleName("已复制");
     // the button keeps its size once the copy worked
-    const after = await primary.boundingBox();
-    expect(after.width).toBeCloseTo(before.width, 0);
-    expect(after.height).toBeCloseTo(before.height, 0);
+    // (the card re-renders as the copy lands, so measure again until the box is there instead of once)
+    await expect.poll(async () => { const box = await primary.boundingBox(); return box ? [Math.round(box.width), Math.round(box.height)] : null; }).toEqual([Math.round(before.width), Math.round(before.height)]);
   });
 
   test("the card marker is a small round drag handle that can be focused", async ({ page }) => {

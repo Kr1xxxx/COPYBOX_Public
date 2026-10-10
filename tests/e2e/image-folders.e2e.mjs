@@ -556,6 +556,7 @@ test("图片 folders can be dragged by the three-bar handle in the sidebar, and 
   await reloadToImages(page);
   await expect.poll(names).toEqual(["乙", "丙", "甲"]);
   await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.locator(".settings-dialog").getByRole("tab", { name: "目录" }).click();
   const group = page.locator(".settings-dialog .settings-folder-group", { hasText: "图片目录" });
   await group.getByRole("button", { name: /图片目录/ }).click();
   const settingsNames = () => group.locator(".settings-folder-name").allInnerTexts();
