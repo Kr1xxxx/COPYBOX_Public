@@ -5,6 +5,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-10 — Claude — Task 25, step 3 of D-021 (owner: unify motion with arc-library, less on frequent actions): the four pop-over menus now use `ArcMenu` (`app/arc/menu.tsx`): 0.16 s fade + 3% scale + 4 px rise from the corner next to the button, 0.10 s fade out via `AnimatePresence`; no blur, no stagger; nothing moves under reduced motion. The CSS `menu-in` stays only on the two folder menus. Dialogs were not changed: their state is cleared on close, so an exit animation would need the content kept alive; left for step 4 if the owner wants it. Added an e2e test for the menus.
 - 2026-10-09 — Claude — Task 25, version update reminder (D-023): main-process check of a JSON file (`desktop/update-check.cjs`, address in `desktop/update-config.cjs`, empty = off), banner `app/update-notice.tsx` with 下载 / 稍后. Unit tests + e2e. The web preview shows a demo banner. Next: owner picks where installers live, then fill the address.
 
 - 2026-10-09 — Claude — Task 24 (owner: whole picture visible; acceptance finding): the tile copy button is hidden until hover or keyboard focus (always shown at .85 on touch screens). The old e2e line that required it to be always visible changed to match.
