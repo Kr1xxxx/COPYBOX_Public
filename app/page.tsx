@@ -60,15 +60,17 @@ import {
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
-import { imageFilterTitle } from "./image-folders-core";
+import { countImagesByFolder, imageFilterTitle, imageFolderColors } from "./image-folders-core";
+import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
+import { ArcSegmented } from "./arc/segmented";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
-import type { SettingsFolderGroup } from "./settings-folders";
+import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
 import { UpdateNotice } from "./update-notice";
@@ -276,8 +278,9 @@ export default function Home() {
   const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
   const imageSectionRef = useRef<ImageSectionHandle>(null);
   const [imageViewMode, setImageViewMode] = useImageView();
-  // Images and folders are shared by the sidebar and the list; nothing is read until 图片 is first opened.
-  const imageLibrary = useImageLibrary(deviceKey, imageView, flashToast);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
+  const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -289,7 +292,6 @@ export default function Home() {
   const [copiedId, setCopiedId] = useState("");
   const [copiedReferenceId, setCopiedReferenceId] = useState("");
   const [, setMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [newFolder, setNewFolder] = useState<{ name: string; error: string } | null>(null);
   const [renamingFolder, setRenamingFolder] = useState<{ from: string; value: string; error: string } | null>(null);
   const [folderMenu, setFolderMenu] = useState("");
@@ -598,6 +600,24 @@ export default function Home() {
     resolvePostCommitFocusTarget(pending, modalOpen, backgroundInert, searchRef.current)?.focus();
   }, [modalOpen, backgroundInert]);
 
+  // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu close on a click or touch anywhere outside them, and on Esc.
+  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || Boolean(folderMenu);
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const closeAll = () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setFolderMenu(""); setFolderDeleteArm(""); };
+    const outside = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".folder-menu, .folder-more")) return; // the folder menu has its own scrim and toggle
+      if (target?.closest(".product-filter-wrap")) { setRowMenuId(""); setBulkMoveOpen(false); return; }
+      if (target?.closest(".menu-wrap")) { setProductMenuOpen(false); return; }
+      closeAll();
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") closeAll(); };
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
+  }, [dropdownOpen]);
+
   useEffect(() => {
     if (loading) return;
     const shortcut = (event: KeyboardEvent) => {
@@ -848,44 +868,62 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  // Folder editing from Settings works on either kind, not just the open tab.
-  async function settingsFolderRename(kind: ItemKind, from: string, to: string) {
+  // Folder editing from Settings works on either kind, not just the open tab, and on 图片 folders (their own store).
+  // The image library reports a failure through `onError`; Settings shows it next to the form.
+  async function imageFolderTask(run: (onError: (message: string) => void) => Promise<unknown>) {
+    let failure = "";
+    const result = await run((message) => { failure = message; });
+    return result === null || result === false ? failure || "没有保存，请重试" : "";
+  }
+
+  async function settingsFolderRename(kind: SettingsFolderKind, from: string, to: string) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.renameFolder(from, to, onError));
     const error = await commitFolderChange((data) => renameFolder(data, kind, from, to), "目录已重命名");
     if (!error && activeKind === kind && activeFolder === `folder:${from}`) setActiveFolder(`folder:${normalizeFolderName(to)}`);
     return error;
   }
 
-  async function settingsFolderDelete(kind: ItemKind, folder: string) {
+  async function settingsFolderDelete(kind: SettingsFolderKind, folder: string) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.deleteFolder(folder, onError));
     const error = await commitFolderChange((data) => deleteFolder(data, kind, folder), `已删除目录「${folder}」`);
     if (!error && activeKind === kind && activeFolder === `folder:${folder}`) selectFolder("all");
     return error;
   }
 
-  async function settingsFolderAdd(kind: ItemKind, name: string) {
+  async function settingsFolderAdd(kind: SettingsFolderKind, name: string) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.createFolder(name, onError));
     const result = addFolder(foldersRef.current, kind, name);
     if (!result.folder) return "请输入目录名称";
     if (!result.created) return "已有同名目录";
     return commitFolderChange((data) => ({ data: { ...data, folders: addFolder(data.folders, kind, name).folders } }), "目录已创建");
   }
 
-  function settingsFolderColor(kind: ItemKind, folder: string, color: string | null) {
+  function settingsFolderColor(kind: SettingsFolderKind, folder: string, color: string | null) {
+    if (kind === "image") { if (color) void imageLibrary.setFolderColor(folder, color); return; }
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  function settingsFolderMove(kind: ItemKind, folder: string, delta: -1 | 1) {
+  // Image folders have no saved order (not sortable in Settings), so only the vault kinds move.
+  function settingsFolderMove(kind: SettingsFolderKind, folder: string, delta: -1 | 1) {
+    if (kind === "image") return;
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: moveName(data.folders[kind], folder, delta) } } }), "目录顺序已更新");
   }
 
-  function settingsFolderReorder(kind: ItemKind, source: string, target: string) {
+  function settingsFolderReorder(kind: SettingsFolderKind, source: string, target: string) {
+    if (kind === "image") return;
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: reorderNames(data.folders[kind], source, target) } } }), "目录顺序已更新");
   }
 
   function buildSettingsFolderGroups(): SettingsFolderGroup[] {
-    return (PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => {
+    const textGroups = (PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind): SettingsFolderGroup => {
       const colors = { ...buildCategoryColorMap(folders[kind]), ...(folderColors?.[kind] || {}) };
       return {
         kind,
         title: kind === "snippet" ? "话术目录" : `${SECRET_WORD}目录`,
+        unit: "条",
+        nameMax: 30,
+        sortable: true,
+        autoColor: true,
         folders: folders[kind].map((name) => ({
           name,
           count: items.filter((item) => !isTrashedItem(item) && (item.kind || "secret") === kind && item.folder === name).length,
@@ -894,6 +932,17 @@ export default function Home() {
         })),
       };
     });
+    const imageCountsByFolder = countImagesByFolder(imageLibrary.images ?? [], imageLibrary.folders).byFolder;
+    const imageColors = imageFolderColors(imageLibrary.folders);
+    return [...textGroups, {
+      kind: "image",
+      title: "图片目录",
+      unit: "张",
+      nameMax: IMAGE_FOLDER_NAME_MAX,
+      sortable: false,
+      autoColor: false,
+      folders: imageLibrary.folders.map(({ name }) => ({ name, count: imageCountsByFolder[name] ?? 0, color: imageColors[name] || UNCATEGORIZED_COLOR, locked: false })),
+    }];
   }
 
   function requestTrash(item: SecretItem) {
@@ -981,7 +1030,7 @@ export default function Home() {
   }
 
   const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
-  const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, 0));
+  const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
   useEffect(() => {
     window.clipboxDesktop?.setMiniHidePolicy?.(miniHidePolicy);
     // Only tell the desktop shell about the stored choice once on start; later changes go through chooseMiniHidePolicy.
@@ -1286,10 +1335,16 @@ export default function Home() {
           : activeFolder.slice(7);
   const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : "搜索标题、编号或内容";
   const kindSwitch = (
-    <div className={`kind-switch ${isMini ? "compact" : ""}`} role="group" aria-label="内容板块">
-      {(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => <button key={kind} type="button" className={!imageView && activeKind === kind ? "active" : ""} aria-pressed={!imageView && activeKind === kind} onClick={() => switchKind(kind)}>{kind === "snippet" ? "话术" : SECRET_WORD}</button>)}
-      <button type="button" className={imageView ? "active" : ""} aria-pressed={imageView} onClick={showImages}>图片</button>
-    </div>
+    <ArcSegmented
+      className={`kind-switch ${isMini ? "compact" : ""}`}
+      label="内容板块"
+      value={imageView ? "image" : activeKind}
+      onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      options={[
+        ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
+        { value: "image", label: "图片" },
+      ]}
+    />
   );
   const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
@@ -1472,10 +1527,13 @@ export default function Home() {
               <h1>{sectionTitle}</h1>
               <span className="section-count">{imageView ? imageCounts.shown : filtered.length}</span>
               <span className="spacer" />
-              {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <div className="scope-switch" role="group" aria-label="搜索范围">
-                <button type="button" className={searchAllFolders ? "" : "active"} aria-pressed={!searchAllFolders} onClick={() => { setSearchAllFolders(false); setSelected(0); }}>此目录</button>
-                <button type="button" className={searchAllFolders ? "active" : ""} aria-pressed={searchAllFolders} onClick={() => { setSearchAllFolders(true); setSelected(0); }}>全部目录</button>
-              </div>}
+              {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <ArcSegmented
+                className="scope-switch"
+                label="搜索范围"
+                value={searchAllFolders ? "all" : "here"}
+                onSelect={(next) => { setSearchAllFolders(next === "all"); setSelected(0); }}
+                options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
+              />}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>

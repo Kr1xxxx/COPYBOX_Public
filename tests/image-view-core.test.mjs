@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   IMAGE_VIEW_KEY,
+  detailScrollDelta,
   gridCardInsertIndex,
   IMAGE_GRID_COLUMNS,
   parseImageView,
@@ -67,4 +68,12 @@ test("the card position is clamped to a short last row and ignores a missing sel
   assert.equal(gridCardInsertIndex(0, 0), -1);
   assert.equal(gridCardInsertIndex(3, 7, 2), 4);
   assert.equal(IMAGE_GRID_COLUMNS, 4);
+});
+
+test("the detail scroll keeps the clicked picture in view", () => {
+  // view 100..500 (pad 6 -> 106..494)
+  assert.equal(detailScrollDelta(100, 500, 200, 400), 0); // everything already visible
+  assert.equal(detailScrollDelta(100, 500, 300, 600), 106); // card sticks out below: scroll down just enough
+  assert.equal(detailScrollDelta(100, 500, 90, 300), -16); // picture cut off above: scroll up
+  assert.equal(detailScrollDelta(100, 500, 300, 900), 194); // card taller than the view: picture goes to the top
 });

@@ -11,6 +11,7 @@ test("folders can be drag-sorted in Settings; standard folders cannot", async ({
   const dialog = page.locator(".settings-dialog");
   // The first group is 话术; the second one (备注/秘密) is only on macOS, so the browser and Windows have one group.
   const group = dialog.locator(".settings-folder-group").nth(0);
+  await group.getByRole("button", { name: /话术目录/ }).click();
   for (const name of ["甲", "乙", "丙"]) {
     await group.getByRole("button", { name: "新建目录" }).click();
     await group.locator("input[aria-label^=新建]").fill(name);
@@ -48,4 +49,60 @@ test("AI settings: empty prompts cannot be saved; presets fill URL and model", a
   await dialog.getByLabel("润色提示词").fill("润色");
   await dialog.getByLabel("整理提示词").fill("");
   await expect(save).toBeDisabled();
+});
+
+test("目录 groups start folded and open on click; 图片目录 can be created, renamed and deleted here", async ({ page }) => {
+  const dialog = page.locator(".settings-dialog");
+  const groups = dialog.locator(".settings-folder-group");
+  // Browser and Windows: 话术目录 and 图片目录 (备注/秘密 is only on macOS).
+  await expect(groups).toHaveCount(2);
+  for (const title of ["话术目录", "图片目录"]) {
+    await expect(dialog.getByRole("button", { name: new RegExp(title) })).toHaveAttribute("aria-expanded", "false");
+  }
+  await expect(dialog.getByRole("button", { name: "新建目录" }).first()).toBeHidden();
+
+  const images = groups.nth(1);
+  const trigger = images.getByRole("button", { name: /图片目录/ });
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(images).toContainText("还没有目录");
+  await images.getByRole("button", { name: "新建目录" }).click();
+  await images.locator("input[aria-label^=新建]").fill("产品图");
+  await page.keyboard.press("Enter");
+  await expect(images.locator(".settings-folder-name")).toHaveText(["产品图"]);
+  await expect(images.locator(".settings-folder-count")).toHaveText("0 张");
+  await expect(images.locator("button.settings-folder-grip")).toHaveCount(0);
+
+  await images.getByRole("button", { name: "改名" }).click();
+  await images.locator("input[aria-label^=重命名]").fill("新品图");
+  await page.keyboard.press("Enter");
+  await expect(images.locator(".settings-folder-name")).toHaveText(["新品图"]);
+
+  // A duplicate name is refused next to the form.
+  await images.getByRole("button", { name: "新建目录" }).click();
+  await images.locator("input[aria-label^=新建]").fill("新品图");
+  await page.keyboard.press("Enter");
+  await expect(dialog.locator(".settings-error")).toBeVisible();
+  await images.getByRole("button", { name: "取消" }).click();
+
+  // The 图片 sidebar sees the same folder.
+  await dialog.getByRole("button", { name: "关闭设置" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await expect(page.locator(".sidebar .directory-row", { hasText: "新品图" })).toBeVisible();
+
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  const again = page.locator(".settings-dialog .settings-folder-group").nth(1);
+  await again.getByRole("button", { name: /图片目录/ }).click();
+  await again.getByRole("button", { name: "删除" }).click();
+  await again.getByRole("button", { name: "确认删除" }).click();
+  await expect(again).toContainText("还没有目录");
+
+  // Folding closes it again.
+  await again.getByRole("button", { name: /图片目录/ }).click();
+  await expect(again.getByRole("button", { name: "新建目录" })).toBeHidden();
+});
+
+test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
+  const radios = page.locator(".settings-dialog").getByRole("radiogroup", { name: "回收站自动清理" });
+  await expect(radios.getByRole("radio", { name: "7 天" })).toHaveAttribute("aria-checked", "true");
 });
