@@ -39,6 +39,7 @@ jobs:
         with:
           workspaces: src-tauri
       - run: npm ci
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npx tauri build
         env:
           CI: "true"
