@@ -128,3 +128,12 @@ export function detectSite(input: { url?: string; apiKey?: string; name?: string
   const first = label.split(/[\s\-_·|｜:：]/)[0] || label;
   return { key: `name:${first.toLowerCase()}`, name: first, color: colorFor(first.toLowerCase()), letter: Array.from(first)[0].toUpperCase() };
 }
+
+// A payment entry belongs to its service when the kind says so (PayPal, Wise) or its name names a known site;
+// otherwise it is one shared 收款 group, never a group made from the first word of its title.
+export function paymentSite(kind: string, name: string): Site {
+  if (kind === "paypal") return detectSite({ name: "PayPal" });
+  if (kind === "wise") return detectSite({ name: "Wise" });
+  const found = detectSite({ name });
+  return found.key.startsWith("name:") || found.key === "other" ? { key: "payment", name: "收款信息", color: "#4a7a68", letter: "收" } : found;
+}

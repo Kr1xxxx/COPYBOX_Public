@@ -6,7 +6,7 @@ import { lastFour } from "./apikey-core";
 import { paymentHint } from "./payment-core";
 import { openSecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
-import { detectSite, type Site } from "./site-core";
+import { detectSite, paymentSite, type Site } from "./site-core";
 import { accountTitle } from "./totp-core";
 import { openTotpStore } from "./totp-store";
 
@@ -17,13 +17,6 @@ type Entry = { id: string; tab: Exclude<VaultTab, "all">; title: string; hint: s
 export const TYPE_LABEL: Record<Exclude<VaultTab, "all">, string> = { login: "密码", payment: "收款", apikey: "API", totp: "验证码" };
 const TYPE_GROUP_LABEL: Record<Exclude<VaultTab, "all">, string> = { login: "账号密码", payment: "收款信息", apikey: "API 密钥", totp: "验证码" };
 const TYPE_ORDER: Exclude<VaultTab, "all">[] = ["login", "payment", "apikey", "totp"];
-
-// A payment entry belongs to its service when the kind says so (PayPal, Wise), else it has no site.
-function paymentSite(kind: string, name: string): Site {
-  if (kind === "paypal") return detectSite({ name: "PayPal" });
-  if (kind === "wise") return detectSite({ name: "Wise" });
-  return detectSite({ name });
-}
 
 export function groupEntries(entries: Entry[], by: "site" | "type") {
   const groups = new Map<string, { key: string; title: string; site?: Site; entries: Entry[] }>();

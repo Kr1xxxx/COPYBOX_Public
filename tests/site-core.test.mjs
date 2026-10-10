@@ -80,3 +80,12 @@ test("new sites are recognised and every bundled glyph belongs to a known site",
     assert.notEqual(detectSite({ name: key }).key.startsWith("name:"), true, `${key} is not a known site`);
   }
 });
+
+test("a payment entry named after a bank joins the shared 收款 group, not a group made from its title", async () => {
+  const { paymentSite } = await import("../app/site-core.ts");
+  assert.equal(paymentSite("bank", "美元电汇 - 汇丰").key, "payment");
+  assert.equal(paymentSite("bank", "美元电汇 - 招行").key, "payment");
+  assert.equal(paymentSite("paypal", "x").key, "paypal");
+  assert.equal(paymentSite("wise", "x").key, "wise");
+  assert.equal(paymentSite("other", "Stripe 提现").key, "stripe");
+});

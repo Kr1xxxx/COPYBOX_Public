@@ -21,3 +21,7 @@
 ## Patch 7: dialog height and QR picker (from the 【驗收】 audit)
 - What changed: the 保险箱 dialog height follows its content even when another rule gives settings dialogs a fixed height (it was stretched with an empty lower half once the settings tabs landed); the QR picture field is a normal button instead of the browser's file input. Test added that fails without the fix.
 - User-visible change: 保险箱 no longer shows a tall empty area; 验证码 add form has a 「选一张图片…」 button.
+
+## Patch 8: payment entries in 全部
+- What changed: a bank 收款 entry no longer becomes its own "site" named after the first word of its title; all of them share one 收款信息 group (PayPal, Wise and other known names still go to their site).
+- User-visible change: 全部 → 按网站 shows one 收款信息 group instead of one group per bank entry.

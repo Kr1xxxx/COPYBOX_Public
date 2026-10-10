@@ -8,7 +8,7 @@ import {
 } from "./payment-core";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
-import { detectSite } from "./site-core";
+import { paymentSite } from "./site-core";
 import { Icon } from "./ui-atoms";
 
 function whenText(at: number) {
@@ -150,7 +150,7 @@ export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: strin
             return (
               <li key={item.id} className={`pay-item${open ? " open" : ""}`}>
                 <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); }}>
-                  <SiteBadge site={item.kind === "paypal" ? detectSite({ name: "PayPal" }) : item.kind === "wise" ? detectSite({ name: "Wise" }) : detectSite({ name: item.name })} />
+                  <SiteBadge site={paymentSite(item.kind, item.name)} />
                   <span className="totp-who"><strong>{item.name}</strong><small>{paymentHint(item)}</small></span>
                   <Icon name="chevron" className="pay-chevron" />
                 </button>
