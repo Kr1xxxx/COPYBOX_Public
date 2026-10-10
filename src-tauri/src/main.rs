@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ai;
 mod shell;
+mod update;
 mod window_mode;
 mod window_state;
 
 use shell::Shell;
+use update::Updates;
 use std::time::Duration;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use window_mode::WindowMode;
@@ -34,6 +37,7 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(WindowMode::default())
         .manage(Shell::default())
+        .manage(Updates::default())
         .invoke_handler(tauri::generate_handler![
             window_mode::set_window_mode,
             window_mode::get_window_mode,
@@ -45,6 +49,13 @@ fn main() {
             shell::get_launch_at_login,
             shell::set_launch_at_login,
             shell::open_data_folder,
+            shell::relaunch,
+            ai::ai_status,
+            ai::ai_save,
+            ai::ai_clear,
+            ai::ai_request,
+            update::check_update,
+            update::open_update,
         ])
         .setup(|app| {
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());

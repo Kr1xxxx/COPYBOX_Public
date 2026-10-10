@@ -206,6 +206,16 @@ pub fn open_data_folder(app: AppHandle) -> Result<String, String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
+/// Restart the app (the page asks for this after settings that need it).
+#[tauri::command]
+pub fn relaunch(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<WindowMode>) {
+    shell.settings.lock().unwrap().quitting = true;
+    if let Some(window) = app.get_webview_window("main") {
+        mode.save_now(&window);
+    }
+    app.restart();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
