@@ -36,6 +36,7 @@ export type SecretItem = {
   snippetMeta?: SnippetMeta;
   snippetNumber?: string;
   lastUsedAt?: number;
+  useCount?: number;
   deletedAt?: number;
   createdAt: number;
   updatedAt: number;

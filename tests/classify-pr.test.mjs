@@ -15,7 +15,7 @@ test("docs and test additions are small", () => {
 });
 
 test("desktop, dependencies, CI, scripts and the rulebook wait for the owner", () => {
-  for (const path of ["desktop/main.cjs", "package.json", "package-lock.json", ".github/workflows/ci.yml", "scripts/classify-pr.mjs", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "docs/DECISIONS.md", "eslint.config.mjs", "playwright.config.mjs"]) {
+  for (const path of ["desktop/main.cjs", "package.json", "package-lock.json", ".github/workflows/ci.yml", "scripts/classify-pr.mjs", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "docs/DECISIONS.md", "docs/decisions/D-030-new-rule.md", "eslint.config.mjs", "playwright.config.mjs"]) {
     assert.equal(run([file(path)]).size, "big", path);
   }
 });
