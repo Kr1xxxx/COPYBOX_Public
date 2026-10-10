@@ -23,7 +23,7 @@
     "test:e2e": "npm run build && playwright test",
     "preview:build": "node tools/preview/build.mjs",
     "preview:serve": "node tools/preview/serve.mjs",
-    "tauri:frontend": "npm run build && node scripts/tauri-frontend.mjs",
+    "tauri:frontend": "node scripts/tauri-frontend.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

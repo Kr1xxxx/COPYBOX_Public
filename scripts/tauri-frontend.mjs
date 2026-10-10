@@ -1,6 +1,7 @@
-// Builds the page the Tauri shell loads: dist-tauri/index.html plus _next/. Needs "npm run build" first.
+// Builds the page the Tauri shell loads: dist-tauri/index.html plus _next/. Runs the app build itself, because
+// the "build" script uses POSIX env syntax that Windows cannot run.
 // The app has one page and no server calls, so the server-rendered page is saved once and served as a file.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
@@ -22,7 +23,7 @@ function freePort() {
 
 async function fetchServerHtml() {
   const port = await freePort();
-  const child = spawn(process.execPath, [join(repo, "node_modules/vinext/dist/cli.js"), "start"], {
+  const child = spawn(process.execPath, [vinext, "start"], {
     cwd: repo,
     env: { ...process.env, PORT: String(port), HOST: "127.0.0.1" },
     stdio: "ignore",
@@ -47,8 +48,14 @@ async function fetchServerHtml() {
   }
 }
 
-if (!existsSync(join(repo, "dist/client/_next"))) {
-  console.error('Run "npm run build" first.');
+const vinext = join(repo, "node_modules/vinext/dist/cli.js");
+const built = spawnSync(process.execPath, [vinext, "build"], {
+  cwd: repo,
+  env: { ...process.env, WRANGLER_LOG_PATH: ".wrangler/wrangler.log" },
+  stdio: "inherit",
+});
+if (built.status !== 0 || !existsSync(join(repo, "dist/client/_next"))) {
+  console.error("The app build failed.");
   process.exit(1);
 }
 const html = await fetchServerHtml();
