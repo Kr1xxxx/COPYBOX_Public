@@ -811,3 +811,34 @@ button { -webkit-tap-highlight-color: transparent; }
 .scope-switch .arc-seg-pill { box-shadow: 0 1px 2px rgba(31,30,28,.14); }
 .segmented .arc-seg-pill { background: white; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 .inline-editor .segmented .arc-seg-pill { background: var(--card); }
+
+/* 验证码 (hidden, Mac only) */
+.totp-dialog{width:min(440px,100%)}
+.totp-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.totp-row{display:flex;align-items:center;gap:8px}
+.totp-main{flex:1;min-width:0;min-height:48px;display:flex;align-items:center;gap:10px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);text-align:left;cursor:pointer;transition:background .15s,border-color .15s,scale .12s}
+.totp-main:hover{background:var(--hover)}
+.totp-main:active{scale:.98}
+.totp-main:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.totp-who{flex:1;min-width:0;display:grid}
+.totp-who strong{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.totp-who small{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.totp-code{font-size:20px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.totp-copy-icon{display:grid;place-items:center;width:16px;height:16px;color:var(--muted)}
+.totp-main.copied .totp-copy-icon{color:var(--accent);animation:totp-pop .2s cubic-bezier(.2,.82,.2,1) both}
+@keyframes totp-pop{from{opacity:0;scale:.5}to{opacity:1;scale:1}}
+.totp-ring{flex:none;color:var(--accent)}
+.totp-ring.urgent{color:var(--danger)}
+.totp-ring-track{fill:none;stroke:var(--line);stroke-width:2.5}
+.totp-ring-arc{fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;transition:stroke-dashoffset .25s linear}
+.totp-ring text{fill:var(--muted);font-size:9px;font-variant-numeric:tabular-nums}
+.totp-delete{flex:none}
+.totp-confirm{display:flex;gap:6px;flex:none}
+.totp-empty{margin:4px 0;color:var(--muted);font-size:12.5px}
+.totp-form{display:grid;gap:10px}
+.totp-form label{display:grid;gap:4px;color:var(--muted);font-size:11.5px}
+.totp-form textarea,.totp-form input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;resize:none}
+.totp-form textarea:focus,.totp-form input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.totp-error{margin:0;color:var(--danger);font-size:12px}
+.totp-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+@media (prefers-reduced-motion: reduce){.totp-main,.totp-main:active{transition:none;scale:1}.totp-main.copied .totp-copy-icon{animation:none}.totp-ring-arc{transition:none}}
