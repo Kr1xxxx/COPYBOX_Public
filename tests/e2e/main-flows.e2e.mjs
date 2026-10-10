@@ -348,3 +348,32 @@ test("English word search is a separate mode next to the pinyin one", async ({ p
   await search.fill("");
   await expect(search).toHaveAttribute("placeholder", "搜索标题、编号或内容");
 });
+
+test("the sidebar entry says 最近 (it used to be cut off); its page is still titled 最近使用", async ({ page }) => {
+  await page.goto("/");
+  const entry = page.locator(".sidebar .nav-item", { hasText: "最近" });
+  await expect(entry).toBeVisible();
+  await expect(entry).not.toContainText("最近使用");
+  // The whole label fits: no ellipsis cut-off.
+  const label = entry.locator("span").first();
+  expect(await label.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await entry.click();
+  await expect(page.locator("h1")).toHaveText("最近使用");
+});
+
+test("dialog backdrops fade in by tint only: the blurred page behind is not re-blurred every frame (Mac smoothness)", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "设置" }).click();
+  const backdrop = page.locator(".settings-backdrop");
+  await expect(backdrop).toBeVisible();
+  const info = await backdrop.evaluate((el) => {
+    const style = getComputedStyle(el);
+    let keyframes = "";
+    for (const sheet of document.styleSheets) for (const rule of sheet.cssRules) if (rule.type === CSSRule.KEYFRAMES_RULE && rule.name === style.animationName) keyframes = rule.cssText;
+    return { blur: style.backdropFilter || style.webkitBackdropFilter, name: style.animationName, keyframes };
+  });
+  expect(info.blur).toContain("blur");
+  expect(info.name).toBe("backdrop-in");
+  expect(info.keyframes).not.toMatch(/opacity/);
+  expect(info.keyframes).toMatch(/background-color/);
+});

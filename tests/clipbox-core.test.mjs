@@ -328,12 +328,12 @@ test("builds all and favorite shortcuts for the active content kind", () => {
   assert.deepEqual(buildDirectoryShortcuts(items, "snippet"), [
     { id: "all", label: "全部话术", count: 2 },
     { id: "pinned", label: "收藏", count: 1 },
-    { id: "recent", label: "最近使用", count: 0 },
+    { id: "recent", label: "最近", count: 0 },
   ]);
   assert.deepEqual(buildDirectoryShortcuts(items, "secret"), [
     { id: "all", label: "全部", count: 1 },
     { id: "pinned", label: "收藏", count: 1 },
-    { id: "recent", label: "最近使用", count: 0 },
+    { id: "recent", label: "最近", count: 0 },
   ]);
 });
 

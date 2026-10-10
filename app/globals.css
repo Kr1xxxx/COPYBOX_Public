@@ -352,7 +352,8 @@ button { -webkit-tap-highlight-color: transparent; }
 @keyframes row-in { to { opacity: 1; transform: none; } }
 @keyframes menu-in { from { opacity:0; transform:translateY(-6px) scale(.97) } to { opacity:1; transform:none } }
 @keyframes check-in { from{opacity:0;transform:scale(.4) rotate(-20deg)} to{opacity:1;transform:none} }
-@keyframes backdrop-in { from{opacity:0} }
+/* Only the tint fades in. Fading the whole backdrop's opacity made the browser re-blur the page behind it on every frame (slow on a Mac). */
+@keyframes backdrop-in { from{background-color:transparent} }
 @keyframes dialog-in { from{opacity:0;transform:translateY(14px) scale(.97)} to{opacity:1;transform:none} }
 @keyframes editor-dialog-in { from{opacity:0;transform:translateY(10px) scale(.975)} to{opacity:1;transform:none} }
 @keyframes title-settle { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }

@@ -57,7 +57,7 @@ test("the 图片 sidebar lists 全部图片, 目录 with a + button, and 未分�
   await expect(navCount(page, "全部图片")).toHaveText("0");
   await expect(navCount(page, "未分类")).toHaveText("0");
   await expect(sidebar(page).getByRole("button", { name: "设置" })).toBeVisible();
-  for (const hidden of ["回收站", "收藏", "最近使用"]) await expect(sidebar(page)).not.toContainText(hidden);
+  for (const hidden of ["回收站", "收藏", "最近"]) await expect(sidebar(page)).not.toContainText(hidden);
 });
 
 test("a new folder: Enter creates it, Esc cancels, empty and repeated names are refused", async ({ page }) => {
@@ -509,7 +509,7 @@ test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep the
 
   await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
   await expect(sidebar(page)).toContainText("收藏");
-  await expect(sidebar(page)).toContainText("最近使用");
+  await expect(sidebar(page)).toContainText("最近");
   await expect(sidebar(page)).toContainText("回收站");
   await expect(sidebar(page)).not.toContainText("全部图片");
   await expect(sidebar(page)).not.toContainText("收款码");
