@@ -39,6 +39,8 @@ jobs:
         with:
           workspaces: src-tauri
       - run: npm ci
+      # The shell embeds the saved page at compile time, so it has to exist before cargo test.
+      - run: npm run tauri:frontend
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npx tauri build
         env:
