@@ -8,6 +8,7 @@ const V2 = fileURLToPath(new URL("../../docs/samples/shared-library-v2.json", im
 async function syncFile(page, file) {
   await page.getByRole("button", { name: /设置/ }).first().click();
   const dialog = page.locator(".settings-dialog");
+  await dialog.getByRole("tab", { name: "共享话术" }).click();
   const [chooser] = await Promise.all([page.waitForEvent("filechooser"), dialog.getByRole("button", { name: "选公司文件…" }).click()]);
   await chooser.setFiles(file);
   const summary = dialog.locator(".shared-summary");
@@ -76,6 +77,7 @@ test("choosing the company version replaces the edited text", async ({ page }) =
 test("a wrong file changes nothing and says so; the address field starts empty", async ({ page }) => {
   await page.getByRole("button", { name: /设置/ }).first().click();
   const dialog = page.locator(".settings-dialog");
+  await dialog.getByRole("tab", { name: "共享话术" }).click();
   await expect(dialog.locator("#shared-url")).toHaveValue("");
   await expect(dialog.getByRole("button", { name: "立即同步" })).toBeDisabled();
   const before = await page.locator(".native-row").count();
@@ -92,6 +94,7 @@ test("an address syncs on 立即同步 and again by itself on the next start, qu
   const before = await page.locator(".native-row").count();
   await page.getByRole("button", { name: /设置/ }).first().click();
   const dialog = page.locator(".settings-dialog");
+  await dialog.getByRole("tab", { name: "共享话术" }).click();
   await dialog.locator("#shared-url").fill("https://company.example/library.json");
   await dialog.getByRole("button", { name: "立即同步" }).click();
   await expect(dialog.locator(".shared-summary")).toContainText("新增 3 条");

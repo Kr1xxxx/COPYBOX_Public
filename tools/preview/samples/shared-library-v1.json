@@ -1,0 +1,42 @@
+{
+  "format": "clipbox-shared-library",
+  "version": 1,
+  "items": [
+    {
+      "id": "CO-001",
+      "label": "公司 · 开场问候",
+      "folder": "询盘接待",
+      "secret": "Hi [Name], thanks for contacting Comely Beauty! Which products are you interested in?",
+      "summary": "确认需求",
+      "scene": "公司 · 开场问候",
+      "action": "确认需求",
+      "rawProduct": "睫毛",
+      "chineseText": "你好 [Name]，感谢联系 Comely Beauty！请问您对哪些产品感兴趣？",
+      "usageNote": ""
+    },
+    {
+      "id": "CO-002",
+      "label": "公司 · 样品费说明",
+      "folder": "产品样品",
+      "secret": "Our sample fee is [Sample Fee] and it is refunded with your first bulk order.",
+      "summary": "说明样品费",
+      "scene": "公司 · 样品费说明",
+      "action": "说明样品费",
+      "rawProduct": "睫毛",
+      "chineseText": "",
+      "usageNote": ""
+    },
+    {
+      "id": "CO-003",
+      "label": "公司 · 付款方式",
+      "folder": "报价成交",
+      "secret": "We accept bank transfer and PayPal. Please confirm the amount before paying.",
+      "summary": "说明付款",
+      "scene": "公司 · 付款方式",
+      "action": "说明付款",
+      "rawProduct": "睫毛",
+      "chineseText": "",
+      "usageNote": ""
+    }
+  ]
+}
