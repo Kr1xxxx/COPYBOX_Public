@@ -48,7 +48,15 @@ test.describe("snippet list", () => {
     await expect(status).toHaveAttribute("aria-live", "polite");
     await expect(button).toHaveAttribute("aria-label", /^已复制 /);
     await expect(row).toHaveClass(/copied/);
-    expect(await button.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(47, 155, 98)");
+    // the colour fades in and the copied state is short, so watch it inside the page (a round trip from the test can arrive too late)
+    expect(await button.evaluate((element) => new Promise((resolve) => {
+      const start = performance.now();
+      const look = () => {
+        const color = getComputedStyle(element).color;
+        if (color === "rgb(47, 155, 98)" || performance.now() - start > 1200) resolve(color); else requestAnimationFrame(look);
+      };
+      look();
+    }))).toBe("rgb(47, 155, 98)");
     await expect(page.locator(".copy-feedback")).toHaveCount(0);
 
     await page.keyboard.press("Tab");

@@ -16,3 +16,9 @@ The 保险箱 (验证码 accounts and typed items) goes into the 秘密 backup a
 - New item type `recovery` (恢复码: name, site, codes, note) in the same encrypted store; its own tab.
 - 全部 also lists the old 秘密 entries (read only; they stay in the vault where they are). Their type is guessed from the content (`secret-classify.ts`); unknown ones are 其他 and sit under 其他网站. Opening one leads back to the 秘密 list.
 - 改归类: Lock can change the type (old 秘密 only) and the website of any entry. Stored as a `mark` item in the same encrypted store (so it is in backups); clearing both goes back to the guess. Nothing in the old 秘密 data is changed.
+
+## Examples (Lock 2026-10-10, "秘密直接给加几个范例")
+The first time the 保险箱 is opened and it is completely empty (nothing in 验证码, the typed items or the old 秘密), one example of each type is put in, all named 【范例】 with fake data (RFC test IBAN, example.com, public test TOTP key). Done once (`clipbox.vault.samples.v1`), never into existing data, and 「删除范例」 on 全部 removes exactly the entries whose id starts with `sample-`.
+
+## 清除范例 / 恢复范例 in 设置 → 数据 (Lock 2026-10-10)
+Two rows, shown only on a Mac whose 保险箱 is unlocked. 清除 (asks once) removes only entries whose id carries the `sample-` mark and that are still as created (an edited example counts as the user's and stays; the toast says how many were kept); it never judges by content or name. 恢复 adds only the examples whose ids are missing. No storage format change.

@@ -25,3 +25,34 @@ test("recovery codes: one per line, duplicates dropped, bad input explained", ()
   assert.match(recoveryProblem(["x".repeat(200)]), /太长/);
   assert.equal(recoveryProblem(["ok1", "ok2"]), "");
 });
+
+test("the example entries are clearly fake, valid, and recognisable by id", async () => {
+  const { sampleVaultData, isSampleId } = await import("../app/vault-samples.ts");
+  const { isValidIban } = await import("../app/payment-core.ts");
+  const { totp, items } = sampleVaultData(1);
+  assert.ok([...totp, ...items].every((entry) => isSampleId(entry.id)));
+  assert.ok([...totp.map((a) => a.name), ...items.map((i) => i.name)].every((name) => name.includes("范例")));
+  const payment = items.find((item) => item.type === "payment");
+  assert.equal(isValidIban(payment.fields.account), true);
+  assert.deepEqual(items.map((i) => i.type).sort(), ["apikey", "login", "payment", "recovery"]);
+  assert.equal(items.find((i) => i.type === "login").totpId, totp[0].id);
+});
+
+test("clearing samples only takes untouched entries with the sample mark; restoring only adds the missing", async () => {
+  const { sampleVaultData, planClearSamples, planRestoreSamples } = await import("../app/vault-samples.ts");
+  const samples = sampleVaultData(100);
+  const mine = { id: "u1", type: "login", name: "【范例】我自己起的名字", createdAt: 1, updatedAt: 1 };
+  const mineTotp = { id: "t1", name: "【范例】看起来像范例", createdAt: 1 };
+  const edited = { ...samples.items.find((i) => i.type === "payment"), updatedAt: 500 };
+  const items = [mine, ...samples.items.filter((i) => i.type !== "payment"), edited, { id: "mark:login:sample-login", type: "mark", target: "login:sample-login", updatedAt: 2 }];
+  const plan = planClearSamples([mineTotp, ...samples.totp], items);
+  assert.deepEqual(plan.removeTotp, ["sample-totp"]);
+  assert.ok(!plan.removeItems.includes("u1") && !plan.removeItems.includes("sample-payment") && !plan.removeItems.includes("mark:login:sample-login"));
+  assert.deepEqual(plan.removeItems.sort(), ["sample-apikey", "sample-login", "sample-recovery"]);
+  assert.equal(plan.keptEdited, 1);
+  // Restore: nothing missing → nothing added; only what is gone comes back; the edited one is not duplicated.
+  assert.deepEqual(planRestoreSamples(samples.totp, samples.items, 9), { addTotp: [], addItems: [] });
+  const back = planRestoreSamples([], [mine, edited], 9);
+  assert.deepEqual(back.addItems.map((i) => i.id).sort(), ["sample-apikey", "sample-login", "sample-recovery"]);
+  assert.deepEqual(back.addTotp.map((i) => i.id), ["sample-totp"]);
+});

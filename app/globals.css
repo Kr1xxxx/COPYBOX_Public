@@ -996,6 +996,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .vault-entry:hover{background:var(--hover)}
 .vault-entry:active{scale:.98}
 .vault-entry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vault-sample-note{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:10px;background:var(--hover);color:var(--muted);font-size:12.5px}
 .vault-entry-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
 .vault-sort{font-size:12px;white-space:nowrap}
 .vault-sort-form{grid-column:1 / -1;display:grid;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}

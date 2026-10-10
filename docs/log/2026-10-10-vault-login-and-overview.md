@@ -29,3 +29,11 @@
 ## Patch 9: 恢复码, old 秘密 in 全部, 改归类
 - What changed: new 恢复码 type and tab; 全部 lists the old 秘密 entries sorted by content (unknown → 其他 / 其他网站); 改归类 lets the type (old 秘密) and website be chosen by hand, saved as a `mark` item (encrypted, in backups). Old 秘密 data is untouched.
 - User-visible change: 保险箱 gets a 恢复码 tab; 全部 shows the old 秘密 too, each with a 改归类 button.
+
+## Patch 10: examples
+- What changed: an empty 保险箱 gets one 【范例】 entry per type the first time it is opened; 全部 shows a note with 删除范例. e2e helper marks the examples as already done so other tests start empty.
+- User-visible change: a new 保险箱 is no longer blank; the fake examples can be removed in one tap.
+
+## Patch 11: 清除范例 / 恢复范例 in settings
+- What changed: two rows in 设置 → 数据 (Mac, 保险箱 unlocked). Clear removes only untouched entries with the sample id mark, after one confirmation; restore only adds missing ones. The 全部 page's 删除范例 uses the same rule.
+- User-visible change: 设置 → 数据 has 清除范例 and 恢复范例.

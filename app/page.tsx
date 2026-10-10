@@ -73,6 +73,7 @@ import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
 import { VaultDialog } from "./vault-dialog";
+import { clearSampleEntries, restoreSampleEntries } from "./vault-samples";
 import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
@@ -1861,6 +1862,18 @@ export default function Home() {
       {totpOpen && <VaultDialog deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={() => { setTotpOpen(false); switchKind("secret"); }} onClose={() => setTotpOpen(false)} onToast={flashToast}
         onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("保险箱入口已隐藏"); }} />}
       {settingsOpen && <SettingsDialog
+        onClearSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
+          try {
+            const result = await clearSampleEntries(deviceKey);
+            flashToast(result.removed === 0 ? "没有可清除的范例" : result.keptEdited > 0 ? `已清除 ${result.removed} 条范例，${result.keptEdited} 条你改过的已保留` : `已清除 ${result.removed} 条范例`);
+          } catch { flashToast("清除失败，数据没有改动"); }
+        }}
+        onRestoreSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
+          try {
+            const result = await restoreSampleEntries(deviceKey);
+            flashToast(result.added === 0 ? "范例都在，没有缺的" : `已补回 ${result.added} 条范例`);
+          } catch { flashToast("恢复失败，数据没有改动"); }
+        }}
         onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
         buildTime={buildTime}

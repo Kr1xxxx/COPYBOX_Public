@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArcSegmented } from "./arc/segmented";
 import { lastFour } from "./apikey-core";
 import { paymentHint, type MarkItem } from "./payment-core";
+import { clearSampleEntries, isSampleId } from "./vault-samples";
 import { classifySecret } from "./secret-classify";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
@@ -60,6 +61,7 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
   const [editing, setEditing] = useState("");
   const [kindDraft, setKindDraft] = useState<EntryKind>("other");
   const [siteDraft, setSiteDraft] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -86,7 +88,7 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
       setBase(list);
     }).catch((reason: Error) => { if (live) setError(reason.message); });
     return () => { live = false; };
-  }, [deviceKey, legacySecrets]);
+  }, [deviceKey, legacySecrets, reload]);
 
   const entries = useMemo(() => (base ?? []).map((entry): Entry => {
     const mark = marks[entry.target];
@@ -95,6 +97,16 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
   }), [base, marks]);
   const groups = useMemo(() => groupEntries(entries, by), [entries, by]);
   const siteNames = useMemo(() => [...new Set(entries.map((entry) => entry.site).filter((site) => site.key !== "other").map((site) => site.name))], [entries]);
+
+  const hasSamples = (base ?? []).some((entry) => !entry.legacy && isSampleId(entry.id));
+  async function removeSamples() {
+    try {
+      await clearSampleEntries(deviceKey);
+      setReload((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除失败，请重试");
+    }
+  }
 
   async function saveMark(entry: Entry) {
     const store = storeRef.current;
@@ -121,6 +133,7 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
   if (entries.length === 0) return <p className="totp-empty">保险箱还是空的。切到上面的标签，添加账号密码、收款信息或验证码。</p>;
   return (
     <>
+      {hasSamples && <div className="vault-sample-note"><span>里面带了几条「范例」，是假数据，看完可以删掉。</span><button type="button" className="secondary-button" onClick={() => void removeSamples()}>删除范例</button></div>}
       <ArcSegmented className="settings-segment vault-tabs" label="分组方式" value={by} onSelect={(next) => setBy(next as "site" | "type")}
         options={[{ value: "site", label: "按网站" }, { value: "type", label: "按类型" }]} />
       <div className="vault-groups">
