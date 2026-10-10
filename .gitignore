@@ -49,3 +49,6 @@ yarn-error.log*
 # Claude Code worker worktrees
 /.claude/worktrees/
 /dist-preview/
+/dist-tauri/
+/src-tauri/target/
+/src-tauri/gen/
