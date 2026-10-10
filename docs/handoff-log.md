@@ -3,7 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
-- 2026-10-09 — Claude — Task 18, version update reminder (D-023): main-process check of a JSON file (`desktop/update-check.cjs`, address in `desktop/update-config.cjs`, empty = off), banner `app/update-notice.tsx` with 下载 / 稍后. Unit tests + e2e. The web preview shows a demo banner. Next: owner picks where installers live, then fill the address.
+- 2026-10-09 — Claude — Task 25, version update reminder (D-023): main-process check of a JSON file (`desktop/update-check.cjs`, address in `desktop/update-config.cjs`, empty = off), banner `app/update-notice.tsx` with 下载 / 稍后. Unit tests + e2e. The web preview shows a demo banner. Next: owner picks where installers live, then fill the address.
 
 - 2026-10-09 — Claude — Task 24 (owner: whole picture visible; acceptance finding): the tile copy button is hidden until hover or keyboard focus (always shown at .85 on touch screens). The old e2e line that required it to be always visible changed to match.
 - 2026-10-09 — Claude — Task 19 (acceptance finding on D-020): the 图片 tile glass now reads as frosted glass: unprefixed `backdrop-filter` kept in the built CSS (inside `@supports`, the minifier had dropped it), soft grey blobs behind so the blur shows, a fine colourless grain and an inner highlight; lighter grain in dark mode.

@@ -49,7 +49,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 23 | Dropdowns (全部产品, row menu, bulk 移动到, folder menu) close on outside click and Esc | In progress | Claude | Lock reported the 全部产品 filter stayed open |
 | 21 | Motion from arc-library, step 2 of 4 (D-021): segmented controls glide one highlight pill | In progress | Claude | `app/arc/segmented.tsx`; used by the section switch, search scope, 宫格\|列表, settings choices, secret display switch |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
-| 18 | Version update reminder (D-023) | Done | Claude | `desktop/update-check.cjs`, banner `app/update-notice.tsx`; off until the owner chooses an address (`desktop/update-config.cjs`). Same code on Windows and Mac |
+| 25 | Version update reminder (D-023) | Done | Claude | `desktop/update-check.cjs`, banner `app/update-notice.tsx`; off until the owner chooses an address (`desktop/update-config.cjs`). Same code on Windows and Mac |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
 
