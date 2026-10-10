@@ -395,7 +395,26 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-dialog{width:min(560px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--bg);box-shadow:0 30px 80px rgba(31,30,28,.3);animation:editor-dialog-in .22s cubic-bezier(.2,.82,.2,1) both}
 .settings-dialog>header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px}
 .settings-dialog h2{margin:0;font-size:16px;font-weight:650}
-.settings-body{overflow:auto;scrollbar-width:none;padding:0 18px 16px;display:grid;gap:16px}
+/* Two columns: groups on the left, the chosen group on the right (arc-library tabs: a pill glides to the chosen group). */
+.settings-dialog{width:min(640px,100%);height:min(560px,calc(100vh - 32px))}
+.settings-layout{min-height:0;flex:1;display:grid;grid-template-columns:132px minmax(0,1fr);gap:4px}
+.settings-tabs{padding:4px 8px 16px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;scrollbar-width:none}
+.settings-tabs::-webkit-scrollbar{display:none}
+.settings-tabs button{position:relative;min-height:40px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;transition-property:color;transition-duration:.14s;transition-timing-function:ease-out}
+.settings-tabs button:hover{color:var(--ink)}
+.settings-tabs button.active{color:var(--ink);font-weight:600}
+.settings-tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.settings-tab-pill{position:absolute;inset:0;z-index:0;border-radius:9px;background:var(--hover)}
+.settings-tab-label{position:relative;z-index:1}
+.settings-body section:not([hidden]){animation:settings-panel-in .2s ease-out both}
+@keyframes settings-panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.settings-body section:not([hidden]){animation:none}}
+@media (max-width:520px){
+  .settings-layout{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .settings-tabs{flex-direction:row;overflow-x:auto;padding:0 12px 8px}
+  .settings-tabs button{flex:none}
+}
+.settings-body{min-height:0;overflow:auto;scrollbar-width:none;padding:0 18px 16px 8px;display:grid;gap:16px;align-content:start}
 .settings-body::-webkit-scrollbar{display:none}
 .settings-body h3{margin:0 0 4px;color:var(--muted);font-size:11px;font-weight:650;letter-spacing:.06em}
 .settings-row{min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid var(--line-soft)}
