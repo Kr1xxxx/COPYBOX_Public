@@ -983,6 +983,10 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* 保险箱: site badges, overview groups, 账号密码 */
 .vault-dialog{width:min(480px,100%)}
+/* The height follows the content, also when another rule gives .settings-dialog a fixed height (settings tabs). */
+.settings-dialog.vault-dialog{height:auto}
+/* The settings tabs leave only 8px on the left of .settings-body (the nav sits there); the 保险箱 has no nav. */
+.vault-dialog .settings-body{padding:0 18px 16px}
 .vault-panel{display:grid;gap:12px;animation:vault-in .18s cubic-bezier(.2,.82,.2,1) both}
 @keyframes vault-in{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
 .site-badge{flex:none;display:inline-grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;line-height:1;outline:1px solid rgba(0,0,0,.1);outline-offset:-1px;user-select:none}
@@ -1017,4 +1021,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .totp-form input[type="date"]{font-variant-numeric:tabular-nums}
 
 /* 验证码: QR picture picker */
-.totp-qr input[type="file"]{font:inherit;font-size:12px;color:var(--muted)}
+.totp-qr{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.totp-qr-pick{position:relative;justify-self:start;cursor:pointer}
+.totp-qr-pick input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+.totp-qr-pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}

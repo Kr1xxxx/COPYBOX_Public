@@ -123,3 +123,23 @@ test("Mac: copying a code with few seconds left says so", async ({ page }) => {
   await dialog.getByRole("button", { name: "复制 急用 的验证码" }).click();
   await expect(page.getByText(/只剩 \d 秒/)).toBeVisible();
 });
+
+test("Mac: the 保险箱 dialog is as tall as its content even when settings dialogs are given a fixed height", async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const style = document.createElement("style");
+      style.textContent = ".settings-dialog{height:min(560px,100vh - 32px)}";
+      document.head.append(style);
+    });
+  });
+  await open(page, "darwin");
+  await tapVersion(page);
+  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
+  await dialog.getByRole("button", { name: "添加账号" }).click();
+  await expect(dialog.getByLabel("密钥或链接")).toBeVisible();
+  const box = await dialog.boundingBox();
+  expect(box.height).toBeLessThan(480);
+  const field = await dialog.getByLabel("密钥或链接").boundingBox();
+  expect(field.x - box.x).toBeGreaterThanOrEqual(16);
+});

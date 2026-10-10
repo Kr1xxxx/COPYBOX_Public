@@ -209,6 +209,9 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await expect(options.first()).toHaveText("Bella");
   // leave the block so its choices (which open below it on this card) no longer sit over the list
   await name.blur();
+  // bring the list fully into view first: a scroll after the menu opened would close it
+  await options.first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
   await options.first().click({ button: "right" });
   await expect(page.getByRole("menuitem", { name: "固定" })).toBeDisabled();
   await page.getByRole("menuitem", { name: "解锁" }).click();

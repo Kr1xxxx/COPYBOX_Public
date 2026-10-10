@@ -17,3 +17,7 @@
 ## Patch 6: real site icons
 - What changed: about 30 bundled brand icons plus a once-only fetch of the site's own favicon, cached encrypted (D-031); new `desktop/site-icon.cjs` and one IPC call.
 - User-visible change: 保险箱 entries show the site's real icon in front; sites without one keep the coloured initial.
+
+## Patch 7: dialog height and QR picker (from the 【驗收】 audit)
+- What changed: the 保险箱 dialog height follows its content even when another rule gives settings dialogs a fixed height (it was stretched with an empty lower half once the settings tabs landed); the QR picture field is a normal button instead of the browser's file input. Test added that fails without the fix.
+- User-visible change: 保险箱 no longer shows a tall empty area; 验证码 add form has a 「选一张图片…」 button.

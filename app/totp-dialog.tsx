@@ -145,7 +145,8 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
       <form className="totp-form" onSubmit={(event) => void submit(event)}>
         <label>密钥或链接<textarea value={secret} onChange={(event) => { setSecret(event.target.value); setFormError(""); }} placeholder="JBSW Y3DP EHPK 3PXP 或 otpauth://totp/…，也可以直接粘贴二维码截图" rows={2} ref={secretRef} spellCheck={false} autoComplete="off"
           onPaste={(event) => { const file = Array.from(event.clipboardData.files).find((entry) => entry.type.startsWith("image/")); if (file) { event.preventDefault(); void readQr(file); } }} /></label>
-      <label className="totp-qr">二维码截图（可不选）<input type="file" accept="image/*" aria-label="选二维码图片" onChange={(event) => { void readQr(event.target.files?.[0]); event.target.value = ""; }} /></label>
+      <div className="totp-qr"><span>二维码截图（可不选）</span>
+        <label className="secondary-button totp-qr-pick">选一张图片…<input type="file" accept="image/*" aria-label="选二维码图片" onChange={(event) => { void readQr(event.target.files?.[0]); event.target.value = ""; }} /></label></div>
         <label>名称（可不填）<input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：公司邮箱" maxLength={40} autoComplete="off" /></label>
         {formError && <p className="totp-error" role="alert">{formError}</p>}
         <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => { setAdding(false); setFormError(""); }}>取消</button><button type="submit" className="primary-button">保存</button></div>
