@@ -72,6 +72,7 @@ import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
+import { TotpDialog } from "./totp-dialog";
 import { ArcMenu } from "./arc/menu";
 import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
@@ -131,6 +132,12 @@ function readStoredChoice<T extends string | number>(key: string, allowed: reado
 
 function writeStoredChoice(key: string, value: string | number) {
   try { localStorage.setItem(key, String(value)); } catch { /* keep the in-memory choice for this session */ }
+}
+
+const TOTP_UNLOCK_KEY = "clipbox.totp.unlocked";
+
+function readStoredFlag(key: string) {
+  try { return localStorage.getItem(key) === "1"; } catch { return false; }
 }
 
 const STORAGE_KEY = "clipbox.vault.v1";
@@ -228,6 +235,9 @@ export default function Home() {
   const imageSectionRef = useRef<ImageSectionHandle>(null);
   const [imageViewMode, setImageViewMode] = useImageView();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
+  const [totpUnlocked, setTotpUnlocked] = useState(() => !PLAIN_NOTES && readStoredFlag(TOTP_UNLOCK_KEY));
+  const [totpOpen, setTotpOpen] = useState(false);
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -432,7 +442,7 @@ export default function Home() {
       }).catch(() => undefined);
     }
   }, [closingIds, selectedCardId]);
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || totpOpen);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -1409,10 +1419,11 @@ export default function Home() {
       className={`kind-switch ${isMini ? "compact" : ""}`}
       label="内容板块"
       value={imageView ? "image" : activeKind}
-      onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      onSelect={(next) => { if (next === "totp") setTotpOpen(true); else if (next === "image") showImages(); else switchKind(next as ItemKind); }}
       options={[
         ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
         { value: "image", label: "图片" },
+        ...(totpUnlocked ? [{ value: "totp", label: "验证码" }] : []),
       ]}
     />
   );
@@ -1716,7 +1727,10 @@ export default function Home() {
           </section>
         </>}
       </section>
+      {totpOpen && <TotpDialog deviceKey={deviceKey} onClose={() => setTotpOpen(false)} onToast={flashToast}
+        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("验证码入口已隐藏"); }} />}
       {settingsOpen && <SettingsDialog
+        onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
         isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}
         refreshing={refreshing}
