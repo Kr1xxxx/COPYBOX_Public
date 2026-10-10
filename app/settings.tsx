@@ -14,7 +14,8 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini }: {
+export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini }: {
+  onUnlockTotp?: () => void;
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
@@ -32,6 +33,14 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
   const closeRef = useRef<HTMLButtonElement>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [versionCopied, setVersionCopied] = useState(false);
+  // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
+  const versionTaps = useRef<number[]>([]);
+  function tapVersion() {
+    if (!onUnlockTotp) return;
+    const now = Date.now();
+    versionTaps.current = [...versionTaps.current.filter((at) => now - at < 3000), now];
+    if (versionTaps.current.length >= 5) { versionTaps.current = []; onUnlockTotp(); }
+  }
   const [aiAvailable] = useState(() => typeof window !== "undefined" && "LanguageModel" in window);
   const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
   useEffect(() => {
@@ -111,7 +120,7 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
             <AiSettingsSection localAiAvailable={aiAvailable} />
           </section>
           <section aria-labelledby="set-about"><h3 id="set-about">关于</h3>
-            <div className="settings-row"><div><strong>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
+            <div className="settings-row"><div><strong role="presentation" onClick={tapVersion}>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipbox ${version || "dev"} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
           </section>
         </div>
