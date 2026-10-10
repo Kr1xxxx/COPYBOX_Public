@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import writeExcelFile from "write-excel-file/node";
-import { formatNumberCell } from "../app/spreadsheet-format.ts";
+import { formatCodeFor, formatNumberCell } from "../app/spreadsheet-format.ts";
 import { decodeXmlEscapes, readSpreadsheet } from "../app/spreadsheet-read.ts";
 
 async function xlsx(rows, name = "S") {
@@ -67,4 +67,14 @@ test("format codes: padding, percent, thousands, currency text, negatives, dates
   assert.equal(formatNumberCell(45000, "mmm d, yyyy"), "Mar 15, 2023");
   assert.equal(formatNumberCell(1234, "0.00E+00"), "1234");
   assert.equal(formatNumberCell(5, "@"), "5");
+});
+
+test("Chinese-locale built-in date formats show the way Excel shows them", () => {
+  const code = (id) => formatCodeFor(id, new Map());
+  assert.equal(formatNumberCell(45000, code(31)), "2023年3月15日");
+  assert.equal(formatNumberCell(45000, code(57)), "2023年3月");
+  assert.equal(formatNumberCell(45000, code(58)), "3月15日");
+  assert.equal(formatNumberCell(45000.75, code(32)), "18时00分");
+  assert.equal(formatNumberCell(45000.75, code(34)), "下午6时00分");
+  assert.equal(formatNumberCell(45000.25, code(35)), "上午6时00分00秒");
 });

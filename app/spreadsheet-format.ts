@@ -7,6 +7,11 @@ const BUILTIN_FORMATS: Record<number, string> = {
   14: "m/d/yy", 15: "d-mmm-yy", 16: "d-mmm", 17: "mmm-yy", 18: "h:mm AM/PM", 19: "h:mm:ss AM/PM",
   20: "h:mm", 21: "h:mm:ss", 22: "m/d/yy h:mm", 37: "#,##0;(#,##0)", 38: "#,##0;(#,##0)",
   39: "#,##0.00;(#,##0.00)", 40: "#,##0.00;(#,##0.00)", 45: "mm:ss", 46: "[h]:mm:ss",
+  // Chinese-locale date and time formats (Excel shows these for ids the file does not define itself)
+  27: 'yyyy"年"m"月"', 28: 'm"月"d"日"', 29: 'm"月"d"日"', 30: "m/d/yy", 31: 'yyyy"年"m"月"d"日"',
+  32: 'h"时"mm"分"', 33: 'h"时"mm"分"ss"秒"', 34: '上午/下午h"时"mm"分"', 35: '上午/下午h"时"mm"分"ss"秒"',
+  36: 'yyyy"年"m"月"', 50: 'yyyy"年"m"月"', 51: 'm"月"d"日"', 52: 'yyyy"年"m"月"', 53: 'm"月"d"日"',
+  54: 'm"月"d"日"', 55: '上午/下午h"时"mm"分"', 56: '上午/下午h"时"mm"分"ss"秒"', 57: 'yyyy"年"m"月"', 58: 'm"月"d"日"',
 };
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -52,8 +57,8 @@ function formatDate(serial: number, code: string, date1904: boolean): string {
   const date = new Date(epoch + Math.round(serial * 86400000));
   if (Number.isNaN(date.getTime())) return formatGeneral(serial);
   const { text, literals } = tokenizeLiterals(code);
-  const twelveHour = /AM\/PM|A\/P/i.test(text);
-  const tokens = [...text.matchAll(/yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|hh|h|ss|s|AM\/PM|A\/P|[\uE100-\uF8FF]|./gi)].map((m) => m[0]);
+  const twelveHour = /AM\/PM|A\/P|上午\/下午/i.test(text);
+  const tokens = [...text.matchAll(/yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|hh|h|ss|s|AM\/PM|A\/P|上午\/下午|[\uE100-\uF8FF]|./gi)].map((m) => m[0]);
   const hours = date.getUTCHours();
   let out = "";
   let previousTime = "";
@@ -85,6 +90,7 @@ function formatDate(serial: number, code: string, date1904: boolean): string {
       case "ss": out += pad(date.getUTCSeconds()); previousTime = "s"; break;
       case "s": out += date.getUTCSeconds(); previousTime = "s"; break;
       case "am/pm": out += hours < 12 ? "AM" : "PM"; break;
+      case "上午/下午": out += hours < 12 ? "上午" : "下午"; break;
       case "a/p": out += hours < 12 ? "A" : "P"; break;
       default: out += token;
     }
