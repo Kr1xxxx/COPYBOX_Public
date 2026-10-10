@@ -54,6 +54,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 25 | Motion from arc-library, step 3 of 4 (D-021): pop-over menus (全部产品, row ⋯, bulk 移动到, 图片 移动到) fade and scale from their corner, and fade out | In progress | Claude | `app/arc/menu.tsx` (`ArcMenu` + `AnimatePresence`); short and small on purpose, none under reduced motion. Folder menus and the dialogs keep their CSS entrance for now (dialogs unmount at once; an exit needs their state kept). Step 4 still to do |
 | 25 | 话术搜索: pinyin + initials, rank by hit place and copy count | Done | Claude | `app/snippet-search.ts`; new dependency `pinyin-pro`; `useCount` on items (optional, no migration) |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
+| 25 | Version update reminder (D-023) | Done | Claude | `desktop/update-check.cjs`, banner `app/update-notice.tsx`; off until the owner chooses an address (`desktop/update-config.cjs`). Same code on Windows and Mac |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
 
