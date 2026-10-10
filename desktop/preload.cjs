@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   aiSave: (settings) => ipcRenderer.invoke("clipbox:ai-save", settings),
   aiClear: () => ipcRenderer.invoke("clipbox:ai-clear"),
   aiRequest: (payload) => ipcRenderer.invoke("clipbox:ai-request", payload),
+  fetchSharedLibrary: (url) => ipcRenderer.invoke("clipbox:fetch-shared-library", url),
   relaunch: () => ipcRenderer.send("clipbox:relaunch"),
   onFocusSearch: (callback) => {
     const listener = () => callback();

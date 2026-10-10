@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AiSettingsSection } from "./ai-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
@@ -14,7 +14,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini }: {
+export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
   onUnlockTotp?: () => void;
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
@@ -29,6 +29,7 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
   onClose: () => void; onExport: () => void; onExportSecret: () => void; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
+  sharedLibrary: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
@@ -115,6 +116,9 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
                 options={[["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]].map(([value, label]) => ({ value, label }))} />
             </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
+          </section>
+          <section aria-labelledby="set-shared"><h3 id="set-shared">共享话术</h3>
+            {sharedLibrary}
           </section>
           <section aria-labelledby="set-ai"><h3 id="set-ai">AI</h3>
             <AiSettingsSection localAiAvailable={aiAvailable} />

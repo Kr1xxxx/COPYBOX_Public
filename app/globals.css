@@ -811,6 +811,23 @@ button { -webkit-tap-highlight-color: transparent; }
 .scope-switch .arc-seg-pill { box-shadow: 0 1px 2px rgba(31,30,28,.14); }
 .segmented .arc-seg-pill { background: white; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 .inline-editor .segmented .arc-seg-pill { background: var(--card); }
+
+/* Company 话术 library */
+.shared-url { align-items: flex-end; }
+.shared-url > div { flex: 1; min-width: 0; }
+.shared-url input { box-sizing: border-box; width: 100%; margin-top: 6px; padding: 7px 10px; border: 0; border-radius: 8px; background: var(--fill); color: var(--ink); font: inherit; font-size: 13px; }
+.shared-url input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.shared-error { color: var(--danger, #b3261e); }
+.row-shared-mark { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.row-shared-mark[data-mark="retired"] { background: var(--fill); color: var(--muted); }
+.shared-notice { display: grid; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12.5px; }
+.shared-notice small { color: var(--ink-3); font-size: 12px; }
+.shared-notice.retired { background: var(--fill); color: var(--ink); }
+.shared-compare { display: grid; gap: 6px; }
+.shared-compare > div { padding: 7px 10px; border-radius: 7px; background: var(--card); color: var(--ink); }
+.shared-compare span { display: block; margin-bottom: 2px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.shared-compare p { margin: 0; max-height: 96px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: none; }
+.shared-actions { display: flex; justify-content: flex-end; gap: 8px; }
 /* Variable blocks: the ? hint, pinned values and the choices above a block. */
 .var-chip { grid-template-columns: minmax(0, 1fr) auto; }
 .var-help { grid-area: 1 / 2; align-self: center; width: 14px; height: 14px; margin: 0 5px 0 -3px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); font: inherit; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center; cursor: help; opacity: .7; transition: opacity .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }

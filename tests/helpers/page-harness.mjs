@@ -38,7 +38,7 @@ export async function pageHarness() {
     cancelled: false, loading: false, setLoading: () => {}, setStartupError: message => { c.startupError = message; },
     setCapabilities: () => {}, setActiveKind: () => {}, finishOpening: data => { c.opened = data; },
     useCallback: fn => fn, setItems: () => {}, setFolders: () => {}, setFolderColors: () => {}, folderColorsRef: { current: undefined }, setToast: () => {}, setSelected: () => {}, closeEditor: () => {},
-    itemsRef: { current: [] }, foldersRef: { current: core.EMPTY_FOLDER_REGISTRY }, nextSnippetNumberRef: { current: 1 },
+    itemsRef: { current: [] }, foldersRef: { current: core.EMPTY_FOLDER_REGISTRY }, nextSnippetNumberRef: { current: 1 }, sharedSeenRef: { current: undefined },
     persistQueueRef: { current: Promise.resolve() }, automationQueueRef: { current: Promise.resolve() },
     deviceKey: 'synthetic-device-key', capabilitiesRef: { current: caps }, capabilities: caps,
     timestampNow: () => 2, URLSearchParams,
