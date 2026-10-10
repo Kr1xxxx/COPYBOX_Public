@@ -7,6 +7,7 @@ import { ArcCopyIcon } from "./arc/copy-icon";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEvent, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence } from "motion/react";
+import { ArcDropHint } from "./arc/drop-hint";
 import { resolveFocusWrapIndex } from "./clipbox-core";
 import "./desktop-bridge";
 import { UNCATEGORIZED_COLOR } from "./category-colors";
@@ -641,7 +642,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
         onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void addFiles(files); }}
       />
       <div ref={listRef} className={`native-list list-switch image-list ${compact ? "mini-list" : ""} ${gridShown ? "image-grid" : ""}`}>{body}</div>
-      {dragging && <div className="image-drop-hint" aria-hidden="true">松开即可添加图片</div>}
+      <AnimatePresence>{dragging && <ArcDropHint className="image-drop-hint">松开即可添加图片</ArcDropHint>}</AnimatePresence>
       {deleteTarget && createPortal(<ImageDeleteDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />, document.body)}
     </div>
   );

@@ -41,3 +41,19 @@ test("card dots and sidebar folder markers use the same colours; uncategorized c
   }
   expect(coloured).toBeGreaterThan(0);
 });
+
+test("the first-run panel settles part by part, and not at all with reduced motion (arc step 4)", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.goto("/");
+  const parts = page.locator(".native-empty.onboarding > *");
+  await expect(parts.first()).toBeVisible();
+  const delays = await parts.evaluateAll((els) => els.map((el) => getComputedStyle(el).animationDelay));
+  expect(delays[0]).toBe("0s");
+  expect(delays.slice(1).every((delay, i) => parseFloat(delay) > parseFloat(delays[i]))).toBe(true); // each part a little later
+  await expect(parts.last()).toHaveCSS("opacity", "1", { timeout: 3000 }); // and all of it ends fully visible
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(page.locator(".native-empty.onboarding")).toBeVisible();
+  await expect(parts.last()).toHaveCSS("opacity", "1", { timeout: 500 });
+});
