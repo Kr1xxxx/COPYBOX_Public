@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import * as XLSX from "xlsx";
+import { readFileSync } from "node:fs";
+import writeExcelFile from "write-excel-file/node";
 import {
   buildSnippetImportPreview,
   extractPlaceholders,
@@ -13,6 +14,16 @@ import {
   snippetCopyReadiness,
   snippetSearchText,
 } from "../app/snippet-import.ts";
+
+// Builds a real .xlsx file in memory: sheets = [{ name, rows: [[cell, ...], ...] }], first row = column names.
+async function makeXlsx(sheets) {
+  const buffer = await writeExcelFile(sheets.map(({ name, rows }) => ({ sheet: name, data: rows.map((row) => row.map((value) => ({ value }))) }))).toBuffer();
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+}
+
+function rowsOf(object) {
+  return [Object.keys(object), Object.values(object)];
+}
 
 const baseRow = {
   标题: "报价－首次报价－发送睫毛报价",
@@ -110,51 +121,96 @@ test("fills literal bracket variables and reports every missing value", () => {
   );
 });
 
-test("parses the named 话术库 worksheet and preserves every source column", () => {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["说明"], ["不是数据"]]), "分类统计");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ 序号: 1, ...baseRow }]), "话术库");
-  const binary = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
-  const rows = parseSnippetWorkbook(binary, "话术.xlsx");
+test("parses the named 话术库 worksheet and preserves every source column", async () => {
+  const binary = await makeXlsx([
+    { name: "分类统计", rows: [["说明"], ["不是数据"]] },
+    { name: "话术库", rows: rowsOf({ 序号: 1, ...baseRow }) },
+  ]);
+  const rows = await parseSnippetWorkbook(binary, "话术.xlsx");
   assert.equal(rows.length, 1);
   assert.deepEqual(Object.keys(rows[0]), [
     "序号", "标题", "沟通阶段", "具体场景", "核心动作", "产品/业务", "搜索关键词",
     "英文即时消息", "中文对照", "可替换变量", "使用备注", "优先级",
   ]);
   assert.equal(rows[0].英文即时消息, baseRow.英文即时消息);
+  assert.equal(rows[0].序号, "1");
 });
 
-test("falls back to the first worksheet with all required columns", () => {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["说明"]]), "Sheet1");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([baseRow]), "客服资料");
-  const rows = parseSnippetWorkbook(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), "客服.xlsx");
+test("falls back to the first worksheet with all required columns", async () => {
+  const binary = await makeXlsx([
+    { name: "Sheet1", rows: [["说明"]] },
+    { name: "客服资料", rows: rowsOf(baseRow) },
+  ]);
+  const rows = await parseSnippetWorkbook(binary, "客服.xlsx");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].沟通阶段, "报价");
 });
 
-test("parses CSV locally and drops fully empty rows", () => {
+test("reads numbers, empty cells and blank rows from a worksheet as text", async () => {
+  const header = ["序号", "标题", "沟通阶段", "具体场景", "核心动作", "英文即时消息", "中文对照"];
+  const binary = await makeXlsx([{ name: "话术库", rows: [
+    header,
+    [2.5, "a", "b", "c", "d", "line1\nline2", ""],
+    [null, null, null, null, null, null, null],
+    [3, "x", 7, "c", "d", "e", "f"],
+  ] }]);
+  const rows = await parseSnippetWorkbook(binary, "数字.xlsx");
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].序号, "2.5");
+  assert.equal(rows[0].英文即时消息, "line1\nline2");
+  assert.equal(rows[0].中文对照, "");
+  assert.equal(rows[1].沟通阶段, "7");
+});
+
+test("a repeated column name keeps both columns", async () => {
+  const binary = await makeXlsx([{ name: "话术库", rows: [
+    ["标题", "沟通阶段", "具体场景", "核心动作", "英文即时消息", "中文对照", "标题"],
+    ["第一", "报价", "c", "d", "e", "f", "第二"],
+  ] }]);
+  const [row] = await parseSnippetWorkbook(binary, "重复.xlsx");
+  assert.equal(row.标题, "第一");
+  assert.equal(row.标题_1, "第二");
+});
+
+test("parses CSV locally and drops fully empty rows", async () => {
   const csv = [
     "标题,沟通阶段,具体场景,核心动作,英文即时消息,中文对照",
     '"报价－首次报价－发送睫毛报价",报价,首次报价,发送睫毛报价,"Hello, customer",您好',
     ",,,,,",
   ].join("\n");
-  const rows = parseSnippetWorkbook(new TextEncoder().encode(csv).buffer, "话术.csv");
+  const rows = await parseSnippetWorkbook(new TextEncoder().encode(csv).buffer, "话术.csv");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].英文即时消息, "Hello, customer");
 });
 
-test("rejects workbooks without the required snippet columns", () => {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ 标题: "缺少字段" }]), "话术库");
-  assert.throws(
-    () => parseSnippetWorkbook(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), "错误.xlsx"),
+test("CSV: a BOM, Windows line endings and line breaks inside quotes are handled", async () => {
+  const csv = "\uFEFF标题,沟通阶段,具体场景,核心动作,英文即时消息,中文对照\r\nA,报价,c,d,\"line1\r\nline2\",您好\r\n";
+  const rows = await parseSnippetWorkbook(new TextEncoder().encode(csv).buffer, "话术.csv");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].标题, "A");
+  assert.equal(rows[0].英文即时消息, "line1\nline2");
+});
+
+test("the sample sheet in docs/samples imports as before (37 rows)", async () => {
+  const bytes = readFileSync(new URL("../docs/samples/clipbox-test-snippets.csv", import.meta.url));
+  const rows = await parseSnippetWorkbook(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "clipbox-test-snippets.csv");
+  assert.equal(rows.length, 37);
+  assert.equal(rows[31].标题, "需要整理的文本｜凌乱格式测试");
+  assert.equal(rows[31].中文对照, "您好  ，感谢您的留言 ！我们会 尽快 回复 。\n\n\n   此致 ，\n  [Sender]");
+});
+
+test("rejects workbooks without the required snippet columns", async () => {
+  const binary = await makeXlsx([{ name: "话术库", rows: [["标题"], ["缺少字段"]] }]);
+  await assert.rejects(
+    parseSnippetWorkbook(binary, "错误.xlsx"),
     /缺少必需列：沟通阶段、具体场景、核心动作、英文即时消息、中文对照/,
   );
 });
 
-test("rejects unsupported spreadsheet extensions", () => {
-  assert.throws(() => parseSnippetWorkbook(new ArrayBuffer(0), "话术.json"), /仅支持 XLSX 和 CSV/);
+test("rejects unsupported extensions, damaged files and oversized files", async () => {
+  await assert.rejects(parseSnippetWorkbook(new ArrayBuffer(0), "话术.json"), /仅支持 XLSX 和 CSV/);
+  await assert.rejects(parseSnippetWorkbook(new TextEncoder().encode("not a zip").buffer, "坏.xlsx"), /无法读取这个表格文件/);
+  await assert.rejects(parseSnippetWorkbook(new ArrayBuffer(21 * 1024 * 1024), "大.xlsx"), /表格文件太大/);
 });
 
 test("matches structured product groups without hiding legacy snippets in the default filter", () => {

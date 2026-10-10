@@ -53,7 +53,7 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
     const match = /^\[([^\]]+)\]$/.exec(part);
     if (!match) return <span key={index}>{renderText(part)}</span>;
     const name = match[1].trim();
-    if (!values || !onChange) return <mark key={index} className="snippet-variable">{name}</mark>;
+    if (!values || !onChange) return <mark key={index} className="snippet-variable">{renderText(name)}</mark>;
     const value = values[name] || "";
     return (
       <span key={index} className="var-chip" data-filled={value ? "" : undefined} data-remembered={remembered?.includes(name) ? "" : undefined} title={remembered?.includes(name) ? "上次填的，点一下可以改" : undefined}>

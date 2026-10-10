@@ -37,7 +37,6 @@ import {
   renameFolder,
   restoreTrashedItems,
   setFolderColor,
-  splitSearchHighlight,
   type BackupScope,
   type ImportStrategy,
   type ItemKind,
@@ -59,7 +58,10 @@ import {
   snippetCopyReadiness,
   type SnippetImportPreview,
 } from "./snippet-import";
+import { FolderRow } from "./folder-row";
+import { ListEmptyState } from "./list-empty-state";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
 import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
@@ -70,12 +72,15 @@ import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
+import { ArcMenu } from "./arc/menu";
+import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
-import { SnippetFill, SnippetVariableText, emptyFillState, latestValues, rememberValues, type ValueMemory, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { SnippetFill, emptyFillState, latestValues, rememberValues, type ValueMemory, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
+import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -136,56 +141,6 @@ function readRefreshedImageView(stored: string | null) {
 
 function timestampNow() {
   return Date.now();
-}
-
-const ICON_PATHS: Record<string, React.ReactNode> = {
-  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
-  plus: <path d="M12 5v14M5 12h14" />,
-  mini: <><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><rect x="4" y="13" width="8" height="7" rx="1.5" /></>,
-  restore: <><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5" /><path d="M15 4h5v5M20 4l-7 7" /></>,
-  grid: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M4 10h16" /></>,
-  star: <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" />,
-  trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />,
-  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
-  settings: <><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
-  copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></>,
-  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
-  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
-  more: <><circle cx="5" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="19" cy="12" r="1.4" fill="currentColor" /></>,
-  eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
-  lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
-  shield: <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3z" />,
-  chevron: <path d="m6 9 6 6 6-6" />,
-};
-
-function Icon({ name, filled = false, className }: { name: keyof typeof ICON_PATHS; filled?: boolean; className?: string }) {
-  return (
-    <svg className={`icon${className ? ` ${className}` : ""}`} width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-      {ICON_PATHS[name]}
-    </svg>
-  );
-}
-
-function Highlight({ text, query }: { text: string; query: string }) {
-  if (!query.trim()) return <>{text}</>;
-  return <>{splitSearchHighlight(text, query).map((piece, index) => piece.hit
-    ? <mark key={index} className="search-hit">{piece.text}</mark>
-    : <span key={index}>{piece.text}</span>)}</>;
-}
-
-function SnippetContent({ text, query = "" }: { text: string; query?: string }) {
-  return <SnippetVariableText text={text} renderText={(part) => <Highlight text={part} query={query} />} />;
-}
-
-function SnippetTitle({ label, query = "" }: { label: string; query?: string }) {
-  const separatorIndex = label.search(/[|｜]/);
-  if (separatorIndex < 0) return <Highlight text={label} query={query} />;
-
-  const primary = label.slice(0, separatorIndex).trim();
-  const detail = label.slice(separatorIndex + 1).trim();
-  if (!primary || !detail) return <Highlight text={label} query={query} />;
-
-  return <><span className="snippet-title-primary"><Highlight text={primary} query={query} /></span><span className="snippet-title-separator">｜</span><span className="snippet-title-detail"><Highlight text={detail} query={query} /></span></>;
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -254,15 +209,6 @@ async function readLocalEncryptedVault() {
   const envelope = JSON.parse(raw) as VaultEnvelope;
   const data = await decryptVault(envelope, storedDeviceKey);
   return { data, deviceKey: storedDeviceKey };
-}
-
-function VaultMark({ small = false }: { small?: boolean }) {
-  return (
-    <span className={`vault-mark ${small ? "small" : ""}`} aria-hidden="true">
-      <span className="vault-lid" />
-      <span className="vault-body">C</span>
-    </span>
-  );
 }
 
 export default function Home() {
@@ -1346,7 +1292,7 @@ export default function Home() {
 
   async function prepareSnippetImport(file: File) {
     try {
-      const rows = parseSnippetWorkbook(await file.arrayBuffer(), file.name);
+      const rows = await parseSnippetWorkbook(await file.arrayBuffer(), file.name);
       const preview = buildSnippetImportPreview(rows, itemsRef.current, () => crypto.randomUUID(), timestampNow());
       setSnippetImport(preview);
       setSnippetImportName(file.name);
@@ -1402,20 +1348,18 @@ export default function Home() {
   );
   const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
-  const emptyState = firstRun ? (
-    <div className="native-empty onboarding">
-      <VaultMark />
-      <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
-      <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
-      <div className="onboarding-actions">
-        <button type="button" className="primary-button" onClick={() => openEditor(null)}><Icon name="plus" />新增第一条</button>
-        {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={() => spreadsheetFileRef.current?.click()}>导入话术表格</button>}
-        <button type="button" className="secondary-button" onClick={() => fileRef.current?.click()}>导入备份</button>
-      </div>
-      <small>内容用 AES-256 加密，只保存在这台设备上</small>
-    </div>
-  ) : (
-    <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : activeFolder === "recent" ? "还没有使用记录" : "这个目录还是空的"}</strong><span>{query ? (searchAllFolders || activeFolder === "all" ? "换个词搜索试试" : "换个词，或改为搜索全部目录") : activeFolder === "trash" ? "删除的内容会加密保留在这里" : activeFolder === "pinned" ? "点条目右侧的星标添加收藏" : activeFolder === "recent" ? "复制过的内容会出现在这里" : isMini ? "回到完整窗口添加第一条" : "点右上角的「新增」添加第一条"}</span></div>
+  const emptyState = (
+    <ListEmptyState
+      firstRun={firstRun}
+      activeKind={activeKind}
+      activeFolder={activeFolder}
+      query={query}
+      searchAllFolders={searchAllFolders}
+      isMini={isMini}
+      onAdd={() => openEditor(null)}
+      onImportSheet={() => spreadsheetFileRef.current?.click()}
+      onImportBackup={() => fileRef.current?.click()}
+    />
   );
   const showFolderChip = searching && (searchWholeVault || activeFolder === "pinned" || activeFolder === "recent");
   const editorNode = (
@@ -1440,28 +1384,30 @@ export default function Home() {
     const renaming = renamingFolder?.from === folder;
     const count = activeKindItems.filter((item) => item.folder === folder).length;
     return (
-      <div key={folder} {...(sortable ? { "data-sort-scope": "folder", "data-sort-id": folder } : {})} className={`directory-row ${sortable ? "" : "fixed"} ${active ? "active" : ""} ${folderReorder.draggingId === folder ? "dragging" : ""} ${folderReorder.overId === folder && folderReorder.draggingId !== folder ? "drag-over" : ""}`}>
-        {renaming ? (
-          <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); void submitFolderRename(); }}>
-            <i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />
-            <input ref={renameInputRef} value={renamingFolder.value} aria-label={`重命名 ${folder}`} aria-invalid={Boolean(renamingFolder.error)} maxLength={30}
-              onChange={(event) => setRenamingFolder({ ...renamingFolder, value: event.target.value, error: "" })}
-              onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setRenamingFolder(null); } }}
-              onBlur={() => window.setTimeout(() => setRenamingFolder((current) => current?.from === folder ? null : current), 120)} />
-            {renamingFolder.error && <small className="directory-error" role="alert">{renamingFolder.error}</small>}
-          </form>
-        ) : (
-          <button type="button" className="nav-item directory-main" onClick={() => selectFolder(`folder:${folder}`)} title={folder}><span className="nav-icon"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} /></span><span className="nav-label">{folder}</span><b>{count}</b></button>
-        )}
-        {!renaming && <button type="button" className="folder-more" aria-label={`管理目录 ${folder}`} aria-haspopup="menu" aria-expanded={folderMenu === folder} title="重命名、颜色、删除"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            setFolderDeleteArm("");
-            setFolderMenuPos({ top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 270)), left: rect.left });
-            setFolderMenu((value) => value === folder ? "" : folder);
-          }}><Icon name="more" /></button>}
-        {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)}><span aria-hidden="true">⠿</span></button>}
-      </div>
+      <FolderRow
+        key={folder}
+        folder={folder}
+        sortable={sortable}
+        active={active}
+        count={count}
+        color={categoryColors[folder]}
+        dragging={folderReorder.draggingId === folder}
+        dragOver={folderReorder.overId === folder && folderReorder.draggingId !== folder}
+        renaming={renaming ? renamingFolder : null}
+        renameInputRef={renameInputRef}
+        menuOpen={folderMenu === folder}
+        onSelect={() => selectFolder(`folder:${folder}`)}
+        onSubmitRename={() => { void submitFolderRename(); }}
+        onRenameChange={setRenamingFolder}
+        onRenameCancel={() => setRenamingFolder(null)}
+        onRenameBlur={() => window.setTimeout(() => setRenamingFolder((current) => current?.from === folder ? null : current), 120)}
+        onOpenMenu={(rect) => {
+          setFolderDeleteArm("");
+          setFolderMenuPos({ top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 270)), left: rect.left });
+          setFolderMenu((value) => value === folder ? "" : folder);
+        }}
+        onBeginDrag={(event) => folderReorder.beginPointerDrag(event, folder)}
+      />
     );
   };
   const menuFolder = folderMenu && activeFolders.includes(folderMenu) ? folderMenu : "";
@@ -1566,6 +1512,7 @@ export default function Home() {
           </>}
 
           <section className="content-panel">
+            <UpdateNotice />
             <header className="toolbar drag-region">
               <div className="native-search">
                 <Icon name="search" className="search-glyph" />
@@ -1597,9 +1544,9 @@ export default function Home() {
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
-                {productMenuOpen && <div className="product-filter-menu" role="menu">
+                <AnimatePresence>{productMenuOpen && <ArcMenu className="product-filter-menu">
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
-                </div>}
+                </ArcMenu>}</AnimatePresence>
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
@@ -1666,12 +1613,12 @@ export default function Home() {
                           <span className="spacer" />
                           <div className="menu-wrap">
                             <button type="button" className="icon-button" aria-label={`更多操作 ${item.label}`} aria-expanded={rowMenuId === item.id} onClick={() => setRowMenuId((value) => value === item.id ? "" : item.id)}><Icon name="more" /></button>
-                            {rowMenuId === item.id && <div className="dropdown row-menu" role="menu">
+                            <AnimatePresence>{rowMenuId === item.id && <ArcMenu className="dropdown row-menu">
                               {moveTargets.length > 0 && <p className="menu-label">移动到</p>}
                               {moveTargets.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void moveItemToFolder(item, folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
                               {moveTargets.length > 0 && <div className="menu-divider" />}
                               <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); void trashNow(item); }}>移到回收站</button>
-                            </div>}
+                            </ArcMenu>}</AnimatePresence>
                           </div>
                         </div>
                       {!isSnippet && !PLAIN_NOTES && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
@@ -1686,9 +1633,9 @@ export default function Home() {
               <span className="spacer" />
               <div className="menu-wrap">
                 <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => setBulkMoveOpen((value) => !value)}>移动到<Icon name="chevron" /></button>
-                {bulkMoveOpen && <div className="dropdown bulk-menu" role="menu">
+                <AnimatePresence>{bulkMoveOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
                   {[...activeFolders, ...(activeKind === "secret" ? [""] : [])].map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void bulkMoveTo(folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
-                </div>}
+                </ArcMenu>}</AnimatePresence>
               </div>
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>

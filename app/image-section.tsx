@@ -6,6 +6,7 @@
 import { ArcCopyIcon } from "./arc/copy-icon";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEvent, type Ref } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence } from "motion/react";
 import { resolveFocusWrapIndex } from "./clipbox-core";
 import "./desktop-bridge";
 import { UNCATEGORIZED_COLOR } from "./category-colors";
@@ -173,7 +174,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
             <span>{currentFolder ?? "未分类"}</span>
             <ChevronGlyph />
           </button>
-          {menuHere?.anchor === "line" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={menuHere.up} onMove={onMove} />}
+          <AnimatePresence>{menuHere?.anchor === "line" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={menuHere.up} onMove={onMove} />}</AnimatePresence>
         </div>
       </div>
       <div className="row-actions">
@@ -182,7 +183,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
         <span className="spacer" />
         <div className="menu-wrap" data-move-menu>
           <button type="button" className="icon-button" aria-label={`更多操作 ${meta.title}`} aria-haspopup="menu" aria-expanded={menuHere?.anchor === "more"} onClick={(event) => onToggleMenu("more", event.currentTarget)}><MoreGlyph /></button>
-          {menuHere?.anchor === "more" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={menuHere.up} onMove={onMove} />}
+          <AnimatePresence>{menuHere?.anchor === "more" && <ImageMoveMenu folders={folders} colors={colors} current={currentFolder} up={menuHere.up} onMove={onMove} />}</AnimatePresence>
         </div>
         <button type="button" className="ghost-button danger-text" onClick={onDelete}>删除</button>
       </div>
