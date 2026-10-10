@@ -72,6 +72,7 @@ import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
+import { TotpDialog } from "./totp-dialog";
 import { ArcMenu } from "./arc/menu";
 import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
@@ -81,7 +82,8 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
 import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
-import { SnippetFill, emptyFillState, latestValues, rememberValues, type ValueMemory, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { SnippetFill, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { NAME_OPTIONS, PINNED_KEY, isPinned, latestValues, memoryOptions, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
@@ -130,6 +132,12 @@ function readStoredChoice<T extends string | number>(key: string, allowed: reado
 
 function writeStoredChoice(key: string, value: string | number) {
   try { localStorage.setItem(key, String(value)); } catch { /* keep the in-memory choice for this session */ }
+}
+
+const TOTP_UNLOCK_KEY = "clipbox.totp.unlocked";
+
+function readStoredFlag(key: string) {
+  try { return localStorage.getItem(key) === "1"; } catch { return false; }
 }
 
 const STORAGE_KEY = "clipbox.vault.v1";
@@ -227,6 +235,9 @@ export default function Home() {
   const imageSectionRef = useRef<ImageSectionHandle>(null);
   const [imageViewMode, setImageViewMode] = useImageView();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
+  const [totpUnlocked, setTotpUnlocked] = useState(() => !PLAIN_NOTES && readStoredFlag(TOTP_UNLOCK_KEY));
+  const [totpOpen, setTotpOpen] = useState(false);
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -261,9 +272,11 @@ export default function Home() {
   const [snippetImportName, setSnippetImportName] = useState("");
   const [fill, setFill] = useState<SnippetFillState | null>(null);
   const [typingVariable, setTypingVariable] = useState(false);
-  // Kept in memory only: customer names must not sit in plain browser storage.
+  // The recent values stay in memory only: customer names must not sit in plain browser storage. Only the values the person pinned are kept.
   const [valueMemory, setValueMemory] = useState<ValueMemory>({});
   const lastValues = latestValues(valueMemory);
+  const [pinnedValues, setPinnedValues] = useState<PinnedValues>(() => { try { return parsePinned(localStorage.getItem(PINNED_KEY)); } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedValues)); } catch { /* pins last for this session only */ } }, [pinnedValues]);
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
@@ -429,7 +442,7 @@ export default function Home() {
       }).catch(() => undefined);
     }
   }, [closingIds, selectedCardId]);
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || totpOpen);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -803,7 +816,20 @@ export default function Home() {
       return;
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
-    setValueMemory((current) => rememberValues(current, state.values));
+    setValueMemory((current) => rememberValues(current, state.values, pinnedValues));
+  }
+
+  // Right-click on a block (or on one of its remembered values) pins the value: a pinned value is not pushed out by new ones.
+  function pinValue(item: SecretItem, name: string, value = fillFor(item).values[name] || "") {
+    const outcome = togglePin(valueMemory, pinnedValues, name, value);
+    if (outcome.result === "empty") { setToast("先填一个值，再右键固定"); }
+    else if (outcome.result === "full") { setToast(`${name} 已固定 3 个，先取消一个再固定`); }
+    else { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); setToast(outcome.result === "pinned" ? `已固定「${value.trim()}」，不会被新值顶掉` : `已取消固定「${value.trim()}」`); }
+    window.setTimeout(() => setToast(""), 2400);
+  }
+  function showVariableHelp() {
+    setToast("最多记 3 个值，右键固定，固定的不会被新值顶掉");
+    window.setTimeout(() => setToast(""), 4200);
   }
 
   // Clicking a remembered value fills the block. If every other block is already filled it copies at once, otherwise the cursor moves on.
@@ -1393,10 +1419,11 @@ export default function Home() {
       className={`kind-switch ${isMini ? "compact" : ""}`}
       label="内容板块"
       value={imageView ? "image" : activeKind}
-      onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      onSelect={(next) => { if (next === "totp") setTotpOpen(true); else if (next === "image") showImages(); else switchKind(next as ItemKind); }}
       options={[
         ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
         { value: "image", label: "图片" },
+        ...(totpUnlocked ? [{ value: "totp", label: "验证码" }] : []),
       ]}
     />
   );
@@ -1652,19 +1679,20 @@ export default function Home() {
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
                       {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => setActiveVar(name ? { id: item.id, name } : null)} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => setActiveVar(name ? { id: item.id, name } : null)} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} onHelp={showVariableHelp} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
                         </div>
                       )}
                       <div className="row-actions">
-                          <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</button>
+                          <button type="button" className="primary-button copy-main" aria-label={copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"} data-copied={copiedId === item.id ? "" : undefined} onClick={() => void copy(item)}><span className="copy-main-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span><span className="copy-main-label"><span>{isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</span><span>已复制</span></span></button>
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
-                          {isSnippet && activeVar?.id === item.id && (valueMemory[activeVar.name] || []).length > 0 && <span className="var-memory" role="listbox" aria-label={`${activeVar.name} 最近用过的`}>
+                          {isSnippet && !closing && activeVar?.id === item.id && activeVar.name === "Name" && <VariablePopup rowId={item.id} name="Name" options={NAME_OPTIONS} current={fillFor(item).values.Name || ""} onPick={(value) => pickRemembered(item, "Name", value)} />}
+                          {isSnippet && activeVar?.id === item.id && memoryOptions(valueMemory, pinnedValues, activeVar.name).length > 0 && <span className="var-memory" role="listbox" aria-label={`${activeVar.name} 最近用过的`}>
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
-                            {(valueMemory[activeVar.name] || []).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} title={option} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} onClick={() => pickRemembered(item, activeVar.name, option)}>{option}</button>)}
+                            {memoryOptions(valueMemory, pinnedValues, activeVar.name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} data-pinned={isPinned(pinnedValues, activeVar.name, option) ? "" : undefined} title={isPinned(pinnedValues, activeVar.name, option) ? `${option}（已固定，右键取消）` : `${option}（右键固定）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} onContextMenu={(event) => { event.preventDefault(); pinValue(item, activeVar.name, option); }} onClick={() => pickRemembered(item, activeVar.name, option)}>{option}</button>)}
                           </span>}
                           <span className="spacer" />
                           <div className="menu-wrap">
@@ -1699,7 +1727,10 @@ export default function Home() {
           </section>
         </>}
       </section>
+      {totpOpen && <TotpDialog deviceKey={deviceKey} onClose={() => setTotpOpen(false)} onToast={flashToast}
+        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("验证码入口已隐藏"); }} />}
       {settingsOpen && <SettingsDialog
+        onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
         isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}
         refreshing={refreshing}

@@ -117,6 +117,58 @@ test("a block offers its last three values; clicking one fills it and copies whe
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
 });
 
+test("Name offers beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  await expect(row.locator("input[data-var=Name]")).toHaveValue("Friend");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  await row.getByRole("button", { name: "复制", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Friend, thanks for reaching out to Comely! How can I help you today?");
+  const chip = row.locator(".var-chip", { has: page.locator("input[data-var=Name]") });
+  await row.locator("input[data-var=Name]").click();
+  const popup = page.locator(".var-popup");
+  await expect(popup.locator(".var-popup-option")).toHaveText(["beautiful", "Friend", "Lovely"]);
+  const chipBox = await chip.boundingBox();
+  const popupBox = await popup.boundingBox();
+  expect(popupBox.y + popupBox.height).toBeLessThanOrEqual(chipBox.y + 1);
+  await popup.getByRole("option", { name: "Lovely" }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
+});
+
+test("remembered values stay after many clicks; a right-click pins one so new values never push it out; ? explains", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  for (const value of ["Amanda", "Bella", "Cara"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  // clicking the same block again and again keeps all three
+  for (let round = 0; round < 4; round += 1) {
+    await name.click();
+    await expect(row.locator(".var-memory-option")).toHaveCount(3);
+  }
+  // pin Amanda from the list, then push three newer values through
+  await row.locator(".var-memory-option", { hasText: "Amanda" }).click({ button: "right" });
+  await expect(page.getByText("已固定「Amanda」")).toBeVisible();
+  // only the pinned value is kept on the device, so it is still there after a reload
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.pinned-values.v1"))).toBe('{"Name":["Amanda"]}');
+  for (const value of ["Dana", "Eve", "Fay"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  await name.click();
+  await expect(row.locator(".var-memory-option")).toHaveText(["Amanda", "Fay", "Eve"]);
+  await expect(row.locator(".var-memory-option[data-pinned]")).toHaveText(["Amanda"]);
+  // right-click on the block itself unpins its current value
+  await name.fill("Amanda");
+  await row.locator(".var-chip", { has: page.locator("input[data-var=Name]") }).click({ button: "right" });
+  await expect(page.getByText("已取消固定「Amanda」")).toBeVisible();
+  // the ? at the right edge of the block
+  await row.locator(".var-help").first().click();
+  const hint = page.locator(".toast-line", { hasText: "固定的不会被新值顶掉" });
+  await expect(hint).toBeVisible();
+  // the whole sentence shows, nothing is cut off by an ellipsis
+  expect(await hint.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await page.locator(".native-row", { hasText: "需要整理的文本" }).first().locator(".row-main").click();

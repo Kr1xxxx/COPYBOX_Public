@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useState, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { SecretItem } from "./clipbox-core";
+import { DEFAULT_VALUES } from "./variable-memory";
 
 export type CopyLanguage = "en" | "zh";
 export type SnippetFillState = {
@@ -18,27 +20,14 @@ export type SnippetFillState = {
 export function emptyFillState(item: SecretItem, remembered: Record<string, string> = {}, language: CopyLanguage = "en"): SnippetFillState {
   const values: Record<string, string> = {};
   for (const name of item.snippetMeta?.placeholders || []) if (remembered[name]) values[name] = remembered[name];
-  return { itemId: item.id, language, values, checkedInputs: [], verificationConfirmed: false, remembered: Object.keys(values) };
-}
-
-export const MEMORY_SIZE = 3;
-
-// The last few values used per variable name, newest first. Kept in memory only, never saved.
-export type ValueMemory = Record<string, string[]>;
-export function rememberValues(memory: ValueMemory, values: Record<string, string>): ValueMemory {
-  const next = { ...memory };
-  for (const [name, raw] of Object.entries(values)) {
-    const value = raw.trim();
-    if (value) next[name] = [value, ...(next[name] || []).filter((entry) => entry !== value)].slice(0, MEMORY_SIZE);
-  }
-  return next;
-}
-export function latestValues(memory: ValueMemory): Record<string, string> {
-  return Object.fromEntries(Object.entries(memory).filter(([, list]) => list.length > 0).map(([name, list]) => [name, list[0]]));
+  const carried = Object.keys(values);
+  // Name starts as Friend, so a reply with no choice made still goes out. This is not a carried-over value: it needs no second look.
+  for (const name of item.snippetMeta?.placeholders || []) if (!values[name] && DEFAULT_VALUES[name]) values[name] = DEFAULT_VALUES[name];
+  return { itemId: item.id, language, values, checkedInputs: [], verificationConfirmed: false, remembered: carried };
 }
 
 // A variable shows as a highlighted block without its brackets. Static in the collapsed list, a field in the open card.
-export function SnippetVariableText({ text, renderText, values, remembered, onChange, onEnter, onActive, onFocusChange }: {
+export function SnippetVariableText({ text, renderText, values, remembered, onChange, onEnter, onActive, onFocusChange, onPin, onHelp, isPinned }: {
   text: string;
   renderText: (text: string) => ReactNode;
   values?: Record<string, string>;
@@ -47,6 +36,9 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
   onEnter?: (name: string) => void;
   onActive?: (name: string | null) => void;
   onFocusChange?: (focused: boolean) => void;
+  onPin?: (name: string) => void;
+  onHelp?: () => void;
+  isPinned?: (name: string) => boolean;
 }) {
   const parts = text.split(/(\[[^\]]+\])/g);
   return <>{parts.map((part, index) => {
@@ -56,7 +48,7 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
     if (!values || !onChange) return <mark key={index} className="snippet-variable">{renderText(name)}</mark>;
     const value = values[name] || "";
     return (
-      <span key={index} className="var-chip" data-filled={value ? "" : undefined} data-remembered={remembered?.includes(name) ? "" : undefined} title={remembered?.includes(name) ? "上次填的，点一下可以改" : undefined}>
+      <span key={index} className="var-chip" data-filled={value ? "" : undefined} data-remembered={remembered?.includes(name) ? "" : undefined} data-pinned={isPinned?.(name) ? "" : undefined} onContextMenu={(event) => { if (!onPin) return; event.preventDefault(); onPin(name); }} title={remembered?.includes(name) ? "上次填的，点一下可以改" : undefined}>
         {/* The hidden copy of the text gives the field its width, so the block grows while you type. */}
         <span className="var-sizer" aria-hidden="true">{value || name}</span>
         <input
@@ -74,12 +66,13 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.blur(); }
           }}
         />
+        {onHelp && <button type="button" className="var-help" aria-label="变量块说明" onMouseDown={(event) => event.preventDefault()} onClick={onHelp}>?</button>}
       </span>
     );
   })}</>;
 }
 
-export function SnippetFill({ item, state, onState, renderText, onSubmit, onActive, onFocusChange }: {
+export function SnippetFill({ item, state, onState, renderText, onSubmit, onActive, onFocusChange, onPin, onHelp, isPinned }: {
   item: SecretItem;
   state: SnippetFillState;
   onState: (update: (current: SnippetFillState) => SnippetFillState) => void;
@@ -87,6 +80,9 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
   onSubmit: () => void;
   onActive: (name: string | null) => void;
   onFocusChange: (focused: boolean) => void;
+  onPin: (name: string) => void;
+  onHelp: () => void;
+  isPinned: (name: string) => boolean;
 }) {
   const meta = item.snippetMeta!;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -116,10 +112,36 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
           onChange={(name, value) => onState((current) => ({ ...current, values: { ...current.values, [name]: value }, remembered: current.remembered.filter((entry) => entry !== name) }))}
           onEnter={next}
           onFocusChange={onFocusChange}
+          onPin={onPin}
+          onHelp={onHelp}
+          isPinned={isPinned}
         />
       </p>
       {meta.requiredInputs.length > 0 && <fieldset className="copy-checks"><legend>发送前确认</legend>{meta.requiredInputs.map((input) => <label key={input}><input type="checkbox" checked={state.checkedInputs.includes(input)} onChange={(event) => onState((current) => ({ ...current, checkedInputs: event.target.checked ? [...current.checkedInputs, input] : current.checkedInputs.filter((value) => value !== input) }))} /><span>已确认 {input}</span></label>)}</fieldset>}
       {meta.requiresVerification && <label className="copy-warning"><input type="checkbox" checked={state.verificationConfirmed} onChange={(event) => onState((current) => ({ ...current, verificationConfirmed: event.target.checked }))} /><span><strong>发送前核实</strong> 金额、库存、地址或时效已按当前情况检查</span></label>}
     </div>
+  );
+}
+
+// The choices for a block, shown above it while it is focused. Drawn in the page body so no card can clip it.
+export function VariablePopup({ rowId, name, options, current, onPick }: { rowId: string; name: string; options: readonly string[]; current: string; onPick: (value: string) => void }) {
+  const [box, setBox] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    const place = () => {
+      const input = document.querySelector(`[data-sort-id="${CSS.escape(rowId)}"] input[data-var="${CSS.escape(name)}"]`);
+      const rect = input?.closest(".var-chip")?.getBoundingClientRect();
+      setBox(rect ? { left: rect.left + rect.width / 2, top: rect.top } : null);
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [rowId, name]);
+  if (!box || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="var-popup" role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
+      {options.map((option) => <button key={option} type="button" role="option" aria-selected={option === current} className="var-popup-option" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(option)}>{option}</button>)}
+    </div>,
+    document.body,
   );
 }
