@@ -9,6 +9,7 @@ async function open(page, platform) {
 
 async function tapVersion(page, times = 5) {
   await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
   for (let i = 0; i < times; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
 }
 

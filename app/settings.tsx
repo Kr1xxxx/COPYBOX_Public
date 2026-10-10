@@ -72,7 +72,7 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
   useEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => { closeRef.current?.focus(); }, []);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if ((event.target as HTMLElement | null)?.closest?.("[data-local-esc]") || document.querySelector(".settings-folder.dragging")) return; event.stopPropagation(); onCloseRef.current(); } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if ((event.target as HTMLElement | null)?.closest?.("[data-local-esc]") || document.querySelector(".backup-backdrop") || document.querySelector(".settings-folder.dragging")) return; event.stopPropagation(); onCloseRef.current(); } };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);

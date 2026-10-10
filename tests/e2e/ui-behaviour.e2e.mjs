@@ -6,7 +6,9 @@ import { asDesktop, seedSnippets } from "./helpers.mjs";
 
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
-  return page.getByRole("dialog", { name: "设置" });
+  const dialog = page.getByRole("dialog", { name: "设置" });
+  await dialog.getByRole("tab", { name: "数据" }).click();
+  return dialog;
 }
 
 test.describe("snippet list", () => {
@@ -118,4 +120,37 @@ test("snippets and 秘密 are exported to separate files, never one combined bac
   expect(download.suggestedFilename()).toMatch(/^clipbox-snippets-\d{4}-\d{2}-\d{2}\.json$/);
   const { readFileSync } = await import("node:fs");
   expect(JSON.parse(readFileSync(await download.path(), "utf8"))).toMatchObject({ format: "clipbox-secure-backup", version: 3, scope: "snippet" });
+});
+
+test("a row's ⋯ menu stays inside the window, even on the last row", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  const rows = page.locator(".native-row");
+  await rows.last().scrollIntoViewIfNeeded();
+  await rows.last().locator(".row-main").click();
+  await page.waitForTimeout(500);
+  const more = page.locator(".native-row.selected").getByRole("button", { name: /^更多操作/ });
+  await more.click();
+  const menu = page.locator(".row-menu");
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(300);
+  const box = await menu.boundingBox();
+  const size = page.viewportSize();
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+});
+
+test("the backup dialog has a Chinese title, readable gray text, and Esc closes it", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await seedSnippets(page);
+  const settings = await openSettings(page);
+  await settings.locator(".settings-row", { hasText: "导出话术备份" }).getByRole("button", { name: "导出…" }).click();
+  const dialog = page.getByRole("dialog", { name: /导出话术备份/ });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).not.toContainText(/SNIPPET|EXPORT|IMPORT/);
+  const gray = await dialog.locator(".backup-intro").evaluate((element) => getComputedStyle(element).color);
+  const channel = Number(/rgb\((\d+)/.exec(gray)[1]);
+  expect(channel).toBeLessThanOrEqual(110);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
 });

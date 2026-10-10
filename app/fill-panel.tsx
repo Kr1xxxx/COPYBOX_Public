@@ -27,7 +27,7 @@ export function emptyFillState(item: SecretItem, remembered: Record<string, stri
 }
 
 // A variable shows as a highlighted block without its brackets. Static in the collapsed list, a field in the open card.
-export function SnippetVariableText({ text, renderText, values, remembered, onChange, onEnter, onActive, onFocusChange, onPin, onHelp, isPinned }: {
+export function SnippetVariableText({ text, renderText, values, remembered, onChange, onEnter, onActive, onFocusChange, onPin, isPinned }: {
   text: string;
   renderText: (text: string) => ReactNode;
   values?: Record<string, string>;
@@ -37,7 +37,6 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
   onActive?: (name: string | null) => void;
   onFocusChange?: (focused: boolean) => void;
   onPin?: (name: string) => void;
-  onHelp?: () => void;
   isPinned?: (name: string) => boolean;
 }) {
   const parts = text.split(/(\[[^\]]+\])/g);
@@ -66,13 +65,12 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.blur(); }
           }}
         />
-        {onHelp && <button type="button" className="var-help" aria-label="变量块说明" onMouseDown={(event) => event.preventDefault()} onClick={onHelp}>?</button>}
       </span>
     );
   })}</>;
 }
 
-export function SnippetFill({ item, state, onState, renderText, onSubmit, onActive, onFocusChange, onPin, onHelp, isPinned }: {
+export function SnippetFill({ item, state, onState, renderText, onSubmit, onActive, onFocusChange, onPin, isPinned }: {
   item: SecretItem;
   state: SnippetFillState;
   onState: (update: (current: SnippetFillState) => SnippetFillState) => void;
@@ -81,7 +79,6 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
   onActive: (name: string | null) => void;
   onFocusChange: (focused: boolean) => void;
   onPin: (name: string) => void;
-  onHelp: () => void;
   isPinned: (name: string) => boolean;
 }) {
   const meta = item.snippetMeta!;
@@ -113,7 +110,6 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
           onEnter={next}
           onFocusChange={onFocusChange}
           onPin={onPin}
-          onHelp={onHelp}
           isPinned={isPinned}
         />
       </p>
@@ -125,12 +121,14 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
 
 // The choices for a block, shown above it while it is focused. Drawn in the page body so no card can clip it.
 export function VariablePopup({ rowId, name, options, current, onPick }: { rowId: string; name: string; options: readonly string[]; current: string; onPick: (value: string) => void }) {
-  const [box, setBox] = useState<{ left: number; top: number } | null>(null);
+  const [box, setBox] = useState<{ left: number; top: number; below: boolean } | null>(null);
   useEffect(() => {
     const place = () => {
       const input = document.querySelector(`[data-sort-id="${CSS.escape(rowId)}"] input[data-var="${CSS.escape(name)}"]`);
       const rect = input?.closest(".var-chip")?.getBoundingClientRect();
-      setBox(rect ? { left: rect.left + rect.width / 2, top: rect.top } : null);
+      // Above the block, unless the card has the 英文/中文 switch: that sits right over the text, so the choices open below.
+      const below = Boolean(input?.closest(".snippet-fill")?.querySelector(".copy-language"));
+      setBox(rect ? { left: rect.left + rect.width / 2, top: below ? rect.bottom : rect.top, below } : null);
     };
     place();
     window.addEventListener("resize", place);
@@ -139,7 +137,7 @@ export function VariablePopup({ rowId, name, options, current, onPick }: { rowId
   }, [rowId, name]);
   if (!box || typeof document === "undefined") return null;
   return createPortal(
-    <div className="var-popup" role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
+    <div className="var-popup" data-below={box.below ? "" : undefined} role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
       {options.map((option) => <button key={option} type="button" role="option" aria-selected={option === current} className="var-popup-option" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(option)}>{option}</button>)}
     </div>,
     document.body,

@@ -635,6 +635,26 @@ export default function Home() {
     return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
   }, [dropdownOpen]);
 
+  // A row's ⋯ menu opens downward, but flips above the button when it would run past the bottom of the window.
+  useEffect(() => {
+    if (!rowMenuId) return;
+    const frame = requestAnimationFrame(() => {
+      const menu = document.querySelector<HTMLElement>(".row-menu");
+      const anchor = menu?.parentElement?.querySelector<HTMLElement>(".icon-button");
+      if (!menu || !anchor) return;
+      const height = menu.offsetHeight;
+      const room = window.innerHeight - anchor.getBoundingClientRect().bottom - 12;
+      const above = anchor.getBoundingClientRect().top - 12;
+      const up = height > room && above > room;
+      menu.style.top = up ? "auto" : "";
+      menu.style.bottom = up ? "34px" : "";
+      menu.style.transformOrigin = up ? "bottom right" : "";
+      menu.style.maxHeight = `${Math.max(120, Math.floor(up ? above : room))}px`;
+      menu.style.overflowY = "auto";
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [rowMenuId]);
+
   useEffect(() => {
     if (loading) return;
     const shortcut = (event: KeyboardEvent) => {
@@ -859,6 +879,15 @@ export default function Home() {
     dragOption.current = null;
   }
 
+  // Variable blocks, checks, or a 中文翻译 all mean the card offers the 英文/中文 switch and prepares the copy.
+  function hasPreparedCopy(item: SecretItem) {
+    return hasOptionalSnippetPreparation(item) || Boolean(item.snippetMeta?.chineseText?.trim());
+  }
+
+  function variableNames(item: SecretItem) {
+    return [...new Set([...item.secret.matchAll(/\[([^[\]\n]+)\]/g)].map((match) => match[1].trim()))];
+  }
+
   function showVariableHelp() {
     setToast("最多记 3 个值，右键固定，固定的不会被新值顶掉");
     window.setTimeout(() => setToast(""), 4200);
@@ -877,7 +906,7 @@ export default function Home() {
   }
 
   async function copy(item: SecretItem, language: CopyLanguage = "en") {
-    if (item.kind === "snippet" && hasOptionalSnippetPreparation(item)) { await copyPrepared(item); return; }
+    if (item.kind === "snippet" && hasPreparedCopy(item)) { await copyPrepared(item); return; }
     await copyRaw(item, language);
   }
 
@@ -1711,7 +1740,7 @@ export default function Home() {
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
                       {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} onHelp={showVariableHelp} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
@@ -1722,10 +1751,14 @@ export default function Home() {
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           {isSnippet && !closing && activeVar?.id === item.id && activeVar.name === "Name" && <VariablePopup rowId={item.id} name="Name" options={NAME_OPTIONS} current={fillFor(item).values.Name || ""} onPick={(value) => pickRemembered(item, "Name", value)} />}
-                          {isSnippet && activeVar?.id === item.id && memoryOptions(valueMemory, pinnedValues, activeVar.name).length > 0 && <span className="var-memory" role="listbox" aria-label={`${activeVar.name} 最近用过的`}>
+                          {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
+                            {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="listbox" aria-label={`${name} 最近用过的`}>
+                            {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
-                            {memoryOptions(valueMemory, pinnedValues, activeVar.name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} data-pinned={isPinned(pinnedValues, activeVar.name, option) ? "" : undefined} title={`${option}（右键：固定 / 解锁 / 删除，按住可拖动）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onPointerDown={(event) => startOptionDrag(event, activeVar.name, option)} onPointerMove={moveOptionDrag} onPointerUp={endOptionDrag} onPointerCancel={endOptionDrag} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name: activeVar.name, value: option, x: event.clientX, y: event.clientY }); }} onClick={() => { if (suppressOptionClick.current) return; pickRemembered(item, activeVar.name, option); }}>{option}</button>)}
-                            {valueMenu && activeVar && valueMenu.name === activeVar.name && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
+                            {memoryOptions(valueMemory, pinnedValues, name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[name]} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} title={`${option}（右键：固定 / 解锁 / 删除，按住可拖动）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onPointerDown={(event) => startOptionDrag(event, name, option)} onPointerMove={moveOptionDrag} onPointerUp={endOptionDrag} onPointerCancel={endOptionDrag} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }} onClick={() => { if (suppressOptionClick.current) return; pickRemembered(item, name, option); }}>{option}</button>)}
+                            </span>)}
+                            <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button>
+                            {valueMenu && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
                           </span>}
                           <span className="spacer" />
                           <div className="menu-wrap">

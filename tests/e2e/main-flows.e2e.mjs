@@ -103,7 +103,7 @@ test("a block offers its last three values; clicking one fills it and copies whe
   }
   // only the newest three are offered, newest first
   await row.locator("input[data-var=Name]").click();
-  const options = row.locator(".var-memory-option");
+  const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
   await expect(options).toHaveText(["Dana", "Cara", "Bella"]);
   // every other block is filled, so one click fills and copies
   await options.nth(2).click();
@@ -111,7 +111,7 @@ test("a block offers its last three values; clicking one fills it and copies whe
   // the copy moved Bella to the front: [Bella, Dana, Cara]; with another block empty, a click only fills and moves on
   await row.locator("input[data-var=Company]").fill("");
   await row.locator("input[data-var=Name]").click();
-  await row.locator(".var-memory-option").nth(1).click();
+  await row.locator("[aria-label='Name 最近用过的'] .var-memory-option").nth(1).click();
   await expect(row.locator("input[data-var=Name]")).toHaveValue("Dana");
   await expect(row.locator("input[data-var=Company]")).toBeFocused();
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
@@ -131,7 +131,12 @@ test("Name offers beautiful, Friend and Lovely above the block; Friend goes out 
   await expect(popup.locator(".var-popup-option")).toHaveText(["beautiful", "Friend", "Lovely"]);
   const chipBox = await chip.boundingBox();
   const popupBox = await popup.boundingBox();
-  expect(popupBox.y + popupBox.height).toBeLessThanOrEqual(chipBox.y + 1);
+  // this card has the 英文/中文 switch above its text, so the choices open below the block and never cover it
+  await expect(row.locator(".copy-language")).toBeVisible();
+  const switchBox = await row.locator(".copy-language").boundingBox();
+  expect(popupBox.y).toBeGreaterThan(chipBox.y);
+  const overlap = Math.min(popupBox.y + popupBox.height, switchBox.y + switchBox.height) - Math.max(popupBox.y, switchBox.y);
+  expect(overlap).toBeLessThanOrEqual(0);
   await popup.getByRole("option", { name: "Lovely" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
 });
@@ -146,10 +151,10 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   // clicking the same block again and again keeps all three
   for (let round = 0; round < 4; round += 1) {
     await name.click();
-    await expect(row.locator(".var-memory-option")).toHaveCount(3);
+    await expect(row.locator("[aria-label='Name 最近用过的'] .var-memory-option")).toHaveCount(3);
   }
   // pin Amanda from the list, then push three newer values through
-  await row.locator(".var-memory-option", { hasText: "Amanda" }).click({ button: "right" });
+  await row.locator("[aria-label='Name 最近用过的'] .var-memory-option", { hasText: "Amanda" }).click({ button: "right" });
   await expect(page.locator(".var-menu button")).toHaveText(["固定", "解锁", "删除"]);
   await expect(page.getByRole("menuitem", { name: "解锁" })).toBeDisabled();
   await page.getByRole("menuitem", { name: "固定" }).click();
@@ -158,8 +163,8 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   expect(await page.evaluate(() => localStorage.getItem("clipbox.pinned-values.v1"))).toBe('{"Name":["Amanda"]}');
   for (const value of ["Dana", "Eve", "Fay"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
   await name.click();
-  await expect(row.locator(".var-memory-option")).toHaveText(["Amanda", "Fay", "Eve"]);
-  await expect(row.locator(".var-memory-option[data-pinned]")).toHaveText(["Amanda"]);
+  await expect(row.locator("[aria-label='Name 最近用过的'] .var-memory-option")).toHaveText(["Amanda", "Fay", "Eve"]);
+  await expect(row.locator("[aria-label='Name 最近用过的'] .var-memory-option[data-pinned]")).toHaveText(["Amanda"]);
   // right-click on the block itself unpins its current value
   await name.fill("Amanda");
   await row.locator(".var-chip", { has: page.locator("input[data-var=Name]") }).click({ button: "right" });
@@ -180,7 +185,7 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await row.locator("input[data-var=Company]").fill("Comely");
   for (const value of ["Amanda", "Bella", "Cara"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
   await name.click();
-  const options = row.locator(".var-memory-option");
+  const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
   await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
   // drag Amanda (last) in front of Cara by holding and moving
   const from = await options.nth(2).boundingBox();
@@ -376,4 +381,39 @@ test("dialog backdrops fade in by tint only: the blurred page behind is not re-b
   expect(info.name).toBe("backdrop-in");
   expect(info.keyframes).not.toMatch(/opacity/);
   expect(info.keyframes).toMatch(/background-color/);
+});
+
+test("remembered values are always shown with the ? at their right end, and not inside the text", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  await row.locator("input[data-var=Name]").fill("Amanda");
+  await row.locator("input[data-var=Name]").press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Amanda");
+  // click away from every block: the strip stays
+  await row.locator(".row-actions").click({ position: { x: 2, y: 2 } });
+  await expect(row.locator("input:focus")).toHaveCount(0);
+  await expect(row.locator(".var-memory-option", { hasText: "Amanda" }).first()).toBeVisible();
+  await expect(row.locator(".var-chip .var-help")).toHaveCount(0);
+  const help = row.locator(".var-memory .var-help");
+  await expect(help).toBeVisible();
+  const lastOption = await row.locator(".var-memory-option").last().boundingBox();
+  const helpBox = await help.boundingBox();
+  expect(helpBox.x).toBeGreaterThanOrEqual(lastOption.x + lastOption.width);
+});
+
+test("a 话术 written by hand can carry its own 中文翻译, kept exactly as typed", async ({ page }) => {
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  await expect(editor.getByLabel(/中文翻译/)).toBeVisible();
+  await editor.locator("input").first().fill("手写问候");
+  await editor.locator("textarea").first().fill("Hello there");
+  await editor.getByLabel(/中文翻译/).fill("你好呀");
+  await editor.locator(".editor-save").first().click();
+  const row = page.locator(".native-row", { hasText: "手写问候" });
+  await row.locator(".row-main").click();
+  await expect(page.locator(".native-row.selected .copy-language")).toBeVisible();
+  await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
+  await expect(page.locator(".inline-editor").getByLabel(/中文翻译/)).toHaveValue("你好呀");
 });

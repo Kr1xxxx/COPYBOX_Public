@@ -93,15 +93,15 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
       chineseText,
       placeholders: extractPlaceholders(`${secret}\n${chineseText}`),
       usageNote: usageNote.trim(),
-    } : kind === "snippet" && extractPlaceholders(secret).length > 0 ? {
+    } : kind === "snippet" && (extractPlaceholders(`${secret}\n${chineseText}`).length > 0 || chineseText.trim()) ? {
       // A 话术 typed by hand gets its variable blocks here; nothing else about it changes.
       stage: selectedFolder,
       scene: label.trim(),
       action: nextSummary,
       productGroups: [],
       rawProduct: "",
-      chineseText: "",
-      placeholders: extractPlaceholders(secret),
+      chineseText,
+      placeholders: extractPlaceholders(`${secret}\n${chineseText}`),
       requiredInputs: [],
       usageNote: "",
       requiresVerification: false,
@@ -250,6 +250,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
             <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"}</span>{kind === "secret" && !PLAIN_NOTES && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="variable-actions"><button type="button" className="segment-toggle" onMouseDown={(event) => event.preventDefault()} onClick={() => editVariable(markVariable)} title="先选中一段文字，再点这里：复制时它会变成可以填写的高亮块">设为高亮</button><button type="button" className="segment-toggle" onMouseDown={(event) => event.preventDefault()} onClick={() => editVariable(unmarkVariable)} title="光标放在高亮块里，再点这里">取消高亮</button></span>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label={`${SECRET_WORD}第一段`} className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label={`${SECRET_WORD}第二段`} className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea ref={contentRef} aria-label={kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"} className={kind === "secret" && !PLAIN_NOTES && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); setVariableNotice(""); if (kind === "snippet") setVariableNames(extractPlaceholders(event.target.value)); }} placeholder={kind === "secret" ? (PLAIN_NOTES ? "输入要保存的备注内容" : "输入要保存的密码或文本") : "输入需要反复使用的话术"} rows={6} />}</div></div>
 
             {kind === "snippet" && <small className="variable-hint" role="status">{variableNotice || (variableNames.length > 0 ? `高亮块：${variableNames.join("、")}。复制时可以在这些位置填写。` : "想让某个词复制时能自己填？选中它，点「设为高亮」。")}</small>}
+            {kind === "snippet" && <label className="native-field chinese-field"><span>中文翻译 <small>可选，自己写，不会被自动改</small></span><div className="soft-textarea compact"><textarea value={chineseText} onChange={(event) => setChineseText(event.target.value)} rows={3} placeholder="复制时点「中文」就会复制这里的内容" lang="zh" /></div></label>}
             {kind === "snippet" && aiNotice && <small className="ai-notice" role="status">{aiNotice}</small>}
 
             {kind === "snippet" && <div className="native-field summary-field">
@@ -259,9 +260,8 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
               </div>
             </div>}
             {structured && <details className="structured-details">
-              <summary>中文对照与使用规则</summary>
+              <summary>使用规则</summary>
               <div className="structured-fields">
-                <label className="native-field"><span>中文对照</span><div className="soft-textarea compact"><textarea value={chineseText} onChange={(event) => setChineseText(event.target.value)} rows={4} /></div></label>
                 <label className="native-field"><span>产品 / 业务</span><div className="soft-input"><input value={rawProduct} onChange={(event) => setRawProduct(event.target.value)} /></div></label>
                 <label className="native-field"><span>使用备注</span><div className="soft-textarea compact note"><textarea value={usageNote} onChange={(event) => setUsageNote(event.target.value)} rows={3} /></div></label>
               </div>
