@@ -1,4 +1,5 @@
 import { splitSearchHighlight } from "./clipbox-core";
+import { SnippetVariableText } from "./fill-panel";
 
 // Small presentational pieces shared across the main page (moved out of page.tsx unchanged).
 
@@ -37,11 +38,9 @@ export function Highlight({ text, query }: { text: string; query: string }) {
     : <span key={index}>{piece.text}</span>)}</>;
 }
 
+// A variable shows as a highlighted block without its brackets (the same block the open card types into).
 export function SnippetContent({ text, query = "" }: { text: string; query?: string }) {
-  const parts = text.split(/(\[[^\]]+\])/g);
-  return <>{parts.map((part, index) => /^\[[^\]]+\]$/.test(part)
-    ? <mark key={index} className="snippet-variable"><Highlight text={part} query={query} /></mark>
-    : <span key={index}><Highlight text={part} query={query} /></span>)}</>;
+  return <SnippetVariableText text={text} renderText={(part) => <Highlight text={part} query={query} />} />;
 }
 
 export function SnippetTitle({ label, query = "" }: { label: string; query?: string }) {

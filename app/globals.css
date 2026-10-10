@@ -470,24 +470,33 @@ button { -webkit-tap-highlight-color: transparent; }
 .inline-editor .editor-save.secondary { border: 1px solid var(--border); background: var(--card); color: var(--ink-2); }
 .inline-editor .editor-save.secondary:hover { background: var(--hover); }
 
-.fill-panel { display: grid; gap: 10px; animation: detail-in .2s cubic-bezier(.2,.8,.2,1) both; }
-.fill-panel form { display: grid; gap: 10px; }
-.fill-panel .copy-language { height: 28px; background: var(--fill); }
-.fill-panel .copy-language button { color: var(--muted); font-size: 12px; }
-.fill-panel .copy-language button.active { background: var(--card); color: var(--ink); }
-.fill-panel .copy-fields legend, .fill-panel .copy-checks legend { margin-bottom: 6px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
-.fill-panel .copy-fields label { grid-template-columns: minmax(90px, 140px) minmax(0, 1fr); }
-.fill-panel .copy-fields label > span { color: var(--ink-3); font-size: 12px; font-weight: 600; }
-.fill-panel .copy-fields input { height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--content); color: var(--ink); font-size: 13px; }
-.fill-panel .copy-fields input:focus { border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--ring); }
-.fill-panel .copy-checks label, .fill-panel .copy-warning { color: var(--ink-3); font-size: 12px; }
-.fill-panel .copy-warning { background: var(--warn-bg); color: var(--warn); }
-.fill-panel .copy-warning strong { color: inherit; }
-.fill-panel .copy-preview { padding: 9px 12px; border-radius: 8px; background: var(--content); }
-.fill-panel .copy-preview h3 { margin: 0 0 5px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
-.fill-panel .copy-preview p { max-height: 120px; color: var(--ink); font-size: 13.5px; line-height: 1.6; scrollbar-width: none; }
-.fill-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
-.fill-actions .primary-button:disabled { opacity: .45; cursor: default; }
+.snippet-fill { display: grid; gap: 10px; }
+.snippet-fill .copy-language { height: 28px; background: var(--fill); }
+.snippet-fill .copy-language button { color: var(--muted); font-size: 12px; }
+.snippet-fill .copy-language button.active { background: var(--card); color: var(--ink); }
+.snippet-fill .copy-checks legend { margin-bottom: 6px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.snippet-fill .copy-checks label, .snippet-fill .copy-warning { color: var(--ink-3); font-size: 12px; }
+.snippet-fill .copy-warning { background: var(--warn-bg); color: var(--warn); }
+.snippet-fill .copy-warning strong { color: inherit; }
+/* Variable blocks: no brackets; the name is the placeholder, and a click types right there. */
+.var-chip { position: relative; display: inline-grid; max-width: 100%; vertical-align: baseline; margin: 0 1px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: 0 0 0 0 var(--ring); transition: background-color .16s cubic-bezier(.22,1,.36,1), box-shadow .16s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.var-chip:active { scale: .96; }
+.var-chip:focus-within { background: var(--card); box-shadow: 0 0 0 2px var(--accent); }
+.var-sizer { grid-area: 1 / 1; padding: 1px 7px; overflow: hidden; white-space: pre; visibility: hidden; font: inherit; }
+/* width 0 + min-width 100%: the field's own default width must not widen the block. */
+.var-chip input { grid-area: 1 / 1; box-sizing: border-box; width: 0; min-width: 100%; padding: 1px 7px; border: 0; border-radius: inherit; outline: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: text; }
+.var-chip input::placeholder { color: var(--accent-ink); opacity: .75; }
+.var-chip input:focus::placeholder { opacity: .4; }
+.var-chip[data-remembered] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.var-chip[data-remembered]:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+.var-chip[data-filled] { background: color-mix(in srgb, var(--accent-soft) 70%, var(--card)); }
+.var-memory { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.var-memory-option { flex: 0 1 auto; min-width: 0; max-width: 130px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; animation: var-memory-in .16s cubic-bezier(.22,1,.36,1); transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.var-memory-option:hover, .var-memory-option[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.var-memory-option:active { scale: .96; }
+@keyframes var-memory-in { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .var-memory-option { animation: none; transition: none; } .var-memory-option:active { scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .var-chip { transition: none; } .var-chip:active { scale: 1; } }
 
 .nav-item .directory-main { width: 100%; }
 .directory-row .folder-more { position: absolute; right: 22px; top: 4px; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); opacity: 0; cursor: pointer; }
@@ -601,7 +610,7 @@ button { -webkit-tap-highlight-color: transparent; }
 /* Ctrl on Windows/Linux, ⌘ on macOS */
 
 /* Scrollbars are hidden, so long text shows a soft shadow where more is hidden. */
-.row-content, .fill-panel .copy-preview p {
+.row-content {
   background:
     linear-gradient(var(--content) 30%, rgba(0,0,0,0)) center top,
     linear-gradient(rgba(0,0,0,0), var(--content) 70%) center bottom,
@@ -657,7 +666,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-folder-fixed { flex: none; padding: 1px 7px; border-radius: 9px; background: var(--fill); color: var(--muted); font-size: 11px; }
 
 /* With many variables the copy button stays reachable at the bottom of the list. */
-.fill-actions { position: sticky; bottom: 0; z-index: 3; margin: 0 -6px; padding: 10px 6px 2px; background: linear-gradient(to top, var(--card) 72%, transparent); }
 
 /* Settings → AI: the user's own interface */
 .settings-ai-form { margin: 4px 0 8px; display: grid; gap: 10px; }
