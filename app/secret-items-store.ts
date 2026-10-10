@@ -16,6 +16,8 @@ export type SecretItemsStore = {
   // Adds the item, or replaces the one with the same id.
   put(item: VaultItem): Promise<VaultItem[]>;
   remove(id: string): Promise<VaultItem[]>;
+  // Used when restoring a backup: writes the whole list at once.
+  replaceAll(items: VaultItem[]): Promise<VaultItem[]>;
 };
 
 export type SecretItemsStorage = Pick<Storage, "getItem" | "setItem">;
@@ -76,5 +78,6 @@ export function openSecretItemsStore(deviceKey: string, storage: SecretItemsStor
       return write(index < 0 ? [...items, item] : items.map((entry) => (entry.id === item.id ? item : entry)));
     }),
     remove: (id) => serial(async () => write((await read()).filter((entry) => entry.id !== id))),
+    replaceAll: (items) => serial(async () => write(items)),
   };
 }

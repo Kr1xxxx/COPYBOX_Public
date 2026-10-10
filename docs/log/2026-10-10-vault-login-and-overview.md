@@ -9,3 +9,7 @@
 ## Patches 3–4 (same branch)
 - What changed: API 密钥 tab (prefix → service, expiry reminder); 验证码 gets QR picture add (chosen or pasted screenshot, via the system's QR reader, otherwise a message to paste the link), a warning when copying a code with 5 s or less left, and secrets must be at least 16 characters.
 - User-visible change: 保险箱 → 验证码 can add an account from a QR picture; copying a nearly expired code says so.
+
+## Patch 5: 保险箱 in the 秘密 backup
+- What changed: the 秘密 backup file now also holds the 验证码 accounts and the typed items, as an extra encrypted block (`app/vault-backup.ts`); restoring brings them back (合并 or 覆盖). Old backups without the block import as before.
+- User-visible change: 导出秘密备份 on Mac now also saves 保险箱 content; 导入备份 restores it.

@@ -73,6 +73,9 @@ import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
 import { VaultDialog } from "./vault-dialog";
+import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
+import { openSecretItemsStore } from "./secret-items-store";
+import { openTotpStore } from "./totp-store";
 import { ArcMenu } from "./arc/menu";
 import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
@@ -108,9 +111,9 @@ type LegacyDeviceBackup = {
 
 type SecureBackup =
   | { format: "clipbox-secure-backup"; version: 2; createdAt: number; envelope: VaultEnvelope }
-  | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope };
+  | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope; vaultBox?: VaultBoxEnvelope };
 
-type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope };
+type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope; vaultBox?: VaultBoxEnvelope };
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -1403,7 +1406,17 @@ export default function Home() {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, sharedSeen: sharedSeenRef.current };
     const scopedData = vaultDataForBackupScope(currentData, scope);
     const envelope = await encryptVault(scopedData, password);
-    const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope, createdAt: Date.now(), envelope };
+    let vaultBox: VaultBoxEnvelope | undefined;
+    if (scope === "secret" && !PLAIN_NOTES) {
+      try {
+        const payload: VaultBoxPayload = { totp: await openTotpStore(deviceKey).list(), items: await openSecretItemsStore(deviceKey).list() };
+        if (!isVaultBoxEmpty(payload)) vaultBox = await encryptVaultBox(payload, password);
+      } catch {
+        window.alert("保险箱里的内容读不出来，备份没有生成，数据没有改动。");
+        return;
+      }
+    }
+    const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope, createdAt: Date.now(), envelope, ...(vaultBox ? { vaultBox } : {}) };
     const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -1432,7 +1445,7 @@ export default function Home() {
         if (!parsed.envelope?.ciphertext || !parsed.envelope?.salt) throw new Error();
         if (parsed.version === 3) {
           if (parsed.scope !== "snippet" && parsed.scope !== "secret") throw new Error();
-          setPendingImport({ envelope: parsed.envelope, scope: parsed.scope });
+          setPendingImport({ envelope: parsed.envelope, scope: parsed.scope, ...(looksLikeVaultBox(parsed.vaultBox) ? { vaultBox: parsed.vaultBox } : {}) });
         } else if (parsed.version === 2) {
           setPendingImport({ envelope: parsed.envelope });
         } else {
@@ -1456,6 +1469,8 @@ export default function Home() {
   async function applyImport(password: string, strategy: ImportStrategy) {
     if (!pendingImport) return;
     const importedData = pendingImport.legacyData || await decryptVault(pendingImport.envelope as VaultEnvelope, password);
+    // Opened before anything is written, so a bad block cannot leave a half-restored backup.
+    const importedBox = pendingImport.vaultBox && !PLAIN_NOTES ? await decryptVaultBox(pendingImport.vaultBox, password) : null;
     const result = await enqueueVaultTask(async () => {
       const result = mergeImportedVaultData(
         readVault(),
@@ -1467,6 +1482,13 @@ export default function Home() {
       await writeVault(result.data);
       return result;
     });
+    if (importedBox) {
+      const totpStore = openTotpStore(deviceKey);
+      const itemStore = openSecretItemsStore(deviceKey);
+      const merged = mergeVaultBox({ totp: await totpStore.list(), items: await itemStore.list() }, importedBox, strategy);
+      await totpStore.replaceAll(merged.totp);
+      await itemStore.replaceAll(merged.items);
+    }
     setPendingImport(null);
     setBackupMode(null);
     setToast(strategy === "replace" ? `已恢复 ${result.importedCount} 条内容` : `已安全导入 ${result.importedCount} 条内容`);

@@ -8,3 +8,6 @@
   SWIFT checked, every field copyable, 复制整段 gives an English block, changing an entry asks twice, 上次修改 is shown.
 - Consequences: not in any backup file yet (same as 验证码). Rollback = revert; the new key is then ignored.
 - Status: Accepted (waits for the owner's 合并: new encrypted store).
+
+## Backup (Lock 2026-10-10, "放啊")
+The 保险箱 (验证码 accounts and typed items) goes into the 秘密 backup as one extra block `vaultBox`, encrypted with the backup password (AES-GCM, PBKDF2 310 000, own label). Old backups have no block and restore as before; Windows ignores the block. The block is opened before anything is written. 合并 keeps what is here and adds what is missing; 覆盖 makes the 保险箱 equal to the backup. The Mac command-line secret export is unchanged. This changes the backup format, so merging waits for Lock's 合并.
