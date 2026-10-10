@@ -22,6 +22,30 @@ export type SnippetMeta = {
   sourceRow?: number;
 };
 
+// A 话术 that came from the company library. `baseHash` is the company text last applied here; if the text now differs, the
+// employee changed it. `pending` holds a newer company version that was not applied over such a change.
+export type SharedContent = {
+  label: string;
+  secret: string;
+  note: string;
+  summary: string;
+  scene: string;
+  action: string;
+  productGroups: string[];
+  rawProduct: string;
+  chineseText: string;
+  placeholders: string[];
+  requiredInputs: string[];
+  usageNote: string;
+  requiresVerification: boolean;
+};
+export type SharedLink = {
+  id: string;
+  baseHash: string;
+  pending?: { content: SharedContent; hash: string };
+  retired?: boolean;
+};
+
 export type SecretItem = {
   id: string;
   label: string;
@@ -35,6 +59,7 @@ export type SecretItem = {
   pinned?: boolean;
   snippetMeta?: SnippetMeta;
   snippetNumber?: string;
+  shared?: SharedLink;
   lastUsedAt?: number;
   useCount?: number;
   deletedAt?: number;

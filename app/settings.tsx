@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "./arc/motion-tokens";
 import { AiSettingsSection } from "./ai-settings";
@@ -10,7 +10,7 @@ import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeC
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
-const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
+const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["shared", "共享话术"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number][0];
 
 function backupAgeLabel(at: number) {
@@ -20,7 +20,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini }: {
+export function SettingsDialog({ version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
   version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
@@ -34,6 +34,7 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
   onClose: () => void; onExport: () => void; onExportSecret: () => void; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
+  sharedLibrary: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [tab, setTab] = useState<SettingsTab>("look");
@@ -132,6 +133,9 @@ export function SettingsDialog({ version, isDesktop, refreshing, itemCount, tras
                 options={[["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]].map(([value, label]) => ({ value, label }))} />
             </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
+          </section>
+          <section aria-labelledby="set-shared" hidden={tab !== "shared"}><h3 id="set-shared">共享话术</h3>
+            {sharedLibrary}
           </section>
           <section aria-labelledby="set-ai" hidden={tab !== "ai"}><h3 id="set-ai">AI</h3>
             <AiSettingsSection localAiAvailable={aiAvailable} />

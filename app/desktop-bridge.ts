@@ -18,6 +18,7 @@ export type ClipboxDesktop = {
   aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiRequest?: (payload: { url: string; body?: unknown; method?: "GET" | "POST" }) => Promise<{ ok: boolean; status: number; text: string }>;
+  fetchSharedLibrary?: (url: string) => Promise<string>;
   relaunch: () => void;
   onFocusSearch: (callback: () => void) => () => void;
   onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;

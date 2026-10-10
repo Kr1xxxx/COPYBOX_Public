@@ -1,6 +1,7 @@
 const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
 const { createClipboardWriter, createImageClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { createAiStore } = require("./ai.cjs");
+const { fetchSharedText } = require("./shared-fetch.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
@@ -450,6 +451,12 @@ ipcMain.handle("clipbox:ai-status", (event) => aiStoreFor(event).status());
 ipcMain.handle("clipbox:ai-save", (event, settings) => aiStoreFor(event).save(settings || {}));
 ipcMain.handle("clipbox:ai-clear", (event) => aiStoreFor(event).clear());
 ipcMain.handle("clipbox:ai-request", (event, payload) => aiStoreFor(event).request(payload || {}));
+
+// The company 话术 library file; a plain GET with no keys.
+ipcMain.handle("clipbox:fetch-shared-library", (event, url) => {
+  if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Request denied");
+  return fetchSharedText(url);
+});
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
 
