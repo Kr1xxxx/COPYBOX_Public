@@ -26,11 +26,13 @@
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
+    "fflate": "0.8.3",
     "motion": "13.4.0",
     "pinyin-pro": "3.29.4",
+    "papaparse": "5.7.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "xlsx": "0.18.5"
+    "read-excel-file": "9.3.5"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -57,7 +59,8 @@
     "typescript-eslint": "8.59.3",
     "vinext": "1.0.0-beta.2",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "write-excel-file": "4.1.1"
   },
   "type": "module",
   "build": {
