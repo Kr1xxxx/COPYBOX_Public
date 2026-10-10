@@ -2,6 +2,7 @@
 
 mod ai;
 mod automation;
+mod shared_library;
 mod shell;
 mod update;
 mod window_mode;
@@ -56,6 +57,7 @@ fn main() {
             ai::ai_save,
             ai::ai_clear,
             ai::ai_request,
+            shared_library::fetch_shared_library,
             update::check_update,
             update::open_update,
             automation::automation_ready,

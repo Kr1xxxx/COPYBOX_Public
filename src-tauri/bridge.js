@@ -3,7 +3,10 @@
   var tauri = window.__TAURI__;
   var platform = "__PLATFORM__";
   var noop = function () {};
-  var invoke = function (name, args) { return tauri.core.invoke(name, args); };
+  // Rust commands reject with a plain string; the page (written for Electron) reads error.message.
+  var invoke = function (name, args) {
+    return tauri.core.invoke(name, args).catch(function (error) { throw error instanceof Error ? error : new Error(String(error)); });
+  };
   var fireAndForget = function (name, args) { invoke(name, args).catch(noop); };
 
   window.clipboxDesktop = {
@@ -25,6 +28,7 @@
     aiSave: function (settings) { return invoke("ai_save", { settings: settings }); },
     aiClear: function () { return invoke("ai_clear"); },
     aiRequest: function (payload) { return invoke("ai_request", { payload: payload }); },
+    fetchSharedLibrary: function (url) { return invoke("fetch_shared_library", { url: url }); },
     onFocusSearch: function (callback) {
       var stopped = false;
       var unlisten = null;

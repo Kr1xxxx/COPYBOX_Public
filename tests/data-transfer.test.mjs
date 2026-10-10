@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  applyPayload, base64ToBytes, countImages, bytesToBase64, collectPayload, countPayload, decodeValue, encodeValue,
+  applyPayload, hasStashedBackup, restoreStashedBackup, base64ToBytes, countImages, bytesToBase64, collectPayload, countPayload, decodeValue, encodeValue,
   openTransfer, parseTransferFile, sealTransfer,
 } from "../app/data-transfer.ts";
 
@@ -178,4 +178,31 @@ test("image counts ignore the two bookkeeping rows", () => {
 
 test("new files use 600000 PBKDF2 rounds", async () => {
   assert.equal((await sealTransfer({ localStorage: {}, indexedDB: {} }, "long-enough-pass")).iterations, 600_000);
+});
+
+test("a copy of the old data is kept on disk during the import and removed after it", async () => {
+  const idb = fakeIndexedDB({ "clipbox-images": { meta: [{ id: "old1", iv: "a", ciphertext: "b" }], blobs: [] } });
+  const storage = fakeStorage({ "clipbox.vault.v1": "OLD" });
+  assert.equal(await hasStashedBackup(idb), false);
+  await applyPayload({ localStorage: { "clipbox.vault.v1": "NEW" }, indexedDB: {} }, storage, idb);
+  assert.equal(storage.getItem("clipbox.vault.v1"), "NEW");
+  assert.equal(await hasStashedBackup(idb), false);
+});
+
+test("after a power cut mid-import the leftover copy brings the old data back", async () => {
+  const idb = fakeIndexedDB({ "clipbox-images": { meta: [{ id: "old1", iv: "a", ciphertext: "b" }], blobs: [] } });
+  const storage = fakeStorage({ "clipbox.vault.v1": "OLD" });
+  // Model the cut: the copy was written to disk, then the images were replaced and the settings half-written.
+  const copy = await collectPayload(storage, idb);
+  const db = await new Promise((resolve) => { const r = idb.open("clipbox-import-backup"); r.onupgradeneeded = () => r.result.createObjectStore("backup"); r.onsuccess = () => resolve(r.result); });
+  const tx = db.transaction("backup", "readwrite");
+  tx.objectStore("backup").put({ id: "last", json: JSON.stringify(copy) });
+  idb.dbs.get("clipbox-images").get("meta").clear();
+  storage.setItem("clipbox.vault.v1", "HALF-WRITTEN");
+  assert.equal(await hasStashedBackup(idb), true);
+  assert.equal(await restoreStashedBackup(storage, idb), true);
+  assert.equal(storage.getItem("clipbox.vault.v1"), "OLD");
+  assert.deepEqual([...idb.dbs.get("clipbox-images").get("meta").keys()], ["old1"]);
+  assert.equal(await hasStashedBackup(idb), false);
+  assert.equal(await restoreStashedBackup(storage, idb), false);
 });
