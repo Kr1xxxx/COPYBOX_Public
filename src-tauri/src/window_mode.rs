@@ -12,6 +12,8 @@ const FILE_MINI: &str = "mini-window-state.json";
 #[derive(Default)]
 struct Inner {
     quick_mode: bool,
+    /// Opened by the tray or 快速搜索: the window may hide itself after a copy.
+    mini_auto_hide: bool,
     normal: Option<Bounds>,
 }
 
@@ -68,6 +70,10 @@ impl WindowMode {
         self.inner.lock().unwrap().quick_mode
     }
 
+    pub fn mini_auto_hide(&self) -> bool {
+        self.inner.lock().unwrap().mini_auto_hide
+    }
+
     /// Writes the full-window size or the mini position, whichever is showing.
     pub fn save_now(&self, window: &WebviewWindow) {
         let app = window.app_handle();
@@ -100,8 +106,9 @@ impl WindowMode {
         });
     }
 
-    pub fn enter_mini(&self, window: &WebviewWindow) {
+    pub fn enter_mini(&self, window: &WebviewWindow, auto_hide: bool) {
         if self.is_mini() {
+            self.inner.lock().unwrap().mini_auto_hide = auto_hide;
             self.emit_mode(window);
             return;
         }
@@ -113,7 +120,11 @@ impl WindowMode {
         }
         self.save_now(window);
         let normal = self.inner.lock().unwrap().normal;
-        self.inner.lock().unwrap().quick_mode = true;
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.quick_mode = true;
+            inner.mini_auto_hide = auto_hide;
+        }
         let app = window.app_handle();
         let saved = data_file(app, FILE_MINI)
             .and_then(|p| ws::read_json::<Point>(&p))
@@ -142,7 +153,11 @@ impl WindowMode {
         }
         self.save_now(window);
         let normal = self.inner.lock().unwrap().normal;
-        self.inner.lock().unwrap().quick_mode = false;
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.quick_mode = false;
+            inner.mini_auto_hide = false;
+        }
         let _ = window.set_always_on_top(false);
         let _ = window.set_max_size(None::<LogicalSize<f64>>);
         let _ = window.set_maximizable(true);
@@ -162,7 +177,7 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 #[tauri::command]
 pub fn set_window_mode(app: AppHandle, state: tauri::State<WindowMode>, mode: String) -> Result<(), String> {
     let window = main_window(&app)?;
-    if mode == "mini" { state.enter_mini(&window) } else { state.enter_full(&window) }
+    if mode == "mini" { state.enter_mini(&window, false) } else { state.enter_full(&window) }
     Ok(())
 }
 
@@ -185,5 +200,9 @@ pub fn set_theme(app: AppHandle, theme: String) -> Result<(), String> {
 /// The page tells us it has drawn; only then is the window shown, so there is no white flash.
 #[tauri::command]
 pub fn page_ready(app: AppHandle) -> Result<(), String> {
+    // Started quietly at login (--hidden): stay in the tray until someone opens it.
+    if std::env::args().any(|a| a == "--hidden") {
+        return Ok(());
+    }
     main_window(&app)?.show().map_err(|e| e.to_string())
 }
