@@ -19,7 +19,13 @@ test("a new 保险箱 opens with clearly fake examples of each type, which one t
   await expect(dialog).toContainText("范例");
   await dialog.getByRole("button", { name: "按类型" }).click();
   for (const group of ["账号密码", "收款信息", "API 密钥", "恢复码", "验证码"]) await expect(dialog.getByRole("region", { name: group })).toContainText("【范例】");
-  await dialog.getByRole("button", { name: "删除范例" }).click();
+  await dialog.getByRole("button", { name: "删除范例…" }).click();
+  await expect(dialog).toContainText("将删除 5 条");
+  await expect(dialog).toContainText("【范例】接口密钥");
+  await dialog.getByRole("button", { name: "取消" }).click();
+  await expect(dialog).toContainText("里面带了几条");
+  await dialog.getByRole("button", { name: "删除范例…" }).click();
+  await dialog.getByRole("button", { name: "确认删除" }).click();
   await expect(dialog).toContainText("保险箱还是空的");
   expect(await page.evaluate(() => localStorage.getItem("clipbox.totp.v1"))).toBeTruthy();
   // Closed and opened again, after a restart: they do not come back.
@@ -79,6 +85,11 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   const settings = async () => { await page.getByRole("button", { name: /设置/ }).first().click(); const d = page.getByRole("dialog", { name: "设置" }); await d.getByRole("tab", { name: "数据" }).click(); return d; };
   let s = await settings();
   await s.getByRole("button", { name: "清除…" }).click();
+  // Before anything is deleted the box says how many and which; own entries and the edited example are not on the list.
+  const list = s.getByRole("status");
+  await expect(list).toContainText("将删除 4 条");
+  await expect(list).toContainText("【范例】接口密钥");
+  for (const kept of ["我的邮箱", "我的店铺", "美元电汇"]) await expect(list).not.toContainText(kept);
   await s.getByRole("button", { name: "确认清除" }).click();
   await expect(page.getByText("已清除 4 条范例，1 条你改过的已保留")).toBeVisible();
   await page.keyboard.press("Escape");

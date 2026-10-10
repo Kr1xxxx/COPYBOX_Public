@@ -22,3 +22,4 @@ The first time the 保险箱 is opened and it is completely empty (nothing in �
 
 ## 清除范例 / 恢复范例 in 设置 → 数据 (Lock 2026-10-10)
 Two rows, shown only on a Mac whose 保险箱 is unlocked. 清除 (asks once) removes only entries whose id carries the `sample-` mark and that are still as created (an edited example counts as the user's and stays; the toast says how many were kept); it never judges by content or name. 恢复 adds only the examples whose ids are missing. No storage format change.
+Safety (Lock: 「后期不要一点全部给删除了」): the confirmation lists how many and which entries will go; the clear rewrites each list with only the planned ids taken out and refuses to write unless exactly those are gone, every other entry is the very same object, and at most 20 entries are involved. There is no code path from the button that removes anything else.

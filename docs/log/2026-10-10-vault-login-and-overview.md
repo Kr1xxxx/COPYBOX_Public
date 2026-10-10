@@ -37,3 +37,11 @@
 ## Patch 11: 清除范例 / 恢复范例 in settings
 - What changed: two rows in 设置 → 数据 (Mac, 保险箱 unlocked). Clear removes only untouched entries with the sample id mark, after one confirmation; restore only adds missing ones. The 全部 page's 删除范例 uses the same rule.
 - User-visible change: 设置 → 数据 has 清除范例 and 恢复范例.
+
+## Patch 12: 清除范例 shows what it will delete, and cannot delete anything else
+- What changed: the 清除范例 confirmation lists how many and which entries go; the clear refuses to write unless only those entries are removed (checked in code, capped at 20); unit tests with user data next to examples prove user data stays identical.
+- User-visible change: the confirmation text names the entries to be deleted.
+
+## Patch 13: 全部 page's 删除范例 asks the same way
+- What changed: 全部 → 删除范例… shows how many and which examples will go and asks to confirm, with the same safe clear as in settings.
+- User-visible change: one confirmation listing the examples before they are removed.

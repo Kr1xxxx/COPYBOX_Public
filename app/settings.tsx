@@ -21,10 +21,10 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onUnlockTotp, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
+export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
   onUnlockTotp?: () => void;
   // Only given on a Mac whose 保险箱 is unlocked: remove / put back the 【范例】 entries.
-  onClearSamples?: () => Promise<void>; onRestoreSamples?: () => Promise<void>;
+  onPreviewSamples?: () => Promise<string[]>; onClearSamples?: () => Promise<void>; onRestoreSamples?: () => Promise<void>;
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
@@ -53,7 +53,8 @@ export function SettingsDialog({ onUnlockTotp, onClearSamples, onRestoreSamples,
     document.getElementById(`settings-tab-${next}`)?.focus();
   }
   const [confirmEmpty, setConfirmEmpty] = useState(false);
-  const [confirmClearSamples, setConfirmClearSamples] = useState(false);
+  // null = not asking; otherwise the names a clear would remove, shown before anything is deleted.
+  const [confirmClearSamples, setConfirmClearSamples] = useState<string[] | null>(null);
   const [versionCopied, setVersionCopied] = useState(false);
   // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
   const builtAt = formatBuildTime(buildTime);
@@ -111,10 +112,12 @@ export function SettingsDialog({ onUnlockTotp, onClearSamples, onRestoreSamples,
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {!PLAIN_NOTES && row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
             {onClearSamples && (
-              <div className="settings-row"><div><strong>清除范例</strong><small>只删保险箱里带「范例」标记、你没改过的条目，其他内容不动</small></div>
+              <div className="settings-row"><div><strong>清除范例</strong><small>只删保险箱里带「范例」标记、你没改过的条目，其他内容不动</small>
+                {confirmClearSamples && <small className="settings-sample-list" role="status">{confirmClearSamples.length === 0 ? "现在没有可清除的范例" : `将删除 ${confirmClearSamples.length} 条：${confirmClearSamples.join("、")}`}</small>}</div>
                 {confirmClearSamples
-                  ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmClearSamples(false)}>取消</button><button type="button" className="secondary-button danger" onClick={() => { setConfirmClearSamples(false); void onClearSamples(); }}>确认清除</button></div>
-                  : <button type="button" className="secondary-button" onClick={() => setConfirmClearSamples(true)}>清除…</button>}
+                  ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmClearSamples(null)}>取消</button>
+                    {confirmClearSamples.length > 0 && <button type="button" className="secondary-button danger" onClick={() => { setConfirmClearSamples(null); void onClearSamples(); }}>确认清除</button>}</div>
+                  : <button type="button" className="secondary-button" onClick={() => void (onPreviewSamples?.() ?? Promise.resolve([])).then(setConfirmClearSamples)}>清除…</button>}
               </div>
             )}
             {onRestoreSamples && row("恢复范例", "把缺少的范例补回来，已有的内容不会重复或改动", () => void onRestoreSamples(), "恢复")}

@@ -73,7 +73,7 @@ import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
 import { VaultDialog } from "./vault-dialog";
-import { clearSampleEntries, restoreSampleEntries } from "./vault-samples";
+import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
 import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
@@ -1862,6 +1862,7 @@ export default function Home() {
       {totpOpen && <VaultDialog deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={() => { setTotpOpen(false); switchKind("secret"); }} onClose={() => setTotpOpen(false)} onToast={flashToast}
         onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("保险箱入口已隐藏"); }} />}
       {settingsOpen && <SettingsDialog
+        onPreviewSamples={PLAIN_NOTES || !totpUnlocked ? undefined : () => previewClearSamples(deviceKey)}
         onClearSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
           try {
             const result = await clearSampleEntries(deviceKey);

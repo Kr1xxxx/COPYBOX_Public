@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArcSegmented } from "./arc/segmented";
 import { lastFour } from "./apikey-core";
 import { paymentHint, type MarkItem } from "./payment-core";
-import { clearSampleEntries, isSampleId } from "./vault-samples";
+import { clearSampleEntries, isSampleId, previewClearSamples } from "./vault-samples";
 import { classifySecret } from "./secret-classify";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
@@ -62,6 +62,8 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
   const [kindDraft, setKindDraft] = useState<EntryKind>("other");
   const [siteDraft, setSiteDraft] = useState("");
   const [reload, setReload] = useState(0);
+  // null = not asking; otherwise the names that 删除范例 would remove, shown before anything is deleted.
+  const [sampleNames, setSampleNames] = useState<string[] | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -101,6 +103,7 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
   const hasSamples = (base ?? []).some((entry) => !entry.legacy && isSampleId(entry.id));
   async function removeSamples() {
     try {
+      setSampleNames(null);
       await clearSampleEntries(deviceKey);
       setReload((value) => value + 1);
     } catch (reason) {
@@ -133,7 +136,15 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
   if (entries.length === 0) return <p className="totp-empty">保险箱还是空的。切到上面的标签，添加账号密码、收款信息或验证码。</p>;
   return (
     <>
-      {hasSamples && <div className="vault-sample-note"><span>里面带了几条「范例」，是假数据，看完可以删掉。</span><button type="button" className="secondary-button" onClick={() => void removeSamples()}>删除范例</button></div>}
+      {hasSamples && (
+        <div className="vault-sample-note">
+          <span>{sampleNames === null ? "里面带了几条「范例」，是假数据，看完可以删掉。" : sampleNames.length === 0 ? "现在没有可删除的范例（改过的范例算你的数据，不会删）。" : `将删除 ${sampleNames.length} 条：${sampleNames.join("、")}。改过的范例和你自己的内容不会删。`}</span>
+          {sampleNames === null
+            ? <button type="button" className="secondary-button" onClick={() => void previewClearSamples(deviceKey).then(setSampleNames).catch(() => setError("读取失败，请重试"))}>删除范例…</button>
+            : <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setSampleNames(null)}>取消</button>
+              {sampleNames.length > 0 && <button type="button" className="secondary-button danger" onClick={() => void removeSamples()}>确认删除</button>}</span>}
+        </div>
+      )}
       <ArcSegmented className="settings-segment vault-tabs" label="分组方式" value={by} onSelect={(next) => setBy(next as "site" | "type")}
         options={[{ value: "site", label: "按网站" }, { value: "type", label: "按类型" }]} />
       <div className="vault-groups">
