@@ -33,6 +33,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-022 | Trash auto-cleanup defaults to 7 days for everyone | Accepted |
 | D-023 | Version update reminder: tells, never installs; source address not chosen yet | Accepted |
 | D-024 | 图片 thumbnails: small encrypted copies kept in their own database | Accepted |
+| D-025 | Shared 话术 library: incremental sync that never overwrites or deletes an employee's own 话术 | Accepted |
 
 ---
 
@@ -227,3 +228,8 @@ Statuses: Accepted / Superseded / Deprecated.
   deleted with the image. Pictures that are already small are shown as they are. Tiles and rows use the thumbnail; only an
   opened picture loads the full original, and copying always uses the original.
 - Consequences: dropping the thumbnail database only makes thumbnails be made again; no data is lost. Rollback = revert the PR.
+
+### D-025 Shared 话术 library (2026-10-10)
+- Context (owner): "共享话术也要做一下，但是不要全部覆盖每次更新"; the design was shown in the 【話術】 thread and the owner answered 「可以」 (2026-10-09 17:55). Where the file is hosted is not decided (「先不定」).
+- Decision: one JSON file (see `docs/shared-library.md`) holds the company 话术, each with a stable company id. A sync (from an address typed in Settings, or from a file) works per entry: new ids are added; an entry the employee never edited is updated; an entry they edited keeps their text and the newer company text waits on the card (「公司版有更新」, compare, choose 保留我的 / 用公司版); an entry the company dropped is only marked 「公司已停用」. Personal 话术, folders, favourites, order and use times are never touched, nothing is deleted, trashed copies stay trashed, and a 话术 the employee deleted does not come back. Each sync ends with a summary line. The address is empty until someone fills it in.
+- Consequences: items get an optional `shared` field (`{id, baseHash, pending?, retired?}`) inside the encrypted vault; older versions ignore it and nothing else changes in the storage format. The list of company ids already received (`sharedSeen`, so a 话术 the employee deleted does not come back) is a second optional field of the vault: it is written in the same encrypted save as the 话术 and travels in backups (merged as a union on import), so a failed save cannot lose one without the other. Clearing all app data without a backup starts from nothing, and then deleted company 话术 are added again. The desktop app fetches the file in the main process (`desktop/shared-fetch.cjs`: GET only, http(s), 15 s, 5 MB, no cookies or keys); the web version uses `fetch` and so needs an address that allows it.

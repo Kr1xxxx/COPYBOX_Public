@@ -126,3 +126,13 @@ test("deleted items are cleared after 7 days until another option is picked", ()
   const preferences = fs.readFileSync(new URL("../app/preferences.ts", import.meta.url), "utf8");
   assert.match(preferences, /export const DEFAULT_TRASH_DAYS = 7;/);
 });
+
+test("the company library section lives in settings, starts without an address and the desktop bridge can fetch the file", () => {
+  assert.match(page, /sharedLibrary=\{<SharedLibrarySection onApply=\{applySharedLibraryText\}/);
+  const section = fs.readFileSync(new URL("../app/shared-library-ui.tsx", import.meta.url), "utf8");
+  assert.match(section, /placeholder="还没有地址，先不填也可以"/);
+  const client = fs.readFileSync(new URL("../app/shared-library-client.ts", import.meta.url), "utf8");
+  assert.match(client, /readSharedUrl\(\) \{ return \(read\(SHARED_URL_KEY\) \|\| ""\)\.trim\(\); \}/);
+  assert.match(fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8"), /fetchSharedLibrary: \(url\) => ipcRenderer\.invoke\("clipbox:fetch-shared-library", url\)/);
+  assert.match(fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8"), /ipcMain\.handle\("clipbox:fetch-shared-library"[^]*isTrustedClipboardRequest/);
+});
