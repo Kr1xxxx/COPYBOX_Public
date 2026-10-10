@@ -4,7 +4,7 @@ import test from "node:test";
 import { readUiSource } from "./helpers/ui-source.mjs";
 
 const page = readUiSource();
-// BackupDialog, SnippetImportDialog and DeleteConfirmDialog live in app/dialogs.tsx; SnippetFillPanel in app/fill-panel.tsx (split out of page.tsx).
+// BackupDialog, SnippetImportDialog and DeleteConfirmDialog live in app/dialogs.tsx; SnippetFill in app/fill-panel.tsx (split out of page.tsx).
 const dialogs = fs.readFileSync(new URL("../app/dialogs.tsx", import.meta.url), "utf8");
 const fillPanel = fs.readFileSync(new URL("../app/fill-panel.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
@@ -13,7 +13,8 @@ const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.ur
 
 test("editing, filling variables and creating folders happen in place, not in popups", () => {
   assert.match(page, /className="inline-editor"/);
-  assert.match(fillPanel, /function SnippetFillPanel/);
+  assert.match(fillPanel, /function SnippetFill\b/);
+  assert.match(fillPanel, /className="var-chip"/);
   assert.doesNotMatch(page, /function FolderDialog|function SnippetCopyDialog|className="editor-backdrop"|className="editor-dialog"/);
   assert.match(page, /className="directory-new"/);
   assert.match(page, /className=\{`native-row selected editing new-row/);

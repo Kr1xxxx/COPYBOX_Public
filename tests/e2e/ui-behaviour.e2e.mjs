@@ -30,7 +30,9 @@ test.describe("snippet list", () => {
   });
 
   test("copying shows an announced 已复制 state on a compact green button, and the opened entry has a labelled copy action", async ({ page }) => {
-    const row = page.locator(".native-row").nth(1);
+    // a 话术 without variables copies at once; one with variables asks for them first (see main-flows)
+    const plain = page.locator(".native-row:not(.selected):not(:has(.snippet-variable))");
+    const row = plain.first();
     const button = row.locator(".native-copy");
     const box = await button.boundingBox();
     expect(Math.round(box.width)).toBe(28);
@@ -51,7 +53,7 @@ test.describe("snippet list", () => {
     await button.focus();
     expect(await button.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
 
-    await page.locator(".native-row .row-main").nth(4).click();
+    await plain.nth(3).locator(".row-main").click();
     const primary = page.locator(".native-row.selected").locator(".primary-button", { hasText: /^复制$/ }).first();
     await expect(primary).toBeVisible();
     await primary.click();
