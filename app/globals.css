@@ -951,3 +951,68 @@ button { -webkit-tap-highlight-color: transparent; }
 .row-actions { flex-wrap: wrap; row-gap: 8px; }
 .var-memory { order: 10; flex: 1 1 100%; gap: 14px; flex-wrap: wrap; overflow: visible; }
 .var-memory .var-help { margin-left: auto; }
+
+
+/* 保险箱 tabs and 收款信息 */
+.vault-tabs{align-self:start;justify-self:start}
+.vault-foot{align-items:flex-start;gap:12px}
+.vault-foot .settings-note{margin:0}
+.pay-list{gap:8px}
+.pay-item{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+.pay-head{width:100%;min-height:48px;display:flex;align-items:center;gap:10px;padding:6px 12px;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background .15s}
+.pay-head:hover{background:var(--hover)}
+.pay-head:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.pay-chevron{flex:none;color:var(--muted);transition:rotate .2s cubic-bezier(.2,.82,.2,1)}
+.pay-item.open .pay-chevron{rotate:180deg}
+.pay-body{padding:2px 12px 12px;display:grid;gap:8px;border-top:1px solid var(--line-soft)}
+.pay-fields{margin:0;display:grid;gap:2px}
+.pay-field{display:grid;grid-template-columns:96px minmax(0,1fr) auto;align-items:center;gap:8px;min-height:34px}
+.pay-field dt{color:var(--muted);font-size:11.5px}
+.pay-field dd{margin:0;font-size:13px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;user-select:text}
+.pay-copy{width:28px;height:28px}
+.pay-copy.copied{color:var(--accent)}
+.pay-meta{margin:0;color:var(--muted);font-size:11.5px}
+.pay-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.pay-kinds{display:flex;flex-wrap:wrap;gap:6px}
+.pay-kind{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:12.5px;cursor:pointer;transition:background .15s,border-color .15s,scale .12s}
+.pay-kind:active{scale:.96}
+.pay-kind.active{border-color:var(--accent);background:var(--accent);color:#fff}
+.pay-form label .totp-error{margin-top:2px}
+.pay-confirm{margin:0;color:var(--danger);font-size:12.5px;font-weight:600}
+@media (prefers-reduced-motion: reduce){.pay-chevron,.pay-kind{transition:none}.pay-kind:active{scale:1}}
+
+/* 保险箱: site badges, overview groups, 账号密码 */
+.vault-dialog{width:min(480px,100%)}
+.vault-panel{display:grid;gap:12px;animation:vault-in .18s cubic-bezier(.2,.82,.2,1) both}
+@keyframes vault-in{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
+.site-badge{flex:none;display:inline-grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;line-height:1;outline:1px solid rgba(0,0,0,.1);outline-offset:-1px;user-select:none}
+.vault-groups{display:grid;gap:14px}
+.vault-group h3{margin:0 0 6px;display:flex;align-items:center;gap:8px;color:var(--ink);font-size:12.5px;font-weight:650;letter-spacing:0}
+.vault-group h3 .vault-count{color:var(--muted);font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums}
+.vault-entry{width:100%;min-height:44px;display:flex;align-items:center;gap:10px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);text-align:left;cursor:pointer;transition:background .15s,scale .12s}
+.vault-entry:hover{background:var(--hover)}
+.vault-entry:active{scale:.98}
+.vault-entry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vault-type-chip{flex:none;min-width:40px;padding:2px 6px;border-radius:999px;background:var(--hover);color:var(--muted);font-size:10.5px;font-weight:600;text-align:center}
+.login-pass-row{display:flex;gap:8px}
+.login-pass-row input{flex:1;min-width:0}
+.login-pass-actions{display:flex;gap:2px}
+.login-pass{letter-spacing:.08em}
+.login-code{font-variant-numeric:tabular-nums;font-weight:600;letter-spacing:.04em}
+.login-code small{margin-left:8px;color:var(--muted);font-weight:400;letter-spacing:0}
+.pay-warn{color:var(--danger);font-size:11.5px}
+.totp-form select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:13px}
+.pay-head .site-badge{margin-right:0}
+@media (prefers-reduced-motion: reduce){.vault-panel{animation:none}.vault-entry{transition:none}.vault-entry:active{scale:1}}
+
+/* API 密钥 */
+.apikey-expiry{flex:none;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.apikey-expiry.soon{background:var(--warn-bg);color:var(--warn)}
+.apikey-expiry.expired{background:var(--danger-bg);color:var(--danger)}
+.apikey-expiry-text.soon{color:var(--warn);font-weight:600}
+.apikey-expiry-text.expired{color:var(--danger);font-weight:600}
+.pay-hint{color:var(--muted);font-size:11.5px}
+.totp-form input[type="date"]{font-variant-numeric:tabular-nums}
+
+/* 验证码: QR picture picker */
+.totp-qr input[type="file"]{font:inherit;font-size:12px;color:var(--muted)}

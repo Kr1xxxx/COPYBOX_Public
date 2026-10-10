@@ -72,7 +72,7 @@ import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
-import { TotpDialog } from "./totp-dialog";
+import { VaultDialog } from "./vault-dialog";
 import { ArcMenu } from "./arc/menu";
 import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
@@ -1526,7 +1526,7 @@ export default function Home() {
       options={[
         ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
         { value: "image", label: "图片" },
-        ...(totpUnlocked ? [{ value: "totp", label: "验证码" }] : []),
+        ...(totpUnlocked ? [{ value: "totp", label: "保险箱" }] : []),
       ]}
     />
   );
@@ -1835,8 +1835,8 @@ export default function Home() {
           </section>
         </>}
       </section>
-      {totpOpen && <TotpDialog deviceKey={deviceKey} onClose={() => setTotpOpen(false)} onToast={flashToast}
-        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("验证码入口已隐藏"); }} />}
+      {totpOpen && <VaultDialog deviceKey={deviceKey} onClose={() => setTotpOpen(false)} onToast={flashToast}
+        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("保险箱入口已隐藏"); }} />}
       {settingsOpen && <SettingsDialog
         onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}

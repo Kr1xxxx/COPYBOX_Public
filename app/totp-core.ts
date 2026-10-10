@@ -25,7 +25,7 @@ export function normalizeBase32(raw: string): string {
 
 export function isValidBase32(raw: string): boolean {
   const value = normalizeBase32(raw);
-  return value.length >= 8 && /^[A-Z2-7]+$/.test(value);
+  return value.length >= 16 && /^[A-Z2-7]+$/.test(value);
 }
 
 export function base32Decode(raw: string): Uint8Array<ArrayBuffer> {
@@ -79,7 +79,7 @@ export function parseTotpInput(raw: string, fallbackName = ""): TotpDraft {
     };
   }
   const secret = normalizeBase32(text);
-  if (!isValidBase32(secret)) throw new Error("密钥不对：只能有字母 A-Z 和数字 2-7，至少 8 位");
+  if (!isValidBase32(secret)) throw new Error("密钥不对：只能有字母 A-Z 和数字 2-7，至少 16 位");
   return { issuer: "", name: clampName(fallbackName), secret, digits: 6, period: 30, algorithm: "SHA1" };
 }
 

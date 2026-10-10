@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { copyTextWithExpiry } from "./clipboard";
 import { TOTP_NAME_MAX, accountTitle, formatCode, generateTotp, parseTotpInput, secondsLeft, type TotpAccount } from "./totp-core";
 import { openTotpStore, type TotpStore } from "./totp-store";
+import { scanQrFromBlob } from "./qr-scan";
 import { Icon } from "./ui-atoms";
 
 // Hidden 验证码 (Mac only): 6-digit codes with a countdown, click a row to copy. Secrets never leave the encrypted store.
@@ -30,7 +31,7 @@ function Ring({ left, period }: { left: number; period: number }) {
 
 function TotpRow({ account, now, copied, confirming, onCopy, onAskDelete, onCancelDelete, onDelete }: {
   account: TotpAccount; now: number; copied: boolean; confirming: boolean;
-  onCopy: (code: string) => void; onAskDelete: () => void; onCancelDelete: () => void; onDelete: () => void;
+  onCopy: (code: string, left: number) => void; onAskDelete: () => void; onCancelDelete: () => void; onDelete: () => void;
 }) {
   const [code, setCode] = useState("");
   const step = Math.floor(now / 1000 / account.period);
@@ -42,7 +43,7 @@ function TotpRow({ account, now, copied, confirming, onCopy, onAskDelete, onCanc
   const left = secondsLeft(account.period, now);
   return (
     <li className="totp-row">
-      <button type="button" className={`totp-main${copied ? " copied" : ""}`} onClick={() => code && onCopy(code)} aria-label={`复制 ${accountTitle(account)} 的验证码`}>
+      <button type="button" className={`totp-main${copied ? " copied" : ""}`} onClick={() => code && onCopy(code, left)} aria-label={`复制 ${accountTitle(account)} 的验证码`}>
         <span className="totp-who"><strong>{accountTitle(account)}</strong>{account.issuer && account.name && <small>{account.name}</small>}</span>
         <span className="totp-code" aria-live="off">{code ? formatCode(code) : "······"}</span>
         <span className="totp-copy-icon"><Icon name={copied ? "check" : "copy"} /></span>
@@ -55,7 +56,7 @@ function TotpRow({ account, now, copied, confirming, onCopy, onAskDelete, onCanc
   );
 }
 
-export function TotpDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey: string; onClose: () => void; onHide: () => void; onToast: (message: string) => void }) {
+export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: (message: string) => void }) {
   const storeRef = useRef<TotpStore | null>(null);
   const [accounts, setAccounts] = useState<TotpAccount[] | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -65,13 +66,9 @@ export function TotpDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey:
   const [formError, setFormError] = useState("");
   const [copiedId, setCopiedId] = useState("");
   const [deleteId, setDeleteId] = useState("");
-  const [confirmHide, setConfirmHide] = useState(false);
   const now = useNow();
-  const closeRef = useRef<HTMLButtonElement>(null);
   const secretRef = useRef<HTMLTextAreaElement>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
     let live = true;
@@ -80,29 +77,29 @@ export function TotpDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey:
     store.list().then((list) => { if (live) setAccounts(list); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
-  useEffect(() => { closeRef.current?.focus(); }, []);
   useEffect(() => { if (adding) secretRef.current?.focus(); }, [adding]);
   useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      if ((event.target as HTMLElement | null)?.closest?.("form")) { setAdding(false); return; }
-      onCloseRef.current();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
-
-  async function copy(account: TotpAccount, code: string) {
+  async function copy(account: TotpAccount, code: string, left: number) {
     try {
       await copyTextWithExpiry(code);
       setCopiedId(account.id);
       if (copiedTimer.current) clearTimeout(copiedTimer.current);
       copiedTimer.current = setTimeout(() => setCopiedId(""), 1600);
-      onToast("验证码已复制");
+      onToast(left <= 5 ? `已复制，但这个码只剩 ${left} 秒，来不及就等下一个` : "验证码已复制");
     } catch {
       onToast("复制失败，请重试");
+    }
+  }
+
+  // A QR picture (chosen or pasted as a screenshot) fills in the otpauth:// link.
+  async function readQr(blob: Blob | null | undefined) {
+    if (!blob) return;
+    try {
+      const link = await scanQrFromBlob(blob);
+      setSecret(link);
+      setFormError("");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "识别失败，请重试");
     }
   }
 
@@ -132,38 +129,31 @@ export function TotpDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey:
   }
 
   return (
-    <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="settings-dialog totp-dialog" role="dialog" aria-modal="true" aria-labelledby="totp-title">
-        <header><h2 id="totp-title">验证码</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭验证码">×</button></header>
-        <div className="settings-body">
-          {loadError && <p className="settings-note" role="alert">{loadError}</p>}
-          {!loadError && accounts === null && <p className="settings-note">正在读取…</p>}
-          {accounts && accounts.length === 0 && !adding && <p className="totp-empty">还没有账号。点下面的「添加账号」，粘贴密钥或 otpauth:// 链接。</p>}
-          {accounts && accounts.length > 0 && (
-            <ul className="totp-list">
-              {accounts.map((account) => (
-                <TotpRow key={account.id} account={account} now={now} copied={copiedId === account.id} confirming={deleteId === account.id}
-                  onCopy={(code) => void copy(account, code)} onAskDelete={() => setDeleteId(account.id)} onCancelDelete={() => setDeleteId("")} onDelete={() => void remove(account.id)} />
-              ))}
-            </ul>
-          )}
-          {adding && (
-            <form className="totp-form" onSubmit={(event) => void submit(event)}>
-              <label>密钥或链接<textarea value={secret} onChange={(event) => { setSecret(event.target.value); setFormError(""); }} placeholder="JBSW Y3DP EHPK 3PXP 或 otpauth://totp/…" rows={2} ref={secretRef} spellCheck={false} autoComplete="off" /></label>
-              <label>名称（可不填）<input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：公司邮箱" maxLength={40} autoComplete="off" /></label>
-              {formError && <p className="totp-error" role="alert">{formError}</p>}
-              <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => { setAdding(false); setFormError(""); }}>取消</button><button type="submit" className="primary-button">保存</button></div>
-            </form>
-          )}
-          {!adding && accounts && <div className="totp-actions">
-            <button type="button" className="primary-button" onClick={() => setAdding(true)}><Icon name="plus" />添加账号</button>
-            {confirmHide
-              ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmHide(false)}>取消</button><button type="button" className="secondary-button" onClick={onHide}>确认隐藏</button></span>
-              : <button type="button" className="secondary-button" onClick={() => setConfirmHide(true)} title="隐藏后入口消失；账号仍保存在本机">隐藏入口</button>}
-          </div>}
-          <p className="settings-note">密钥用本机密钥加密保存，不进备份文件。隐藏入口后，在设置里连点版本号 5 次可重新打开。</p>
-        </div>
-      </section>
-    </div>
+    <>
+    {loadError && <p className="settings-note" role="alert">{loadError}</p>}
+    {!loadError && accounts === null && <p className="settings-note">正在读取…</p>}
+    {accounts && accounts.length === 0 && !adding && <p className="totp-empty">还没有账号。点下面的「添加账号」，粘贴密钥或 otpauth:// 链接。</p>}
+    {accounts && accounts.length > 0 && (
+      <ul className="totp-list">
+        {accounts.map((account) => (
+          <TotpRow key={account.id} account={account} now={now} copied={copiedId === account.id} confirming={deleteId === account.id}
+            onCopy={(code, left) => void copy(account, code, left)} onAskDelete={() => setDeleteId(account.id)} onCancelDelete={() => setDeleteId("")} onDelete={() => void remove(account.id)} />
+        ))}
+      </ul>
+    )}
+    {adding && (
+      <form className="totp-form" onSubmit={(event) => void submit(event)}>
+        <label>密钥或链接<textarea value={secret} onChange={(event) => { setSecret(event.target.value); setFormError(""); }} placeholder="JBSW Y3DP EHPK 3PXP 或 otpauth://totp/…，也可以直接粘贴二维码截图" rows={2} ref={secretRef} spellCheck={false} autoComplete="off"
+          onPaste={(event) => { const file = Array.from(event.clipboardData.files).find((entry) => entry.type.startsWith("image/")); if (file) { event.preventDefault(); void readQr(file); } }} /></label>
+      <label className="totp-qr">二维码截图（可不选）<input type="file" accept="image/*" aria-label="选二维码图片" onChange={(event) => { void readQr(event.target.files?.[0]); event.target.value = ""; }} /></label>
+        <label>名称（可不填）<input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：公司邮箱" maxLength={40} autoComplete="off" /></label>
+        {formError && <p className="totp-error" role="alert">{formError}</p>}
+        <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => { setAdding(false); setFormError(""); }}>取消</button><button type="submit" className="primary-button">保存</button></div>
+      </form>
+    )}
+    {!adding && accounts && <div className="totp-actions">
+      <button type="button" className="primary-button" onClick={() => setAdding(true)}><Icon name="plus" />添加账号</button>
+    </div>}
+    </>
   );
 }
