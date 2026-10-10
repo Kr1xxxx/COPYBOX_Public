@@ -1,0 +1,69 @@
+// What each variable block remembers. Held in memory only (never saved): the values are often customer names.
+export const MEMORY_SIZE = 3;
+
+// Every variable called Name starts with these three, so a quick reply needs no typing. The first one is not used by default.
+export const NAME_OPTIONS = ["beautiful", "Friend", "Lovely"] as const;
+export const DEFAULT_VALUES: Record<string, string> = { Name: "Friend" };
+
+export type ValueMemory = Record<string, string[]>;
+// The values the person pinned, per name. A pinned value is also in the memory and is never pushed out by a new one.
+export type PinnedValues = Record<string, string[]>;
+
+export function isPinned(pins: PinnedValues, name: string, value: string): boolean {
+  return (pins[name] || []).includes(value);
+}
+
+// Newest first; pushing a fourth value out removes the oldest one that is not pinned. When all three are pinned the new value is not kept.
+export function rememberValues(memory: ValueMemory, values: Record<string, string>, pins: PinnedValues = {}): ValueMemory {
+  const next = { ...memory };
+  for (const [name, raw] of Object.entries(values)) {
+    const value = raw.trim();
+    if (!value) continue;
+    const list = [value, ...(next[name] || []).filter((entry) => entry !== value)];
+    while (list.length > MEMORY_SIZE) {
+      let drop = -1;
+      for (let index = list.length - 1; index >= 0; index -= 1) if (!isPinned(pins, name, list[index])) { drop = index; break; }
+      if (drop < 0) break;
+      list.splice(drop, 1);
+    }
+    next[name] = list.slice(0, MEMORY_SIZE);
+  }
+  return next;
+}
+
+// Pinned values first, in the order they were pinned (they survive a reload), then the recent ones newest first, three in all.
+export function memoryOptions(memory: ValueMemory, pins: PinnedValues, name: string): string[] {
+  const pinned = pins[name] || [];
+  return [...pinned, ...(memory[name] || []).filter((value) => !pinned.includes(value))].slice(0, MEMORY_SIZE);
+}
+
+export function latestValues(memory: ValueMemory): Record<string, string> {
+  return Object.fromEntries(Object.entries(memory).filter(([, list]) => list.length > 0).map(([name, list]) => [name, list[0]]));
+}
+
+// Pin the value, or unpin it when it is already pinned. A value that is not remembered yet is added; with three pinned values there is no room.
+export function togglePin(memory: ValueMemory, pins: PinnedValues, name: string, raw: string): { memory: ValueMemory; pins: PinnedValues; result: "pinned" | "unpinned" | "full" | "empty" } {
+  const value = raw.trim();
+  if (!value) return { memory, pins, result: "empty" };
+  const pinned = pins[name] || [];
+  if (pinned.includes(value)) return { memory, pins: { ...pins, [name]: pinned.filter((entry) => entry !== value) }, result: "unpinned" };
+  if (pinned.length >= MEMORY_SIZE) return { memory, pins, result: "full" };
+  const nextPins = { ...pins, [name]: [...pinned, value] };
+  return { memory: rememberValues(memory, { [name]: value }, nextPins), pins: nextPins, result: "pinned" };
+}
+
+// Only the pinned values are kept on this device (the person chose them on purpose); the recent ones are forgotten when the page is closed.
+export const PINNED_KEY = "clipbox.pinned-values.v1";
+export function parsePinned(raw: string | null): PinnedValues {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const pins: PinnedValues = {};
+    for (const [name, list] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(list)) continue;
+      const values = Array.from(new Set(list.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "" && entry.length <= 200).map((entry) => entry.trim()))).slice(0, MEMORY_SIZE);
+      if (values.length > 0) pins[name] = values;
+    }
+    return pins;
+  } catch { return {}; }
+}

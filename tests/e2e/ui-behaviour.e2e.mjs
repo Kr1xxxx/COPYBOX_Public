@@ -54,10 +54,16 @@ test.describe("snippet list", () => {
     expect(await button.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
 
     await plain.nth(3).locator(".row-main").click();
-    const primary = page.locator(".native-row.selected").locator(".primary-button", { hasText: /^复制$/ }).first();
+    const primary = page.locator(".native-row.selected").locator(".primary-button.copy-main").first();
     await expect(primary).toBeVisible();
+    const before = await primary.boundingBox();
     await primary.click();
-    await expect(page.locator(".native-row.selected").locator(".primary-button", { hasText: "已复制" }).first()).toBeVisible();
+    await expect(primary).toHaveAttribute("data-copied", "");
+    await expect(primary).toHaveAccessibleName("已复制");
+    // the button keeps its size once the copy worked
+    const after = await primary.boundingBox();
+    expect(after.width).toBeCloseTo(before.width, 0);
+    expect(after.height).toBeCloseTo(before.height, 0);
   });
 
   test("the card marker is a small round drag handle that can be focused", async ({ page }) => {
