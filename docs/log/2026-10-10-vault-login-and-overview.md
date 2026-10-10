@@ -25,3 +25,7 @@
 ## Patch 8: payment entries in 全部
 - What changed: a bank 收款 entry no longer becomes its own "site" named after the first word of its title; all of them share one 收款信息 group (PayPal, Wise and other known names still go to their site).
 - User-visible change: 全部 → 按网站 shows one 收款信息 group instead of one group per bank entry.
+
+## Patch 9: 恢复码, old 秘密 in 全部, 改归类
+- What changed: new 恢复码 type and tab; 全部 lists the old 秘密 entries sorted by content (unknown → 其他 / 其他网站); 改归类 lets the type (old 秘密) and website be chosen by hand, saved as a `mark` item (encrypted, in backups). Old 秘密 data is untouched.
+- User-visible change: 保险箱 gets a 恢复码 tab; 全部 shows the old 秘密 too, each with a 改归类 button.

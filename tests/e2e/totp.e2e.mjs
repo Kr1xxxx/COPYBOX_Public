@@ -107,10 +107,9 @@ test("Mac: a QR picture fills in the link; unreadable pictures say so", async ({
 
 test("Mac: copying a code with few seconds left says so", async ({ page }) => {
   await page.addInitScript(() => {
-    const real = Date.now.bind(Date);
-    // Pin the clock to 27 s into a 30 s period so only 3 s are left.
-    const offset = (Math.floor(real() / 30000) * 30000 + 27000) - real();
-    Date.now = () => real() + offset;
+    // Freeze the clock 27 s into a 30 s period so exactly 3 s are left, however slow the page is to load.
+    const frozen = Math.floor(Date.now() / 30000) * 30000 + 27000;
+    Date.now = () => frozen;
   });
   await open(page, "darwin");
   await tapVersion(page);

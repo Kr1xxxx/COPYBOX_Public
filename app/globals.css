@@ -996,6 +996,11 @@ button { -webkit-tap-highlight-color: transparent; }
 .vault-entry:hover{background:var(--hover)}
 .vault-entry:active{scale:.98}
 .vault-entry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vault-entry-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
+.vault-sort{font-size:12px;white-space:nowrap}
+.vault-sort-form{grid-column:1 / -1;display:grid;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.vault-sort-form label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.vault-sort-form select,.vault-sort-form input{font:inherit;font-size:13px;min-height:34px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .vault-type-chip{flex:none;min-width:40px;padding:2px 6px;border-radius:999px;background:var(--hover);color:var(--muted);font-size:10.5px;font-weight:600;text-align:center}
 .login-pass-row{display:flex;gap:8px}
 .login-pass-row input{flex:1;min-width:0}

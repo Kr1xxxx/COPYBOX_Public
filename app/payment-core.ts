@@ -63,6 +63,30 @@ export type LoginItem = {
   updatedAt: number;
 };
 
+// Backup codes a site gives out once ("恢复码"): one text with a code per line.
+export type RecoveryItem = {
+  id: string;
+  type: "recovery";
+  name: string;
+  // Website or service, free text ("Google", "shopify.com"); the badge and the grouping follow it.
+  site: string;
+  codes: string[];
+  note: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Lock's own sorting of an entry in 全部: another type (only for old 秘密) and/or another website. Not shown in any list.
+export type MarkItem = {
+  id: string;
+  type: "mark";
+  // "legacy:<id>" for an old 秘密 entry, "<type>:<id>" for a 保险箱 entry.
+  target: string;
+  as?: "login" | "payment" | "apikey" | "totp" | "recovery" | "other";
+  site?: string;
+  updatedAt: number;
+};
+
 export type ApiKeyItem = {
   id: string;
   type: "apikey";

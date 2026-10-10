@@ -1,13 +1,13 @@
 // Encrypted store for the typed items of the hidden 保险箱 (Mac only): 收款信息 now, 账号密码 and API 密钥 later.
 // A separate AES-GCM envelope in its own localStorage key. The 验证码 accounts keep their own key (`clipbox.totp.v1`,
 // totp-store.ts) and are not touched, so older data stays readable without any migration.
-import type { ApiKeyItem, LoginItem, PaymentItem } from "./payment-core.ts";
+import type { ApiKeyItem, LoginItem, MarkItem, PaymentItem, RecoveryItem } from "./payment-core.ts";
 
 export const SECRET_ITEMS_KEY = "clipbox.vault-items.v1";
 const ITERATIONS = 310_000;
 const LABEL = new TextEncoder().encode("clipbox-vault-items:items");
 
-export type VaultItem = PaymentItem | LoginItem | ApiKeyItem;
+export type VaultItem = PaymentItem | LoginItem | ApiKeyItem | RecoveryItem | MarkItem;
 
 type Envelope = { version: 1; salt: string; iv: string; ciphertext: string; iterations: number };
 
