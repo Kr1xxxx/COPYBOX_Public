@@ -447,7 +447,7 @@ function thumbSetup(makeThumb) {
 const smallBytes = Uint8Array.from([9, 8, 7, 6, 5, 4, 3, 2, 1, 77, 78, 79]);
 const makeSmall = async () => new Blob([smallBytes], { type: "image/webp" });
 
-test("getThumb makes the thumbnail once, keeps it encrypted, and later reads do not touch the original", async () => {
+test("getThumb makes the thumbnail once, keeps it as plain bytes (not encrypted), and later reads do not touch the original", async () => {
   const { open, calls, thumbRows, blobRows } = thumbSetup(makeSmall);
   const store = await open();
   await store.add(pngBlob(), "图", null);
@@ -459,7 +459,8 @@ test("getThumb makes the thumbnail once, keeps it encrypted, and later reads do 
   assert.equal(calls.made, 1);
   const stored = thumbRows().get("img-1");
   assert.ok(stored, "the thumbnail is stored");
-  assert.ok(!Array.from(new Uint8Array(stored.ciphertext)).join(",").includes(Array.from(smallBytes).join(",")), "stored encrypted, not as plain bytes");
+  assert.deepEqual(Array.from(new Uint8Array(stored.bytes)), Array.from(smallBytes), "stored as plain bytes, readable without the key");
+  assert.equal(stored.ciphertext, undefined);
 
   const second = await store.getThumb("img-1");
   assert.deepEqual(Array.from(new Uint8Array(await second.arrayBuffer())), Array.from(smallBytes));
@@ -497,11 +498,23 @@ test("remove also deletes the thumbnail, and a thumbnail that cannot be read is 
   await store.add(pngBlob(), "图", null);
   await store.getThumb("img-1");
   // Corrupt the stored thumbnail: it is replaced by a fresh one instead of failing.
-  const row = thumbRows().get("img-1");
-  thumbRows().set("img-1", { ...row, ciphertext: new Uint8Array(row.ciphertext.byteLength).buffer });
+  thumbRows().set("img-1", { id: "img-1", bytes: new ArrayBuffer(0), type: "image/webp" });
   const repaired = await store.getThumb("img-1");
   assert.equal(repaired.type, "image/webp");
   assert.equal(calls.made, 2);
   await store.remove("img-1");
   assert.equal(thumbRows().has("img-1"), false);
+});
+
+test("an encrypted thumbnail row from the first version is ignored and replaced, never shown broken", async () => {
+  const { open, calls, thumbRows } = thumbSetup(makeSmall);
+  const store = await open();
+  await store.add(pngBlob(), "图", null);
+  await store.getThumb("img-1");
+  thumbRows().set("img-1", { id: "img-1", iv: "AAAA", ciphertext: new Uint8Array([1, 2, 3, 4]).buffer, type: "image/webp" });
+  const fresh = await store.getThumb("img-1");
+  assert.deepEqual(Array.from(new Uint8Array(await fresh.arrayBuffer())), Array.from(smallBytes));
+  assert.equal(calls.made, 2);
+  const row = thumbRows().get("img-1");
+  assert.ok(row.bytes && row.ciphertext === undefined, "the old row is replaced by a plain one");
 });
