@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { motionTokens } from "./arc/motion-tokens";
 import { AiSettingsSection } from "./ai-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
+
+// The groups of the left column. Each section below carries the id of the group it belongs to.
+const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number][0];
 
 function backupAgeLabel(at: number) {
   if (!at) return "还没有导出过";
@@ -32,6 +38,17 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
   sharedLibrary: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [tab, setTab] = useState<SettingsTab>("look");
+  const reducedMotion = useReducedMotion() ?? false;
+  function onTabKey(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = SETTINGS_TABS.findIndex(([id]) => id === tab);
+    const next = SETTINGS_TABS[(index + step + SETTINGS_TABS.length) % SETTINGS_TABS.length][0];
+    setTab(next);
+    document.getElementById(`settings-tab-${next}`)?.focus();
+  }
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [versionCopied, setVersionCopied] = useState(false);
   // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
@@ -66,14 +83,26 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
     <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <header><h2 id="settings-title">设置</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">×</button></header>
-        <div className="settings-body">
-          <section aria-labelledby="set-look"><h3 id="set-look">外观</h3>
+        <div className="settings-layout">
+        <div className="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="设置分类">
+          {SETTINGS_TABS.map(([id, label]) => (
+            <button key={id} id={`settings-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls="settings-panel" tabIndex={tab === id ? 0 : -1} onKeyDown={onTabKey} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>
+              {tab === id && <motion.span className="settings-tab-pill" layoutId="settings-tab-pill" transition={reducedMotion ? { duration: 0 } : motionTokens.spring.snappy} />}
+              <span className="settings-tab-label">{label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="settings-body" id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
+          <section aria-labelledby="set-look" hidden={tab !== "look"}><h3 id="set-look">外观</h3>
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
                 options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
             </div>
           </section>
-          <section aria-labelledby="set-data"><h3 id="set-data">数据</h3>
+          <section aria-labelledby="set-folders" hidden={tab !== "folders"}><h3 id="set-folders">目录</h3>
+            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
+          </section>
+          <section aria-labelledby="set-data" hidden={tab !== "data"}><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {!PLAIN_NOTES && row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
             {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
@@ -83,13 +112,7 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
               ? row("数据位置", "在文件夹中打开 Clipbox 的本机数据", onOpenDataFolder, "打开文件夹")
               : <div className="settings-row static"><div><strong>数据位置</strong><small>浏览器版保存在本站点的本地存储里，清除站点数据会一并删除</small></div></div>}
           </section>
-          <section aria-labelledby="set-folders"><h3 id="set-folders">目录</h3>
-            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
-          </section>
-          <section aria-labelledby="set-security"><h3 id="set-security">安全</h3>
-            <p className="settings-note">条目使用 AES-GCM 加密保存在本机，密钥由设备密钥与 PBKDF2 派生。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
-          </section>
-          <section aria-labelledby="set-trash"><h3 id="set-trash">回收站</h3>
+          <section aria-labelledby="set-trash" hidden={tab !== "data"}><h3 id="set-trash">回收站</h3>
             <div className="settings-row"><div><strong>自动清理</strong><small>超过期限的已删除内容会被永久删除</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="回收站自动清理" value={String(trashDays)} onSelect={(value) => onTrashDays(Number(value))}
                 options={TRASH_DAY_OPTIONS.map((days) => ({ value: String(days), label: days === 0 ? "不清理" : `${days} 天` }))} />
@@ -100,7 +123,10 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
                 : <button type="button" className="secondary-button" disabled={trashCount === 0} onClick={() => setConfirmEmpty(true)}>清空…</button>}
             </div>
           </section>
-          <section aria-labelledby="set-window"><h3 id="set-window">窗口</h3>
+          <section aria-labelledby="set-security" hidden={tab !== "data"}><h3 id="set-security">安全</h3>
+            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
+          </section>
+          <section aria-labelledby="set-window" hidden={tab !== "window"}><h3 id="set-window">窗口</h3>
             {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}
             <div className="settings-row"><div><strong>迷你窗口复制后</strong><small>{isDesktop ? "选择复制后是否自动收起迷你窗口" : "仅桌面版生效"}</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="迷你窗口复制后" value={miniHidePolicy} onSelect={(value) => onMiniHidePolicy(value as MiniHidePolicy)}
@@ -117,16 +143,17 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
             </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
           </section>
-          <section aria-labelledby="set-shared"><h3 id="set-shared">共享话术</h3>
+          <section aria-labelledby="set-shared" hidden={tab !== "data"}><h3 id="set-shared">共享话术</h3>
             {sharedLibrary}
           </section>
-          <section aria-labelledby="set-ai"><h3 id="set-ai">AI</h3>
+          <section aria-labelledby="set-ai" hidden={tab !== "ai"}><h3 id="set-ai">AI</h3>
             <AiSettingsSection localAiAvailable={aiAvailable} />
           </section>
-          <section aria-labelledby="set-about"><h3 id="set-about">关于</h3>
+          <section aria-labelledby="set-about" hidden={tab !== "about"}><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong role="presentation" onClick={tapVersion}>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipbox ${version || "dev"} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
           </section>
+        </div>
         </div>
       </section>
     </div>
