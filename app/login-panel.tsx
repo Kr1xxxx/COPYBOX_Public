@@ -6,6 +6,7 @@ import type { LoginItem } from "./payment-core";
 import { generatePassword, hasEdgeSpace } from "./password-core";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
+import { useSiteIconScan } from "./site-icons-context";
 import { detectSite, isPlausibleUrl, normalizeUrl } from "./site-core";
 import { accountTitle, generateTotp, formatCode, type TotpAccount } from "./totp-core";
 import { openTotpStore } from "./totp-store";
@@ -41,6 +42,7 @@ function LinkedCode({ account, onCopy }: { account: TotpAccount; onCopy: (code: 
 // 账号密码 in the hidden 保险箱. The password is hidden until the eye button is held; each field copies on its own.
 export function LoginPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
+  const scanSiteIcons = useSiteIconScan();
   const [items, setItems] = useState<LoginItem[] | null>(null);
   const [totps, setTotps] = useState<TotpAccount[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -115,6 +117,7 @@ export function LoginPanel({ deviceKey, onToast, focusId }: { deviceKey: string;
       setItems(list.filter((entry): entry is LoginItem => entry.type === "login"));
       setOpenId(item.id);
       setDraft(null);
+      scanSiteIcons();
     } catch (error) {
       setErrors({ name: error instanceof Error ? error.message : "保存失败，请重试" });
     }

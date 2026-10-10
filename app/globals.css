@@ -1003,6 +1003,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .pay-warn{color:var(--danger);font-size:11.5px}
 .totp-form select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:13px}
 .pay-head .site-badge{margin-right:0}
+.site-badge-fetched{background:#fff;overflow:hidden}
+.site-badge-fetched img{display:block;object-fit:contain;border-radius:3px}
 @media (prefers-reduced-motion: reduce){.vault-panel{animation:none}.vault-entry{transition:none}.vault-entry:active{scale:1}}
 
 /* API 密钥 */

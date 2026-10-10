@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   aiClear: () => ipcRenderer.invoke("clipbox:ai-clear"),
   aiRequest: (payload) => ipcRenderer.invoke("clipbox:ai-request", payload),
   fetchSharedLibrary: (url) => ipcRenderer.invoke("clipbox:fetch-shared-library", url),
+  fetchSiteIcon: (host) => ipcRenderer.invoke("clipbox:fetch-site-icon", host),
   relaunch: () => ipcRenderer.send("clipbox:relaunch"),
   onFocusSearch: (callback) => {
     const listener = () => callback();

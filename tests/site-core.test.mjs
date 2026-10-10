@@ -69,3 +69,14 @@ test("API key helpers: cleaning, inner spaces, last four, expiry states", async 
   assert.deepEqual(expiryState("2026-10-18", now), { kind: "ok", text: "2026-10-18 到期" });
   assert.deepEqual(expiryState("2026-10-08", now), { kind: "expired", text: "已过期 2 天" });
 });
+
+test("new sites are recognised and every bundled glyph belongs to a known site", async () => {
+  const { SITE_ICONS } = await import("../app/site-icons.ts");
+  assert.equal(detectSite({ url: "https://www.tiktok.com/login" }).key, "tiktok");
+  assert.equal(detectSite({ name: "淘宝" }).key, "taobao");
+  assert.equal(detectSite({ url: "https://dash.cloudflare.com" }).key, "cloudflare");
+  for (const key of Object.keys(SITE_ICONS)) {
+    assert.ok(/^#[0-9a-f]{6}$/i.test(SITE_ICONS[key].hex), key);
+    assert.notEqual(detectSite({ name: key }).key.startsWith("name:"), true, `${key} is not a known site`);
+  }
+});

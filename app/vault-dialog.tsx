@@ -5,6 +5,7 @@ import { ArcSegmented } from "./arc/segmented";
 import { ApiKeyPanel } from "./apikey-panel";
 import { LoginPanel } from "./login-panel";
 import { PaymentPanel } from "./payment-panel";
+import { SiteIconsProvider } from "./site-icons-context";
 import { TotpPanel } from "./totp-dialog";
 import { VaultOverview, type VaultTab } from "./vault-overview";
 
@@ -36,6 +37,7 @@ export function VaultDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey
   }
 
   return (
+    <SiteIconsProvider deviceKey={deviceKey}>
     <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="settings-dialog totp-dialog vault-dialog" role="dialog" aria-modal="true" aria-labelledby="vault-title">
         <header><h2 id="vault-title">保险箱</h2><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭保险箱">×</button></header>
@@ -50,7 +52,7 @@ export function VaultDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey
             {tab === "totp" && <TotpPanel deviceKey={deviceKey} onToast={onToast} />}
           </div>
           <div className="totp-actions vault-foot">
-            <p className="settings-note">用本机密钥加密保存，不进备份文件。隐藏入口后，在设置里连点版本号 5 次可重新打开。</p>
+            <p className="settings-note">用本机密钥加密保存；导出「秘密备份」时会一起加密带上。隐藏入口后，在设置里连点版本号 5 次可重新打开。</p>
             {confirmHide
               ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmHide(false)}>取消</button><button type="button" className="secondary-button" onClick={onHide}>确认隐藏</button></span>
               : <button type="button" className="secondary-button" onClick={() => setConfirmHide(true)} title="隐藏后入口消失；内容仍保存在本机">隐藏入口</button>}
@@ -58,5 +60,6 @@ export function VaultDialog({ deviceKey, onClose, onHide, onToast }: { deviceKey
         </div>
       </section>
     </div>
+    </SiteIconsProvider>
   );
 }

@@ -13,3 +13,7 @@
 ## Patch 5: 保险箱 in the 秘密 backup
 - What changed: the 秘密 backup file now also holds the 验证码 accounts and the typed items, as an extra encrypted block (`app/vault-backup.ts`); restoring brings them back (合并 or 覆盖). Old backups without the block import as before.
 - User-visible change: 导出秘密备份 on Mac now also saves 保险箱 content; 导入备份 restores it.
+
+## Patch 6: real site icons
+- What changed: about 30 bundled brand icons plus a once-only fetch of the site's own favicon, cached encrypted (D-031); new `desktop/site-icon.cjs` and one IPC call.
+- User-visible change: 保险箱 entries show the site's real icon in front; sites without one keep the coloured initial.

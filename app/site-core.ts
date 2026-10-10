@@ -1,5 +1,5 @@
 // Which website or service a 保险箱 entry belongs to, and how its round badge looks (Mac only). Pure functions.
-// No network here: the badge is a coloured circle with the site's initial; a real icon can be added later (kept on this device).
+// No network here: the badge is a coloured circle with the site's initial, or the bundled brand glyph when we have one (site-icons.ts).
 
 export type Site = { key: string; name: string; color: string; letter: string };
 
@@ -22,6 +22,25 @@ const KNOWN: KnownSite[] = [
   { key: "microsoft", name: "Microsoft", color: "#00a4ef", letter: "M", domains: ["microsoft.com", "outlook.com", "office.com", "live.com"], names: ["microsoft", "outlook"] },
   { key: "stripe", name: "Stripe", color: "#635bff", letter: "S", domains: ["stripe.com"], names: ["stripe"], apiPrefixes: ["sk_live_", "sk_test_", "pk_live_", "pk_test_", "rk_live_"] },
   { key: "slack", name: "Slack", color: "#4a154b", letter: "S", domains: ["slack.com"], names: ["slack"], apiPrefixes: ["xoxb-", "xoxp-", "xapp-"] },
+  { key: "tiktok", name: "TikTok", color: "#000000", letter: "T", domains: ["tiktok.com"], names: ["tiktok", "抖音"] },
+  { key: "ebay", name: "eBay", color: "#E53238", letter: "e", domains: ["ebay.com", "ebay.co.uk"], names: ["ebay"] },
+  { key: "etsy", name: "Etsy", color: "#F16521", letter: "E", domains: ["etsy.com"], names: ["etsy"] },
+  { key: "alipay", name: "支付宝", color: "#1677FF", letter: "支", domains: ["alipay.com"], names: ["alipay", "支付宝"] },
+  { key: "wechat", name: "微信", color: "#07C160", letter: "微", domains: ["wechat.com", "weixin.qq.com", "wx.qq.com"], names: ["wechat", "微信"] },
+  { key: "taobao", name: "淘宝", color: "#E94F20", letter: "淘", domains: ["taobao.com", "tmall.com"], names: ["taobao", "淘宝", "天猫"] },
+  { key: "cloudflare", name: "Cloudflare", color: "#F38020", letter: "C", domains: ["cloudflare.com"], names: ["cloudflare"] },
+  { key: "godaddy", name: "GoDaddy", color: "#1BDBDB", letter: "G", domains: ["godaddy.com"], names: ["godaddy"] },
+  { key: "namecheap", name: "Namecheap", color: "#DE3723", letter: "N", domains: ["namecheap.com"], names: ["namecheap"] },
+  { key: "mailchimp", name: "Mailchimp", color: "#FFE01B", letter: "M", domains: ["mailchimp.com"], names: ["mailchimp"] },
+  { key: "notion", name: "Notion", color: "#000000", letter: "N", domains: ["notion.so", "notion.com"], names: ["notion"] },
+  { key: "dropbox", name: "Dropbox", color: "#0061FF", letter: "D", domains: ["dropbox.com"], names: ["dropbox"] },
+  { key: "apple", name: "Apple", color: "#000000", letter: "A", domains: ["apple.com", "icloud.com"], names: ["apple", "icloud"] },
+  { key: "shopee", name: "Shopee", color: "#EE4D2D", letter: "S", domains: ["shopee.com", "shopee.sg", "shopee.tw"], names: ["shopee", "虾皮", "蝦皮"] },
+  { key: "zoho", name: "Zoho", color: "#E42527", letter: "Z", domains: ["zoho.com"], names: ["zoho"] },
+  { key: "telegram", name: "Telegram", color: "#26A5E4", letter: "T", domains: ["telegram.org", "t.me"], names: ["telegram"] },
+  { key: "discord", name: "Discord", color: "#5865F2", letter: "D", domains: ["discord.com"], names: ["discord"] },
+  { key: "reddit", name: "Reddit", color: "#FF4500", letter: "R", domains: ["reddit.com"], names: ["reddit"] },
+  { key: "pinterest", name: "Pinterest", color: "#BD081C", letter: "P", domains: ["pinterest.com"], names: ["pinterest"] },
 ];
 
 // Domains with a two-part public suffix, so "shop.example.co.uk" is grouped as "example.co.uk".
