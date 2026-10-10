@@ -31,6 +31,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-020 | 图片 grid is 16宫格 (4 per row), whole picture in the thumbnail, 6% margin on frosted glass | Accepted |
 | D-021 | Motion follows arc-library (components vendored into `app/arc/`, `motion` added) | Accepted |
 | D-022 | Trash auto-cleanup defaults to 7 days for everyone | Accepted |
+| D-023 | Version update reminder: tells, never installs; source address not chosen yet | Accepted |
 | D-024 | 图片 thumbnails: small copies kept in their own database, NOT encrypted (owner, 2026-10-10) | Accepted |
 
 ---
@@ -185,6 +186,18 @@ Statuses: Accepted / Superseded / Deprecated.
 - Consequences: CSS and `IMAGE_GRID_COLUMNS` only; no
   stored image data changes. Tests that expected 3 columns or a cropped thumbnail (`cover`) now expect 4 columns and
   `contain`, because the owner changed the behaviour.
+
+### D-023 Version update reminder (2026-10-09)
+- Context (owner): "版本更新提醒做一下". Employees on an old build never get fixes (D-013: no auto-update).
+- Decision: on launch and then once a day the desktop app reads a small JSON file `{"version","notes","url"}` from an
+  address set in `desktop/update-config.cjs` (or env `CLIPBOX_UPDATE_URL`). If it names a newer version, the full window
+  shows a top banner: version, short notes, `下载` (opens the https link in the browser) and `稍后` (hides that version
+  only, `localStorage` key `clipbox.update-dismissed`). Nothing is downloaded or installed by the app, and the page
+  cannot pass its own link: the main process opens only the link it read itself.
+- The address is empty for now (owner: 先不定), so the check is off and nothing is sent anywhere. The repo is private,
+  so GitHub Releases cannot serve employees without a token; pick a shared link or share drive before turning it on.
+- Consequences: D-013 still holds (no code signing, no auto-install). Publishing the JSON and installer is a release
+  to employees and waits for the owner.
 ### D-021 Motion follows arc-library (2026-10-09)
 - Context (owner): "动效优先使用 https://github.com/kuratlielia/arc-library.git 中的 UI 组件"; asked which parts could be replaced and chose
   "全面换" (replace everything that can be) on the decision card.
