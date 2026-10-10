@@ -163,7 +163,10 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   await expect(page.getByText("已取消固定「Amanda」")).toBeVisible();
   // the ? at the right edge of the block
   await row.locator(".var-help").first().click();
-  await expect(page.getByText("最多记 3 个值")).toBeVisible();
+  const hint = page.locator(".toast-line", { hasText: "固定的不会被新值顶掉" });
+  await expect(hint).toBeVisible();
+  // the whole sentence shows, nothing is cut off by an ellipsis
+  expect(await hint.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {

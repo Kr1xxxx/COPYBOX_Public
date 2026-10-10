@@ -874,6 +874,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .copy-main-label > span:last-child, .copy-main[data-copied] .copy-main-label > span:first-child { opacity: 0; }
 .copy-main[data-copied] .copy-main-label > span:last-child { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .copy-main-icon .icon, .copy-main-label > span, .copy-main .copy-tick path { transition: none !important; } }
+
 /* 验证码 (hidden, Mac only) */
 .totp-dialog{width:min(440px,100%)}
 .totp-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}

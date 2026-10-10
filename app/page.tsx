@@ -828,7 +828,7 @@ export default function Home() {
     window.setTimeout(() => setToast(""), 2400);
   }
   function showVariableHelp() {
-    setToast("每个变量块最多记 3 个值。右键变量块可以固定当前值，固定的不会被新值顶掉。");
+    setToast("最多记 3 个值，右键固定，固定的不会被新值顶掉");
     window.setTimeout(() => setToast(""), 4200);
   }
 
