@@ -9,7 +9,15 @@ import { fileURLToPath } from "node:url";
 const LOG_ENTRY = /^docs\/log\/\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*\.md$/;
 const PREVIEW_OWNED = ["tools/preview/VERSION", "tools/preview/changelog.json"];
 
-const NOTE_SAYS_WHAT = /^- What changed: \S.{9,}/m;
+// The line must carry real text: not the template placeholder (<1–3 sentences>), not tbd/todo/n/a, and at least
+// 4 characters (a short Chinese sentence is fine).
+export function noteSaysWhat(text) {
+  const match = /^- What changed:[ \t]*(\S.*)$/m.exec(text);
+  if (!match) return false;
+  const said = match[1].trim();
+  if (/<[^>]*>/.test(said) || /^(tbd|todo|n\/a|none|-|\.+|…+)$/i.test(said)) return false;
+  return [...said].length >= 4;
+}
 
 /**
  * @param {{ file: string, status: string }[]} changes name-status entries of the PR
@@ -18,7 +26,7 @@ const NOTE_SAYS_WHAT = /^- What changed: \S.{9,}/m;
 export function checkHandoff(changes, { readFile = () => "", labels = [] } = {}) {
   const files = changes.map((change) => change.file);
   const touchesApp = files.some((file) => /^(app|desktop)\//.test(file) || file === "package.json");
-  const addedLog = changes.some((change) => change.status === "A" && LOG_ENTRY.test(change.file) && NOTE_SAYS_WHAT.test(readFile(change.file)));
+  const addedLog = changes.some((change) => change.status === "A" && LOG_ENTRY.test(change.file) && noteSaysWhat(readFile(change.file)));
   const updatedHandoff = files.includes("docs/HANDOFF.md");
   const previewFiles = files.filter((file) => PREVIEW_OWNED.includes(file));
   const previewAllowed = labels.includes("preview-publisher");

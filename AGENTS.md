@@ -101,7 +101,7 @@ Files that every PR used to edit made parallel PRs conflict. The rule now: **a P
 - `tools/preview/VERSION` and `tools/preview/changelog.json` belong to the preview publisher (the 【話術】 thread)
   alone. Feature PRs never bump the version or edit the changelog; write the "User-visible change" line in your
   `docs/log/` note and the publisher turns it into a changelog entry. CI fails a PR that edits these files unless it
-  carries the label `preview-publisher` (only the publisher adds it).
+  carries the label `preview-publisher` (only the publisher adds it; GitHub cannot stop another agent from adding it, so this is an agreed rule, not a lock).
 - Handoff notes: one new file per PR in `docs/log/`. Decisions: one new file per decision in `docs/decisions/`.
   `docs/HANDOFF.md`, `docs/handoff-log.md` and the `docs/DECISIONS.md` table are not edited by feature PRs.
 - `docs/HANDOFF.md` (status) and `docs/ROADMAP.md` are updated only by the coordinator.

@@ -16,7 +16,7 @@ test("an app change needs a new docs/log note that says what changed, or the old
 });
 
 test("an empty or placeholder note does not count", () => {
-  for (const content of ["", "# Title\n", "- What changed:\n", "- What changed: tbd\n"]) {
+  for (const content of ["", "# Title\n", "- What changed:\n", "- What changed: tbd\n", "- What changed: <1–3 sentences>\n", "- What changed: <改了什么，一两句话>\n", "- What changed: todo\n"]) {
     assert.equal(checkHandoff([mod("app/page.tsx"), add("docs/log/2026-10-09-grid.md")], { readFile: () => content }).ok, false, JSON.stringify(content));
   }
 });
@@ -59,4 +59,9 @@ test("log notes are named YYYY-MM-DD-short-name.md", () => {
     if (name === "README.md") continue;
     assert.match(name, /^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*\.md$/);
   }
+});
+
+test("a short Chinese note line counts", () => {
+  const readFile = () => "- What changed: 修好了搜索\n";
+  assert.equal(checkHandoff([mod("app/page.tsx"), add("docs/log/2026-10-09-search.md")], { readFile }).ok, true);
 });
