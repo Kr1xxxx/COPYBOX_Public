@@ -1,5 +1,4 @@
 // Stands in for Electron's preload: gives the page the same window.clipboxDesktop object.
-// The command line (Mac) comes in a later step; its calls are quiet no-ops until then.
 (function () {
   var tauri = window.__TAURI__;
   var platform = "__PLATFORM__";
@@ -33,9 +32,17 @@
         .then(function (off) { if (stopped) off(); else unlisten = off; });
       return function () { stopped = true; if (unlisten) unlisten(); };
     },
-    onAutomationCommand: function () { return noop; },
-    respondAutomationCommand: noop,
-    automationReady: noop,
+    onAutomationCommand: function (callback) {
+      var stopped = false;
+      var unlisten = null;
+      tauri.event.listen("clipbox:automation-command", function (event) { if (!stopped) callback(event.payload); })
+        .then(function (off) { if (stopped) off(); else unlisten = off; });
+      return function () { stopped = true; if (unlisten) unlisten(); };
+    },
+    respondAutomationCommand: function (requestId, response) {
+      fireAndForget("automation_response", { requestId: requestId, response: response });
+    },
+    automationReady: function () { fireAndForget("automation_ready"); },
     setWindowMode: function (mode) { fireAndForget("set_window_mode", { mode: mode === "mini" ? "mini" : "full" }); },
     onWindowMode: function (callback) {
       var stopped = false;
