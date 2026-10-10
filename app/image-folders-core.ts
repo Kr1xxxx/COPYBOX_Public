@@ -9,6 +9,7 @@ export type ImageFilter = string;
 
 export const IMAGE_FILTER_ALL: ImageFilter = "all";
 export const IMAGE_FILTER_UNCATEGORIZED: ImageFilter = "uncategorized";
+export const IMAGE_FILTER_PINNED: ImageFilter = "pinned";
 const FOLDER_PREFIX = "folder:";
 
 export function imageFolderFilter(name: string): ImageFilter {
@@ -23,7 +24,7 @@ export function folderOfImageFilter(filter: ImageFilter): string | null {
 // A folder that no longer exists (renamed or deleted elsewhere) falls back to 全部图片.
 export function resolveImageFilter(filter: ImageFilter, folders: readonly ImageFolder[]): ImageFilter {
   const name = folderOfImageFilter(filter);
-  if (name === null) return filter === IMAGE_FILTER_UNCATEGORIZED ? filter : IMAGE_FILTER_ALL;
+  if (name === null) return filter === IMAGE_FILTER_UNCATEGORIZED || filter === IMAGE_FILTER_PINNED ? filter : IMAGE_FILTER_ALL;
   return folders.some((folder) => folder.name === name) ? filter : IMAGE_FILTER_ALL;
 }
 
@@ -34,9 +35,19 @@ function folderOf(meta: ImageMeta, names: ReadonlySet<string>): string | null {
 
 export function filterImagesByFolder(images: readonly ImageMeta[], filter: ImageFilter, folders: readonly ImageFolder[]): ImageMeta[] {
   if (filter === IMAGE_FILTER_ALL) return [...images];
+  if (filter === IMAGE_FILTER_PINNED) return images.filter((meta) => meta.pinned);
   const names = new Set(folders.map((folder) => folder.name));
   const wanted = folderOfImageFilter(filter);
   return images.filter((meta) => folderOf(meta, names) === wanted);
+}
+
+export function countPinnedImages(images: readonly ImageMeta[]): number {
+  return images.filter((meta) => meta.pinned).length;
+}
+
+// Like the 话术 list: favourites first, everything else keeps its order.
+export function pinnedFirst<T extends { pinned?: boolean }>(images: readonly T[]): T[] {
+  return images.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
 }
 
 export type ImageFolderCounts = { total: number; uncategorized: number; byFolder: Record<string, number> };
@@ -55,6 +66,7 @@ export function countImagesByFolder(images: readonly ImageMeta[], folders: reado
 
 export function imageFilterTitle(filter: ImageFilter): string {
   if (filter === IMAGE_FILTER_ALL) return "全部图片";
+  if (filter === IMAGE_FILTER_PINNED) return "收藏";
   return folderOfImageFilter(filter) ?? "未分类";
 }
 

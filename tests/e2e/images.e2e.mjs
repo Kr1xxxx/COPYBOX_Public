@@ -58,7 +58,7 @@ test("the empty 图片 page invites the first image and hides folders, trash and
   await expect(page.getByRole("button", { name: "新增第一张" })).toBeVisible();
   await expect(page.getByPlaceholder("搜索图片标题")).toBeVisible();
   await expect(page.locator(".sidebar .nav-item", { hasText: "全部图片" })).toBeVisible();
-  for (const hidden of ["回收站", "收藏", "最近", "新建目录"]) await expect(page.locator(".sidebar")).not.toContainText(hidden);
+  for (const hidden of ["回收站", "最近", "新建目录"]) await expect(page.locator(".sidebar")).not.toContainText(hidden);
   await expect(page.locator(".sidebar").getByRole("button", { name: "设置" })).toBeVisible();
 });
 

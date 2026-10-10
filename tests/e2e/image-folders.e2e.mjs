@@ -57,7 +57,7 @@ test("the 图片 sidebar lists 全部图片, 目录 with a + button, and 未分�
   await expect(navCount(page, "全部图片")).toHaveText("0");
   await expect(navCount(page, "未分类")).toHaveText("0");
   await expect(sidebar(page).getByRole("button", { name: "设置" })).toBeVisible();
-  for (const hidden of ["回收站", "收藏", "最近"]) await expect(sidebar(page)).not.toContainText(hidden);
+  for (const hidden of ["回收站", "最近"]) await expect(sidebar(page)).not.toContainText(hidden);
 });
 
 test("a new folder: Enter creates it, Esc cancels, empty and repeated names are refused", async ({ page }) => {
@@ -462,7 +462,7 @@ test("the mini window has a folder select next to the search box", async ({ brow
   await page.setViewportSize({ width: 360, height: 440 });
   const select = page.locator(".mini-folder select");
   await expect(select).toBeVisible();
-  await expect(select.locator("option")).toHaveText(["全部", "收款码", "价目表", "未分类"]);
+  await expect(select.locator("option")).toHaveText(["全部", "收藏", "收款码", "价目表", "未分类"]);
   await expect(page.locator(".mini-row")).toHaveCount(4);
   await expect(page.locator(".status-bar")).toContainText("4 张");
 
@@ -493,7 +493,7 @@ test("the 话术 mini window keeps its own folder select", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 440 });
   await expect(page.locator(".mini-folder select option")).toContainText(["全部", "收藏", "最近使用"]);
   await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
-  await expect(page.locator(".mini-folder select option")).toHaveText(["全部", "未分类"]);
+  await expect(page.locator(".mini-folder select option")).toHaveText(["全部", "收藏", "未分类"]);
 });
 
 test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep theirs", async ({ page }) => {

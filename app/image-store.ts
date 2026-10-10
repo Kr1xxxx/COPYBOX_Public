@@ -29,6 +29,8 @@ export type ImageMeta = {
   updatedAt: number;
   lastUsedAt?: number;
   folder?: string;
+  // 收藏. Optional on purpose: records saved before it existed simply do not have it (= not a favourite), so nothing is migrated.
+  pinned?: boolean;
 };
 
 export type ImageFolder = { name: string; color?: string };
@@ -39,10 +41,11 @@ export type ImageStore = {
   rename(id: string, title: string): Promise<ImageMeta>;
   remove(id: string): Promise<void>;
   getBlob(id: string): Promise<Blob>;
-  // A small copy for the grid and list; made from the original on first use, then kept (encrypted) for next time.
+  // A small copy for the grid and list; made from the original on first use, then kept for next time.
   getThumb(id: string): Promise<Blob>;
   markUsed(id: string): Promise<void>;
   moveImage(id: string, folder: string | null): Promise<ImageMeta>;
+  setPinned(id: string, pinned: boolean): Promise<ImageMeta>;
   listFolders(): Promise<ImageFolder[]>;
   createFolder(name: string): Promise<ImageFolder[]>;
   renameFolder(from: string, to: string): Promise<ImageFolder[]>;
@@ -425,6 +428,15 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       if (!folderName) delete moved.folder;
       await writeMeta(moved);
       return moved;
+    },
+
+    async setPinned(id, pinned) {
+      const meta = await readMeta(id);
+      const next: ImageMeta = { ...meta };
+      if (pinned) next.pinned = true;
+      else delete next.pinned;
+      await writeMeta(next);
+      return next;
     },
 
     listFolders: readFolders,

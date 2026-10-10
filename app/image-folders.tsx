@@ -6,8 +6,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArcMenu } from "./arc/menu";
+import { Icon } from "./ui-atoms";
 import {
   IMAGE_FILTER_ALL,
+  IMAGE_FILTER_PINNED,
+  countPinnedImages,
   IMAGE_FILTER_UNCATEGORIZED,
   countImagesByFolder,
   imageFolderColors,
@@ -60,6 +63,7 @@ export function ImageFolderSelect({ library }: { library: ImageLibrary }) {
       <span className="sr-only">目录</span>
       <select value={library.filter} onChange={(event) => library.setFilter(event.target.value)}>
         <option value={IMAGE_FILTER_ALL}>全部</option>
+        <option value={IMAGE_FILTER_PINNED}>收藏</option>
         {library.folders.map((folder) => <option key={folder.name} value={imageFolderFilter(folder.name)}>{folder.name}</option>)}
         <option value={IMAGE_FILTER_UNCATEGORIZED}>未分类</option>
       </select>
@@ -72,6 +76,7 @@ export function ImageFolderSelect({ library }: { library: ImageLibrary }) {
 export function ImageFolderNav({ library }: { library: ImageLibrary }) {
   const { folders, filter, setFilter } = library;
   const counts = useMemo(() => countImagesByFolder(library.images ?? [], folders), [library.images, folders]);
+  const pinnedCount = useMemo(() => countPinnedImages(library.images ?? []), [library.images]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ from: string; value: string } | null>(null);
@@ -188,6 +193,9 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
       <nav className="nav-list" aria-label="快捷入口">
         <button type="button" className={`nav-item image-all ${filter === IMAGE_FILTER_ALL ? "active" : ""}`} aria-current={filter === IMAGE_FILTER_ALL ? "page" : undefined} onClick={() => setFilter(IMAGE_FILTER_ALL)}>
           <span className="nav-icon"><GridGlyph /></span><span className="nav-label">全部图片</span><b>{counts.total}</b>
+        </button>
+        <button type="button" className={`nav-item image-pinned ${filter === IMAGE_FILTER_PINNED ? "active" : ""}`} aria-current={filter === IMAGE_FILTER_PINNED ? "page" : undefined} onClick={() => setFilter(IMAGE_FILTER_PINNED)}>
+          <span className="nav-icon"><Icon name="star" /></span><span className="nav-label">收藏</span><b>{pinnedCount}</b>
         </button>
       </nav>
       <div className="nav-heading">

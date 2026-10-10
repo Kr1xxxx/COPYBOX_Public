@@ -449,3 +449,36 @@ test("segmented controls keep one highlight pill that follows the selected optio
   await pillInActive(page.locator(".kind-switch"));
   await expect(page.locator(".kind-switch").getByRole("button", { name: "话术" })).toHaveAttribute("aria-pressed", "true");
 });
+
+test("收藏: star a picture, see it in the 收藏 list with the right count, favourites go first, and it survives a reload", async ({ page }) => {
+  await openImages(page);
+  await addSix(page);
+  const star = (title) => tile(page, title).locator(".image-tile-pin");
+  // Unstarred stars stay out of the picture's way until hover, like the copy button.
+  await page.mouse.move(2, 2);
+  await expect(star("图三")).toHaveCSS("opacity", "0");
+  await tile(page, "图三").locator(".image-tile-thumb").hover();
+  await expect(star("图三")).toHaveCSS("opacity", "1");
+  await star("图三").click();
+  await expect(star("图三")).toHaveAttribute("aria-pressed", "true");
+  await page.mouse.move(2, 2);
+  await expect(star("图三")).toHaveCSS("opacity", "1"); // a favourite keeps its star in view
+  await star("图五").click();
+
+  const entry = sidebar(page).locator(".nav-item", { hasText: "收藏" });
+  await expect(entry.locator("b")).toHaveText("2");
+  const titles = () => tiles(page).locator(".image-tile-title").allTextContents();
+  expect((await titles()).slice(0, 2).sort()).toEqual(["图三", "图五"]); // favourites first in 全部图片
+  await entry.click();
+  await expect(page.locator("h1")).toHaveText("收藏");
+  expect((await titles()).sort()).toEqual(["图三", "图五"]);
+
+  await page.reload();
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await expect(sidebar(page).locator(".nav-item", { hasText: "收藏" }).locator("b")).toHaveText("2");
+
+  // Unstarring from the list empties the 收藏 list with a plain message.
+  await sidebar(page).locator(".nav-item", { hasText: "收藏" }).click();
+  for (const title of ["图三", "图五"]) await star(title).click();
+  await expect(page.getByText("还没有收藏图片")).toBeVisible();
+});

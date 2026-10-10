@@ -44,6 +44,7 @@ export type ImageLibrary = {
   // The folder actions show their own toast. They return whether the change was made.
   // `onError` (Settings) receives the failure message instead of the toast, to show it next to the form.
   moveImage: (id: string, folder: string | null) => Promise<boolean>;
+  togglePinned: (id: string) => Promise<void>;
   createFolder: (name: string, onError?: (message: string) => void) => Promise<string | null>;
   renameFolder: (from: string, to: string, onError?: (message: string) => void) => Promise<string | null>;
   setFolderColor: (name: string, color: string, onError?: (message: string) => void) => Promise<boolean>;
@@ -115,6 +116,17 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     setImages((current) => current?.filter((meta) => meta.id !== id) ?? current);
   }
 
+  async function togglePinned(id: string) {
+    const current = images?.find((meta) => meta.id === id);
+    if (!current) return;
+    try {
+      const updated = await (await loadStore(deviceKey)).setPinned(id, !current.pinned);
+      setImages((list) => list?.map((meta) => meta.id === updated.id ? updated : meta) ?? list);
+    } catch (error) {
+      toast(readableMessage(error, "收藏保存失败，图片没有改动"));
+    }
+  }
+
   async function moveImage(id: string, folder: string | null) {
     try {
       const moved = await (await loadStore(deviceKey)).moveImage(id, folder);
@@ -179,5 +191,5 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, getThumb, markUsed, moveImage, createFolder, renameFolder, setFolderColor, deleteFolder };
+  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, getThumb, markUsed, moveImage, togglePinned, createFolder, renameFolder, setFolderColor, deleteFolder };
 }

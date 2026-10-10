@@ -439,3 +439,42 @@ test("the 新建目录 field keeps its whole border and placeholder inside the n
   const input = form.locator("input");
   expect(await input.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
+
+test("a folder can be dragged by the three-bar handle on its left, right in the sidebar, and Settings shows the same order", async ({ page }) => {
+  const names = () => page.locator(".sidebar .directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")));
+  for (const name of ["甲", "乙", "丙"]) {
+    await page.getByRole("button", { name: "新建目录" }).first().click();
+    await page.locator(".directory-new input").fill(name);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".sidebar .directory-row", { hasText: name })).toBeVisible();
+  }
+  const row = (name) => page.locator(".sidebar .directory-row", { hasText: name });
+  // Standard folders are fixed: no handle.
+  await expect(row("询盘接待").locator(".folder-drag-handle")).toHaveCount(0);
+
+  // The handle is on the far left, over the colour dot, and appears on hover.
+  await row("甲").hover();
+  const handle = row("甲").locator(".folder-drag-handle");
+  await expect(handle).toHaveCSS("opacity", "1");
+  const [h, label, rowBox] = await Promise.all([handle.boundingBox(), row("甲").locator(".directory-main").boundingBox(), row("甲").boundingBox()]);
+  expect(h.x - rowBox.x).toBeLessThanOrEqual(8);
+  expect(h.x + h.width).toBeLessThan(label.x + label.width / 2);
+  await expect(row("甲").locator(".directory-color-marker")).toHaveCSS("opacity", "0");
+
+  const before = await names();
+  const target = await row("丙").boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
+  await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await names()).indexOf("甲")).toBeGreaterThan(before.indexOf("甲"));
+  const after = await names();
+
+  // The same list lives in Settings.
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.locator(".settings-dialog").getByRole("tab", { name: "目录" }).click();
+  const group = page.locator(".settings-dialog .settings-folder-group").nth(0);
+  await group.getByRole("button", { name: /话术目录/ }).click();
+  expect(await group.locator(".settings-folder-name").allInnerTexts()).toEqual(after);
+});
