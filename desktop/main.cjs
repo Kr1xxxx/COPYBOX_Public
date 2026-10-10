@@ -312,6 +312,8 @@ function createWindow() {
     saveMiniPosition();
     if (!quitting) {
       if (closeBehavior === "quit") {
+        // Keep the window open until quitting has saved what is still waiting (see before-quit); quitting itself closes it.
+        event.preventDefault();
         quitting = true;
         app.quit();
         return;

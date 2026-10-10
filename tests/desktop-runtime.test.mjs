@@ -103,3 +103,8 @@ test("quitting, sleeping and relaunching ask the page to save first", () => {
   assert.match(preload, /onFlushRequest[\s\S]*clipbox:flush/);
   assert.match(preload, /flushDone: \(\) => ipcRenderer\.send\("clipbox:flush-done"\)/);
 });
+
+test("closing the window with 关闭＝退出 keeps it open until the pending save is done", () => {
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  assert.match(main, /closeBehavior === "quit"\) \{[\s\S]*?event\.preventDefault\(\);\s*quitting = true;\s*app\.quit\(\);/);
+});

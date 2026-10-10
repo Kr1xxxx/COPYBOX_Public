@@ -52,7 +52,7 @@ export async function pageHarness() {
   vm.createContext(c);
   const run = text => vm.runInContext(ts.transpileModule(text, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, c);
   for (const name of ['bytesToBase64', 'base64ToBytes', 'createDeviceKey', 'deriveKey', 'encryptVault', 'decryptVault', 'readLocalEncryptedVault', 'openVault', 'saveItem', 'submit']) run(functions.get(name));
-  for (const name of ['readVault', 'enqueueVaultTask', 'storeVault', 'commitVaultToMemory', 'writeVault', 'persist']) if (hooks.has(name)) run(`globalThis.${name} = ${hooks.get(name)}`);
+  for (const name of ['readVault', 'enqueueVaultTask', 'storeVault', 'commitVaultToMemory', 'writeVault', 'persist', 'persistLazy']) if (hooks.has(name)) run(`globalThis.${name} = ${hooks.get(name)}`);
   const clipboard = new URL('../../app/clipboard.ts', import.meta.url);
   if (fs.existsSync(clipboard)) run(fs.readFileSync(clipboard, 'utf8').replace(/^export /gm, ''));
   run(`(${automationEffect})()`);

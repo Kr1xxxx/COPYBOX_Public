@@ -26,3 +26,8 @@
   nothing from the shell except one optional contract on `window.clipboxDesktop`: `onFlushRequest(cb)` (shell asks the page to
   save, e.g. before quit or sleep) and `flushDone()` (page answers). The Electron pieces (`desktop/flush-request.cjs`,
   `ensureWindow` in `main.cjs`) are the minimum and are meant to be replaced by the Tauri shell.
+- After acceptance: the lazy path keeps `sharedSeen` (the company snippets already received, so a snippet an employee deleted is not added
+  again by the next sync) — `persistLazy` falls back to the vault's current value just like the immediate save; `tests/lazy-save-vault.test.mjs`
+  proves it survives a lazy pin and a following immediate save (and fails without the fix). With 关闭＝退出, closing the window now
+  waits (the window stays open) until quitting has saved what is waiting. The copy-colour check in `ui-behaviour.e2e.mjs` now retries
+  (`toHaveCSS`) because saving no longer blocks for ~300 ms, so the check used to land while the colour was still changing; same expected colour.
