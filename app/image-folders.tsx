@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArcMenu } from "./arc/menu";
 import { Icon } from "./ui-atoms";
+import { usePointerReorder } from "./use-pointer-reorder";
+import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import {
   IMAGE_FILTER_ALL,
   IMAGE_FILTER_PINNED,
@@ -78,6 +80,12 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
   const counts = useMemo(() => countImagesByFolder(library.images ?? [], folders), [library.images, folders]);
   const pinnedCount = useMemo(() => countPinnedImages(library.images ?? []), [library.images]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
+  const { prepareSortAnimation } = useSortFlipAnimation();
+  const reorder = usePointerReorder({
+    enabled: true,
+    scope: "image-folder",
+    onDrop: (source, target) => { prepareSortAnimation("image-folder"); void library.reorderFolder(source, target); },
+  });
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ from: string; value: string } | null>(null);
   const [menu, setMenu] = useState("");
@@ -159,7 +167,8 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
     const active = filter === imageFolderFilter(name);
     const isRenaming = renaming?.from === name;
     return (
-      <div key={name} className={`directory-row fixed ${active ? "active" : ""}`}>
+      <div key={name} data-sort-scope="image-folder" data-sort-id={name} className={`directory-row ${active ? "active" : ""} ${reorder.draggingId === name ? "dragging" : ""} ${reorder.overId === name && reorder.draggingId !== name ? "drag-over" : ""}`}>
+        {!isRenaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${name}`} title="按住拖动排序" onPointerDown={(event) => reorder.beginPointerDrag(event, name)}><Icon name="grip" /></button>}
         {isRenaming ? (
           <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(); }}>
             <i className="directory-color-marker" aria-hidden="true" style={{ background: colors[name] }} />

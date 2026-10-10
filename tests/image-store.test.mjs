@@ -542,3 +542,24 @@ test("收藏: setPinned keeps every other field, survives a new session, and rec
   const originalAfter = JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
   assert.equal(originalAfter, originalBefore, "the original image bytes are never touched");
 });
+
+test("reorderFolders moves a folder to another's place, keeps images and colours, and survives a new session", async () => {
+  const { open, rows } = setup();
+  const store = await open();
+  for (const name of ["甲", "乙", "丙"]) await store.createFolder(name);
+  await store.setFolderColor("乙", "#112233");
+  const image = await store.add(pngBlob(), "图", "丙");
+  const blobsBefore = JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+
+  assert.deepEqual((await store.reorderFolders("甲", "丙")).map((folder) => folder.name), ["乙", "丙", "甲"]);
+  assert.deepEqual((await store.reorderFolders("丙", "乙")).map((folder) => folder.name), ["丙", "乙", "甲"]);
+  assert.deepEqual((await store.reorderFolders("乙", "乙")).map((folder) => folder.name), ["丙", "乙", "甲"], "same folder is a no-op");
+
+  const again = await (await open()).listFolders();
+  assert.deepEqual(again.map((folder) => folder.name), ["丙", "乙", "甲"]);
+  assert.equal(again.find((folder) => folder.name === "乙").color, "#112233", "colours stay");
+  assert.equal((await (await open()).list()).find((entry) => entry.id === image.id).folder, "丙", "images keep their folder");
+  await assert.rejects(store.reorderFolders("没有", "甲"), { message: "找不到这个目录" });
+  await assert.rejects(store.reorderFolders("甲", "没有"), { message: "找不到这个目录" });
+  assert.equal(JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))])), blobsBefore, "image bytes untouched");
+});

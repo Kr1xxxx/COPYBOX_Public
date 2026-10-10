@@ -48,6 +48,7 @@ export type ImageLibrary = {
   createFolder: (name: string, onError?: (message: string) => void) => Promise<string | null>;
   renameFolder: (from: string, to: string, onError?: (message: string) => void) => Promise<string | null>;
   setFolderColor: (name: string, color: string, onError?: (message: string) => void) => Promise<boolean>;
+  reorderFolder: (source: string, target: string) => Promise<void>;
   deleteFolder: (name: string, onError?: (message: string) => void) => Promise<boolean>;
 };
 
@@ -167,6 +168,15 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
+  async function reorderFolder(source: string, target: string) {
+    try {
+      setFolders(await (await loadStore(deviceKey)).reorderFolders(source, target));
+      toast("目录顺序已更新");
+    } catch (error) {
+      toast(readableMessage(error, "目录排序保存失败，原顺序已保留"));
+    }
+  }
+
   async function setFolderColor(name: string, color: string, onError = toast) {
     try {
       setFolders(await (await loadStore(deviceKey)).setFolderColor(name, color));
@@ -191,5 +201,5 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, getThumb, markUsed, moveImage, togglePinned, createFolder, renameFolder, setFolderColor, deleteFolder };
+  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, getThumb, markUsed, moveImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, deleteFolder };
 }

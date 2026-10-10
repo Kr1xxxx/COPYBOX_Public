@@ -533,3 +533,35 @@ test("全部图片 is not cut off in the sidebar once there are ten or more imag
   const fits = await label.evaluate((element) => element.scrollWidth <= element.clientWidth);
   expect(fits).toBe(true);
 });
+
+test("图片 folders can be dragged by the three-bar handle in the sidebar, and Settings shows the same order", async ({ page }) => {
+  await openImages(page);
+  for (const name of ["甲", "乙", "丙"]) await createFolder(page, name);
+  const names = () => sidebar(page).locator(".directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")).filter(Boolean));
+  expect(await names()).toEqual(["甲", "乙", "丙"]);
+  const row = (name) => sidebar(page).locator(".directory-row", { hasText: name });
+  await row("甲").hover();
+  const handle = row("甲").locator(".folder-drag-handle");
+  await expect(handle).toHaveCSS("opacity", "1");
+  const h = await handle.boundingBox();
+  const target = await row("丙").boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
+  await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(names).toEqual(["乙", "丙", "甲"]);
+
+  // The order is saved: it survives a reload, and Settings lists the same order and can move a folder too.
+  await reloadToImages(page);
+  await expect.poll(names).toEqual(["乙", "丙", "甲"]);
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  const group = page.locator(".settings-dialog .settings-folder-group", { hasText: "图片目录" });
+  await group.getByRole("button", { name: /图片目录/ }).click();
+  const settingsNames = () => group.locator(".settings-folder-name").allInnerTexts();
+  expect(await settingsNames()).toEqual(["乙", "丙", "甲"]);
+  await group.locator(".settings-folder", { hasText: "甲" }).getByRole("button", { name: /上移/ }).click();
+  await expect.poll(settingsNames).toEqual(["乙", "甲", "丙"]);
+  await page.keyboard.press("Escape");
+  await expect.poll(names).toEqual(["乙", "甲", "丙"]);
+});

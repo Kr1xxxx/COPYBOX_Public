@@ -73,7 +73,8 @@ test("目录 groups start folded and open on click; 图片目录 can be created,
   await page.keyboard.press("Enter");
   await expect(images.locator(".settings-folder-name")).toHaveText(["产品图"]);
   await expect(images.locator(".settings-folder-count")).toHaveText("0 张");
-  await expect(images.locator("button.settings-folder-grip")).toHaveCount(0);
+  // 图片目录 can be sorted now (owner, 2026-10-10): every folder has a drag grip, like 话术目录.
+  await expect(images.locator("button.settings-folder-grip")).toHaveCount(1);
 
   await images.getByRole("button", { name: "改名" }).click();
   await images.locator("input[aria-label^=重命名]").fill("新品图");

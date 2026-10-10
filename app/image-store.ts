@@ -50,6 +50,8 @@ export type ImageStore = {
   createFolder(name: string): Promise<ImageFolder[]>;
   renameFolder(from: string, to: string): Promise<ImageFolder[]>;
   setFolderColor(name: string, color: string): Promise<ImageFolder[]>;
+  // Moves a folder to another folder's place in the saved order (the folder list is already stored in order).
+  reorderFolders(source: string, target: string): Promise<ImageFolder[]>;
   deleteFolder(name: string): Promise<ImageFolder[]>;
 };
 
@@ -457,6 +459,16 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
         folders.map((entry) => (entry === target ? { ...entry, name } : entry)),
         (meta) => (meta.folder === target.name ? { ...meta, folder: name, updatedAt: time } : null),
       );
+    },
+
+    async reorderFolders(source, target) {
+      const folders = await readFolders();
+      const moved = findFolder(folders, source);
+      const place = findFolder(folders, target);
+      if (moved === place) return folders;
+      const next = folders.filter((entry) => entry !== moved);
+      next.splice(folders.indexOf(place), 0, moved);
+      return updateFolders(next);
     },
 
     async setFolderColor(name, color) {

@@ -1082,14 +1082,18 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  // Image folders have no saved order (not sortable in Settings), so only the vault kinds move.
   function settingsFolderMove(kind: SettingsFolderKind, folder: string, delta: -1 | 1) {
-    if (kind === "image") return;
+    if (kind === "image") {
+      const names = imageLibrary.folders.map((entry) => entry.name);
+      const neighbour = names[names.indexOf(folder) + delta];
+      if (neighbour) void imageLibrary.reorderFolder(folder, neighbour);
+      return;
+    }
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: moveName(data.folders[kind], folder, delta) } } }), "目录顺序已更新");
   }
 
   function settingsFolderReorder(kind: SettingsFolderKind, source: string, target: string) {
-    if (kind === "image") return;
+    if (kind === "image") { void imageLibrary.reorderFolder(source, target); return; }
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: reorderNames(data.folders[kind], source, target) } } }), "目录顺序已更新");
   }
 
@@ -1118,7 +1122,7 @@ export default function Home() {
       title: "图片目录",
       unit: "张",
       nameMax: IMAGE_FOLDER_NAME_MAX,
-      sortable: false,
+      sortable: true,
       autoColor: false,
       folders: imageLibrary.folders.map(({ name }) => ({ name, count: imageCountsByFolder[name] ?? 0, color: imageColors[name] || UNCATEGORIZED_COLOR, locked: false })),
     }];
