@@ -3,6 +3,7 @@
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
 
+- 2026-10-09 — Claude — Task 24 (owner: whole picture visible; acceptance finding): the tile copy button is hidden until hover or keyboard focus (always shown at .85 on touch screens). The old e2e line that required it to be always visible changed to match.
 - 2026-10-09 — Claude — Task 22 (owner approved advisor item 9; D-024): `getThumb` makes a <=320 px WebP copy of each image, encrypted, in the separate database `clipbox-image-thumbs`; tiles and rows use it, only the opened picture loads the full original. Originals and their database are untouched. Tests: store unit tests (kept once, encrypted, original untouched, repaired when unreadable, removed with the image) and an e2e.
 - 2026-10-09 — Claude — Task 19 (acceptance finding on D-020): the 图片 tile glass now reads as frosted glass: unprefixed `backdrop-filter` kept in the built CSS (inside `@supports`, the minifier had dropped it), soft grey blobs behind so the blur shows, a fine colourless grain and an inner highlight; lighter grain in dark mode.
 - 2026-10-09 — Claude — Task 23 (owner bug: the 全部产品 dropdown stayed open): one effect in `page.tsx` closes the 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu on an outside press and on Esc (the 图片 menus already did). New e2e test.
