@@ -10,7 +10,7 @@ export const IMAGE_FOLDER_NAME_MAX = 20;
 const DB_NAME = "clipbox-images";
 const DB_VERSION = 1;
 // Thumbnails are derived data and live in their own small database, so the original images and their database are
-// never touched by this feature. Dropping the database only makes thumbnails be made again.
+// never touched by this feature. Thumbnails are NOT encrypted (owner decision); dropping the database only makes them be made again.
 const THUMB_DB_NAME = "clipbox-image-thumbs";
 const THUMB_DB_VERSION = 1;
 export const THUMB_MAX_SIDE = 320;
@@ -60,7 +60,9 @@ export type ImageStoreOptions = {
 
 type MetaRecord = { id: string; iv: string; ciphertext: string };
 type BlobRecord = { id: string; iv: string; ciphertext: ArrayBuffer };
-type ThumbRecord = { id: string; iv: string; ciphertext: ArrayBuffer; type: string };
+// Thumbnails are stored as plain bytes (owner decision): they are tiny copies, readable on disk without the key. Rows
+// written by the first version (iv + ciphertext, no bytes) are not read; they are replaced when the thumbnail is made again.
+type ThumbRecord = { id: string; bytes: ArrayBuffer; type: string };
 type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 
 export function normalizeImageTitle(raw: string, fallback: string): string {
@@ -192,7 +194,7 @@ async function deriveImageKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>) 
 
 // The record id and store name are bound in as additional data, so a record cannot be
 // swapped onto another id (or a blob passed off as meta) without failing to decrypt.
-type RecordKind = "meta" | "blobs" | "thumbs";
+type RecordKind = "meta" | "blobs";
 function recordLabel(kind: RecordKind, id: string) {
   return new TextEncoder().encode(`clipbox-images:${kind}:${id}`);
 }
@@ -390,7 +392,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       try {
         const thumbs = await thumbDatabase();
         const stored = thumbs ? ((await request(thumbs.transaction("thumbs").objectStore("thumbs").get(id))) as ThumbRecord | undefined) : undefined;
-        if (stored) return new Blob([await unseal(key, "thumbs", stored)], { type: stored.type });
+        if (stored && stored.bytes instanceof ArrayBuffer && stored.bytes.byteLength > 0) return new Blob([stored.bytes], { type: stored.type });
       } catch { /* an unreadable thumbnail is simply made again */ }
       const original = await readBlob(id);
       let small: Blob | null = null;
@@ -399,10 +401,10 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       try {
         const thumbs = await thumbDatabase();
         if (thumbs) {
-          const sealed = await seal(key, "thumbs", meta.id, new Uint8Array(await small.arrayBuffer()));
+          const bytes = await small.arrayBuffer(); // before the transaction opens: IndexedDB closes it if we wait inside
           const tx = thumbs.transaction("thumbs", "readwrite");
           const done = finished(tx);
-          tx.objectStore("thumbs").put({ ...sealed, type: small.type } satisfies ThumbRecord);
+          tx.objectStore("thumbs").put({ id: meta.id, bytes, type: small.type } satisfies ThumbRecord);
           await done;
         }
       } catch { /* not kept: made again next time */ }
