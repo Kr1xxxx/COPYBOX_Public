@@ -49,6 +49,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 24 | 图片 tile copy button only on hover or keyboard focus (always on touch) | In progress | Claude | Acceptance: it covered the picture corner |
 | 23 | Dropdowns (全部产品, row menu, bulk 移动到, folder menu) close on outside click and Esc | In progress | Claude | Lock reported the 全部产品 filter stayed open |
 | 21 | Motion from arc-library, step 2 of 4 (D-021): segmented controls glide one highlight pill | In progress | Claude | `app/arc/segmented.tsx`; used by the section switch, search scope, 宫格\|列表, settings choices, secret display switch |
+| 25 | 话术搜索: pinyin + initials, rank by hit place and copy count | Done | Claude | `app/snippet-search.ts`; new dependency `pinyin-pro`; `useCount` on items (optional, no migration) |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
