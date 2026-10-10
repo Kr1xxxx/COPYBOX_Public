@@ -22,3 +22,7 @@
   walked through on Windows or macOS (only unit tests, source-wiring tests and the browser tests). Needs a real check:
   start with `--hidden`, see only the tray icon, click it, quit with a pending pin, run a CLI command on a quiet start.
   On Windows there is no sleep hook for the save (only hide / quit); an OS shutdown relies on the hide flush.
+- For the Tauri move: the lazy save lives entirely in `app/` (`lazy-writer.ts`, `persistLazy`, hide/pagehide flush) and needs
+  nothing from the shell except one optional contract on `window.clipboxDesktop`: `onFlushRequest(cb)` (shell asks the page to
+  save, e.g. before quit or sleep) and `flushDone()` (page answers). The Electron pieces (`desktop/flush-request.cjs`,
+  `ensureWindow` in `main.cjs`) are the minimum and are meant to be replaced by the Tauri shell.
