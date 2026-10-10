@@ -114,7 +114,7 @@ test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
 test("Settings has two columns: groups on the left, the chosen group on the right, 外观 first", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   const tabs = dialog.getByRole("tab");
-  await expect(tabs).toHaveText(["外观", "目录", "数据", "窗口", "AI", "关于"]);
+  await expect(tabs).toHaveText(["外观", "目录", "数据", "共享话术", "窗口", "AI", "关于"]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   // Only the chosen group is shown.
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeVisible();
