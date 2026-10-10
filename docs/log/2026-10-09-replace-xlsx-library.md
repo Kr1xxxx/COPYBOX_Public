@@ -14,6 +14,8 @@
   `_x000D_`-style escapes are decoded. Compared with the old library on the same generated files: identical for every case
   tried. Unknown formats (scientific, fractions) fall back to the plain number. CSV differences: text stays exactly as typed
   (a date or `=1+1` in a CSV is no longer converted).
+- After the second acceptance pass: `fflate` is pinned to 0.8.3 (the advisory fixed there), and the Chinese-locale built-in
+  date/time formats (ids 27–36, 50–58, e.g. 2023年3月15日) are rendered as Excel shows them instead of as serial numbers.
 - Small differences: files over 20 MB are refused ("表格文件太大"); a damaged .xlsx says "无法读取这个表格文件"; column
   names are trimmed. `.xls` was never accepted and still is not.
 - User-visible change: 导入话术表格的读取更安全（换掉了有已知漏洞的组件），导入结果不变
