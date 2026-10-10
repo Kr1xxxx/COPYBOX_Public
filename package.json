@@ -22,7 +22,10 @@
     "test:desktop-idle": "node --test tests/desktop-idle.integration.mjs",
     "test:e2e": "npm run build && playwright test",
     "preview:build": "node tools/preview/build.mjs",
-    "preview:serve": "node tools/preview/serve.mjs"
+    "preview:serve": "node tools/preview/serve.mjs",
+    "tauri:frontend": "node scripts/tauri-frontend.mjs",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -40,6 +43,7 @@
     "@next/eslint-plugin-next": "16.2.6",
     "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "4.2.1",
+    "@tauri-apps/cli": "2.12.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
