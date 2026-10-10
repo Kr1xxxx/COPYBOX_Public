@@ -4,6 +4,7 @@ name: Tauri build
 # it does not ship anything. The Electron app keeps shipping until the Tauri build reaches parity.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - "src-tauri/**"
       - "scripts/tauri-frontend.mjs"
@@ -17,7 +18,8 @@ on:
 
 concurrency:
   group: tauri-${{ github.ref }}
-  cancel-in-progress: true
+  # Only pull requests cancel an older run; a build on main always finishes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -25,9 +27,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS minutes cost ten times as much as Linux, so pull requests build Windows only;
-        # the Mac build runs when a change lands on main, and by hand.
-        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"name":"Windows","os":"windows-latest"}]' || '[{"name":"Windows","os":"windows-latest"},{"name":"macOS arm64","os":"macos-latest"}]') }}
+        # macOS minutes cost ten times as much as Linux. A pull request builds Windows only, plus the Mac build
+        # once it carries the label `mac-check` (add it before merging a PR that touches Tauri code); main always builds both.
+        include: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'mac-check')) && '[{"name":"Windows","os":"windows-latest"},{"name":"macOS arm64","os":"macos-latest"}]' || '[{"name":"Windows","os":"windows-latest"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
