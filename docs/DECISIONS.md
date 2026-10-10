@@ -32,7 +32,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-021 | Motion follows arc-library (components vendored into `app/arc/`, `motion` added) | Accepted |
 | D-022 | Trash auto-cleanup defaults to 7 days for everyone | Accepted |
 | D-023 | Version update reminder: tells, never installs; source address not chosen yet | Accepted |
-| D-024 | 图片 thumbnails: small copies kept in their own database, NOT encrypted (owner, 2026-10-10) | Accepted |
+| D-024 | 图片 thumbnails: small encrypted copies kept in their own database | Accepted |
 
 ---
 
@@ -221,10 +221,9 @@ Statuses: Accepted / Superseded / Deprecated.
 ### D-024 图片 thumbnails (2026-10-09)
 - Context (owner, advisor item 9: "做一下 ... 如果不好看我会回退"): opening the 图片 page decrypted every original at full size.
 - Decision (owner): keep a small thumbnail per image. It is derived data: a copy at most 320 px on the longest side (WebP),
-  stored **unencrypted** (owner, 2026-10-10: "缩略图单独存,不用加密"; first version used the image key) as plain bytes in its **own**
+  encrypted with the same key and the same scheme as the images (AES-GCM, record id bound in), stored in its **own**
   IndexedDB database `clipbox-image-thumbs`. The original images and their database `clipbox-images` are not changed, not migrated
   and not rewritten. A thumbnail is made the first time an image is shown (or when its record is missing or unreadable) and
   deleted with the image. Pictures that are already small are shown as they are. Tiles and rows use the thumbnail; only an
   opened picture loads the full original, and copying always uses the original.
-- Consequences: thumbnails are readable on disk without the key (the originals stay encrypted). Rows written by the first
-  encrypted version are ignored and replaced when the thumbnail is made again. Dropping the thumbnail database only makes thumbnails be made again; no data is lost. Rollback = revert the PR.
+- Consequences: dropping the thumbnail database only makes thumbnails be made again; no data is lost. Rollback = revert the PR.
