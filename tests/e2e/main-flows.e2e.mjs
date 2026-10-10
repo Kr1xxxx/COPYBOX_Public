@@ -150,6 +150,9 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   }
   // pin Amanda from the list, then push three newer values through
   await row.locator(".var-memory-option", { hasText: "Amanda" }).click({ button: "right" });
+  await expect(page.locator(".var-menu button")).toHaveText(["固定", "解锁", "删除"]);
+  await expect(page.getByRole("menuitem", { name: "解锁" })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "固定" }).click();
   await expect(page.getByText("已固定「Amanda」")).toBeVisible();
   // only the pinned value is kept on the device, so it is still there after a reload
   expect(await page.evaluate(() => localStorage.getItem("clipbox.pinned-values.v1"))).toBe('{"Name":["Amanda"]}');
@@ -167,6 +170,46 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   await expect(hint).toBeVisible();
   // the whole sentence shows, nothing is cut off by an ellipsis
   expect(await hint.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
+test("a right-click on a remembered value offers 固定, 解锁 and 删除; holding and moving one changes its place", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  for (const value of ["Amanda", "Bella", "Cara"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  await name.click();
+  const options = row.locator(".var-memory-option");
+  await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
+  // drag Amanda (last) in front of Cara by holding and moving
+  const from = await options.nth(2).boundingBox();
+  const to = await options.nth(0).boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await expect(options).toHaveText(["Amanda", "Cara", "Bella"]);
+  // dropping did not count as a click: nothing was filled or copied
+  await expect(name).toHaveValue("Cara");
+  // pin Bella, then unpin her again from the menu
+  await options.filter({ hasText: "Bella" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "固定" }).click();
+  await expect(options.filter({ hasText: "Bella" })).toHaveAttribute("data-pinned", "");
+  await expect(options.first()).toHaveText("Bella");
+  await options.first().click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "固定" })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "解锁" }).click();
+  await expect(options.filter({ hasText: "Bella" })).not.toHaveAttribute("data-pinned", "");
+  // delete Cara
+  await options.filter({ hasText: "Cara" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "删除" }).click();
+  await expect(options).toHaveCount(2);
+  await expect(options.filter({ hasText: "Cara" })).toHaveCount(0);
+  // Escape closes the menu without doing anything
+  await options.first().click({ button: "right" });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".var-menu")).toHaveCount(0);
 });
 
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {

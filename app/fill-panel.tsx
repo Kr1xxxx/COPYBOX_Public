@@ -145,3 +145,28 @@ export function VariablePopup({ rowId, name, options, current, onPick }: { rowId
     document.body,
   );
 }
+
+// The menu on a remembered value: pin, unpin, delete. Drawn in the page body at the pointer.
+export function VariableMenu({ x, y, pinned, onPin, onUnpin, onDelete, onClose }: { x: number; y: number; pinned: boolean; onPin: () => void; onUnpin: () => void; onDelete: () => void; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const away = (event: Event) => { if (!ref.current?.contains(event.target as Node)) onClose(); };
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("pointerdown", away, true);
+    document.addEventListener("keydown", key);
+    window.addEventListener("scroll", onClose, true);
+    return () => { document.removeEventListener("pointerdown", away, true); document.removeEventListener("keydown", key); window.removeEventListener("scroll", onClose, true); };
+  }, [onClose]);
+  if (typeof document === "undefined") return null;
+  const item = (label: string, enabled: boolean, run: () => void, danger = false) => (
+    <button type="button" role="menuitem" disabled={!enabled} className={danger ? "danger" : undefined} onMouseDown={(event) => event.preventDefault()} onClick={() => { run(); onClose(); }}>{label}</button>
+  );
+  return createPortal(
+    <div ref={ref} className="var-menu" role="menu" aria-label="常用值" style={{ left: Math.min(x, window.innerWidth - 120), top: Math.min(y, window.innerHeight - 130) }}>
+      {item("固定", !pinned, onPin)}
+      {item("解锁", pinned, onUnpin)}
+      {item("删除", true, onDelete, true)}
+    </div>,
+    document.body,
+  );
+}

@@ -82,8 +82,8 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
 import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
-import { SnippetFill, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
-import { NAME_OPTIONS, PINNED_KEY, isPinned, latestValues, memoryOptions, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
+import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { NAME_OPTIONS, PINNED_KEY, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
@@ -278,6 +278,9 @@ export default function Home() {
   const [pinnedValues, setPinnedValues] = useState<PinnedValues>(() => { try { return parsePinned(localStorage.getItem(PINNED_KEY)); } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedValues)); } catch { /* pins last for this session only */ } }, [pinnedValues]);
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
+  const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
+  const dragOption = useRef<{ name: string; value: string; startX: number; moved: boolean } | null>(null);
+  const suppressOptionClick = useRef(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -827,6 +830,35 @@ export default function Home() {
     else { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); setToast(outcome.result === "pinned" ? `已固定「${value.trim()}」，不会被新值顶掉` : `已取消固定「${value.trim()}」`); }
     window.setTimeout(() => setToast(""), 2400);
   }
+  // Delete a remembered value everywhere; the menu on a listed value calls this.
+  function removeValue(name: string, value: string) {
+    const outcome = deleteValue(valueMemory, pinnedValues, name, value);
+    setValueMemory(outcome.memory);
+    setPinnedValues(outcome.pins);
+    setToast(`已删除「${value}」`);
+    window.setTimeout(() => setToast(""), 2000);
+  }
+  // Holding a listed value and moving it drags it to another place in the list.
+  function startOptionDrag(event: React.PointerEvent<HTMLButtonElement>, name: string, value: string) {
+    if (event.button !== 0) return;
+    dragOption.current = { name, value, startX: event.clientX, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function moveOptionDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = dragOption.current;
+    if (!drag) return;
+    if (!drag.moved && Math.abs(event.clientX - drag.startX) < 6) return;
+    drag.moved = true;
+    const over = document.elementsFromPoint(event.clientX, event.clientY).find((element) => element instanceof HTMLElement && element.dataset.optionValue !== undefined && element.dataset.optionValue !== drag.value) as HTMLElement | undefined;
+    if (!over) return;
+    const outcome = moveOption(valueMemory, pinnedValues, drag.name, drag.value, over.dataset.optionValue || "");
+    if (outcome.memory !== valueMemory || outcome.pins !== pinnedValues) { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); }
+  }
+  function endOptionDrag() {
+    if (dragOption.current?.moved) { suppressOptionClick.current = true; window.setTimeout(() => { suppressOptionClick.current = false; }, 0); }
+    dragOption.current = null;
+  }
+
   function showVariableHelp() {
     setToast("最多记 3 个值，右键固定，固定的不会被新值顶掉");
     window.setTimeout(() => setToast(""), 4200);
@@ -1679,7 +1711,7 @@ export default function Home() {
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
                       {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => setActiveVar(name ? { id: item.id, name } : null)} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} onHelp={showVariableHelp} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} onHelp={showVariableHelp} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
@@ -1692,7 +1724,8 @@ export default function Home() {
                           {isSnippet && !closing && activeVar?.id === item.id && activeVar.name === "Name" && <VariablePopup rowId={item.id} name="Name" options={NAME_OPTIONS} current={fillFor(item).values.Name || ""} onPick={(value) => pickRemembered(item, "Name", value)} />}
                           {isSnippet && activeVar?.id === item.id && memoryOptions(valueMemory, pinnedValues, activeVar.name).length > 0 && <span className="var-memory" role="listbox" aria-label={`${activeVar.name} 最近用过的`}>
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
-                            {memoryOptions(valueMemory, pinnedValues, activeVar.name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} data-pinned={isPinned(pinnedValues, activeVar.name, option) ? "" : undefined} title={isPinned(pinnedValues, activeVar.name, option) ? `${option}（已固定，右键取消）` : `${option}（右键固定）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} onContextMenu={(event) => { event.preventDefault(); pinValue(item, activeVar.name, option); }} onClick={() => pickRemembered(item, activeVar.name, option)}>{option}</button>)}
+                            {memoryOptions(valueMemory, pinnedValues, activeVar.name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} data-pinned={isPinned(pinnedValues, activeVar.name, option) ? "" : undefined} title={`${option}（右键：固定 / 解锁 / 删除，按住可拖动）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onPointerDown={(event) => startOptionDrag(event, activeVar.name, option)} onPointerMove={moveOptionDrag} onPointerUp={endOptionDrag} onPointerCancel={endOptionDrag} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name: activeVar.name, value: option, x: event.clientX, y: event.clientY }); }} onClick={() => { if (suppressOptionClick.current) return; pickRemembered(item, activeVar.name, option); }}>{option}</button>)}
+                            {valueMenu && activeVar && valueMenu.name === activeVar.name && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
                           </span>}
                           <span className="spacer" />
                           <div className="menu-wrap">

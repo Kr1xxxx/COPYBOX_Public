@@ -67,3 +67,27 @@ export function parsePinned(raw: string | null): PinnedValues {
     return pins;
   } catch { return {}; }
 }
+
+// Remove a remembered value everywhere: from the list and from the pinned ones.
+export function deleteValue(memory: ValueMemory, pins: PinnedValues, name: string, raw: string): { memory: ValueMemory; pins: PinnedValues } {
+  const value = raw.trim();
+  return {
+    memory: { ...memory, [name]: (memory[name] || []).filter((entry) => entry !== value) },
+    pins: { ...pins, [name]: (pins[name] || []).filter((entry) => entry !== value) },
+  };
+}
+
+// Drag one value onto the place of another. Pinned values stay in front of the others, so a value can only change places inside its own group.
+export function moveOption(memory: ValueMemory, pins: PinnedValues, name: string, value: string, target: string): { memory: ValueMemory; pins: PinnedValues } {
+  const options = memoryOptions(memory, pins, name);
+  const from = options.indexOf(value);
+  const to = options.indexOf(target);
+  const pinnedNow = isPinned(pins, name, value);
+  if (from < 0 || to < 0 || from === to || pinnedNow !== isPinned(pins, name, target)) return { memory, pins };
+  const next = [...options];
+  next.splice(from, 1);
+  next.splice(to, 0, value);
+  const pinnedList = next.filter((entry) => isPinned(pins, name, entry));
+  const known = new Set(memory[name] || []);
+  return { memory: { ...memory, [name]: next.filter((entry) => known.has(entry)) }, pins: { ...pins, [name]: pinnedList } };
+}

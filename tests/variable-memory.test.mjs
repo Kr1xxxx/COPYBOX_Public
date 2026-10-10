@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_VALUES, NAME_OPTIONS, memoryOptions, parsePinned, rememberValues, togglePin } from "../app/variable-memory.ts";
+import { DEFAULT_VALUES, NAME_OPTIONS, deleteValue, memoryOptions, moveOption, parsePinned, rememberValues, togglePin } from "../app/variable-memory.ts";
 
 test("a block remembers its last three values, newest first", () => {
   let memory = {};
@@ -44,4 +44,33 @@ test("pinned values come back after a reload, the recent ones do not", () => {
   assert.deepEqual(parsePinned("not json"), {});
   assert.deepEqual(parsePinned('{"Name":["a","a"," ",5,"b","c","d"]}'), { Name: ["a", "b", "c"] });
   assert.deepEqual(memoryOptions({}, pins, "Name"), ["Amanda"]);
+});
+
+test("a value can be deleted from the list and from the pinned ones", () => {
+  let state = { memory: rememberValues({}, { Name: "A" }), pins: {} };
+  state = { ...state, ...togglePin(state.memory, state.pins, "Name", "A") };
+  state.memory = rememberValues(state.memory, { Name: "B" }, state.pins);
+  const left = deleteValue(state.memory, state.pins, "Name", "A");
+  assert.deepEqual(memoryOptions(left.memory, left.pins, "Name"), ["B"]);
+  assert.deepEqual(left.pins.Name, []);
+});
+
+test("dragging moves a value inside its group only; pinned values stay in front", () => {
+  let memory = {};
+  for (const value of ["A", "B", "C"]) memory = rememberValues(memory, { Name: value });
+  // newest first: C B A
+  assert.deepEqual(memoryOptions(memory, {}, "Name"), ["C", "B", "A"]);
+  let moved = moveOption(memory, {}, "Name", "A", "C");
+  assert.deepEqual(memoryOptions(moved.memory, moved.pins, "Name"), ["A", "C", "B"]);
+  const pinned = togglePin(moved.memory, moved.pins, "Name", "B");
+  assert.deepEqual(memoryOptions(pinned.memory, pinned.pins, "Name"), ["B", "A", "C"]);
+  // a pinned value cannot be dropped among the others, and the other way round
+  assert.deepEqual(moveOption(pinned.memory, pinned.pins, "Name", "B", "C"), { memory: pinned.memory, pins: pinned.pins });
+  assert.deepEqual(moveOption(pinned.memory, pinned.pins, "Name", "C", "B"), { memory: pinned.memory, pins: pinned.pins });
+  const swapped = moveOption(pinned.memory, pinned.pins, "Name", "C", "A");
+  assert.deepEqual(memoryOptions(swapped.memory, swapped.pins, "Name"), ["B", "C", "A"]);
+  // two pinned values can swap places
+  const two = togglePin(pinned.memory, pinned.pins, "Name", "A");
+  const flipped = moveOption(two.memory, two.pins, "Name", "A", "B");
+  assert.deepEqual(memoryOptions(flipped.memory, flipped.pins, "Name"), ["A", "B", "C"]);
 });
