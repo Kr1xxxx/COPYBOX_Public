@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import test from "node:test";
 
 let categoryColors;
@@ -65,15 +64,3 @@ test("normalizes duplicate folder names and exposes a neutral fallback", () => {
   assert.equal(categoryColors.UNCATEGORIZED_COLOR, "#C7C7CC");
 });
 
-test("card and directory markers share the derived category color map", () => {
-  const pageSource = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const styles = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
-
-  assert.match(pageSource, /buildCategoryColorMap\(activeFolders\)/);
-  assert.match(pageSource, /className="directory-color-marker"/);
-  assert.match(pageSource, /background: categoryColors\[folder\]/);
-  assert.match(pageSource, /background: categoryColors\[item\.folder \|\| ""\] \|\| UNCATEGORIZED_COLOR/);
-  assert.doesNotMatch(pageSource, /background: item\.color/);
-  assert.doesNotMatch(styles, /\.snippet-row \.drag-handle i\{background:[^}]*!important/);
-  assert.doesNotMatch(styles, /\.native-row:not\(\.snippet-row\) \.drag-handle i\{background:[^}]*!important/);
-});

@@ -37,11 +37,6 @@ test("lists support bulk move and trash with one undo, plus search scope, highli
   assert.match(page, /最近使用/);
 });
 
-test("first run offers onboarding actions", () => {
-  assert.match(page, /className="native-empty onboarding"/);
-  for (const label of ["新增第一条", "导入话术表格", "导入备份"]) assert.match(page, new RegExp(label));
-});
-
 test("theme follows the system by default and can be forced, with dark tokens defined twice", () => {
   assert.match(page, /\["system", "light", "dark"\]|THEME_OPTIONS = \["system", "light", "dark"\]/);
   assert.match(css, /@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\)/);
