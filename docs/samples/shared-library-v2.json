@@ -1,0 +1,42 @@
+{
+  "format": "clipbox-shared-library",
+  "version": 1,
+  "items": [
+    {
+      "id": "CO-001",
+      "label": "公司 · 开场问候",
+      "folder": "询盘接待",
+      "secret": "Hi [Name], thanks for contacting Comely Beauty! Are you looking for lashes, tweezers or wigs?",
+      "summary": "确认需求",
+      "scene": "公司 · 开场问候",
+      "action": "确认需求",
+      "rawProduct": "睫毛",
+      "chineseText": "你好 [Name]，感谢联系 Comely Beauty！请问您对哪些产品感兴趣？",
+      "usageNote": ""
+    },
+    {
+      "id": "CO-002",
+      "label": "公司 · 样品费说明",
+      "folder": "产品样品",
+      "secret": "Our sample fee is [Sample Fee], refunded with your first bulk order. Shipping is paid by the buyer.",
+      "summary": "说明样品费",
+      "scene": "公司 · 样品费说明",
+      "action": "说明样品费",
+      "rawProduct": "睫毛",
+      "chineseText": "",
+      "usageNote": ""
+    },
+    {
+      "id": "CO-004",
+      "label": "公司 · 交期说明",
+      "folder": "定制生产",
+      "secret": "Production takes [Days] days after the sample is approved.",
+      "summary": "说明交期",
+      "scene": "公司 · 交期说明",
+      "action": "说明交期",
+      "rawProduct": "睫毛",
+      "chineseText": "",
+      "usageNote": ""
+    }
+  ]
+}
