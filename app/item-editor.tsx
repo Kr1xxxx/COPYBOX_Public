@@ -20,6 +20,7 @@ import {
 import { copyTextWithExpiry } from "./clipboard";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { extractPlaceholders, productGroupsForRawProduct } from "./snippet-import";
+import { markVariable, unmarkVariable, type VariableEdit } from "./snippet-variables";
 import { STANDARD_SNIPPET_FOLDERS } from "./snippet-folders";
 
 const COLORS = ["#ffb02e", "#4bc67a", "#4f8df7", "#9b70df", "#ef6d63", "#23b6b0"];
@@ -49,6 +50,9 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
   const titleInputRef = useRef<HTMLInputElement>(null);
   const copyOnSubmitRef = useRef(false);
   const latestContentRef = useRef(secret);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const [variableNotice, setVariableNotice] = useState("");
+  const [variableNames, setVariableNames] = useState<string[]>(() => extractPlaceholders(item?.secret || ""));
 
   useEffect(() => {
     titleInputRef.current?.focus();
@@ -89,6 +93,18 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
       chineseText,
       placeholders: extractPlaceholders(`${secret}\n${chineseText}`),
       usageNote: usageNote.trim(),
+    } : kind === "snippet" && extractPlaceholders(secret).length > 0 ? {
+      // A 话术 typed by hand gets its variable blocks here; nothing else about it changes.
+      stage: selectedFolder,
+      scene: label.trim(),
+      action: nextSummary,
+      productGroups: [],
+      rawProduct: "",
+      chineseText: "",
+      placeholders: extractPlaceholders(secret),
+      requiredInputs: [],
+      usageNote: "",
+      requiresVerification: false,
     } : undefined;
     const result = await attemptEditorSave(() => onSave({
       label: label.trim(),
@@ -141,6 +157,21 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
     } catch {
       setReferenceStatus("error");
     }
+  }
+
+  // Set the selected words as a highlighted variable block, or take the brackets off the block under the cursor.
+  function editVariable(change: (text: string, start: number, end: number) => VariableEdit) {
+    const area = contentRef.current;
+    if (!area) return;
+    const result = change(area.value, area.selectionStart, area.selectionEnd);
+    if (!result.ok) { setVariableNotice(result.error); return; }
+    latestContentRef.current = result.text;
+    setSecret(result.text);
+    setVariableNames(extractPlaceholders(result.text));
+    setVariableNotice("");
+    setAiNotice("");
+    setAiUndo(null);
+    window.requestAnimationFrame(() => { area.focus(); area.setSelectionRange(result.start, result.end); });
   }
 
   async function rewrite(mode: AiRewriteMode) {
@@ -216,8 +247,9 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
             {kind === "secret" && !PLAIN_NOTES && <ArcSegmented className="segmented" label="内容显示方式" value={visible ? "show" : "hide"} onSelect={(value) => setVisible(value === "show")}
               options={[{ value: "hide", label: "隐藏内容" }, { value: "show", label: "明文显示" }]} />}
 
-            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"}</span>{kind === "secret" && !PLAIN_NOTES && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label={`${SECRET_WORD}第一段`} className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label={`${SECRET_WORD}第二段`} className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea aria-label={kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"} className={kind === "secret" && !PLAIN_NOTES && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); }} placeholder={kind === "secret" ? (PLAIN_NOTES ? "输入要保存的备注内容" : "输入要保存的密码或文本") : "输入需要反复使用的话术"} rows={6} />}</div></div>
+            <div className={`native-field content-field ${kind === "snippet" ? "snippet-content" : ""}`}><span className="content-field-head"><span>{kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"}</span>{kind === "secret" && !PLAIN_NOTES && <button type="button" className={segmentedSecret ? "segment-toggle active" : "segment-toggle"} aria-pressed={segmentedSecret} onClick={toggleSecretSegments}>{segmentedSecret ? "合并" : "分段"}</button>}{kind === "snippet" && <span className="variable-actions"><button type="button" className="segment-toggle" onMouseDown={(event) => event.preventDefault()} onClick={() => editVariable(markVariable)} title="先选中一段文字，再点这里：复制时它会变成可以填写的高亮块">设为高亮</button><button type="button" className="segment-toggle" onMouseDown={(event) => event.preventDefault()} onClick={() => editVariable(unmarkVariable)} title="光标放在高亮块里，再点这里">取消高亮</button></span>}{kind === "snippet" && <span className="ai-actions">{aiUndo !== null && <button type="button" className="segment-toggle ai-undo" onClick={undoRewrite} disabled={Boolean(aiBusy)}>撤销</button>}<button type="button" className="segment-toggle" onClick={() => void rewrite("polish")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "polish" ? "润色中…" : "AI 润色"}</button><button type="button" className="segment-toggle" onClick={() => void rewrite("organize")} disabled={Boolean(aiBusy) || !secret.trim()}>{aiBusy === "organize" ? "整理中…" : "AI 整理"}</button></span>}</span><div className={`soft-textarea ${segmentedSecret ? "secret-segmented" : ""}`}>{segmentedSecret ? <><textarea aria-label={`${SECRET_WORD}第一段`} className={!visible ? "masked" : ""} value={secretParts[0]} onChange={(event) => updateSecretPart(0, event.target.value)} placeholder="第一段" rows={2} /><textarea aria-label={`${SECRET_WORD}第二段`} className={!visible ? "masked" : ""} value={secretParts[1]} onChange={(event) => updateSecretPart(1, event.target.value)} placeholder="第二段" rows={2} /></> : <textarea ref={contentRef} aria-label={kind === "secret" ? (PLAIN_NOTES ? "备注内容" : "密码 / 文本") : "话术内容"} className={kind === "secret" && !PLAIN_NOTES && !visible ? "masked" : ""} value={secret} onChange={(event) => { latestContentRef.current = event.target.value; setSecret(event.target.value); setAiNotice(""); setAiUndo(null); setVariableNotice(""); if (kind === "snippet") setVariableNames(extractPlaceholders(event.target.value)); }} placeholder={kind === "secret" ? (PLAIN_NOTES ? "输入要保存的备注内容" : "输入要保存的密码或文本") : "输入需要反复使用的话术"} rows={6} />}</div></div>
 
+            {kind === "snippet" && <small className="variable-hint" role="status">{variableNotice || (variableNames.length > 0 ? `高亮块：${variableNames.join("、")}。复制时可以在这些位置填写。` : "想让某个词复制时能自己填？选中它，点「设为高亮」。")}</small>}
             {kind === "snippet" && aiNotice && <small className="ai-notice" role="status">{aiNotice}</small>}
 
             {kind === "snippet" && <div className="native-field summary-field">

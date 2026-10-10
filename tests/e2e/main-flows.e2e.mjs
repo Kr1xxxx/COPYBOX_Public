@@ -249,6 +249,39 @@ test("the snippet note field is called 小提示", async ({ page }) => {
   await expect(page.locator(".inline-editor")).not.toContainText("备注");
 });
 
+test("when adding a 话术 by hand, selected words can be set as highlighted blocks", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  await editor.locator("input").first().fill("手动高亮测试");
+  const area = editor.getByRole("textbox", { name: "话术内容" });
+  await area.fill("Hi dear friend, welcome to our shop!");
+  await expect(editor).toContainText("设为高亮");
+  // nothing selected: refused with a plain message
+  await area.evaluate((element) => element.setSelectionRange(3, 3));
+  await editor.getByRole("button", { name: "设为高亮" }).click();
+  await expect(editor.locator(".variable-hint")).toContainText("先选中一段文字");
+  // select "dear friend" and set it
+  await area.evaluate((element) => { const at = element.value.indexOf("dear friend"); element.setSelectionRange(at, at + "dear friend".length); });
+  await editor.getByRole("button", { name: "设为高亮" }).click();
+  await expect(area).toHaveValue("Hi [dear friend], welcome to our shop!");
+  await expect(editor.locator(".variable-hint")).toContainText("高亮块：dear friend");
+  // the caret is inside the block: take it off again, then set it once more
+  await editor.getByRole("button", { name: "取消高亮" }).click();
+  await expect(area).toHaveValue("Hi dear friend, welcome to our shop!");
+  await area.evaluate((element) => { const at = element.value.indexOf("dear friend"); element.setSelectionRange(at, at + "dear friend".length); });
+  await editor.getByRole("button", { name: "设为高亮" }).click();
+  await editor.locator(".editor-save").first().click();
+  // the saved 话术 shows a highlighted block that can be filled, and copies the filled text
+  await page.locator(".native-row", { hasText: "手动高亮测试" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const field = row.locator("input[data-var='dear friend']");
+  await expect(field).toBeVisible();
+  await field.fill("Amanda");
+  await field.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda, welcome to our shop!");
+});
+
 test("the 全部产品 filter and the row menu close on an outside click and on Esc", async ({ page }) => {
   const filter = page.locator(".product-filter");
   const menu = page.locator(".product-filter-menu");

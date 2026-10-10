@@ -915,3 +915,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory-option { touch-action: none; user-select: none; -webkit-user-select: none; }
 .var-memory-option:active { cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) { .var-menu { animation: none; } .var-menu button { transition: none; } .var-menu button:active:not(:disabled) { scale: 1; } }
+/* Setting variable blocks by hand in the editor. */
+.inline-editor .variable-actions { display: inline-flex; gap: 6px; margin-left: auto; margin-right: 8px; }
+.inline-editor .variable-actions .segment-toggle { position: static; }
+.variable-hint { display: block; margin: -2px 0 2px; color: var(--ink-3); font-size: 12px; line-height: 1.5; }
