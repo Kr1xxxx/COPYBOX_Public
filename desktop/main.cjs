@@ -461,6 +461,10 @@ ipcMain.handle("clipbox:fetch-shared-library", (event, url) => {
 });
 
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
+// The packaged app (or, in development, the project folder) changes when a new version is installed.
+ipcMain.handle("clipbox:get-build-time", () => {
+  try { return fs.statSync(app.getAppPath()).mtime.toISOString(); } catch { return ""; }
+});
 
 const updateChecker = createUpdateChecker({ url: UPDATE_URL, currentVersion: app.getVersion() });
 ipcMain.handle("clipbox:check-update", () => updateChecker.check());

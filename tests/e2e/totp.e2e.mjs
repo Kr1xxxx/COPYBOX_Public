@@ -65,3 +65,15 @@ test("Windows: tapping the version does nothing", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "验证码" })).toHaveCount(0);
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片"]);
 });
+
+test("关于 shows the version and when it was updated; the version still opens 验证码 after 5 taps", async ({ page }) => {
+  await open(page, "darwin");
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  const settings = page.getByRole("dialog", { name: "设置" });
+  await settings.getByRole("tab", { name: "关于" }).click();
+  await expect(settings.getByText("Clipbox v0.0.0-test")).toBeVisible();
+  const row = settings.locator(".settings-row", { hasText: "更新时间" });
+  await expect(row).toContainText("2026-10-10 21:37");
+  for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipbox v/).click();
+  await expect(page.getByRole("dialog", { name: "验证码" })).toBeVisible();
+});

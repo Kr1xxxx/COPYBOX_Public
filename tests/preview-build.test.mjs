@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   ensureTitle,
   patchPreloadHelper,
+  previewBuildInfo,
   relativizeAssets,
   renderWrapper,
   withDesktopShim,
@@ -45,4 +46,18 @@ test("ensureTitle adds a title only when missing", () => {
   assert.equal(ensureTitle("<head></head>"), "<head><title>Clipbox</title></head>");
   const has = "<head><title>X</title></head>";
   assert.equal(ensureTitle(has), has);
+});
+
+test("previewBuildInfo takes the update time from the newest changelog entry, else the build time", () => {
+  const now = new Date("2026-10-10T12:00:00Z");
+  assert.deepEqual(previewBuildInfo([{ version: "1.13", at: "2026-10-10 21:37" }], "1.13\n", now), { version: "1.13", updatedAt: "2026-10-10T21:37:00+08:00" });
+  assert.deepEqual(previewBuildInfo([{ version: "1.13" }], "1.13", now), { version: "1.13", updatedAt: now.toISOString() });
+  assert.deepEqual(previewBuildInfo([], "1.13", now), { version: "1.13", updatedAt: now.toISOString() });
+});
+
+test("the shim answers getVersion and getBuildTime, and the wrapper shows the update time", () => {
+  const out = withDesktopShim("<head></head>", "win32", { version: "1.13", updatedAt: "2026-10-10T21:37:00+08:00" });
+  assert.ok(out.includes('Promise.resolve("1.13")'));
+  assert.ok(out.includes('Promise.resolve("2026-10-10T21:37:00+08:00")'));
+  assert.ok(renderWrapper("v__VERSION__ __UPDATED__", "1.13", "2026-10-10 21:37") === "v1.13 2026-10-10 21:37");
 });

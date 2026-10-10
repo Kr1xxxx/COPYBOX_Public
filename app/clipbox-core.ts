@@ -609,3 +609,12 @@ function mergeFolderColors(current?: FolderColors, incoming?: FolderColors): Fol
     snippet: { ...(incoming?.snippet || {}), ...(current?.snippet || {}) },
   };
 }
+
+// "2026-10-10 21:37" in the viewer's own time zone; "" when the value is missing or not a date.
+export function formatBuildTime(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
+}

@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),
   getVersion: () => ipcRenderer.invoke("clipbox:get-version"),
+  getBuildTime: () => ipcRenderer.invoke("clipbox:get-build-time"),
   checkUpdate: () => ipcRenderer.invoke("clipbox:check-update"),
   openUpdate: () => ipcRenderer.invoke("clipbox:open-update"),
   aiStatus: () => ipcRenderer.invoke("clipbox:ai-status"),

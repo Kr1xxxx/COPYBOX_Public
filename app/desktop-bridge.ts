@@ -16,6 +16,8 @@ export type ClipboxDesktop = {
   setTheme?: (theme: ThemeChoice) => void;
   openDataFolder?: () => Promise<string>;
   getVersion: () => Promise<string>;
+  // When this build was made or last updated, as an ISO date string.
+  getBuildTime?: () => Promise<string>;
   checkUpdate?: () => Promise<UpdateInfo>;
   openUpdate?: () => Promise<boolean>;
   aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;

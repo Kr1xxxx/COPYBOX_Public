@@ -207,6 +207,8 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await page.getByRole("menuitem", { name: "固定" }).click();
   await expect(options.filter({ hasText: "Bella" })).toHaveAttribute("data-pinned", "");
   await expect(options.first()).toHaveText("Bella");
+  // leave the block so its choices (which open below it on this card) no longer sit over the list
+  await name.blur();
   await options.first().click({ button: "right" });
   await expect(page.getByRole("menuitem", { name: "固定" })).toBeDisabled();
   await page.getByRole("menuitem", { name: "解锁" }).click();

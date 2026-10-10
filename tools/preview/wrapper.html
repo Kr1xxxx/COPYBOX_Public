@@ -24,6 +24,7 @@
   .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
   .brand b { font-size: 15px; letter-spacing: .02em; }
   .brand span { color: var(--soft); font-size: 12.5px; }
+  .brand .ver-time { font-variant-numeric: tabular-nums; }
   .brand .ver { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
   .seg { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--ground); border: 1px solid var(--line); }
   .seg button { all: unset; box-sizing: border-box; cursor: pointer; padding: 5px 18px; border-radius: 7px; font-size: 13px; color: var(--soft); }
@@ -79,7 +80,7 @@
 </style>
 <div class="page">
   <header class="topbar">
-    <div class="brand"><b>Clipbox</b><span class="ver" title="网页测试版的版本号">v__VERSION__</span><span>网页测试版 · 软件窗口之外是预览工具</span></div>
+    <div class="brand"><b>Clipbox</b><span class="ver" title="网页测试版的版本号">v__VERSION__</span><span class="ver-time" title="这个版本的更新时间">__UPDATED__</span><span>网页测试版 · 软件窗口之外是预览工具</span></div>
     <div class="seg" role="radiogroup" aria-label="软件版本">
       <button type="button" role="radio" aria-checked="true" data-os="win">Windows 版</button>
       <button type="button" role="radio" aria-checked="false" data-os="mac">Mac 版</button>

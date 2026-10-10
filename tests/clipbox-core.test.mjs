@@ -538,3 +538,11 @@ test("importing a backup keeps both sets of received company ids, so a deleted c
   const replaced = core.mergeImportedVaultData(core.normalizeVaultData({ ...base, sharedSeen: ["a"] }), core.normalizeVaultData({ ...base, sharedSeen: ["b"] }), "replace", () => "id", "snippet");
   assert.deepEqual(replaced.data.sharedSeen?.sort(), ["a", "b"]);
 });
+
+test("formatBuildTime shows date and time to the minute, empty when missing or invalid", () => {
+  assert.equal(core.formatBuildTime("2026-10-10T21:37:00"), "2026-10-10 21:37");
+  assert.equal(core.formatBuildTime("2026-01-02T03:04:59"), "2026-01-02 03:04");
+  assert.equal(core.formatBuildTime(""), "");
+  assert.equal(core.formatBuildTime(undefined), "");
+  assert.equal(core.formatBuildTime("not a date"), "");
+});

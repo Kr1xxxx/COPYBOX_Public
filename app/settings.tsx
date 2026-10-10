@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "./arc/motion-tokens";
 import { AiSettingsSection } from "./ai-settings";
 import { ArcSegmented } from "./arc/segmented";
+import { formatBuildTime } from "./clipbox-core";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
@@ -20,9 +21,9 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
+export function SettingsDialog({ onUnlockTotp, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
   onUnlockTotp?: () => void;
-  version: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
+  version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
   onFolderAdd: (kind: SettingsFolderKind, name: string) => Promise<string>;
@@ -52,6 +53,7 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [versionCopied, setVersionCopied] = useState(false);
   // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
+  const builtAt = formatBuildTime(buildTime);
   const versionTaps = useRef<number[]>([]);
   function tapVersion() {
     if (!onUnlockTotp) return;
@@ -151,7 +153,8 @@ export function SettingsDialog({ onUnlockTotp, version, isDesktop, refreshing, i
           </section>
           <section aria-labelledby="set-about" hidden={tab !== "about"}><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong role="presentation" onClick={tapVersion}>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
-              <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipbox ${version || "dev"} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
+              <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipbox ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
+            {builtAt && <div className="settings-row static"><div><strong>更新时间</strong><small className="settings-build-time">{builtAt}</small></div></div>}
           </section>
         </div>
         </div>

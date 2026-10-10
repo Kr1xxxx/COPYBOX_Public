@@ -289,6 +289,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [startupError, setStartupError] = useState("");
   const [appVersion, setAppVersion] = useState("");
+  const [buildTime, setBuildTime] = useState("");
   const [windowMode, setWindowMode] = useState<WindowMode>("full");
   const [revealedId, setRevealedId] = useState("");
   const [rowMenuId, setRowMenuId] = useState("");
@@ -377,6 +378,9 @@ export default function Home() {
     let cancelled = false;
     window.clipboxDesktop?.getVersion()
       .then((version) => { if (!cancelled) setAppVersion(version); })
+      .catch(() => undefined);
+    window.clipboxDesktop?.getBuildTime?.()
+      .then((value) => { if (!cancelled) setBuildTime(value); })
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
@@ -878,6 +882,10 @@ export default function Home() {
     if (event.button !== 0) return;
     dragOption.current = { name, value, startX: event.clientX, startLeft: event.currentTarget.offsetLeft, moved: false, element: event.currentTarget };
     event.currentTarget.setPointerCapture(event.pointerId);
+    // Reordering moves the button in the page, which can drop the pointer capture; the window still hears the release.
+    const release = () => { window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); endOptionDrag(); };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
   }
   function moveOptionDrag(event: React.PointerEvent<HTMLButtonElement>) {
     const drag = dragOption.current;
@@ -885,13 +893,16 @@ export default function Home() {
     if (!drag.moved && Math.abs(event.clientX - drag.startX) < 6) return;
     if (!drag.moved) { drag.element.dataset.dragging = ""; drag.element.style.transition = "none"; }
     drag.moved = true;
-    const over = document.elementsFromPoint(event.clientX, event.clientY).find((element) => element instanceof HTMLElement && element.dataset.optionValue !== undefined && element.dataset.optionValue !== drag.value) as HTMLElement | undefined;
+    // Hit-test on layout positions (not painted ones), so values that are still sliding do not confuse the swap.
+    const shift = event.clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft);
+    const centre = drag.element.offsetLeft + shift + drag.element.offsetWidth / 2;
+    const over = Array.from(drag.element.parentElement?.querySelectorAll<HTMLElement>(".var-memory-option") || []).find((element) => element !== drag.element && centre >= element.offsetLeft && centre <= element.offsetLeft + element.offsetWidth);
     if (over) {
     const outcome = moveOption(valueMemory, pinnedValues, drag.name, drag.value, over.dataset.optionValue || "");
     if (outcome.memory !== valueMemory || outcome.pins !== pinnedValues) { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); }
     }
     // the held value follows the pointer, even after the others have slid into new places
-    drag.element.style.transform = `translateX(${event.clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft)}px)`;
+    drag.element.style.transform = `translateX(${shift}px)`;
   }
   function endOptionDrag() {
     const held = dragOption.current;
@@ -1825,6 +1836,7 @@ export default function Home() {
       {settingsOpen && <SettingsDialog
         onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
+        buildTime={buildTime}
         isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}
         refreshing={refreshing}
         trashCount={items.filter((item) => isTrashedItem(item)).length}
