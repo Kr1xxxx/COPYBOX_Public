@@ -1,0 +1,5 @@
+### D-032 Old data moves to the Tauri app through one encrypted file (2026-10-10)
+- Context: the Tauri app's webview has a different storage origin than Electron's, so the vault, device key, images, 验证码 and settings cannot be read by the new app.
+- Decision: both builds get two rows in 设置→数据 (desktop only): "导出到新版" and "从旧版导入". Export copies every `clipbox.*` localStorage key (except the browser-only plain AI key) and every record of the two image databases as they are (already-encrypted stays encrypted), and seals the whole file with a password (PBKDF2-SHA256 310k + AES-GCM). Import checks the password and the contents first, writes the image databases, then the settings (so the vault key is the last thing replaced), then reloads. Import replaces; it does not merge.
+- Consequences: the AI key is not carried (it lives in the OS credential store); the user types it again. The Electron app must ship a version containing "导出到新版" before the cutover, and the old app stays installed until the user confirms the new one shows everything. Format is versioned (`clipbox-data-move`, version 1).
+- Status: Accepted; high-risk (user data), so it waits for the owner's 合并.
