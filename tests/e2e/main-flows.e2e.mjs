@@ -130,3 +130,26 @@ test("the snippet note field is called 小提示", async ({ page }) => {
   await expect(page.locator(".inline-editor")).toContainText("小提示");
   await expect(page.locator(".inline-editor")).not.toContainText("备注");
 });
+
+test("the 全部产品 filter and the row menu close on an outside click and on Esc", async ({ page }) => {
+  const filter = page.locator(".product-filter");
+  const menu = page.locator(".product-filter-menu");
+  await filter.click();
+  await expect(menu).toBeVisible();
+  await page.locator(".section-head, h1").first().click({ position: { x: 4, y: 4 } });
+  await expect(menu).toHaveCount(0);
+
+  await filter.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+
+  // Opening the filter then a row's ⋯ menu leaves only one open; an outside click closes it.
+  await filter.click();
+  await page.locator(".row-main").first().click();
+  await page.getByRole("button", { name: /^更多操作/ }).first().click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.locator(".row-menu")).toBeVisible();
+  await page.locator(".search-box, input[type=search], .sidebar").first().click({ position: { x: 4, y: 4 } });
+  await expect(page.locator(".row-menu")).toHaveCount(0);
+});
