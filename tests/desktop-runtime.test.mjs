@@ -73,3 +73,33 @@ test("closing can minimise to the Windows taskbar, and any reopen restores a min
   assert.match(page, /缩到任务栏/);
   assert.match(page, /platform === "win32" \? \[\["taskbar"/);
 });
+
+// Electron cannot run in CI here, so the main process wiring is checked on its text; the pieces with logic
+// (flush request, command bridge, lazy writer) have behaviour tests of their own.
+test("a quiet start (launch at login) only puts the tray icon up; server and window start on first use", () => {
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  const ready = main.slice(main.indexOf("app.whenReady()"), main.indexOf('app.on("activate"'));
+  assert.match(ready, /if \(!startHidden\) await ensureWindow\(\);/);
+  assert.doesNotMatch(ready, /startServer\(/);
+  assert.match(ready, /createTray\(\)/);
+  assert.match(main, /wasOpenedAtLogin\) startHidden = true/);
+  // the server is started inside ensureWindow, not at launch
+  const ensure = main.slice(main.indexOf("function ensureWindow()"), main.indexOf("function showWindow"));
+  assert.match(ensure, /startServer\(APP_PORT\)[\s\S]*waitForServer\(\)[\s\S]*createWindow\(\)/);
+  // any way of opening goes through showWindow, which creates the window when there is none
+  assert.match(main, /function showWindow[\s\S]*?ensureWindow\(\)\.then\(\(\) => showWindow\(asQuickSearch\)\)/);
+  assert.match(main, /tray\.on\("click", \(\) => mainWindow\?\.isVisible\(\)/);
+  // a command from the command line opens a hidden window instead of failing
+  assert.match(main, /ensureReady: async \(\) => \{\s*await ensureWindow\(\);/);
+});
+
+test("quitting, sleeping and relaunching ask the page to save first", () => {
+  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
+  const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+  assert.match(main, /app\.on\("before-quit", \(event\) => \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?flushRequester\.request\(\)\.finally\(\(\) => app\.quit\(\)\)/);
+  assert.match(main, /for \(const event of \["suspend", "lock-screen", "shutdown"\]\) powerMonitor\.on\(event/);
+  assert.match(main, /async function relaunchApplication\(\)[\s\S]*?await flushRequester\.request\(\);/);
+  assert.match(main, /ipcMain\.on\("clipbox:flush-done"/);
+  assert.match(preload, /onFlushRequest[\s\S]*clipbox:flush/);
+  assert.match(preload, /flushDone: \(\) => ipcRenderer\.send\("clipbox:flush-done"\)/);
+});
