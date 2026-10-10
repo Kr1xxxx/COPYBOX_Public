@@ -5,6 +5,8 @@ status to "Superseded by D-xxx" and add a new entry — do not delete history.
 Format follows lightweight architecture decision records (ADR): number, status, context, decision, consequences.
 Statuses: Accepted / Superseded / Deprecated.
 
+> New decisions are separate files in `docs/decisions/` (see its README), not rows here, so parallel PRs do not conflict.
+
 | # | Decision | Status |
 | --- | --- | --- |
 | D-001 | Windows first | Accepted |

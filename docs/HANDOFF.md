@@ -1,7 +1,7 @@
 # Handoff board
 
-> The single "where are we now". Update it before you stop working; the session log lives in
-> `docs/handoff-log.md`. Keep this file under 100 lines.
+> The single "where are we now". Feature PRs do **not** edit this file (parallel PRs would conflict): leave a note in
+> `docs/log/` instead. Only the coordinator updates the status below. Keep this file under 100 lines.
 
 ## Status (2026-10-09)
 
@@ -14,13 +14,15 @@
 Merging (D-011): small PRs merge themselves when CI is green; big ones are labelled `needs-owner` and wait for the
 owner to write 合并.
 
-Web preview for the owner: version **v1.10** (shown top-left; +0.01 on every update, then say it at the end of each report).
+Web preview for the owner: the current version is in `tools/preview/VERSION` (owned by the preview publisher).
 Windows / Mac switch, ten simulated test images. It is built from the branch under review, not from `main`.
 
 Workflow (`CLAUDE.md`): the main Claude session coordinates; Sonnet workers (`.claude/agents/worker.md`) do pieces in
 git worktrees under `.claude/worktrees/`; the coordinator reviews, merges and pushes.
 
-## Task board
+## Task board (frozen)
+
+Frozen on 2026-10-09: rows 1–15 are history. New work is tracked by PRs and the notes in `docs/log/`, not by new rows.
 
 States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progress" at a time.
 

@@ -1,4 +1,6 @@
-# Session log
+# Session log (frozen)
+
+> Frozen on 2026-10-09. New notes are single files in `docs/log/` (see `docs/log/README.md`); do not add entries here.
 
 Newest first. One entry per session: date — who (person or agent) — what was done, what is unfinished, next step.
 When this file passes 200 lines, move older entries to `docs/handoff-log-archive.md`.
