@@ -76,6 +76,9 @@ import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SnippetFill, SnippetVariableText, emptyFillState, latestValues, rememberValues, type ValueMemory, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
+import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
+import { fetchSharedLibraryText, readSharedSeen, readSharedUrl, writeSharedSeen, writeSharedSummary } from "./shared-library-client";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
@@ -533,6 +536,53 @@ export default function Home() {
     cancelCardDrag();
     cancelFolderDrag();
   }, [activeFolder, activeKind, backupMode, cancelCardDrag, cancelFolderDrag, typingVariable, deleteRequest, newFolder, modalOpen, productFilter, query, snippetImport]);
+
+  // Company 话术 library: new entries come in, untouched ones update, edited ones keep their text (see shared-library.ts).
+  async function applySharedLibraryText(text: string): Promise<SyncSummary> {
+    const { items: incoming, skipped } = parseSharedLibrary(text);
+    let summary: SyncSummary | null = null;
+    await persist((current) => {
+      const result = syncSharedLibrary(current.items, incoming, skipped, { createId: () => crypto.randomUUID(), now: timestampNow(), seen: readSharedSeen() });
+      summary = result.summary;
+      writeSharedSeen(result.seen);
+      return { ...current, items: result.items };
+    });
+    const done = summary as SyncSummary | null;
+    if (!done) throw new Error("同步没有成功，你的话术没有变化");
+    writeSharedSummary(done);
+    return done;
+  }
+
+  async function resolveShared(id: string, resolve: (item: SecretItem, now: number) => SecretItem) {
+    await persist((current) => ({ ...current, items: current.items.map((item) => item.id === id ? resolve(item, timestampNow()) : item) }));
+  }
+
+  // Once per start, if an address is set: stay silent unless something changed, and never complain when offline.
+  const sharedAutoSyncedRef = useRef(false);
+  useEffect(() => {
+    if (loading || sharedAutoSyncedRef.current) return;
+    sharedAutoSyncedRef.current = true;
+    const url = readSharedUrl();
+    if (!url) return;
+    void fetchSharedLibraryText(url).then(applySharedLibraryText).then((summary) => {
+      if (!summary.added && !summary.updated && !summary.keptMine && !summary.retired) return;
+      setToast(`共享话术已同步：${describeSync(summary)}`);
+      window.setTimeout(() => setToast(""), 3600);
+    }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  function exportSharedFile() {
+    const blob = new Blob([exportSharedLibrary(itemsRef.current, timestampNow())], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `clipbox-company-library-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setToast("已导出公司话术库文件");
+    window.setTimeout(() => setToast(""), 2200);
+  }
 
   async function refreshLocalVault() {
     if (refreshing) return;
@@ -1619,6 +1669,7 @@ export default function Home() {
                             <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
                             {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{item.snippetNumber}</b>}
                             {showFolderChip && item.folder && <small className="row-folder">{item.folder}</small>}
+                            {isSnippet && sharedMark(item) && <small className="row-shared-mark" data-mark={sharedMark(item)}>{sharedMark(item) === "update" ? "公司版有更新" : "公司已停用"}</small>}
                           </span>
                           {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
                         </span>
@@ -1630,6 +1681,7 @@ export default function Home() {
                       {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
+                      {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
                       {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} memory={valueMemory} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={(picked, name) => void (picked ? copyPrepared(item, picked, name) : copy(item))} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
@@ -1703,6 +1755,7 @@ export default function Home() {
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
         onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
+        sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
       />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
