@@ -424,3 +424,18 @@ test("a 话术 written by hand can carry its own 中文翻译, kept exactly as t
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   await expect(page.locator(".inline-editor").getByLabel(/中文翻译/)).toHaveValue("你好呀");
 });
+
+test("the 新建目录 field keeps its whole border and placeholder inside the narrow sidebar", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "新建目录" }).first().click();
+  const form = page.locator(".directory-new");
+  await expect(form).toBeVisible();
+  // The folder list scrolls, so an outer ring would be clipped on both sides: the ring must be drawn inside the box.
+  expect(await form.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/inset/);
+  const [box, side] = await Promise.all([form.boundingBox(), page.locator(".sidebar").boundingBox()]);
+  expect(box.x).toBeGreaterThanOrEqual(side.x);
+  expect(box.x + box.width).toBeLessThanOrEqual(side.x + side.width);
+  // The whole placeholder fits in the input (no cut-off text).
+  const input = form.locator("input");
+  expect(await input.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});

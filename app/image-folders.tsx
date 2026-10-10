@@ -199,7 +199,7 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
         {newFolder !== null && (
           <form className="directory-new" onSubmit={(event) => { event.preventDefault(); void submitNewFolder(); }}>
             <i className="directory-color-marker hollow" aria-hidden="true" />
-            <input ref={newInputRef} value={newFolder} placeholder="目录名称，回车创建" aria-label="新目录名称" maxLength={IMAGE_FOLDER_NAME_MAX}
+            <input ref={newInputRef} value={newFolder} placeholder="目录名称" title="输入名称，回车创建" aria-label="新目录名称" maxLength={IMAGE_FOLDER_NAME_MAX}
               onChange={(event) => setNewFolder(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelNewFolder(); } }}
               onBlur={() => window.setTimeout(() => setNewFolder((current) => current !== null && !current.trim() ? null : current), 120)} />

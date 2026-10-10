@@ -66,7 +66,7 @@ test("a new folder: Enter creates it, Esc cancels, empty and repeated names are 
 
   await page.getByRole("button", { name: "新建目录" }).click();
   await expect(input).toBeFocused();
-  await expect(input).toHaveAttribute("placeholder", "目录名称，回车创建");
+  await expect(input).toHaveAttribute("placeholder", "目录名称");
   await input.fill("不会保存");
   await input.press("Escape");
   await expect(input).toHaveCount(0);

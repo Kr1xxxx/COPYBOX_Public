@@ -1661,7 +1661,7 @@ export default function Home() {
               {newFolder && (
                 <form className="directory-new" onSubmit={(event) => { event.preventDefault(); void submitNewFolder(); }}>
                   <i className="directory-color-marker hollow" aria-hidden="true" />
-                  <input ref={newFolderInputRef} value={newFolder.name} placeholder="目录名称，回车创建" aria-label="新目录名称" aria-invalid={Boolean(newFolder.error)} maxLength={30}
+                  <input ref={newFolderInputRef} value={newFolder.name} placeholder="目录名称" title="输入名称，回车创建" aria-label="新目录名称" aria-invalid={Boolean(newFolder.error)} maxLength={30}
                     onChange={(event) => setNewFolder({ name: event.target.value, error: "" })}
                     onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelNewFolder(); } }}
                     onBlur={() => window.setTimeout(() => setNewFolder((current) => current && !current.name.trim() ? null : current), 120)} />
