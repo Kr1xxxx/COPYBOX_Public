@@ -2,7 +2,6 @@ import type { SyncSummary } from "./shared-library.ts";
 
 // Settings of the company 话术 library on this device. The address is empty until someone types one in.
 export const SHARED_URL_KEY = "clipbox.shared-library-url";
-const SHARED_SEEN_KEY = "clipbox.shared-library-seen";
 const SHARED_LAST_KEY = "clipbox.shared-library-last";
 
 function read(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -10,14 +9,6 @@ function write(key: string, value: string) { try { localStorage.setItem(key, val
 
 export function readSharedUrl() { return (read(SHARED_URL_KEY) || "").trim(); }
 export function writeSharedUrl(url: string) { write(SHARED_URL_KEY, url.trim()); }
-
-export function readSharedSeen(): Set<string> {
-  try {
-    const parsed = JSON.parse(read(SHARED_SEEN_KEY) || "[]");
-    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []);
-  } catch { return new Set(); }
-}
-export function writeSharedSeen(ids: string[]) { write(SHARED_SEEN_KEY, JSON.stringify(ids)); }
 
 export function readSharedSummary(): SyncSummary | null {
   try {

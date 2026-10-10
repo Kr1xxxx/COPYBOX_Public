@@ -74,7 +74,7 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
 import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
 import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
-import { fetchSharedLibraryText, readSharedSeen, readSharedUrl, writeSharedSeen, writeSharedSummary } from "./shared-library-client";
+import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
@@ -339,6 +339,7 @@ export default function Home() {
   const itemsRef = useRef<SecretItem[]>([]);
   const foldersRef = useRef<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
   const folderColorsRef = useRef<FolderColors | undefined>(undefined);
+  const sharedSeenRef = useRef<string[] | undefined>(undefined);
   const nextSnippetNumberRef = useRef(1);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { prepareSortAnimation } = useSortFlipAnimation();
@@ -356,6 +357,7 @@ export default function Home() {
       itemsRef.current = data.items;
       foldersRef.current = data.folders;
       folderColorsRef.current = data.folderColors;
+      sharedSeenRef.current = data.sharedSeen;
       nextSnippetNumberRef.current = data.nextSnippetNumber;
       setItems(data.items);
       setFolders(data.folders);
@@ -538,10 +540,9 @@ export default function Home() {
     const { items: incoming, skipped } = parseSharedLibrary(text);
     let summary: SyncSummary | null = null;
     await persist((current) => {
-      const result = syncSharedLibrary(current.items, incoming, skipped, { createId: () => crypto.randomUUID(), now: timestampNow(), seen: readSharedSeen() });
+      const result = syncSharedLibrary(current.items, incoming, skipped, { createId: () => crypto.randomUUID(), now: timestampNow(), seen: new Set(current.sharedSeen) });
       summary = result.summary;
-      writeSharedSeen(result.seen);
-      return { ...current, items: result.items };
+      return { ...current, items: result.items, sharedSeen: result.seen };
     });
     const done = summary as SyncSummary | null;
     if (!done) throw new Error("同步没有成功，你的话术没有变化");
@@ -607,6 +608,7 @@ export default function Home() {
       itemsRef.current = opened.data.items;
       foldersRef.current = opened.data.folders;
       folderColorsRef.current = opened.data.folderColors;
+      sharedSeenRef.current = opened.data.sharedSeen;
       nextSnippetNumberRef.current = opened.data.nextSnippetNumber;
       setItems(opened.data.items);
       setFolders(opened.data.folders);
@@ -699,6 +701,7 @@ export default function Home() {
     folders: foldersRef.current,
     nextSnippetNumber: nextSnippetNumberRef.current,
     folderColors: folderColorsRef.current,
+    sharedSeen: sharedSeenRef.current,
   }), []);
 
   // Both UI changes and external commands compute their update inside this queue.
@@ -709,13 +712,14 @@ export default function Home() {
   }, []);
 
   const writeVault = useCallback(async (nextData: VaultData) => {
-    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber, nextData.folderColors);
+    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber, nextData.folderColors, nextData.sharedSeen ?? sharedSeenRef.current);
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as VaultEnvelope | null;
     const envelope = await encryptVault(data, deviceKey, current?.salt);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
     itemsRef.current = data.items;
     foldersRef.current = data.folders;
     folderColorsRef.current = data.folderColors;
+    sharedSeenRef.current = data.sharedSeen;
     nextSnippetNumberRef.current = data.nextSnippetNumber;
     setItems(data.items);
     setFolders(data.folders);
@@ -1266,7 +1270,7 @@ export default function Home() {
   }, [safeSelected, windowMode, activeFolder, activeKind]);
 
   async function exportVault(password: string, scope: BackupScope) {
-    const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current };
+    const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, sharedSeen: sharedSeenRef.current };
     const scopedData = vaultDataForBackupScope(currentData, scope);
     const envelope = await encryptVault(scopedData, password);
     const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope, createdAt: Date.now(), envelope };

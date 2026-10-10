@@ -69,7 +69,9 @@ export type SecretItem = {
 
 export type FolderRegistry = Record<ItemKind, string[]>;
 export type FolderColors = Record<ItemKind, Record<string, string>>;
-export type VaultData = { items: SecretItem[]; folders: FolderRegistry; nextSnippetNumber: number; folderColors?: FolderColors };
+// `sharedSeen`: ids of company 话术 this vault has already received, so one deleted on purpose is not added again. It sits in the
+// vault (same encrypted save as the 话术, same backups) so a failed save cannot lose one without the other.
+export type VaultData = { items: SecretItem[]; folders: FolderRegistry; nextSnippetNumber: number; folderColors?: FolderColors; sharedSeen?: string[] };
 export type ImportStrategy = "merge" | "replace";
 export type BackupScope = ItemKind;
 export type RefreshContext = {
@@ -339,11 +341,16 @@ export function normalizeVaultData(payload: unknown): VaultData {
     ? (payload as Partial<VaultData>).folderColors
     : undefined;
   const folderColors = normalizeFolderColors(suppliedColors, folders);
+  const suppliedSeen = !Array.isArray(payload) && payload && typeof payload === "object"
+    ? (payload as Partial<VaultData>).sharedSeen
+    : undefined;
+  const sharedSeen = Array.isArray(suppliedSeen) ? Array.from(new Set(suppliedSeen.filter((id): id is string => typeof id === "string" && id.length > 0))) : [];
   return {
     items: numbered.items,
     folders,
     nextSnippetNumber: numbered.nextSnippetNumber,
     ...(folderColors ? { folderColors } : {}),
+    ...(sharedSeen.length ? { sharedSeen } : {}),
   };
 }
 
@@ -470,8 +477,8 @@ export function splitSearchHighlight(text: string, query: string): { text: strin
   return pieces;
 }
 
-export function synchronizeVaultData(items: SecretItem[], folders: FolderRegistry, nextSnippetNumber = 1, folderColors?: FolderColors): VaultData {
-  return normalizeVaultData({ items, folders, nextSnippetNumber, folderColors });
+export function synchronizeVaultData(items: SecretItem[], folders: FolderRegistry, nextSnippetNumber = 1, folderColors?: FolderColors, sharedSeen?: string[]): VaultData {
+  return normalizeVaultData({ items, folders, nextSnippetNumber, folderColors, sharedSeen });
 }
 
 export function addFolder(registry: FolderRegistry, kind: ItemKind, rawName: string) {
@@ -513,6 +520,7 @@ export function vaultDataForBackupScope(data: VaultData, scope: BackupScope): Va
       snippet: scope === "snippet" ? normalized.folders.snippet : [...STANDARD_SNIPPET_FOLDERS],
     },
     nextSnippetNumber: scope === "snippet" ? normalized.nextSnippetNumber : 1,
+    ...(scope === "snippet" && normalized.sharedSeen ? { sharedSeen: normalized.sharedSeen } : {}),
     ...(normalized.folderColors?.[scope] && Object.keys(normalized.folderColors[scope]).length
       ? { folderColors: { secret: {}, snippet: {}, [scope]: normalized.folderColors[scope] } as FolderColors }
       : {}),
@@ -537,7 +545,7 @@ export function mergeImportedVaultData(
     const otherKind = scope === "secret" ? "snippet" : "secret";
     const folderColors: FolderColors = { secret: {}, snippet: {}, [otherKind]: current.folderColors?.[otherKind] || {}, [scope]: source.folderColors?.[scope] || {} };
     return {
-      data: normalizeVaultData({ items: [...source.items, ...retained], folders, nextSnippetNumber, folderColors }),
+      data: normalizeVaultData({ items: [...source.items, ...retained], folders, nextSnippetNumber, folderColors, sharedSeen: scope === "snippet" ? [...(current.sharedSeen || []), ...(source.sharedSeen || [])] : current.sharedSeen }),
       importedCount: source.items.length,
     };
   }
@@ -586,6 +594,7 @@ export function mergeImportedVaultData(
     folders: mergeFolderRegistries(current.folders, source.folders),
     nextSnippetNumber: Math.max(current.nextSnippetNumber, source.nextSnippetNumber),
     folderColors: mergeFolderColors(current.folderColors, source.folderColors),
+    sharedSeen: [...(current.sharedSeen || []), ...(source.sharedSeen || [])],
   });
   return {
     data,

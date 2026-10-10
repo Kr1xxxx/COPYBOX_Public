@@ -519,3 +519,22 @@ test("recent folder lists used items and search highlighting splits on every ter
   ]);
   assert.deepEqual(core.splitSearchHighlight("abc", ""), [{ text: "abc", hit: false }]);
 });
+
+test("the company ids already received live in the vault, survive normalising and travel in snippet backups", async () => {
+  const core = await import("../app/clipbox-core.ts");
+  const data = core.normalizeVaultData({ items: [], folders: { secret: [], snippet: [] }, nextSnippetNumber: 1, sharedSeen: ["a", "b", "a", "", 5] });
+  assert.deepEqual(data.sharedSeen, ["a", "b"]);
+  assert.equal("sharedSeen" in core.normalizeVaultData({ items: [] }), false);
+  assert.deepEqual(core.vaultDataForBackupScope(data, "snippet").sharedSeen, ["a", "b"]);
+  assert.equal(core.vaultDataForBackupScope(data, "secret").sharedSeen, undefined);
+  assert.deepEqual(core.synchronizeVaultData([], data.folders, 1, undefined, ["x"]).sharedSeen, ["x"]);
+});
+
+test("importing a backup keeps both sets of received company ids, so a deleted company 话术 stays gone", async () => {
+  const core = await import("../app/clipbox-core.ts");
+  const base = { items: [], folders: { secret: [], snippet: [] }, nextSnippetNumber: 1 };
+  const merged = core.mergeImportedVaultData(core.normalizeVaultData({ ...base, sharedSeen: ["a"] }), core.normalizeVaultData({ ...base, sharedSeen: ["b", "a"] }), "merge", () => "id");
+  assert.deepEqual(merged.data.sharedSeen?.sort(), ["a", "b"]);
+  const replaced = core.mergeImportedVaultData(core.normalizeVaultData({ ...base, sharedSeen: ["a"] }), core.normalizeVaultData({ ...base, sharedSeen: ["b"] }), "replace", () => "id", "snippet");
+  assert.deepEqual(replaced.data.sharedSeen?.sort(), ["a", "b"]);
+});
