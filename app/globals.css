@@ -811,3 +811,30 @@ button { -webkit-tap-highlight-color: transparent; }
 .scope-switch .arc-seg-pill { box-shadow: 0 1px 2px rgba(31,30,28,.14); }
 .segmented .arc-seg-pill { background: white; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 .inline-editor .segmented .arc-seg-pill { background: var(--card); }
+/* Variable blocks: the ? hint, pinned values and the choices above a block. */
+.var-chip { grid-template-columns: minmax(0, 1fr) auto; }
+.var-help { grid-area: 1 / 2; align-self: center; width: 14px; height: 14px; margin: 0 5px 0 -3px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); font: inherit; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center; cursor: help; opacity: .7; transition: opacity .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.var-help:hover, .var-help:focus-visible { opacity: 1; }
+.var-help:active { scale: .92; }
+.var-chip[data-pinned] { box-shadow: inset 0 0 0 1px var(--accent); }
+.var-chip[data-pinned]:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+.var-memory-option[data-pinned] { box-shadow: inset 0 0 0 1px var(--accent); }
+.var-popup { position: fixed; z-index: 120; display: flex; gap: 4px; padding: 4px; transform: translate(-50%, calc(-100% - 6px)); border-radius: 10px; background: var(--card); box-shadow: 0 0 0 1px var(--line), 0 6px 18px rgba(0, 0, 0, .14); animation: var-popup-in .14s cubic-bezier(.22,1,.36,1); }
+.var-popup-option { padding: 4px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.var-popup-option:hover, .var-popup-option[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.var-popup-option:active { scale: .96; }
+@keyframes var-popup-in { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)); } }
+@media (prefers-reduced-motion: reduce) { .var-popup { animation: none; } .var-popup-option, .var-help { transition: none; } .var-popup-option:active, .var-help:active { scale: 1; } }
+/* The big 复制 button keeps one width: both labels sit in the same cell, and the tick draws itself. */
+.copy-main-icon, .copy-main-label { display: inline-grid; align-items: center; }
+.copy-main-icon > *, .copy-main-label > * { grid-area: 1 / 1; }
+.copy-main-icon .icon { transition: opacity .14s cubic-bezier(.22,1,.36,1), scale .14s cubic-bezier(.22,1,.36,1); }
+.copy-main .copy-tick { opacity: 0; scale: .6; }
+.copy-main .copy-tick path { stroke-dasharray: 22; stroke-dashoffset: 22; }
+.copy-main[data-copied] .icon:not(.copy-tick) { opacity: 0; scale: .6; }
+.copy-main[data-copied] .copy-tick { opacity: 1; scale: 1; }
+.copy-main[data-copied] .copy-tick path { stroke-dashoffset: 0; transition: stroke-dashoffset .28s cubic-bezier(.22,1,.36,1) .05s; }
+.copy-main-label > span { transition: opacity .14s cubic-bezier(.22,1,.36,1); }
+.copy-main-label > span:last-child, .copy-main[data-copied] .copy-main-label > span:first-child { opacity: 0; }
+.copy-main[data-copied] .copy-main-label > span:last-child { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .copy-main-icon .icon, .copy-main-label > span, .copy-main .copy-tick path { transition: none !important; } }
