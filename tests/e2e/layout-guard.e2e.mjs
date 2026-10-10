@@ -15,7 +15,6 @@ const JPG = fileURLToPath(new URL("../fixtures/sample-photo.jpg", import.meta.ur
 // (a stale entry that no longer matches anything is reported as a note, not a failure).
 // match: [state-name regexp, issue type, element-text regexp]
 const KNOWN = [
-  { state: /^totp-add$/, type: /./, reason: "Mac 验证码「添加账号」对话框：左内边距约 9px、整块空白，由其他线程修复" },
 ];
 
 // Deliberate design, not a bug: a one-line list title that ends in "…" when the text is too long.
@@ -23,6 +22,7 @@ const BY_DESIGN = [
   { el: /snippet-label/, type: /文字省略/, reason: "列表标题单行显示，过长时用 … 结尾（测试数据里有超长场景名）" },
 ];
 
+BY_DESIGN.push({ el: /image-tile-title/, type: /文字省略/, reason: "图片名单行显示，过长时用 … 结尾（迷你窗口的小图块只有约 80px 宽）" });
 BY_DESIGN.push({ el: /image-tile-main/, type: /元素重疊/, reason: "图片卡片的「复制」小按钮故意浮在整张卡片按钮上" });
 
 const SIZES = {
@@ -75,7 +75,15 @@ for (const { platform, theme, size } of cases) {
       await press2(); await closeLeftovers();
     }
 
+    const addImages = async () => {
+      const [ch] = await Promise.all([page.waitForEvent("filechooser", { timeout: 4000 }), page.getByRole("button", { name: /新增图片|添加/ }).first().click()]);
+      await ch.setFiles([PNG, JPG]); await page.waitForTimeout(1500);
+    };
     if (size === "mini") {
+      // The mini window cannot add images ("回到完整窗口添加图片"), so add them in the full window first.
+      await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+      await addImages();
+      await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
       await page.getByRole("button", { name: "迷你模式" }).click();
       await page.waitForTimeout(400);
       await page.setViewportSize(SIZES.mini);
@@ -85,10 +93,11 @@ for (const { platform, theme, size } of cases) {
 
     await state("list", async () => {});
     await state("row-open", async () => { await page.locator(".row-main").nth(2).click(); });
-    await state("variable-popup", async () => {
+    // The mini window copies on click and shows variable chips only: there is no popup to open there.
+    if (!mini) await state("variable-popup", async () => {
       await page.locator(".native-row .row-main").first().click(); await page.waitForTimeout(400);
       await page.locator(".native-row.selected input[data-var]").first().click();
-    }, { optional: size === "mini" }); // the mini window copies on click, there is no inline fill
+    });
     await search().fill("");
     await state("search-long", async () => { await search().fill("Instagram Instagram Instagram 很长很长的搜索词测试 abcdefghijklmnop"); });
     await search().fill("");
@@ -131,22 +140,24 @@ for (const { platform, theme, size } of cases) {
 
     // 图片
     await state("images-empty", async () => { await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click(); });
-    await state("images-added", async () => {
-      const [ch] = await Promise.all([page.waitForEvent("filechooser", { timeout: 4000 }), page.getByRole("button", { name: /新增图片|添加/ }).first().click()]);
-      await ch.setFiles([PNG, JPG]); await page.waitForTimeout(1500);
-    }, { optional: size === "mini" });
-    await state("images-open", async () => { await page.locator(".image-tile-main, .image-row").first().click(); }, { optional: true });
+    await state("images-added", async () => { if (!mini) await addImages(); else await page.locator(".image-tile-main").first().waitFor(); });
+    await state("images-open", async () => { await page.locator(".image-tile-main, .image-row").first().click(); });
     if (!mini) await state("images-new-folder", async () => { await page.getByRole("button", { name: "新建目录" }).first().click(); await page.keyboard.type("收款码很长的图片目录名"); });
 
     if (platform === "darwin") {
       await state("secrets", async () => { await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click(); });
       if (!mini) {
+        // 验证码 now lives inside the hidden 保险箱: 设置 → 关于, tap the version 5 times, then 验证码 → 添加账号.
         await state("totp-add", async () => {
           await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
           await settingsBtn().click();
-          for (let i = 0; i < 5; i++) await page.getByText(/^Clipbox v/).first().click();
-          await page.waitForTimeout(500);
-          await page.getByRole("dialog", { name: "验证码" }).getByRole("button", { name: "添加账号" }).click();
+          const settings = page.getByRole("dialog", { name: "设置" });
+          await settings.getByRole("tab", { name: "关于" }).click();
+          for (let i = 0; i < 5; i++) await settings.getByText(/^Clipbox v/).click();
+          const vault = page.getByRole("dialog", { name: "保险箱" });
+          await vault.waitFor();
+          await vault.getByRole("button", { name: "验证码", exact: true }).click();
+          await vault.getByRole("button", { name: "添加账号" }).click();
         });
       }
     }
@@ -154,7 +165,7 @@ for (const { platform, theme, size } of cases) {
     const real = [], known = [];
     for (const f of found) {
       if (BY_DESIGN.some((x) => x.el.test(f.el) && x.type.test(f.type))) continue;
-      const k = KNOWN.find((x) => x.state.test(f.state) && x.type.test(f.type));
+      const k = f.type === "步骤失败" ? null : KNOWN.find((x) => x.state.test(f.state) && x.type.test(f.type));
       (k ? known : real).push(f);
     }
     const fmt = (f) => `[${f.state}] ${f.type}：${f.el}${f.by ? " ← " + f.by : ""} ${f.detail ?? ""}`;
