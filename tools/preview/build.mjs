@@ -40,6 +40,8 @@ export function withDesktopShim(html, platform) {
     onAutomationCommand: function () { return function () {}; },
     respondAutomationCommand: function () {},
     automationReady: function () {},
+    checkUpdate: function () { return Promise.resolve({ status: "available", version: "9.9.9", notes: ["这是演示：真实版本会在这里列出新版本的改动"] }); },
+    openUpdate: function () { return Promise.resolve(true); },
     aiStatus: function () { return Promise.resolve({ hasKey: false, origin: "" }); },
     setWindowMode: function (mode) { try { parent.postMessage({ clipbox: "window-mode", mode: mode }, "*"); } catch (e) {} },
     relaunch: function () { location.reload(); }

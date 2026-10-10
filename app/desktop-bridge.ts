@@ -1,5 +1,7 @@
 import type { CloseBehavior, MiniHidePolicy, ThemeChoice } from "./preferences";
 
+export type UpdateInfo = { status: "disabled" | "current" | "error" } | { status: "available"; version: string; notes: string[] };
+
 export type WindowMode = "full" | "mini";
 
 export type ClipboxDesktop = {
@@ -14,6 +16,8 @@ export type ClipboxDesktop = {
   setTheme?: (theme: ThemeChoice) => void;
   openDataFolder?: () => Promise<string>;
   getVersion: () => Promise<string>;
+  checkUpdate?: () => Promise<UpdateInfo>;
+  openUpdate?: () => Promise<boolean>;
   aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;

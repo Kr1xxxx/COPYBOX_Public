@@ -58,9 +58,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Read labels now (not from the event) so a label added after opening still counts.
+      - id: labels
+        run: echo "json=$(gh pr view "$PR" --json labels --jq '[.labels[].name]')" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
       - run: node scripts/check-handoff.mjs
         env:
           BASE_REF: origin/${{ github.base_ref }}
+          LABELS: ${{ steps.labels.outputs.json }}
 
   # D-011: small changes merge themselves once every check is green; big ones wait for the owner.
   merge-policy:

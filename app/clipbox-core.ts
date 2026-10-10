@@ -61,6 +61,7 @@ export type SecretItem = {
   snippetNumber?: string;
   shared?: SharedLink;
   lastUsedAt?: number;
+  useCount?: number;
   deletedAt?: number;
   createdAt: number;
   updatedAt: number;
