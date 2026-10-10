@@ -408,9 +408,12 @@ test("remembered values are always shown with the ? at their right end, and not 
   await expect(row.locator(".var-chip .var-help")).toHaveCount(0);
   const help = row.locator(".var-memory .var-help");
   await expect(help).toBeVisible();
-  const lastOption = await row.locator(".var-memory-option").last().boundingBox();
-  const helpBox = await help.boundingBox();
-  expect(helpBox.x).toBeGreaterThanOrEqual(lastOption.x + lastOption.width);
+  // the strip stays on the same line as the buttons, to the right of 编辑 (Lock's placement), and never pushes the card wider
+  const edit = await row.getByRole("button", { name: "编辑", exact: true }).boundingBox();
+  const strip = await row.locator(".var-memory").boundingBox();
+  expect(strip.x).toBeGreaterThanOrEqual(edit.x + edit.width);
+  expect(Math.abs((strip.y + strip.height / 2) - (edit.y + edit.height / 2))).toBeLessThan(10);
+  expect(await page.locator(".native-list").evaluate((list) => list.scrollWidth <= list.clientWidth)).toBe(true);
 });
 
 test("a 话术 written by hand can carry its own 中文翻译, kept exactly as typed", async ({ page }) => {
