@@ -50,6 +50,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 23 | Dropdowns (全部产品, row menu, bulk 移动到, folder menu) close on outside click and Esc | In progress | Claude | Lock reported the 全部产品 filter stayed open |
 | 21 | Motion from arc-library, step 2 of 4 (D-021): segmented controls glide one highlight pill | In progress | Claude | `app/arc/segmented.tsx`; used by the section switch, search scope, 宫格\|列表, settings choices, secret display switch |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
+| 25 | Shared 话术 library (D-025): Settings → 共享话术 syncs a company JSON file without overwriting or deleting the employee's 话术 | In progress | Claude | Built, needs the owner's 合并 (storage: optional `shared` field). Nobody has hosted a file yet; format in `docs/shared-library.md` |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).
 
