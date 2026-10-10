@@ -49,6 +49,7 @@ import {
 } from "./clipbox-core";
 import {
   buildSnippetImportPreview,
+  extractPlaceholders,
   fillSnippetTemplate,
   hasOptionalSnippetPreparation,
   matchesSnippetProduct,
@@ -773,22 +774,32 @@ export default function Home() {
   }
 
   // A snippet with variables copies what is typed into its highlighted blocks; the first empty block gets the cursor instead of a half-filled copy.
-  async function copyPrepared(item: SecretItem, pickedValues?: Record<string, string>) {
+  async function copyPrepared(item: SecretItem, pickedValues?: Record<string, string>, pickedName?: string) {
     const state = pickedValues ? { ...fillFor(item), values: pickedValues } : fillFor(item);
     const source = resolveSnippetCopySource(item, state.language);
     if (!source) return;
-    const readiness = snippetCopyReadiness(item, state.values, state.checkedInputs, state.verificationConfirmed);
+    const readiness = snippetCopyReadiness(item, state.values, state.checkedInputs, state.verificationConfirmed, state.language);
     if (!readiness.ready) {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== safeSelected) selectRow(index);
       const missing = readiness.missingPlaceholders;
-      setToast(missing.length > 0 ? `先填写：${missing.join("、")}` : "先勾选“发送前确认”");
+      setToast(missing.length > 0 ? `先填写：${missing.join("、")}` : readiness.missingChecks.length > 0 ? "先勾选“发送前确认”" : "先勾选“发送前核实”");
       window.setTimeout(() => setToast(""), 2200);
       window.setTimeout(() => {
         const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
         if (missing.length > 0) Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
         else row?.querySelector<HTMLInputElement>(".copy-checks input:not(:checked), .copy-warning input:not(:checked)")?.focus();
       }, 60);
+      return;
+    }
+    // Values carried over from an earlier copy are shown first: the person must see them once before they go out.
+    const unseen = state.remembered.filter((name) => name !== pickedName && extractPlaceholders(source).includes(name));
+    if (unseen.length > 0) {
+      const index = filtered.findIndex((value) => value.id === item.id);
+      if (index >= 0 && index !== safeSelected) selectRow(index);
+      setFill({ ...state, values: state.values, remembered: [] });
+      setToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`);
+      window.setTimeout(() => setToast(""), 3600);
       return;
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
@@ -1619,7 +1630,7 @@ export default function Home() {
                       {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} memory={valueMemory} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={(picked) => void (picked ? copyPrepared(item, picked) : copy(item))} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} memory={valueMemory} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={(picked, name) => void (picked ? copyPrepared(item, picked, name) : copy(item))} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>

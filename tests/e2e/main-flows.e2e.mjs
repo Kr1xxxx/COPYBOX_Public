@@ -77,9 +77,16 @@ test("a variable remembers the last value, and with one variable Enter copies th
   const same = page.locator(".native-row.selected input[data-var=Name]");
   await expect(same).toHaveValue("Amanda");
   await expect(same.locator("..")).toHaveAttribute("data-remembered", "");
-  // a snippet with exactly one variable: Enter copies the text right away
+  // carried-over values are shown before they go out: the first copy only asks for a look, the second one copies
+  const earlier = await page.evaluate(() => window.__copied);
   await same.click();
   await page.keyboard.press("Enter");
+  await expect(page.getByText("确认没错再复制一次")).toBeVisible();
+  expect(await page.evaluate(() => window.__copied)).toBe(earlier);
+  await expect(same.locator("..")).not.toHaveAttribute("data-remembered", "");
+  await same.click();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).not.toBe(earlier);
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Amanda");
 });
 
@@ -107,6 +114,21 @@ test("a block offers its last three values; clicking one fills it and copies whe
   await expect(row.locator("input[data-var=Name]")).toHaveValue("Dana");
   await expect(row.locator("input[data-var=Company]")).toBeFocused();
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
+});
+
+test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "需要整理的文本" }).first().locator(".row-main").click();
+  const row = page.locator(".native-row.selected:not(.closing-row)");
+  await row.getByRole("button", { name: "中文" }).click();
+  // the Chinese text has only [Sender]; [Name] belongs to the English text and must not block the copy
+  await expect(row.locator("input[data-var]")).toHaveCount(1);
+  await row.locator("input[data-var=Sender]").fill("Amanda 1234 Long Street Name Apartment 56 Springfield Illinois 62704 United States");
+  const chip = await row.locator(".var-chip").boundingBox();
+  const box = await row.locator(".row-content").boundingBox();
+  expect(chip.x + chip.width).toBeLessThanOrEqual(box.x + box.width + 1);
+  await row.locator("input[data-var=Sender]").press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Amanda 1234 Long Street");
 });
 
 test("no keyboard shortcut hints anywhere and Ctrl+E does nothing", async ({ page }) => {

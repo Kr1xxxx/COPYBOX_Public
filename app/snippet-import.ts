@@ -251,10 +251,13 @@ export function snippetCopyReadiness(
   values: Record<string, string>,
   checkedInputs: string[],
   verificationConfirmed: boolean,
+  language?: "en" | "zh",
 ) {
   const meta = item.snippetMeta;
   if (!meta) return { ready: true, missingPlaceholders: [], missingChecks: [], needsVerification: false };
-  const missingPlaceholders = meta.placeholders.filter((name) => !values[name]?.trim());
+  // The English and Chinese texts can use different variable names; only the ones in the text being copied need a value.
+  const needed = language ? extractPlaceholders(resolveSnippetCopySource(item, language)) : meta.placeholders;
+  const missingPlaceholders = needed.filter((name) => !values[name]?.trim());
   const checked = new Set(checkedInputs);
   const missingChecks = meta.requiredInputs.filter((name) => !checked.has(name));
   const needsVerification = meta.requiresVerification && !verificationConfirmed;

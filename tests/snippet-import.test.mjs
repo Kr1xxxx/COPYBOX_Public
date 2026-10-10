@@ -196,3 +196,12 @@ test("offers optional preparation without blocking standard copy", () => {
   assert.equal(hasOptionalSnippetPreparation(plain), false);
   assert.equal(hasOptionalSnippetPreparation({ ...structured, snippetMeta: undefined }), false);
 });
+
+test("readiness for the Chinese text only needs the variables that text uses", () => {
+  const item = { id: "x", label: "x", secret: "Hi [Name], best [Sender]", note: "", color: "#fff", kind: "snippet", createdAt: 1, updatedAt: 1,
+    snippetMeta: { stage: "询盘接待", scene: "s", action: "a", productGroups: [], rawProduct: "", chineseText: "此致 [Sender]", placeholders: ["Name", "Sender"], requiredInputs: [], usageNote: "", requiresVerification: false } };
+  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, [], false, "zh").missingPlaceholders, []);
+  assert.equal(snippetCopyReadiness(item, { Sender: "Amy" }, [], false, "zh").ready, true);
+  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, [], false, "en").missingPlaceholders, ["Name"]);
+  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, [], false).missingPlaceholders, ["Name"]);
+});

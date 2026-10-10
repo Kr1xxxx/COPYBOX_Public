@@ -478,10 +478,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .snippet-fill .copy-warning { background: var(--warn-bg); color: var(--warn); }
 .snippet-fill .copy-warning strong { color: inherit; }
 /* Variable blocks: no brackets; the name is the placeholder, and a click types right there. */
-.var-chip { position: relative; display: inline-grid; vertical-align: baseline; margin: 0 1px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: 0 0 0 0 var(--ring); transition: background-color .16s cubic-bezier(.22,1,.36,1), box-shadow .16s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.var-chip { position: relative; display: inline-grid; max-width: 100%; vertical-align: baseline; margin: 0 1px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: 0 0 0 0 var(--ring); transition: background-color .16s cubic-bezier(.22,1,.36,1), box-shadow .16s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
 .var-chip:active { scale: .96; }
 .var-chip:focus-within { background: var(--card); box-shadow: 0 0 0 2px var(--accent); }
-.var-sizer { grid-area: 1 / 1; padding: 1px 7px; white-space: pre; visibility: hidden; font: inherit; }
+.var-sizer { grid-area: 1 / 1; padding: 1px 7px; overflow: hidden; white-space: pre; visibility: hidden; font: inherit; }
 /* width 0 + min-width 100%: the field's own default width must not widen the block. */
 .var-chip input { grid-area: 1 / 1; box-sizing: border-box; width: 0; min-width: 100%; padding: 1px 7px; border: 0; border-radius: inherit; outline: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: text; }
 .var-chip input::placeholder { color: var(--accent-ink); opacity: .75; }

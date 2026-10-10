@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import type { SecretItem } from "./clipbox-core";
+import { extractPlaceholders } from "./snippet-import";
 
 export type CopyLanguage = "en" | "zh";
 export type SnippetFillState = {
@@ -85,7 +86,7 @@ export function SnippetFill({ item, state, memory, onState, renderText, onSubmit
   memory: ValueMemory;
   onState: (update: (current: SnippetFillState) => SnippetFillState) => void;
   renderText: (text: string) => ReactNode;
-  onSubmit: (values?: Record<string, string>) => void;
+  onSubmit: (values?: Record<string, string>, picked?: string) => void;
   onFocusChange: (focused: boolean) => void;
 }) {
   const meta = item.snippetMeta!;
@@ -106,7 +107,7 @@ export function SnippetFill({ item, state, memory, onState, renderText, onSubmit
   function pick(name: string, value: string) {
     const values = { ...state.values, [name]: value };
     onState((current) => ({ ...current, values: { ...current.values, [name]: value }, remembered: current.remembered.filter((entry) => entry !== name) }));
-    if (meta.placeholders.every((placeholder) => (values[placeholder] || "").trim())) onSubmit(values);
+    if (extractPlaceholders(source).every((placeholder) => (values[placeholder] || "").trim())) onSubmit(values, name);
     else window.setTimeout(() => next(name), 0);
   }
 
