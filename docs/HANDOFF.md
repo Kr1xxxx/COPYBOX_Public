@@ -1,7 +1,7 @@
 # Handoff board
 
-> The single "where are we now". Update it before you stop working; the session log lives in
-> `docs/handoff-log.md`. Keep this file under 100 lines.
+> The single "where are we now". Feature PRs do **not** edit this file (parallel PRs would conflict): leave a note in
+> `docs/log/` instead. Only the coordinator updates the status below. Keep this file under 100 lines.
 
 ## Status (2026-10-09)
 
@@ -14,13 +14,15 @@
 Merging (D-011): small PRs merge themselves when CI is green; big ones are labelled `needs-owner` and wait for the
 owner to write 合并.
 
-Web preview for the owner: version **v1.10** (shown top-left; +0.01 on every update, then say it at the end of each report).
+Web preview for the owner: the current version is in `tools/preview/VERSION` (owned by the preview publisher).
 Windows / Mac switch, ten simulated test images. It is built from the branch under review, not from `main`.
 
 Workflow (`CLAUDE.md`): the main Claude session coordinates; Sonnet workers (`.claude/agents/worker.md`) do pieces in
 git worktrees under `.claude/worktrees/`; the coordinator reviews, merges and pushes.
 
-## Task board
+## Task board (frozen)
+
+Frozen on 2026-10-09: rows 1–15 are history. New work is tracked by PRs and the notes in `docs/log/`, not by new rows.
 
 States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progress" at a time.
 
@@ -50,6 +52,7 @@ States: Todo / In progress / Done / Blocked / Cancelled. Only one task "In progr
 | 23 | Dropdowns (全部产品, row menu, bulk 移动到, folder menu) close on outside click and Esc | In progress | Claude | Lock reported the 全部产品 filter stayed open |
 | 21 | Motion from arc-library, step 2 of 4 (D-021): segmented controls glide one highlight pill | In progress | Claude | `app/arc/segmented.tsx`; used by the section switch, search scope, 宫格\|列表, settings choices, secret display switch |
 | 25 | Motion from arc-library, step 3 of 4 (D-021): pop-over menus (全部产品, row ⋯, bulk 移动到, 图片 移动到) fade and scale from their corner, and fade out | In progress | Claude | `app/arc/menu.tsx` (`ArcMenu` + `AnimatePresence`); short and small on purpose, none under reduced motion. Folder menus and the dialogs keep their CSS entrance for now (dialogs unmount at once; an exit needs their state kept). Step 4 still to do |
+| 25 | 话术搜索: pinyin + initials, rank by hit place and copy count | Done | Claude | `app/snippet-search.ts`; new dependency `pinyin-pro`; `useCount` on items (optional, no migration) |
 | 15 | 图片 九宫格 (D-019) | Done | Claude | Merged with PR #25 (2026-10-09). Sonnet worker; list view kept behind a switch; existing list tests start in list view via `asDesktop(..., { imageView: "list" })` |
 
 The queue behind this board is `docs/ROADMAP.md` (each item is a GitHub issue).

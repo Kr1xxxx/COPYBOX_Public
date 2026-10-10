@@ -4,7 +4,7 @@ What comes next, in the order to do it. Each item is a GitHub issue (acceptance 
 in `docs/HANDOFF.md` only holds what is being worked on right now; this file is the queue behind it.
 Working rules: one item per PR; anything under `desktop/`, storage or encryption waits for the owner's 合并 (D-011).
 
-Last updated: 2026-10-09 (web preview v1.01).
+Last updated: 2026-10-09.
 
 ## Now / next
 
