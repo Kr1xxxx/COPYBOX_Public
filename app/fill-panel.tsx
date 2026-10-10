@@ -68,7 +68,7 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
           spellCheck={false}
           onChange={(event) => onChange(name, event.target.value)}
           onFocus={(event) => { onFocusChange?.(true); onActive?.(name); event.currentTarget.select(); }}
-          onBlur={() => { onFocusChange?.(false); onActive?.(null); }}
+          onBlur={(event) => { onFocusChange?.(false); onActive?.(null); event.currentTarget.scrollLeft = 0; }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); onEnter?.(name); }
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.blur(); }
