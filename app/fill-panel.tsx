@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { SecretItem } from "./clipbox-core";
-import { extractPlaceholders } from "./snippet-import";
 
 export type CopyLanguage = "en" | "zh";
 export type SnippetFillState = {
@@ -80,19 +79,17 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
   })}</>;
 }
 
-export function SnippetFill({ item, state, memory, onState, renderText, onSubmit, onFocusChange }: {
+export function SnippetFill({ item, state, onState, renderText, onSubmit, onActive, onFocusChange }: {
   item: SecretItem;
   state: SnippetFillState;
-  memory: ValueMemory;
   onState: (update: (current: SnippetFillState) => SnippetFillState) => void;
   renderText: (text: string) => ReactNode;
-  onSubmit: (values?: Record<string, string>, picked?: string) => void;
+  onSubmit: () => void;
+  onActive: (name: string | null) => void;
   onFocusChange: (focused: boolean) => void;
 }) {
   const meta = item.snippetMeta!;
   const rootRef = useRef<HTMLDivElement>(null);
-  const [activeName, setActiveName] = useState<string | null>(null);
-  const options = activeName ? memory[activeName] || [] : [];
   const source = state.language === "zh" ? meta.chineseText : item.secret;
 
   // Enter moves to the next empty block; when all are filled it copies.
@@ -101,14 +98,6 @@ export function SnippetFill({ item, state, memory, onState, renderText, onSubmit
     const start = chips.findIndex((chip) => chip.dataset.var === name);
     const target = [...chips.slice(start + 1), ...chips.slice(0, start)].find((chip) => !chip.value.trim());
     if (target) target.focus(); else onSubmit();
-  }
-
-  // Clicking a remembered value fills it. If every other block is already filled it copies at once, otherwise the cursor moves on.
-  function pick(name: string, value: string) {
-    const values = { ...state.values, [name]: value };
-    onState((current) => ({ ...current, values: { ...current.values, [name]: value }, remembered: current.remembered.filter((entry) => entry !== name) }));
-    if (extractPlaceholders(source).every((placeholder) => (values[placeholder] || "").trim())) onSubmit(values, name);
-    else window.setTimeout(() => next(name), 0);
   }
 
   return (
@@ -123,17 +112,12 @@ export function SnippetFill({ item, state, memory, onState, renderText, onSubmit
           renderText={renderText}
           values={state.values}
           remembered={state.remembered}
-          onActive={setActiveName}
+          onActive={onActive}
           onChange={(name, value) => onState((current) => ({ ...current, values: { ...current.values, [name]: value }, remembered: current.remembered.filter((entry) => entry !== name) }))}
           onEnter={next}
           onFocusChange={onFocusChange}
         />
       </p>
-      {meta.placeholders.some((name) => (memory[name] || []).length > 0) && <div className="var-memory" role="listbox" aria-label="最近用过的值">
-        {options.length > 0 && <span className="var-memory-label">最近用过</span>}
-        {/* The row keeps its height while no block is focused, so the layout does not jump when a click elsewhere blurs the block. mousedown is stopped so the block keeps focus until the click lands. */}
-        {options.map((option) => <button key={option} type="button" role="option" aria-selected={option === state.values[activeName!]} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} onClick={() => pick(activeName!, option)}>{option}</button>)}
-      </div>}
       {meta.requiredInputs.length > 0 && <fieldset className="copy-checks"><legend>发送前确认</legend>{meta.requiredInputs.map((input) => <label key={input}><input type="checkbox" checked={state.checkedInputs.includes(input)} onChange={(event) => onState((current) => ({ ...current, checkedInputs: event.target.checked ? [...current.checkedInputs, input] : current.checkedInputs.filter((value) => value !== input) }))} /><span>已确认 {input}</span></label>)}</fieldset>}
       {meta.requiresVerification && <label className="copy-warning"><input type="checkbox" checked={state.verificationConfirmed} onChange={(event) => onState((current) => ({ ...current, verificationConfirmed: event.target.checked }))} /><span><strong>发送前核实</strong> 金额、库存、地址或时效已按当前情况检查</span></label>}
     </div>

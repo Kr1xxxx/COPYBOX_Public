@@ -314,6 +314,7 @@ export default function Home() {
   // Kept in memory only: customer names must not sit in plain browser storage.
   const [valueMemory, setValueMemory] = useState<ValueMemory>({});
   const lastValues = latestValues(valueMemory);
+  const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -804,6 +805,18 @@ export default function Home() {
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
     setValueMemory((current) => rememberValues(current, state.values));
+  }
+
+  // Clicking a remembered value fills the block. If every other block is already filled it copies at once, otherwise the cursor moves on.
+  function pickRemembered(item: SecretItem, name: string, value: string) {
+    const state = fillFor(item);
+    const values = { ...state.values, [name]: value };
+    updateFill(item)((current) => ({ ...current, values: { ...current.values, [name]: value }, remembered: current.remembered.filter((entry) => entry !== name) }));
+    if (extractPlaceholders(resolveSnippetCopySource(item, state.language)).every((placeholder) => (values[placeholder] || "").trim())) { void copyPrepared(item, values, name); return; }
+    window.setTimeout(() => {
+      const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
+      Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => input.dataset.var !== name && !input.value.trim())?.focus();
+    }, 40);
   }
 
   async function copy(item: SecretItem, language: CopyLanguage = "en") {
@@ -1630,7 +1643,7 @@ export default function Home() {
                       {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} memory={valueMemory} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={(picked, name) => void (picked ? copyPrepared(item, picked, name) : copy(item))} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => setActiveVar(name ? { id: item.id, name } : null)} onFocusChange={setTypingVariable} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
@@ -1640,6 +1653,10 @@ export default function Home() {
                           <button type="button" className="primary-button" onClick={() => void copy(item)}><Icon name={copiedId === item.id ? "check" : "copy"} />{copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</button>
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
+                          {isSnippet && activeVar?.id === item.id && (valueMemory[activeVar.name] || []).length > 0 && <span className="var-memory" role="listbox" aria-label={`${activeVar.name} 最近用过的`}>
+                            {/* mousedown is stopped so the block keeps focus until the click lands */}
+                            {(valueMemory[activeVar.name] || []).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} title={option} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} onClick={() => pickRemembered(item, activeVar.name, option)}>{option}</button>)}
+                          </span>}
                           <span className="spacer" />
                           <div className="menu-wrap">
                             <button type="button" className="icon-button" aria-label={`更多操作 ${item.label}`} aria-expanded={rowMenuId === item.id} onClick={() => setRowMenuId((value) => value === item.id ? "" : item.id)}><Icon name="more" /></button>
