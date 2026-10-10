@@ -128,6 +128,8 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog).toContainText("加密后只保存在这台电脑上");
   // Arrow keys move between groups.
   await dialog.getByRole("tab", { name: "数据" }).press("ArrowDown");
+  await expect(dialog.getByRole("tab", { name: "共享话术" })).toHaveAttribute("aria-selected", "true");
+  await dialog.getByRole("tab", { name: "共享话术" }).press("ArrowDown");
   await expect(dialog.getByRole("tab", { name: "窗口" })).toHaveAttribute("aria-selected", "true");
   await expect(dialog.getByText("迷你模式")).toBeVisible();
 });
