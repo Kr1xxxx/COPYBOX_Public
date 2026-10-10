@@ -177,7 +177,7 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
         </div>
         </div>
       </section>
-      {dataMove && <DataMoveDialog mode={dataMove} onClose={() => setDataMove(null)} />}
+      {dataMove && <DataMoveDialog mode={dataMove} itemCount={itemCount} onClose={() => setDataMove(null)} />}
     </div>
   );
 }

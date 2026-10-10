@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  applyPayload, base64ToBytes, bytesToBase64, collectPayload, countPayload, decodeValue, encodeValue,
+  applyPayload, base64ToBytes, countImages, bytesToBase64, collectPayload, countPayload, decodeValue, encodeValue,
   openTransfer, parseTransferFile, sealTransfer,
 } from "../app/data-transfer.ts";
 
@@ -18,7 +18,7 @@ function fakeStorage(initial = {}) {
 }
 
 // Just enough IndexedDB for data-transfer.ts: open / stores / getAll / clear / put / transaction completion.
-function fakeIndexedDB(seed = {}) {
+function fakeIndexedDB(seed = {}, { failPutIn } = {}) {
   const dbs = new Map(Object.entries(seed).map(([name, stores]) => [name, new Map(Object.entries(stores).map(([s, rows]) => [s, new Map(rows.map((r) => [r.id, structuredClone(r)]))]))]));
   const later = (fn) => setTimeout(fn, 0);
   const request = (run) => {
@@ -46,7 +46,10 @@ function fakeIndexedDB(seed = {}) {
             tx.objectStore = (s) => ({
               getAll: () => { pending += 1; return request(() => { pending -= 1; return [...stores.get(s).values()].map((r) => structuredClone(r)); }); },
               clear: () => void stores.get(s).clear(),
-              put: (row) => void stores.get(s).set(row.id, structuredClone(row)),
+              put: (row) => {
+                if (failPutIn === name && !tx.rolledBack) throw new Error("QuotaExceededError");
+                stores.get(s).set(row.id, structuredClone(row));
+              },
             });
             void names;
             settle();
@@ -138,4 +141,41 @@ test("a payload with foreign keys or databases is refused before anything is wri
   await assert.rejects(applyPayload({ localStorage: { "clipbox.ai-key.web.v1": "x" }, indexedDB: {} }, storage, idb), /文件内容不对/);
   assert.deepEqual(storage.snapshot(), { "clipbox.vault.v1": "KEEP" });
   assert.equal(idb.dbs.size, 0);
+});
+
+test("a failure half-way puts the old data back (images and settings)", async () => {
+  const oldImages = { "clipbox-images": { meta: [{ id: "settings", salt: "s" }, { id: "old1", iv: "a", ciphertext: "b" }, { id: "old2", iv: "a", ciphertext: "b" }], blobs: [{ id: "old1", iv: "a", ciphertext: Uint8Array.from([1]).buffer }] } };
+  const payload = {
+    localStorage: { "clipbox.vault.v1": "NEW" },
+    indexedDB: { "clipbox-images": { meta: [{ id: "new1", iv: "a", ciphertext: "b" }], blobs: [] }, "clipbox-image-thumbs": { thumbs: [{ id: "new1", bytes: Uint8Array.from([2]).buffer, type: "image/png" }] } },
+  };
+  // Disk full while writing the second database: the first one is already replaced by then.
+  const idb = fakeIndexedDB({ ...oldImages, "clipbox-image-thumbs": { thumbs: [] } }, { failPutIn: "clipbox-image-thumbs" });
+  const storage = fakeStorage({ "clipbox.vault.v1": "OLD", "clipbox.device-key.v1": "K" });
+  await assert.rejects(applyPayload(payload, storage, idb), /现有内容已经原样保留/);
+  assert.deepEqual(storage.snapshot(), { "clipbox.vault.v1": "OLD", "clipbox.device-key.v1": "K" });
+  assert.deepEqual([...idb.dbs.get("clipbox-images").get("meta").keys()].sort(), ["old1", "old2", "settings"]);
+  assert.equal(idb.dbs.get("clipbox-images").get("blobs").size, 1);
+});
+
+test("a failing settings write also rolls the images back", async () => {
+  const idb = fakeIndexedDB({ "clipbox-images": { meta: [{ id: "old1", iv: "a", ciphertext: "b" }], blobs: [] } });
+  const storage = fakeStorage({ "clipbox.vault.v1": "OLD" });
+  const real = storage.setItem;
+  let failures = 1;
+  storage.setItem = (key, value) => { if (failures-- > 0) throw new Error("QuotaExceededError"); real(key, value); };
+  const payload = { localStorage: { "clipbox.vault.v1": "NEW" }, indexedDB: { "clipbox-images": { meta: [{ id: "new1", iv: "a", ciphertext: "b" }], blobs: [] } } };
+  await assert.rejects(applyPayload(payload, storage, idb), /原样保留/);
+  assert.equal(storage.getItem("clipbox.vault.v1"), "OLD");
+  assert.deepEqual([...idb.dbs.get("clipbox-images").get("meta").keys()], ["old1"]);
+});
+
+test("image counts ignore the two bookkeeping rows", () => {
+  const payload = { localStorage: {}, indexedDB: { "clipbox-images": { meta: [{ id: "settings" }, { id: "folders" }, { id: "a" }, { id: "b" }], blobs: [] } } };
+  assert.equal(countImages(payload), 2);
+  assert.equal(countImages({ localStorage: {}, indexedDB: {} }), 0);
+});
+
+test("new files use 600000 PBKDF2 rounds", async () => {
+  assert.equal((await sealTransfer({ localStorage: {}, indexedDB: {} }, "long-enough-pass")).iterations, 600_000);
 });

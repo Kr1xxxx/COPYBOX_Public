@@ -1030,3 +1030,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .totp-qr-pick{position:relative;justify-self:start;cursor:pointer}
 .totp-qr-pick input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
 .totp-qr-pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+.backup-warning{margin:0;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;background:#fff4e9;color:#8b5b37;font-size:12px;line-height:1.5}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .backup-warning{background:var(--warn-bg);color:var(--warn)}}
+:root[data-theme="dark"] .backup-warning{background:var(--warn-bg);color:var(--warn)}
+.backup-dialog.data-move .backup-intro,.backup-dialog.data-move .backup-note,.backup-dialog.data-move .backup-field{color:#5b5b60}.backup-dialog.data-move .backup-head p{color:#7a5a43}.backup-dialog.data-move:focus{outline:0}

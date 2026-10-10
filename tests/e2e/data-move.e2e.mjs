@@ -17,6 +17,12 @@ test("全部数据可以导出成加密文件，清空后再导入回来", async
   const settings = await openSettings(page);
   await settings.locator(".settings-row", { hasText: "导出到新版" }).getByRole("button", { name: "导出…" }).click();
   const dialog = page.getByRole("dialog", { name: "导出到新版" });
+  // Esc closes only this dialog; the settings stay open. No English eyebrow text.
+  await expect(dialog).not.toContainText("DATA MOVE");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(settings).toBeVisible();
+  await settings.locator(".settings-row", { hasText: "导出到新版" }).getByRole("button", { name: "导出…" }).click();
   await dialog.getByPlaceholder("至少 8 个字符").fill("move-1234");
   await dialog.getByPlaceholder("确认密码").fill("move-9999");
   await dialog.getByRole("button", { name: "加密并导出" }).click();
@@ -48,5 +54,7 @@ test("全部数据可以导出成加密文件，清空后再导入回来", async
   await expect(importDialog).toContainText("密码不对");
   await importDialog.getByPlaceholder("输入导出时设置的密码").fill("move-1234");
   await importDialog.getByRole("button", { name: "验证并替换" }).click();
+  await expect(importDialog.getByRole("alert")).toContainText(/替换现有的 0 条内容、0 张图片/);
+  await importDialog.getByRole("button", { name: "确认替换" }).click();
   await expect(page.locator(".native-row")).toHaveCount(34);
 });

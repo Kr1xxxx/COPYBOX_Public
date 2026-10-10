@@ -3,9 +3,11 @@
 // cannot see the old data by itself. Records are copied as they are (already-encrypted stays encrypted), so nothing is
 // re-encrypted or interpreted here; the file as a whole is sealed with a password on top.
 
+export class TransferError extends Error {}
+
 export const TRANSFER_FORMAT = "clipbox-data-move";
 export const TRANSFER_VERSION = 1;
-const ITERATIONS = 310_000;
+const ITERATIONS = 600_000;
 const KEY_PREFIX = "clipbox.";
 // The browser build keeps its AI key in plain text in localStorage; it never travels. Desktop builds keep it in the OS store.
 const SKIPPED_KEYS = new Set(["clipbox.ai-key.web.v1"]);
@@ -47,7 +49,7 @@ export function encodeValue(value: unknown): Wire {
   if (Array.isArray(value)) return value.map(encodeValue);
   if (typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, encodeValue(inner)]));
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
-  throw new Error("遇到无法搬家的数据");
+  throw new TransferError("遇到无法搬家的数据");
 }
 
 export function decodeValue(wire: Wire): unknown {
@@ -122,21 +124,27 @@ function validatePayload(value: unknown): TransferPayload {
   const payload = value as TransferPayload | null;
   const stores = payload?.indexedDB;
   const local = payload?.localStorage;
-  if (!payload || typeof local !== "object" || local === null || typeof stores !== "object" || stores === null) throw new Error("文件内容不对");
+  if (!payload || typeof local !== "object" || local === null || typeof stores !== "object" || stores === null) throw new TransferError("文件内容不对");
   for (const [key, text] of Object.entries(local)) {
-    if (!key.startsWith(KEY_PREFIX) || SKIPPED_KEYS.has(key) || typeof text !== "string") throw new Error("文件内容不对");
+    if (!key.startsWith(KEY_PREFIX) || SKIPPED_KEYS.has(key) || typeof text !== "string") throw new TransferError("文件内容不对");
   }
   for (const [name, tables] of Object.entries(stores)) {
-    if (!DATABASES.includes(name) || typeof tables !== "object" || tables === null) throw new Error("文件内容不对");
-    for (const rows of Object.values(tables)) if (!Array.isArray(rows)) throw new Error("文件内容不对");
+    if (!DATABASES.includes(name) || typeof tables !== "object" || tables === null) throw new TransferError("文件内容不对");
+    for (const rows of Object.values(tables)) if (!Array.isArray(rows)) throw new TransferError("文件内容不对");
   }
   return payload;
 }
 
-// Replaces what is stored here with the payload. The databases are written first and the settings last, so a failure
-// part-way leaves the old vault key in place instead of a new vault key pointing at missing images.
-export async function applyPayload(input: TransferPayload, storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<void> {
-  const payload = validatePayload(input);
+// What the person sees in the confirmation: pictures only (the two bookkeeping rows are not pictures).
+export function countImages(payload: TransferPayload): number {
+  const rows = payload.indexedDB["clipbox-images"]?.meta ?? [];
+  return rows.filter((row) => {
+    const id = (row as { id?: unknown } | null)?.id;
+    return id !== "settings" && id !== "folders";
+  }).length;
+}
+
+async function writePayload(payload: TransferPayload, storage: Storage, factory: IDBFactory): Promise<void> {
   for (const [name, tables] of Object.entries(payload.indexedDB)) {
     const open = factory.open(name, 1);
     open.onupgradeneeded = () => {
@@ -166,6 +174,29 @@ export async function applyPayload(input: TransferPayload, storage: Storage = lo
   for (const [key, text] of Object.entries(payload.localStorage)) storage.setItem(key, text);
 }
 
+// Replaces what is stored here with the payload. The databases are written first and the settings last. Before
+// anything is touched the current data is copied; if any step fails (disk full, browser refusing a write), the copy is
+// written back, so a half-finished import never leaves new images beside the old vault.
+export async function applyPayload(input: TransferPayload, storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<void> {
+  const payload = validatePayload(input);
+  let backup: TransferPayload;
+  try {
+    backup = await collectPayload(storage, factory);
+  } catch {
+    throw new TransferError("没能先备份现有内容，所以没有导入。现有内容没有改动。");
+  }
+  try {
+    await writePayload(payload, storage, factory);
+  } catch {
+    try {
+      await writePayload(backup, storage, factory);
+    } catch {
+      throw new TransferError("导入中断了，而且没能恢复原来的内容。请不要关闭这个窗口，马上联系管理员。");
+    }
+    throw new TransferError("导入没有成功（可能是磁盘空间不够）。现有内容已经原样保留，没有改动。");
+  }
+}
+
 async function passwordKey(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
@@ -182,11 +213,11 @@ export async function sealTransfer(payload: TransferPayload, password: string, n
 
 export function parseTransferFile(text: string): TransferFile {
   let file: TransferFile;
-  try { file = JSON.parse(text) as TransferFile; } catch { throw new Error("这不是搬家文件"); }
-  if (file?.format !== TRANSFER_FORMAT) throw new Error("这不是搬家文件");
-  if (file.version !== TRANSFER_VERSION) throw new Error("搬家文件的版本太新，请先更新 Clipbox");
+  try { file = JSON.parse(text) as TransferFile; } catch { throw new TransferError("这不是搬家文件"); }
+  if (file?.format !== TRANSFER_FORMAT) throw new TransferError("这不是搬家文件");
+  if (file.version !== TRANSFER_VERSION) throw new TransferError("搬家文件的版本太新，请先更新 Clipbox");
   if (typeof file.salt !== "string" || typeof file.iv !== "string" || typeof file.ciphertext !== "string" || !Number.isInteger(file.iterations) || file.iterations < 1) {
-    throw new Error("搬家文件已损坏");
+    throw new TransferError("搬家文件已损坏");
   }
   return file;
 }
@@ -197,7 +228,7 @@ export async function openTransfer(file: TransferFile, password: string): Promis
   try {
     plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(file.iv), additionalData: new TextEncoder().encode(`${TRANSFER_FORMAT}:${file.version}`) }, key, base64ToBytes(file.ciphertext));
   } catch {
-    throw new Error("密码不对，或文件已损坏");
+    throw new TransferError("密码不对，或文件已损坏");
   }
   return validatePayload(JSON.parse(new TextDecoder().decode(plain)));
 }
