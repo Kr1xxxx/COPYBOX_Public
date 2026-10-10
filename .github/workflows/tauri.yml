@@ -8,11 +8,16 @@ on:
       - "src-tauri/**"
       - "scripts/tauri-frontend.mjs"
       - ".github/workflows/tauri.yml"
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "src-tauri/**"
       - "scripts/tauri-frontend.mjs"
+
+concurrency:
+  group: tauri-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -20,11 +25,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Windows
-            os: windows-latest
-          - name: macOS arm64
-            os: macos-latest
+        # macOS minutes cost ten times as much as Linux, so pull requests build Windows only;
+        # the Mac build runs when a change lands on main, and by hand.
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"name":"Windows","os":"windows-latest"}]' || '[{"name":"Windows","os":"windows-latest"},{"name":"macOS arm64","os":"macos-latest"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
