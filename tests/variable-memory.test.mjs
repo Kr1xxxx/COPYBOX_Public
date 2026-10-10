@@ -32,8 +32,8 @@ test("pinning twice unpins; an empty value cannot be pinned; three pinned values
   assert.equal(togglePin(state.memory, state.pins, "Name", "A").result, "unpinned");
 });
 
-test("Name starts with beautiful, Friend and Lovely, and Friend is the default", () => {
-  assert.deepEqual([...NAME_OPTIONS], ["beautiful", "Friend", "Lovely"]);
+test("Name starts with Beautiful, Friend and Lovely, and Friend is the default", () => {
+  assert.deepEqual([...NAME_OPTIONS], ["Beautiful", "Friend", "Lovely"]);
   assert.equal(DEFAULT_VALUES.Name, "Friend");
 });
 
@@ -73,4 +73,15 @@ test("dragging moves a value inside its group only; pinned values stay in front"
   const two = togglePin(pinned.memory, pinned.pins, "Name", "A");
   const flipped = moveOption(two.memory, two.pins, "Name", "A", "B");
   assert.deepEqual(memoryOptions(flipped.memory, flipped.pins, "Name"), ["A", "B", "C"]);
+});
+
+test("Name's three fixed options never take a place in the recent list", () => {
+  const memory = rememberValues({}, { Name: "Friend" });
+  assert.deepEqual(memory.Name || [], []);
+  assert.deepEqual(rememberValues({}, { Name: "lovely" }).Name || [], []);
+  const withAmanda = rememberValues(memory, { Name: "Amanda" });
+  assert.deepEqual(memoryOptions(withAmanda, {}, "Name"), ["Amanda"]);
+  assert.deepEqual(memoryOptions({ Name: ["Friend", "Amanda"] }, {}, "Name"), ["Amanda"]);
+  // other variables are not touched
+  assert.deepEqual(rememberValues({}, { Company: "Friend" }).Company, ["Friend"]);
 });

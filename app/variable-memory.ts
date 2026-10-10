@@ -1,9 +1,14 @@
 // What each variable block remembers. Held in memory only (never saved): the values are often customer names.
 export const MEMORY_SIZE = 3;
 
-// Every variable called Name starts with these three, so a quick reply needs no typing. The first one is not used by default.
-export const NAME_OPTIONS = ["beautiful", "Friend", "Lovely"] as const;
+// Every variable called Name starts with these three, so a quick reply needs no typing. Friend is the default.
+export const NAME_OPTIONS = ["Beautiful", "Friend", "Lovely"] as const;
 export const DEFAULT_VALUES: Record<string, string> = { Name: "Friend" };
+
+// The three above are always on offer, so they never take a place in the recent list.
+export function isDefaultOption(name: string, value: string): boolean {
+  return name === "Name" && NAME_OPTIONS.some((option) => option.toLowerCase() === value.trim().toLowerCase());
+}
 
 export type ValueMemory = Record<string, string[]>;
 // The values the person pinned, per name. A pinned value is also in the memory and is never pushed out by a new one.
@@ -18,7 +23,7 @@ export function rememberValues(memory: ValueMemory, values: Record<string, strin
   const next = { ...memory };
   for (const [name, raw] of Object.entries(values)) {
     const value = raw.trim();
-    if (!value) continue;
+    if (!value || (isDefaultOption(name, value) && !isPinned(pins, name, value))) continue;
     const list = [value, ...(next[name] || []).filter((entry) => entry !== value)];
     while (list.length > MEMORY_SIZE) {
       let drop = -1;
@@ -34,7 +39,7 @@ export function rememberValues(memory: ValueMemory, values: Record<string, strin
 // Pinned values first, in the order they were pinned (they survive a reload), then the recent ones newest first, three in all.
 export function memoryOptions(memory: ValueMemory, pins: PinnedValues, name: string): string[] {
   const pinned = pins[name] || [];
-  return [...pinned, ...(memory[name] || []).filter((value) => !pinned.includes(value))].slice(0, MEMORY_SIZE);
+  return [...pinned, ...(memory[name] || []).filter((value) => !pinned.includes(value) && !isDefaultOption(name, value))].slice(0, MEMORY_SIZE);
 }
 
 export function latestValues(memory: ValueMemory): Record<string, string> {

@@ -279,7 +279,7 @@ export default function Home() {
   useEffect(() => { try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedValues)); } catch { /* pins last for this session only */ } }, [pinnedValues]);
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
-  const dragOption = useRef<{ name: string; value: string; startX: number; moved: boolean } | null>(null);
+  const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; element: HTMLButtonElement } | null>(null);
   const suppressOptionClick = useRef(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
@@ -859,22 +859,49 @@ export default function Home() {
     window.setTimeout(() => setToast(""), 2000);
   }
   // Holding a listed value and moving it drags it to another place in the list.
+  // The other values slide to their new places while one is dragged (first, last, invert, play).
+  const optionLefts = useRef<Map<string, number>>(new Map());
+  useLayoutEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next = new Map<string, number>();
+    document.querySelectorAll<HTMLElement>(".var-memory-option").forEach((element) => {
+      const key = `${element.closest(".var-memory-group")?.getAttribute("aria-label")}|${element.dataset.optionValue}`;
+      next.set(key, element.offsetLeft);
+      const before = optionLefts.current.get(key);
+      if (reduce || before === undefined || before === element.offsetLeft || "dragging" in element.dataset) return;
+      element.animate([{ transform: `translateX(${before - element.offsetLeft}px)` }, { transform: "none" }], { duration: 180, easing: "cubic-bezier(.22,1,.36,1)" });
+    });
+    optionLefts.current = next;
+  });
+
   function startOptionDrag(event: React.PointerEvent<HTMLButtonElement>, name: string, value: string) {
     if (event.button !== 0) return;
-    dragOption.current = { name, value, startX: event.clientX, moved: false };
+    dragOption.current = { name, value, startX: event.clientX, startLeft: event.currentTarget.offsetLeft, moved: false, element: event.currentTarget };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
   function moveOptionDrag(event: React.PointerEvent<HTMLButtonElement>) {
     const drag = dragOption.current;
     if (!drag) return;
     if (!drag.moved && Math.abs(event.clientX - drag.startX) < 6) return;
+    if (!drag.moved) { drag.element.dataset.dragging = ""; drag.element.style.transition = "none"; }
     drag.moved = true;
     const over = document.elementsFromPoint(event.clientX, event.clientY).find((element) => element instanceof HTMLElement && element.dataset.optionValue !== undefined && element.dataset.optionValue !== drag.value) as HTMLElement | undefined;
-    if (!over) return;
+    if (over) {
     const outcome = moveOption(valueMemory, pinnedValues, drag.name, drag.value, over.dataset.optionValue || "");
     if (outcome.memory !== valueMemory || outcome.pins !== pinnedValues) { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); }
+    }
+    // the held value follows the pointer, even after the others have slid into new places
+    drag.element.style.transform = `translateX(${event.clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft)}px)`;
   }
   function endOptionDrag() {
+    const held = dragOption.current;
+    if (held?.moved) {
+      const element = held.element;
+      delete element.dataset.dragging;
+      element.style.transition = "transform .18s cubic-bezier(.22,1,.36,1)";
+      element.style.transform = "";
+      window.setTimeout(() => { element.style.transition = ""; }, 200);
+    }
     if (dragOption.current?.moved) { suppressOptionClick.current = true; window.setTimeout(() => { suppressOptionClick.current = false; }, 0); }
     dragOption.current = null;
   }

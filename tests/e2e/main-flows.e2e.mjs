@@ -117,7 +117,7 @@ test("a block offers its last three values; clicking one fills it and copies whe
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
 });
 
-test("Name offers beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
+test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
   const row = page.locator(".native-row.selected");
@@ -128,7 +128,7 @@ test("Name offers beautiful, Friend and Lovely above the block; Friend goes out 
   const chip = row.locator(".var-chip", { has: page.locator("input[data-var=Name]") });
   await row.locator("input[data-var=Name]").click();
   const popup = page.locator(".var-popup");
-  await expect(popup.locator(".var-popup-option")).toHaveText(["beautiful", "Friend", "Lovely"]);
+  await expect(popup.locator(".var-popup-option")).toHaveText(["Beautiful", "Friend", "Lovely"]);
   const chipBox = await chip.boundingBox();
   const popupBox = await popup.boundingBox();
   // this card has the 英文/中文 switch above its text, so the choices open below the block and never cover it
@@ -193,7 +193,12 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  // while held, the value follows the pointer with a lift; the others slide instead of jumping
+  const held = row.locator(".var-memory-option[data-dragging]");
+  await expect(held).toHaveText("Amanda");
+  expect(await held.evaluate((element) => element.style.transform)).toMatch(/translateX/);
   await page.mouse.up();
+  await expect(row.locator(".var-memory-option[data-dragging]")).toHaveCount(0);
   await expect(options).toHaveText(["Amanda", "Cara", "Bella"]);
   // dropping did not count as a click: nothing was filled or copied
   await expect(name).toHaveValue("Cara");

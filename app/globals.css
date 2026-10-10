@@ -925,3 +925,4 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory-name { font-size: 11.5px; color: var(--muted); }
 .var-memory { flex: 0 1 auto; }
 .var-popup[data-below] { transform: translate(-50%, 6px); }
+.var-memory-option[data-dragging] { z-index: 2; position: relative; scale: 1.06; box-shadow: 0 4px 12px rgba(0,0,0,.18); cursor: grabbing; }
