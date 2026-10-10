@@ -76,7 +76,7 @@ test("the status bar no longer mentions clearing the clipboard", () => {
 
 test("on Windows the 备注 section is plain notes: no masking, reference links or segments", () => {
   assert.match(page, /const PLAIN_NOTES = typeof window === "undefined" \|\| window\.clipboxDesktop\?\.platform !== "darwin"/);
-  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <ArcSegmented className="segmented"', '!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint"']) {
+  for (const marker of ['!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference"', 'kind === "secret" && !PLAIN_NOTES && item && <button', 'kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"', 'kind === "secret" && !PLAIN_NOTES && <ArcSegmented className="segmented"', '!isSnippet && !PLAIN_NOTES && <p className="row-hint"']) {
     assert.ok(page.includes(marker), marker);
   }
   assert.match(page, /: PLAIN_NOTES \? <p className="row-content">/);
