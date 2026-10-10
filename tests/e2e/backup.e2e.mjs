@@ -4,7 +4,9 @@ import { asDesktop, seedSnippets } from "./helpers.mjs";
 
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
-  return page.getByRole("dialog", { name: "设置" });
+  const dialog = page.getByRole("dialog", { name: "设置" });
+  await dialog.getByRole("tab", { name: "数据" }).click();
+  return dialog;
 }
 
 test("macOS: 秘密 can be exported to its own encrypted file and imported back", async ({ page }) => {
