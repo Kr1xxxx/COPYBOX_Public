@@ -55,6 +55,8 @@ import {
   resolveSnippetCopySource,
   type SnippetImportPreview,
 } from "./snippet-import";
+import { FolderRow } from "./folder-row";
+import { ListEmptyState } from "./list-empty-state";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
@@ -1287,20 +1289,18 @@ export default function Home() {
   );
   const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
-  const emptyState = firstRun ? (
-    <div className="native-empty onboarding">
-      <VaultMark />
-      <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
-      <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
-      <div className="onboarding-actions">
-        <button type="button" className="primary-button" onClick={() => openEditor(null)}><Icon name="plus" />新增第一条</button>
-        {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={() => spreadsheetFileRef.current?.click()}>导入话术表格</button>}
-        <button type="button" className="secondary-button" onClick={() => fileRef.current?.click()}>导入备份</button>
-      </div>
-      <small>内容用 AES-256 加密，只保存在这台设备上</small>
-    </div>
-  ) : (
-    <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : activeFolder === "recent" ? "还没有使用记录" : "这个目录还是空的"}</strong><span>{query ? (searchAllFolders || activeFolder === "all" ? "换个词搜索试试" : "换个词，或改为搜索全部目录") : activeFolder === "trash" ? "删除的内容会加密保留在这里" : activeFolder === "pinned" ? "点条目右侧的星标添加收藏" : activeFolder === "recent" ? "复制过的内容会出现在这里" : isMini ? "回到完整窗口添加第一条" : "点右上角的「新增」添加第一条"}</span></div>
+  const emptyState = (
+    <ListEmptyState
+      firstRun={firstRun}
+      activeKind={activeKind}
+      activeFolder={activeFolder}
+      query={query}
+      searchAllFolders={searchAllFolders}
+      isMini={isMini}
+      onAdd={() => openEditor(null)}
+      onImportSheet={() => spreadsheetFileRef.current?.click()}
+      onImportBackup={() => fileRef.current?.click()}
+    />
   );
   const showFolderChip = searching && (searchWholeVault || activeFolder === "pinned" || activeFolder === "recent");
   const editorNode = (
@@ -1325,28 +1325,30 @@ export default function Home() {
     const renaming = renamingFolder?.from === folder;
     const count = activeKindItems.filter((item) => item.folder === folder).length;
     return (
-      <div key={folder} {...(sortable ? { "data-sort-scope": "folder", "data-sort-id": folder } : {})} className={`directory-row ${sortable ? "" : "fixed"} ${active ? "active" : ""} ${folderReorder.draggingId === folder ? "dragging" : ""} ${folderReorder.overId === folder && folderReorder.draggingId !== folder ? "drag-over" : ""}`}>
-        {renaming ? (
-          <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); void submitFolderRename(); }}>
-            <i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} />
-            <input ref={renameInputRef} value={renamingFolder.value} aria-label={`重命名 ${folder}`} aria-invalid={Boolean(renamingFolder.error)} maxLength={30}
-              onChange={(event) => setRenamingFolder({ ...renamingFolder, value: event.target.value, error: "" })}
-              onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setRenamingFolder(null); } }}
-              onBlur={() => window.setTimeout(() => setRenamingFolder((current) => current?.from === folder ? null : current), 120)} />
-            {renamingFolder.error && <small className="directory-error" role="alert">{renamingFolder.error}</small>}
-          </form>
-        ) : (
-          <button type="button" className="nav-item directory-main" onClick={() => selectFolder(`folder:${folder}`)} title={folder}><span className="nav-icon"><i className="directory-color-marker" aria-hidden="true" style={{ background: categoryColors[folder] }} /></span><span className="nav-label">{folder}</span><b>{count}</b></button>
-        )}
-        {!renaming && <button type="button" className="folder-more" aria-label={`管理目录 ${folder}`} aria-haspopup="menu" aria-expanded={folderMenu === folder} title="重命名、颜色、删除"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            setFolderDeleteArm("");
-            setFolderMenuPos({ top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 270)), left: rect.left });
-            setFolderMenu((value) => value === folder ? "" : folder);
-          }}><Icon name="more" /></button>}
-        {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序" onPointerDown={(event) => folderReorder.beginPointerDrag(event, folder)}><span aria-hidden="true">⠿</span></button>}
-      </div>
+      <FolderRow
+        key={folder}
+        folder={folder}
+        sortable={sortable}
+        active={active}
+        count={count}
+        color={categoryColors[folder]}
+        dragging={folderReorder.draggingId === folder}
+        dragOver={folderReorder.overId === folder && folderReorder.draggingId !== folder}
+        renaming={renaming ? renamingFolder : null}
+        renameInputRef={renameInputRef}
+        menuOpen={folderMenu === folder}
+        onSelect={() => selectFolder(`folder:${folder}`)}
+        onSubmitRename={() => { void submitFolderRename(); }}
+        onRenameChange={setRenamingFolder}
+        onRenameCancel={() => setRenamingFolder(null)}
+        onRenameBlur={() => window.setTimeout(() => setRenamingFolder((current) => current?.from === folder ? null : current), 120)}
+        onOpenMenu={(rect) => {
+          setFolderDeleteArm("");
+          setFolderMenuPos({ top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 270)), left: rect.left });
+          setFolderMenu((value) => value === folder ? "" : folder);
+        }}
+        onBeginDrag={(event) => folderReorder.beginPointerDrag(event, folder)}
+      />
     );
   };
   const menuFolder = folderMenu && activeFolders.includes(folderMenu) ? folderMenu : "";
