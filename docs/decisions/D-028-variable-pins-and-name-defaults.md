@@ -1,4 +1,4 @@
-### D-027 Variable blocks: pinned values and Name defaults (2026-10-10)
+### D-028 Variable blocks: pinned values and Name defaults (2026-10-10)
 - Context (owner, 2026-10-10): remembered values must not disappear on their own; a block should say how many it remembers and let a value be pinned; every Name starts with beautiful / Friend / Lovely and a copy with no choice sends Friend.
 - Decision (owner): each block remembers at most 3 values. Right-click on a block (or on a listed value) pins it; a pinned value is never pushed out by a new one, and with three pinned there is no room for new ones. A `?` at the right edge of the block explains this. The variable `Name` is prefilled with `Friend` (not a carried-over value, so no extra confirmation) and shows beautiful / Friend / Lovely in a pop-up above the block.
 - Consequences: the recent values still live in memory only (customer names are not written to browser storage). Only the pinned values are saved on the device, in `localStorage` key `clipbox.pinned-values.v1` as plain text, because the person chose them on purpose; the vault and its encryption format are not touched. Clearing site data drops the pins.
