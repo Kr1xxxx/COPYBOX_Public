@@ -9,3 +9,7 @@
 ## Follow-up (v1.25)
 - What changed: dragging a remembered value now animates (the held value follows the pointer and lifts, the others slide to their new places with a short FLIP, it settles on release; reduced motion skips the slide); the first Name option is `Beautiful`; Beautiful/Friend/Lovely never enter the recent list (`isDefaultOption`, pinned ones still show); imported the 【設置】 patch showing version and update time in 设置 → 关于 and the page header.
 - User-visible change: 常用值拖动有动效；首选项 Beautiful 首字母大写；固定的三个选项不进常用；关于页和页面顶部显示更新时间。
+
+## Follow-up (v1.27)
+- What changed: fixed options are now a general rule in `app/variable-memory.ts` (`FIXED_OPTIONS` map, `fixedOptions`, `isFixedOption`); the popup above a block and the recent-list filter both read it, so any block listed there keeps its fixed options out of 常用. Only Name has them today.
+- User-visible change: 固定选项（Beautiful / Friend / Lovely）不进「常用」，以后新增的固定选项也一样。

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_VALUES, NAME_OPTIONS, deleteValue, memoryOptions, moveOption, parsePinned, rememberValues, togglePin } from "../app/variable-memory.ts";
+import { DEFAULT_VALUES, FIXED_OPTIONS, NAME_OPTIONS, fixedOptions, isFixedOption, deleteValue, memoryOptions, moveOption, parsePinned, rememberValues, togglePin } from "../app/variable-memory.ts";
 
 test("a block remembers its last three values, newest first", () => {
   let memory = {};
@@ -84,4 +84,16 @@ test("Name's three fixed options never take a place in the recent list", () => {
   assert.deepEqual(memoryOptions({ Name: ["Friend", "Amanda"] }, {}, "Name"), ["Amanda"]);
   // other variables are not touched
   assert.deepEqual(rememberValues({}, { Company: "Friend" }).Company, ["Friend"]);
+});
+
+test("fixed options are a general rule: any block listed in FIXED_OPTIONS keeps them out of the recent list", () => {
+  FIXED_OPTIONS.Greeting = ["Hello"];
+  try {
+    assert.deepEqual(fixedOptions("Greeting"), ["Hello"]);
+    assert.equal(isFixedOption("Greeting", " hello "), true);
+    assert.deepEqual(rememberValues({}, { Greeting: "Hello" }).Greeting || [], []);
+    assert.deepEqual(rememberValues({}, { Greeting: "Hi" }).Greeting, ["Hi"]);
+    assert.deepEqual(memoryOptions({ Greeting: ["Hello", "Hi"] }, {}, "Greeting"), ["Hi"]);
+    assert.equal(isFixedOption("Company", "Hello"), false);
+  } finally { delete FIXED_OPTIONS.Greeting; }
 });

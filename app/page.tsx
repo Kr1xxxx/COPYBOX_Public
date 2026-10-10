@@ -83,7 +83,7 @@ import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
 import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
-import { NAME_OPTIONS, PINNED_KEY, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
+import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
@@ -1792,7 +1792,7 @@ export default function Home() {
                           <button type="button" className="primary-button copy-main" aria-label={copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"} data-copied={copiedId === item.id ? "" : undefined} onClick={() => void copy(item)}><span className="copy-main-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span><span className="copy-main-label"><span>{isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</span><span>已复制</span></span></button>
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
-                          {isSnippet && !closing && activeVar?.id === item.id && activeVar.name === "Name" && <VariablePopup rowId={item.id} name="Name" options={NAME_OPTIONS} current={fillFor(item).values.Name || ""} onPick={(value) => pickRemembered(item, "Name", value)} />}
+                          {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
                           {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
                             {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="listbox" aria-label={`${name} 最近用过的`}>
                             {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
