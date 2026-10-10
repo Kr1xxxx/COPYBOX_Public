@@ -68,6 +68,8 @@ import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
+import { ArcMenu } from "./arc/menu";
+import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
@@ -1535,9 +1537,9 @@ export default function Home() {
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
-                {productMenuOpen && <div className="product-filter-menu" role="menu">
+                <AnimatePresence>{productMenuOpen && <ArcMenu className="product-filter-menu">
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
-                </div>}
+                </ArcMenu>}</AnimatePresence>
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
@@ -1604,12 +1606,12 @@ export default function Home() {
                           <span className="spacer" />
                           <div className="menu-wrap">
                             <button type="button" className="icon-button" aria-label={`更多操作 ${item.label}`} aria-expanded={rowMenuId === item.id} onClick={() => setRowMenuId((value) => value === item.id ? "" : item.id)}><Icon name="more" /></button>
-                            {rowMenuId === item.id && <div className="dropdown row-menu" role="menu">
+                            <AnimatePresence>{rowMenuId === item.id && <ArcMenu className="dropdown row-menu">
                               {moveTargets.length > 0 && <p className="menu-label">移动到</p>}
                               {moveTargets.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void moveItemToFolder(item, folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
                               {moveTargets.length > 0 && <div className="menu-divider" />}
                               <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); void trashNow(item); }}>移到回收站</button>
-                            </div>}
+                            </ArcMenu>}</AnimatePresence>
                           </div>
                         </div>}
                       {!isSnippet && !PLAIN_NOTES && !fillOpen && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
@@ -1624,9 +1626,9 @@ export default function Home() {
               <span className="spacer" />
               <div className="menu-wrap">
                 <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => setBulkMoveOpen((value) => !value)}>移动到<Icon name="chevron" /></button>
-                {bulkMoveOpen && <div className="dropdown bulk-menu" role="menu">
+                <AnimatePresence>{bulkMoveOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
                   {[...activeFolders, ...(activeKind === "secret" ? [""] : [])].map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void bulkMoveTo(folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
-                </div>}
+                </ArcMenu>}</AnimatePresence>
               </div>
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>

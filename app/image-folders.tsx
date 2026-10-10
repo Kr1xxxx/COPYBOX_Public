@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ArcMenu } from "./arc/menu";
 import {
   IMAGE_FILTER_ALL,
   IMAGE_FILTER_UNCATEGORIZED,
@@ -35,7 +36,7 @@ export function ImageMoveMenu({ folders, colors, current, up, onMove }: {
 }) {
   const targets = folders.filter((folder) => folder.name !== current);
   return (
-    <div className={`dropdown row-menu image-move-menu ${up ? "up" : ""}`} role="menu" aria-label="移动到">
+    <ArcMenu className={`dropdown row-menu image-move-menu ${up ? "up" : ""}`} label="移动到" origin={up ? "bottom left" : "top left"}>
       <p className="menu-label">移动到</p>
       {targets.map((folder) => (
         <button type="button" role="menuitem" key={folder.name} onClick={() => onMove(folder.name)}>
@@ -48,7 +49,7 @@ export function ImageMoveMenu({ folders, colors, current, up, onMove }: {
         </button>
       )}
       {targets.length === 0 && current === null && <p className="menu-empty">还没有目录，先在左边新建一个</p>}
-    </div>
+    </ArcMenu>
   );
 }
 

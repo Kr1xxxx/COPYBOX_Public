@@ -99,3 +99,20 @@ test("the 全部产品 filter and the row menu close on an outside click and on 
   await page.locator(".search-box, input[type=search], .sidebar").first().click({ position: { x: 4, y: 4 } });
   await expect(page.locator(".row-menu")).toHaveCount(0);
 });
+
+test("menus fade in and out quickly (arc step 3) and do not move at all with reduced motion", async ({ page }) => {
+  const filter = page.locator(".product-filter");
+  const menu = page.locator(".product-filter-menu");
+  await filter.click();
+  await expect(menu).toBeVisible();
+  // Settled: fully opaque and not scaled.
+  await expect.poll(() => menu.evaluate((el) => `${getComputedStyle(el).opacity}|${getComputedStyle(el).transform}`)).toMatch(/^1\|(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0, { timeout: 2000 }); // the exit is short, the menu does not linger
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await filter.click();
+  expect(await menu.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+});
