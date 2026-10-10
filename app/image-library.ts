@@ -39,6 +39,7 @@ export type ImageLibrary = {
   rename: (id: string, title: string) => Promise<ImageMeta>;
   remove: (id: string) => Promise<void>;
   getBlob: (id: string) => Promise<Blob>;
+  getThumb: (id: string) => Promise<Blob>;
   markUsed: (id: string) => Promise<void>;
   // The folder actions show their own toast. They return whether the change was made.
   // `onError` (Settings) receives the failure message instead of the toast, to show it next to the form.
@@ -87,6 +88,7 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
   const toast = (message: string) => toastRef.current(message);
 
   const getBlob = useCallback(async (id: string) => (await loadStore(deviceKey)).getBlob(id), [deviceKey]);
+  const getThumb = useCallback(async (id: string) => (await loadStore(deviceKey)).getThumb(id), [deviceKey]);
   const markUsed = useCallback(async (id: string) => (await loadStore(deviceKey)).markUsed(id), [deviceKey]);
 
   async function addImage(file: Blob, title: string, folder: string | null) {
@@ -177,5 +179,5 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, markUsed, moveImage, createFolder, renameFolder, setFolderColor, deleteFolder };
+  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, getThumb, markUsed, moveImage, createFolder, renameFolder, setFolderColor, deleteFolder };
 }

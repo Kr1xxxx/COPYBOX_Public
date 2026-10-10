@@ -9,6 +9,11 @@ export const IMAGE_FOLDER_NAME_MAX = 20;
 
 const DB_NAME = "clipbox-images";
 const DB_VERSION = 1;
+// Thumbnails are derived data and live in their own small database, so the original images and their database are
+// never touched by this feature. Dropping the database only makes thumbnails be made again.
+const THUMB_DB_NAME = "clipbox-image-thumbs";
+const THUMB_DB_VERSION = 1;
+export const THUMB_MAX_SIDE = 320;
 const SETTINGS_ID = "settings";
 const FOLDERS_ID = "folders";
 const ITERATIONS = 310_000;
@@ -34,6 +39,8 @@ export type ImageStore = {
   rename(id: string, title: string): Promise<ImageMeta>;
   remove(id: string): Promise<void>;
   getBlob(id: string): Promise<Blob>;
+  // A small copy for the grid and list; made from the original on first use, then kept (encrypted) for next time.
+  getThumb(id: string): Promise<Blob>;
   markUsed(id: string): Promise<void>;
   moveImage(id: string, folder: string | null): Promise<ImageMeta>;
   listFolders(): Promise<ImageFolder[]>;
@@ -47,10 +54,13 @@ export type ImageStoreOptions = {
   indexedDB?: IDBFactory;
   now?: () => number;
   createId?: () => string;
+  // Test hook: makes the thumbnail bytes. Returns null when the picture cannot be shrunk (the original is used then).
+  makeThumb?: (blob: Blob) => Promise<Blob | null>;
 };
 
 type MetaRecord = { id: string; iv: string; ciphertext: string };
 type BlobRecord = { id: string; iv: string; ciphertext: ArrayBuffer };
+type ThumbRecord = { id: string; iv: string; ciphertext: ArrayBuffer; type: string };
 type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 
 export function normalizeImageTitle(raw: string, fallback: string): string {
@@ -116,6 +126,43 @@ function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
   return request(req);
 }
 
+function openThumbDatabase(factory: IDBFactory): Promise<IDBDatabase> {
+  const req = factory.open(THUMB_DB_NAME, THUMB_DB_VERSION);
+  req.onupgradeneeded = () => {
+    if (!req.result.objectStoreNames.contains("thumbs")) req.result.createObjectStore("thumbs", { keyPath: "id" });
+  };
+  return request(req);
+}
+
+// Shrinks a picture so its longest side is at most THUMB_MAX_SIDE. Null when the browser cannot (or the picture is
+// already small enough to be its own thumbnail).
+export async function shrinkImage(blob: Blob): Promise<Blob | null> {
+  if (typeof createImageBitmap !== "function") return null;
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const scale = Math.min(1, THUMB_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale >= 1 && blob.size < 60_000) return null;
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    if (typeof OffscreenCanvas === "function") {
+      const canvas = new OffscreenCanvas(width, height);
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      context.drawImage(bitmap, 0, 0, width, height);
+      return await canvas.convertToBlob({ type: "image/webp", quality: 0.82 });
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(bitmap, 0, 0, width, height);
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+  } finally {
+    bitmap.close();
+  }
+}
+
 async function readOrCreateSalt(db: IDBDatabase): Promise<Uint8Array<ArrayBuffer>> {
   const tx = db.transaction("meta", "readwrite");
   const done = finished(tx);
@@ -145,17 +192,18 @@ async function deriveImageKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>) 
 
 // The record id and store name are bound in as additional data, so a record cannot be
 // swapped onto another id (or a blob passed off as meta) without failing to decrypt.
-function recordLabel(kind: "meta" | "blobs", id: string) {
+type RecordKind = "meta" | "blobs" | "thumbs";
+function recordLabel(kind: RecordKind, id: string) {
   return new TextEncoder().encode(`clipbox-images:${kind}:${id}`);
 }
 
-async function seal(key: CryptoKey, kind: "meta" | "blobs", id: string, plaintext: Uint8Array<ArrayBuffer>) {
+async function seal(key: CryptoKey, kind: RecordKind, id: string, plaintext: Uint8Array<ArrayBuffer>) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: recordLabel(kind, id) }, key, plaintext);
   return { id, iv: bytesToBase64(iv), ciphertext };
 }
 
-async function unseal(key: CryptoKey, kind: "meta" | "blobs", record: { id: string; iv: string; ciphertext: ArrayBuffer | Uint8Array<ArrayBuffer> }) {
+async function unseal(key: CryptoKey, kind: RecordKind, record: { id: string; iv: string; ciphertext: ArrayBuffer | Uint8Array<ArrayBuffer> }) {
   try {
     return await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: base64ToBytes(record.iv), additionalData: recordLabel(kind, record.id) },
@@ -186,6 +234,10 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
   const createId = options.createId ?? (() => crypto.randomUUID());
   const db = await openDatabase(factory);
   const key = await deriveImageKey(deviceKey, await readOrCreateSalt(db));
+  const makeThumb = options.makeThumb ?? shrinkImage;
+  // Opened on first use; a failure to open it only means thumbnails are not kept (originals are shown instead).
+  let thumbDb: Promise<IDBDatabase | null> | null = null;
+  const thumbDatabase = () => (thumbDb ??= openThumbDatabase(factory).catch(() => null));
 
   async function sealMeta(meta: ImageMeta): Promise<MetaRecord> {
     const record = await seal(key, "meta", meta.id, new TextEncoder().encode(JSON.stringify(meta)));
@@ -267,6 +319,13 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
     return folders;
   }
 
+  async function readBlob(id: string) {
+    const meta = await readMeta(id);
+    const record = (await request(db.transaction("blobs").objectStore("blobs").get(id))) as BlobRecord | undefined;
+    if (!record) throw new Error("找不到这张图片");
+    return new Blob([await unseal(key, "blobs", record)], { type: meta.type });
+  }
+
   return {
     async list() {
       return (await listImages()).sort((a, b) => b.createdAt - a.createdAt);
@@ -314,14 +373,43 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       tx.objectStore("meta").delete(id);
       tx.objectStore("blobs").delete(id);
       await done;
+      // The thumbnail is only a copy: a failure here leaves a harmless orphan that is never shown.
+      try {
+        const thumbs = await thumbDatabase();
+        if (thumbs) {
+          const thumbTx = thumbs.transaction("thumbs", "readwrite");
+          const thumbDone = finished(thumbTx);
+          thumbTx.objectStore("thumbs").delete(id);
+          await thumbDone;
+        }
+      } catch { /* ignore */ }
     },
 
-    async getBlob(id) {
+    async getThumb(id) {
       const meta = await readMeta(id);
-      const record = (await request(db.transaction("blobs").objectStore("blobs").get(id))) as BlobRecord | undefined;
-      if (!record) throw new Error("找不到这张图片");
-      return new Blob([await unseal(key, "blobs", record)], { type: meta.type });
+      try {
+        const thumbs = await thumbDatabase();
+        const stored = thumbs ? ((await request(thumbs.transaction("thumbs").objectStore("thumbs").get(id))) as ThumbRecord | undefined) : undefined;
+        if (stored) return new Blob([await unseal(key, "thumbs", stored)], { type: stored.type });
+      } catch { /* an unreadable thumbnail is simply made again */ }
+      const original = await readBlob(id);
+      let small: Blob | null = null;
+      try { small = await makeThumb(original); } catch { small = null; }
+      if (!small) return original;
+      try {
+        const thumbs = await thumbDatabase();
+        if (thumbs) {
+          const sealed = await seal(key, "thumbs", meta.id, new Uint8Array(await small.arrayBuffer()));
+          const tx = thumbs.transaction("thumbs", "readwrite");
+          const done = finished(tx);
+          tx.objectStore("thumbs").put({ ...sealed, type: small.type } satisfies ThumbRecord);
+          await done;
+        }
+      } catch { /* not kept: made again next time */ }
+      return small;
     },
+
+    getBlob: readBlob,
 
     async markUsed(id) {
       const meta = await readMeta(id);

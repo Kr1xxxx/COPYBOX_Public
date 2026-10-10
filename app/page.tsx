@@ -54,7 +54,6 @@ import {
   parseSnippetWorkbook,
   PRODUCT_GROUPS,
   resolveSnippetCopySource,
-  snippetSearchText,
   type SnippetImportPreview,
 } from "./snippet-import";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
@@ -73,6 +72,7 @@ import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SnippetFillPanel, type CopyLanguage, type SnippetCopyRequest } from "./fill-panel";
+import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
@@ -298,6 +298,7 @@ export default function Home() {
   const [folderMenuPos, setFolderMenuPos] = useState({ top: 0, left: 0 });
   const [folderDeleteArm, setFolderDeleteArm] = useState("");
   const [searchAllFolders, setSearchAllFolders] = useState(false);
+  const [englishSearch, setEnglishSearch] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
@@ -430,16 +431,14 @@ export default function Home() {
     const productMatched = activeKind === "snippet" && !trashView
       ? scoped.filter((item) => matchesSnippetProduct(item, productFilter))
       : scoped;
-    const matched = normalized ? productMatched.filter((item) => {
-      const searchable = activeKind === "snippet"
-        ? snippetSearchText(item)
-        : `${item.label} ${item.note} ${item.summary || ""}`;
-      const haystack = searchable.toLowerCase();
+    const isSnippetSearch = Boolean(normalized) && activeKind === "snippet";
+    const matched = isSnippetSearch ? (englishSearch ? searchSnippetsEnglish(productMatched, normalized) : searchSnippets(productMatched, normalized)) : normalized ? productMatched.filter((item) => {
+      const haystack = `${item.label} ${item.note} ${item.summary || ""}`.toLowerCase();
       return normalized.split(/\s+/).every((term) => haystack.includes(term));
     }) : productMatched;
     if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, 50);
-    return matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
-  }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders]);
+    return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+  }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders, englishSearch]);
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
   const selectedCardId = filtered[safeSelected]?.id || "";
@@ -747,7 +746,7 @@ export default function Home() {
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
-    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow() } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
+    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow(), useCount: (value.useCount || 0) + 1 } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
@@ -1333,7 +1332,7 @@ export default function Home() {
       : activeFolder === "trash" ? "回收站"
         : activeFolder === "uncategorized" ? "未分类"
           : activeFolder.slice(7);
-  const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : "搜索标题、编号或内容";
+  const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : englishSearch ? "搜索英文单词" : "搜索标题、编号或内容";
   const kindSwitch = (
     <ArcSegmented
       className={`kind-switch ${isMini ? "compact" : ""}`}
@@ -1346,7 +1345,7 @@ export default function Home() {
       ]}
     />
   );
-  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) setSearchAllFolders(false); }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
+  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = firstRun ? (
     <div className="native-empty onboarding">
@@ -1527,6 +1526,13 @@ export default function Home() {
               <h1>{sectionTitle}</h1>
               <span className="section-count">{imageView ? imageCounts.shown : filtered.length}</span>
               <span className="spacer" />
+              {!imageView && searching && activeKind === "snippet" && activeFolder !== "trash" && <ArcSegmented
+                className="scope-switch"
+                label="搜索方式"
+                value={englishSearch ? "english" : "pinyin"}
+                onSelect={(next) => { setEnglishSearch(next === "english"); setSelected(0); }}
+                options={[{ value: "pinyin", label: "中文拼音" }, { value: "english", label: "英文单词" }]}
+              />}
               {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <ArcSegmented
                 className="scope-switch"
                 label="搜索范围"
