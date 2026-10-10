@@ -393,6 +393,29 @@ test("opening a tile scrolls so the clicked picture is fully visible", async ({ 
   }
 });
 
+test("tiles use a small kept thumbnail; only the opened picture loads the full size (D-024)", async ({ page }) => {
+  await openImages(page);
+  await addImages(page, [png("大图", 2000, 1500, [60, 120, 200]), png("小图", 64, 64, [200, 120, 60])]);
+  await expect(tiles(page)).toHaveCount(2);
+  const natural = (title) => tile(page, title).locator(".image-tile-pic").evaluate((img) => Math.max(img.naturalWidth, img.naturalHeight));
+  await expect.poll(() => natural("大图")).toBeGreaterThan(0);
+  expect(await natural("大图")).toBeLessThanOrEqual(320); // a thumbnail, not the 2000px original
+  expect(await natural("小图")).toBe(64); // already small: shown as is
+
+  // The thumbnail is kept (encrypted) in its own database; the original database is not touched by it.
+  const kept = await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => { const req = indexedDB.open("clipbox-image-thumbs"); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+    const count = await new Promise((resolve, reject) => { const req = db.transaction("thumbs").objectStore("thumbs").count(); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+    db.close();
+    return count;
+  });
+  expect(kept).toBe(1);
+
+  // Opening the picture loads the full-size original for the preview.
+  await tile(page, "大图").getByRole("button", { name: "展开 大图" }).click();
+  await expect.poll(() => card(page).locator("img").first().evaluate((img) => img.naturalWidth)).toBe(2000);
+});
+
 test("the tile copy button shows only on hover or keyboard focus, so the whole picture is visible", async ({ page }) => {
   await openImages(page);
   await addImages(page, [png("图一", 64, 64), png("图二", 64, 64)]);

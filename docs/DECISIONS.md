@@ -28,6 +28,8 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-019 | 图片 shown as a 九宫格 (grid) by default | Accepted (columns changed by D-020) |
 | D-020 | 图片 grid is 16宫格 (4 per row), whole picture in the thumbnail, 6% margin on frosted glass | Accepted |
 | D-021 | Motion follows arc-library (components vendored into `app/arc/`, `motion` added) | Accepted |
+| D-022 | Trash auto-cleanup defaults to 7 days for everyone | Accepted |
+| D-024 | 图片 thumbnails: small encrypted copies kept in their own database | Accepted |
 
 ---
 
@@ -200,3 +202,13 @@ Statuses: Accepted / Superseded / Deprecated.
 - Decision (owner): everyone who never picked a cleanup period moves to 7 天, existing users included. Trash older than 7 days
   is deleted for good on the next start (accepted by the owner). Anyone who picked 不清理, 30 天 or 90 天 earlier keeps that choice.
 - Consequences: `DEFAULT_TRASH_DAYS = 7` in `app/preferences.ts` is the single place to change it. No migration, no notice.
+
+### D-024 图片 thumbnails (2026-10-09)
+- Context (owner, advisor item 9: "做一下 ... 如果不好看我会回退"): opening the 图片 page decrypted every original at full size.
+- Decision (owner): keep a small thumbnail per image. It is derived data: a copy at most 320 px on the longest side (WebP),
+  encrypted with the same key and the same scheme as the images (AES-GCM, record id bound in), stored in its **own**
+  IndexedDB database `clipbox-image-thumbs`. The original images and their database `clipbox-images` are not changed, not migrated
+  and not rewritten. A thumbnail is made the first time an image is shown (or when its record is missing or unreadable) and
+  deleted with the image. Pictures that are already small are shown as they are. Tiles and rows use the thumbnail; only an
+  opened picture loads the full original, and copying always uses the original.
+- Consequences: dropping the thumbnail database only makes thumbnails be made again; no data is lost. Rollback = revert the PR.
