@@ -15,12 +15,19 @@ test("the app version is the trial version with .0 added", () => {
 
 test("only the package's own version line is rewritten in Cargo files", () => {
   const toml = '[package]\nname = "clipbox"\nversion = "0.2.24"\n\n[dependencies]\ntauri = { version = "2" }\nurl = "2"\n';
-  assert.equal(withCargoVersion(toml, "[package]", "1.43.0"), toml.replace("0.2.24", "1.43.0"));
+  assert.equal(withCargoVersion(toml, /\[package\]/, "1.43.0"), toml.replace("0.2.24", "1.43.0"));
   const lock = 'name = "a"\nversion = "1.0.0"\n\n[[package]]\nname = "clipbox"\nversion = "0.2.24"\n\n[[package]]\nname = "z"\nversion = "9.9.9"\n';
-  const out = withCargoVersion(lock, 'name = "clipbox"\n', "1.43.0");
+  const out = withCargoVersion(lock, /name = "clipbox"\r?\n/, "1.43.0");
   assert.match(out, /name = "clipbox"\nversion = "1\.43\.0"/);
   assert.match(out, /name = "a"\nversion = "1\.0\.0"/);
   assert.match(out, /name = "z"\nversion = "9\.9\.9"/);
+});
+
+test("a Windows checkout (CRLF line endings) works too and keeps its line endings", () => {
+  const toml = '[package]\r\nname = "clipbox"\r\nversion = "0.2.24"\r\n\r\n[dependencies]\r\nurl = "2"\r\n';
+  assert.equal(withCargoVersion(toml, /\[package\]/, "1.43.0"), toml.replace("0.2.24", "1.43.0"));
+  const lock = '[[package]]\r\nname = "clipbox"\r\nversion = "0.2.24"\r\n';
+  assert.equal(withCargoVersion(lock, /name = "clipbox"\r?\n/, "1.43.0"), lock.replace("0.2.24", "1.43.0"));
 });
 
 test("package.json, Cargo.toml and Cargo.lock agree, and builds sync them from tools/preview/VERSION", () => {

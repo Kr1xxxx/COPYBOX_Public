@@ -10,10 +10,11 @@ export function appVersionFrom(trialVersion) {
   return `${match[1]}.${match[2]}.0`;
 }
 
-// Replaces the first `version = "…"` that follows `anchor` (the [package] header or the clipbox entry in Cargo.lock).
+// Replaces the first `version = "…"` that follows `anchor` (a pattern for the [package] header or the clipbox entry in Cargo.lock).
+// Line endings are kept as they are: a Windows checkout has \r\n.
 export function withCargoVersion(source, anchor, version) {
-  const start = source.indexOf(anchor);
-  if (start < 0) throw new Error(`"${anchor}" not found`);
+  const start = source.search(anchor);
+  if (start < 0) throw new Error(`${anchor} not found`);
   const rest = source.slice(start).replace(/^version = "[^"]*"$/m, `version = "${version}"`);
   return source.slice(0, start) + rest;
 }
@@ -30,8 +31,8 @@ export function syncVersion(root = new URL("../", import.meta.url)) {
     if (lockfile.packages?.[""]) lockfile.packages[""].version = version;
     write("package-lock.json", `${JSON.stringify(lockfile, null, 2)}\n`);
   }
-  write("src-tauri/Cargo.toml", withCargoVersion(read("src-tauri/Cargo.toml"), "[package]", version));
-  write("src-tauri/Cargo.lock", withCargoVersion(read("src-tauri/Cargo.lock"), 'name = "clipbox"\n', version));
+  write("src-tauri/Cargo.toml", withCargoVersion(read("src-tauri/Cargo.toml"), /\[package\]/, version));
+  write("src-tauri/Cargo.lock", withCargoVersion(read("src-tauri/Cargo.lock"), /name = "clipbox"\r?\n/, version));
   return version;
 }
 
