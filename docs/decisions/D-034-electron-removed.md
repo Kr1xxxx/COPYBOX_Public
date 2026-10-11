@@ -8,5 +8,5 @@
   `desktop/`'s place in the "owner decides" list (`scripts/classify-pr.mjs`) and the handoff-note check.
 - Consequences: the last Electron release is the only way to export data for the move (设置 → 数据 → 导出到新版), so it
   must reach staff before they update. Releasing the Tauri installer to staff is a separate step that waits for the owner.
-  Going back to Electron means restoring `desktop/` from git history (the parent of the merge commit of this change).
-- Status: Proposed — takes effect when the owner writes 合并 on the cutover PR.
+  Going back to Electron means restoring `desktop/` from git history (the branch `electron-last` keeps the last commit that still has Electron, d715231).
+- Status: Accepted (owner: 「都合并」, 2026-10-11).
