@@ -29,6 +29,8 @@ export type ClipboxDesktop = {
   fetchSiteIcon?: (host: string) => Promise<string>;
   relaunch: () => void;
   onFocusSearch: (callback: () => void) => () => void;
+  onFlushRequest?: (callback: () => void) => () => void;
+  flushDone?: () => void;
   onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;

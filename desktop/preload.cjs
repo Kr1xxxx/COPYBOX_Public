@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
     ipcRenderer.send("clipbox:automation-response", { requestId, response });
   },
   automationReady: () => ipcRenderer.send("clipbox:automation-ready"),
+  // Main asks the page to save anything still waiting (before quit, sleep or relaunch) and waits for flushDone.
+  onFlushRequest: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("clipbox:flush", listener);
+    return () => ipcRenderer.removeListener("clipbox:flush", listener);
+  },
+  flushDone: () => ipcRenderer.send("clipbox:flush-done"),
   setWindowMode: (mode) => ipcRenderer.send("clipbox:set-window-mode", mode === "mini" ? "mini" : "full"),
   onWindowMode: (callback) => {
     const listener = (_event, mode) => callback(mode === "mini" ? "mini" : "full");
