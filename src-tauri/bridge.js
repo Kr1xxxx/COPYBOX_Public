@@ -1,5 +1,5 @@
 // Stands in for Electron's preload: gives the page the same window.clipboxDesktop object.
-// Calls for later steps (AI, updates, command line) are quiet no-ops until their own step.
+// The command line (Mac) comes in a later step; its calls are quiet no-ops until then.
 (function () {
   var tauri = window.__TAURI__;
   var platform = "__PLATFORM__";
@@ -19,7 +19,13 @@
     openDataFolder: function () { return invoke("open_data_folder"); },
     setTheme: function (theme) { fireAndForget("set_theme", { theme: theme }); },
     getVersion: function () { return tauri.app.getVersion(); },
-    relaunch: function () { location.reload(); },
+    relaunch: function () { fireAndForget("relaunch"); },
+    checkUpdate: function () { return invoke("check_update"); },
+    openUpdate: function () { return invoke("open_update"); },
+    aiStatus: function () { return invoke("ai_status"); },
+    aiSave: function (settings) { return invoke("ai_save", { settings: settings }); },
+    aiClear: function () { return invoke("ai_clear"); },
+    aiRequest: function (payload) { return invoke("ai_request", { payload: payload }); },
     onFocusSearch: function (callback) {
       var stopped = false;
       var unlisten = null;
