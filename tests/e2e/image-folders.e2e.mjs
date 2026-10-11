@@ -497,9 +497,9 @@ test("the 话术 mini window keeps its own folder select", async ({ page }) => {
   await expect(page.locator(".mini-folder select option")).toHaveText(["全部", "收藏", "未分类"]);
 });
 
-test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep theirs", async ({ page }) => {
+test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs", async ({ page }) => {
   await openImages(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
   await expect(navCount(page, "全部图片")).toHaveText("0");
   await expect(sidebar(page).locator(".nav-item", { hasText: "未分类" })).toBeVisible();
   await createFolder(page, "收款码");
@@ -515,7 +515,7 @@ test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep the
   await expect(sidebar(page)).not.toContainText("全部图片");
   await expect(sidebar(page)).not.toContainText("收款码");
 
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(sidebar(page)).toContainText("未分类");
   await expect(sidebar(page)).toContainText("回收站");
   await expect(sidebar(page)).not.toContainText("全部图片");

@@ -95,10 +95,6 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
 
   return (
     <div ref={rootRef} className="snippet-fill">
-      {meta.chineseText && <div className="copy-language" role="group" aria-label="复制语言">
-        <button type="button" className={state.language === "en" ? "active" : ""} onClick={() => onState((current) => ({ ...current, language: "en" }))}>英文</button>
-        <button type="button" className={state.language === "zh" ? "active" : ""} onClick={() => onState((current) => ({ ...current, language: "zh" }))}>中文</button>
-      </div>}
       <p className="row-content" lang={state.language === "zh" ? "zh" : "en"}>
         <SnippetVariableText
           text={source}
@@ -121,14 +117,12 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
 
 // The choices for a block, shown above it while it is focused. Drawn in the page body so no card can clip it.
 export function VariablePopup({ rowId, name, options, current, onPick }: { rowId: string; name: string; options: readonly string[]; current: string; onPick: (value: string) => void }) {
-  const [box, setBox] = useState<{ left: number; top: number; below: boolean } | null>(null);
+  const [box, setBox] = useState<{ left: number; top: number } | null>(null);
   useEffect(() => {
     const place = () => {
       const input = document.querySelector(`[data-sort-id="${CSS.escape(rowId)}"] input[data-var="${CSS.escape(name)}"]`);
       const rect = input?.closest(".var-chip")?.getBoundingClientRect();
-      // Above the block, unless the card has the 英文/中文 switch: that sits right over the text, so the choices open below.
-      const below = Boolean(input?.closest(".snippet-fill")?.querySelector(".copy-language"));
-      setBox(rect ? { left: rect.left + rect.width / 2, top: below ? rect.bottom : rect.top, below } : null);
+      setBox(rect ? { left: rect.left + rect.width / 2, top: rect.top } : null);
     };
     place();
     window.addEventListener("resize", place);
@@ -137,7 +131,7 @@ export function VariablePopup({ rowId, name, options, current, onPick }: { rowId
   }, [rowId, name]);
   if (!box || typeof document === "undefined") return null;
   return createPortal(
-    <div className="var-popup" data-below={box.below ? "" : undefined} role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
+    <div className="var-popup" role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
       {options.map((option) => <button key={option} type="button" role="option" aria-selected={option === current} className="var-popup-option" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(option)}>{option}</button>)}
     </div>,
     document.body,

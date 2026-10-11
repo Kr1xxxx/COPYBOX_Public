@@ -8,10 +8,8 @@ async function open(page, fetchSiteIcon, arg) {
   await page.addInitScript(fetchSiteIcon, arg);
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
-  for (let i = 0; i < 5; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -49,8 +47,8 @@ test("a site's own icon is fetched once, shown, kept encrypted and not fetched a
   await page.evaluate(() => { window.__iconCalls = []; });
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
-  const again = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  const again = page.getByRole("region", { name: "保险箱" });
   await again.getByRole("button", { name: "账号密码", exact: true }).click();
   await expect(again.locator(".site-badge-fetched img").first()).toBeVisible();
   expect(await page.evaluate(() => window.__iconCalls)).toEqual([]);

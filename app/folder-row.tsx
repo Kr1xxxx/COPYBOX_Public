@@ -1,11 +1,12 @@
 import type { Ref } from "react";
+import { ReorderHandle } from "./reorder-handle";
 import { Icon } from "./ui-atoms";
 
 export type FolderRenaming = { from: string; value: string; error: string };
 
 // One row of the folder list in the sidebar: name and count, rename form, ⋯ menu button and drag handle
 // (moved out of page.tsx unchanged).
-export function FolderRow({ folder, sortable, active, count, color, dragging, dragOver, renaming, renameInputRef, menuOpen, onSelect, onSubmitRename, onRenameChange, onRenameCancel, onRenameBlur, onOpenMenu, onBeginDrag }: {
+export function FolderRow({ folder, sortable, active, count, color, dragging, dragOver, renaming, renameInputRef, menuOpen, onSelect, onSubmitRename, onRenameChange, onRenameCancel, onRenameBlur, onOpenMenu, onBeginDrag, canMoveUp, canMoveDown, onMove }: {
   folder: string;
   sortable: boolean;
   active: boolean;
@@ -23,10 +24,13 @@ export function FolderRow({ folder, sortable, active, count, color, dragging, dr
   onRenameBlur: () => void;
   onOpenMenu: (rect: DOMRect) => void;
   onBeginDrag: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (delta: -1 | 1) => void;
 }) {
   return (
     <div {...(sortable ? { "data-sort-scope": "folder", "data-sort-id": folder } : {})} className={`directory-row ${sortable ? "" : "fixed"} ${active ? "active" : ""} ${dragging ? "dragging" : ""} ${dragOver ? "drag-over" : ""}`}>
-      {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="按住拖动排序" onPointerDown={onBeginDrag}><Icon name="grip" /></button>}
+      {sortable && !renaming && <ReorderHandle className="folder-drag-handle" label={`拖动目录 ${folder}`} title="按住拖动，点一下可上移下移" canMoveUp={canMoveUp} canMoveDown={canMoveDown} onBeginDrag={onBeginDrag} onMove={onMove}><Icon name="grip" /></ReorderHandle>}
       {renaming ? (
         <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); onSubmitRename(); }}>
           <i className="directory-color-marker" aria-hidden="true" style={{ background: color }} />

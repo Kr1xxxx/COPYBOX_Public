@@ -4,7 +4,8 @@ import type { TotpAccount } from "./totp-core.ts";
 import { openSecretItemsStore, type VaultItem } from "./secret-items-store.ts";
 import { openTotpStore } from "./totp-store.ts";
 
-export const SAMPLES_DONE_KEY = "clipbox.vault.samples.v1";
+// v2: people who opened an earlier 保险箱 (flag v1) with data in it never got the examples; they get them once now.
+export const SAMPLES_DONE_KEY = "clipbox.vault.samples.v2";
 const PREFIX = "sample-";
 export const isSampleId = (id: string) => id.startsWith(PREFIX);
 

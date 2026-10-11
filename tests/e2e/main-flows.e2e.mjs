@@ -129,16 +129,40 @@ test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out 
   await row.locator("input[data-var=Name]").click();
   const popup = page.locator(".var-popup");
   await expect(popup.locator(".var-popup-option")).toHaveText(["Beautiful", "Friend", "Lovely"]);
-  const chipBox = await chip.boundingBox();
-  const popupBox = await popup.boundingBox();
-  // this card has the 英文/中文 switch above its text, so the choices open below the block and never cover it
-  await expect(row.locator(".copy-language")).toBeVisible();
-  const switchBox = await row.locator(".copy-language").boundingBox();
-  expect(popupBox.y).toBeGreaterThan(chipBox.y);
-  const overlap = Math.min(popupBox.y + popupBox.height, switchBox.y + switchBox.height) - Math.max(popupBox.y, switchBox.y);
-  expect(overlap).toBeLessThanOrEqual(0);
+  // the 英文/中文 switch sits in the top row now, so the choices open above the block as before
+  await expect.poll(async () => {
+    const chipBox = await chip.boundingBox();
+    const popupBox = await popup.boundingBox();
+    if (!chipBox || !popupBox) return "waiting";
+    return popupBox.y + popupBox.height <= chipBox.y + 1 ? "above" : `popup ${popupBox.y}+${popupBox.height} chip ${chipBox.y}`;
+  }, { timeout: 5000 }).toBe("above");
   await popup.getByRole("option", { name: "Lovely" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
+});
+
+test("the 英文/中文 switch sits just left of the favourite star, and the 常用值 strip can be folded away and back", async ({ page }) => {
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await row.locator("input[data-var=Company]").fill("Comely");
+  await row.locator("input[data-var=Name]").fill("Dana");
+  await row.getByRole("button", { name: "复制", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Dana");
+  const toggle = row.locator(".row-line .copy-language");
+  await expect(toggle).toBeVisible();
+  const toggleBox = await toggle.boundingBox();
+  const starBox = await row.locator(".native-pin").boundingBox();
+  expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(starBox.x + 1);
+  expect(Math.abs((toggleBox.y + toggleBox.height / 2) - (starBox.y + starBox.height / 2))).toBeLessThan(4);
+  await expect(row.locator(".snippet-fill .copy-language")).toHaveCount(0);
+  // the strip: 收起 leaves a single 展开 button, 展开 brings the values back, and the choice is remembered
+  const options = row.locator(".var-memory .var-memory-option");
+  await expect(options.first()).toBeVisible();
+  await row.getByRole("button", { name: "收起常用值" }).click();
+  await expect(options).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.values-collapsed"))).toBe("1");
+  await page.locator(".native-row.selected").getByRole("button", { name: "展开常用值" }).click();
+  await expect(page.locator(".native-row.selected .var-memory-option").first()).toBeVisible();
 });
 
 test("remembered values stay after many clicks; a right-click pins one so new values never push it out; ? explains", async ({ page }) => {
@@ -177,6 +201,25 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   expect(await hint.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
+test("each remembered value has a six-dot handle; tapping it offers 上移 and 下移, and the value itself still fills", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  for (const value of ["Amanda", "Bella", "Cara"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  await name.click();
+  const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
+  await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
+  await expect(options.first().locator(".var-grip .icon")).toBeVisible();
+  await options.nth(1).locator(".var-grip").click();
+  await page.getByRole("menuitem", { name: "上移" }).click();
+  await expect(options).toHaveText(["Bella", "Cara", "Amanda"]);
+  await expect(name).toHaveValue("Cara");
+  await options.nth(2).locator(".var-grip").click();
+  await expect(page.getByRole("menuitem", { name: "下移" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+});
 test("a right-click on a remembered value offers 固定, 解锁 and 删除; holding and moving one changes its place", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
@@ -188,7 +231,7 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
   await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
   // drag Amanda (last) in front of Cara by holding and moving
-  const from = await options.nth(2).boundingBox();
+  const from = await options.nth(2).locator(".var-grip").boundingBox();
   const to = await options.nth(0).boundingBox();
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
@@ -455,8 +498,8 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
     await expect(page.locator(".sidebar .directory-row", { hasText: name })).toBeVisible();
   }
   const row = (name) => page.locator(".sidebar .directory-row", { hasText: name });
-  // Standard folders are fixed: no handle.
-  await expect(row("询盘接待").locator(".folder-drag-handle")).toHaveCount(0);
+  // Standard folders can be sorted too (D-035): they have a handle.
+  await expect(row("询盘接待").locator(".folder-drag-handle")).toHaveCount(1);
 
   // The handle is on the far left, over the colour dot, and appears on hover.
   await row("甲").hover();
@@ -475,6 +518,8 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect.poll(async () => (await names()).indexOf("甲")).toBeGreaterThan(before.indexOf("甲"));
+  // A drag never opens the little menu.
+  await expect(page.getByRole("menu", { name: /拖动目录/ })).toHaveCount(0);
   const after = await names();
 
   // The same list lives in Settings.
@@ -483,4 +528,110 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   const group = page.locator(".settings-dialog .settings-folder-group").nth(0);
   await group.getByRole("button", { name: /话术目录/ }).click();
   expect(await group.locator(".settings-folder-name").allInnerTexts()).toEqual(after);
+
+  // Every drag handle is the same six-dot pill.
+  const look = (locator) => locator.evaluate((element) => { const c = getComputedStyle(element); return { w: c.width, h: c.height, r: c.borderRadius, dots: element.querySelector("path").getAttribute("d").split("M").length - 1 }; });
+  const settingsLook = await look(group.locator(".settings-folder-grip .icon").first());
+  expect(settingsLook).toEqual({ w: "16px", h: "22px", r: "999px", dots: 6 });
+  await page.keyboard.press("Escape");
+  const sidebarLook = await look(page.locator(".sidebar .folder-drag-handle .icon").first());
+  expect(sidebarLook.dots).toBe(6);
+  expect(sidebarLook.r).toBe("999px");
+});
+
+test("the 话术内容 and 中文翻译 boxes are about three lines when short, grow while typing and stop at a limit", async ({ page }) => {
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  const content = editor.getByRole("textbox", { name: "话术内容" });
+  const chinese = editor.getByLabel(/中文翻译/);
+  const heights = async () => [await content.evaluate((e) => e.getBoundingClientRect().height), await chinese.evaluate((e) => e.getBoundingClientRect().height)];
+  const [emptyContent, emptyChinese] = await heights();
+  expect(emptyContent).toBeLessThan(90);
+  expect(emptyChinese).toBeLessThan(90);
+  await content.fill("Hello there");
+  expect((await heights())[0]).toBeLessThan(90);
+  await content.fill(Array.from({ length: 6 }, (_, i) => `line ${i + 1}`).join("\n"));
+  const six = (await heights())[0];
+  expect(six).toBeGreaterThan(emptyContent + 30);
+  await content.fill(Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n"));
+  const many = (await heights())[0];
+  expect(many).toBeLessThan(220);
+  expect(await content.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
+  await chinese.fill("一\n二\n三\n四\n五");
+  expect((await heights())[1]).toBeGreaterThan(emptyChinese + 15);
+});
+
+test("a click on a drag handle opens 上移 / 下移, greyed at the ends, and a card moves too", async ({ page }) => {
+  const names = () => page.locator(".sidebar .directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")));
+  for (const name of ["甲", "乙", "丙"]) {
+    await page.getByRole("button", { name: "新建目录" }).first().click();
+    await page.locator(".directory-new input").fill(name);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".sidebar .directory-row", { hasText: name })).toBeVisible();
+  }
+  const row = (n) => page.locator(".sidebar .directory-row", { hasText: n });
+  await row("甲").hover();
+  await row("甲").locator(".folder-drag-handle").click();
+  const menu = page.getByRole("menu", { name: "拖动目录 甲" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText(["上移", "下移"]);
+  // 甲 is the first custom folder: it may move up past the standard ones (D-035).
+  await expect(menu.getByRole("menuitem", { name: "上移" })).toBeEnabled();
+  await menu.getByRole("menuitem", { name: "下移" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => { const n = await names(); return n.indexOf("乙") < n.indexOf("甲"); }).toBe(true);
+  await row("丙").hover();
+  await row("丙").locator(".folder-drag-handle").click();
+  await expect(page.getByRole("menu", { name: "拖动目录 丙" }).getByRole("menuitem", { name: "下移" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "拖动目录 丙" })).toHaveCount(0);
+
+  // Cards: the first one cannot go up; 下移 swaps it with the next.
+  await page.locator(".sidebar .nav-item", { hasText: "全部" }).first().click();
+  const titles = () => page.locator(".native-row .row-main").evaluateAll((els) => els.slice(0, 3).map((el) => el.getAttribute("aria-label")));
+  const first = await titles();
+  await page.locator(".native-row .drag-handle").first().click();
+  const cardMenu = page.getByRole("menu", { name: /拖动排序/ });
+  await expect(cardMenu.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+  await cardMenu.getByRole("menuitem", { name: "下移" }).click();
+  await expect.poll(async () => (await titles())[0]).not.toBe(first[0]);
+});
+
+test("the standard 话术 folders can be dragged to a new place and the order is kept after a reload; they still cannot be renamed or deleted", async ({ page }) => {
+  const names = () => page.locator(".sidebar .directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")).filter(Boolean));
+  const row = (n) => page.locator(".sidebar .directory-row", { hasText: n });
+  const before = await names();
+  expect(before.slice(0, 3)).toEqual(["询盘接待", "产品样品", "报价成交"]);
+  await row("询盘接待").hover();
+  const handle = row("询盘接待").locator(".folder-drag-handle");
+  await expect(handle).toHaveCSS("opacity", "1");
+  const h = await handle.boundingBox();
+  const target = await row("报价成交").boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
+  await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  // the row being dragged is 80% opaque so the place under it stays visible
+  await expect(page.locator(".sidebar .directory-row.dragging")).toHaveCSS("opacity", "0.8");
+  await page.mouse.up();
+  await expect.poll(async () => (await names()).indexOf("询盘接待")).toBeGreaterThan(1);
+  const after = await names();
+  expect([...after].sort()).toEqual([...before].sort());
+  await expect(page.locator(".toast")).toContainText("目录顺序已更新");
+  await page.waitForTimeout(1500); // the vault is saved a moment after a change
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  expect(await names()).toEqual(after);
+
+  // 点一下把手 also moves it; the menu is greyed at the top.
+  const first = (await names())[0];
+  await row(first).hover();
+  await row(first).locator(".folder-drag-handle").click();
+  await expect(page.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  // Rename and delete stay blocked for the standard folders.
+  await row("产品样品").locator(".folder-more").click();
+  await expect(page.getByRole("menuitem", { name: "重命名" })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "删除目录…" })).toBeDisabled();
 });

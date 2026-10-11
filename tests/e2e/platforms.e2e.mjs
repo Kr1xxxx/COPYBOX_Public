@@ -12,11 +12,12 @@ test("Windows: the second section is 图片 (no 备注) and there is no empty ti
   await expect(page.locator(".native-reference")).toHaveCount(0);
 });
 
-test("macOS: the second section is still 秘密 with masking and references", async ({ page }) => {
+test("macOS: the second section is still 账号 with masking and references", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   expect(await page.locator(".sidebar-top").evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(40);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await expect(editor).toContainText("被什么引用");
@@ -54,9 +55,10 @@ test("Windows: the empty 图片 page does not mention copy references", async ({
   await expect(page.locator("body")).not.toContainText("备注");
 });
 
-test("macOS: the empty 秘密 page still says only the reference is copied", async ({ page }) => {
+test("macOS: the empty 账号 page still says only the reference is copied", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator("body")).toContainText("默认只复制引用");
 });
