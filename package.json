@@ -1,6 +1,6 @@
 {
   "name": "clipbox-local-vault",
-  "version": "0.2.24",
+  "version": "1.43.0",
   "description": "本地加密的秘密与话术复制盒",
   "author": "Clipbox",
   "private": true,
@@ -25,7 +25,7 @@
     "preview:serve": "node tools/preview/serve.mjs",
     "tauri:frontend": "node scripts/tauri-frontend.mjs",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "node scripts/sync-version.mjs && tauri build"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
