@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs";
+
+const openAll = (page) => page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ }).click();
 
 async function openVault(page) {
   await asDesktop(page, "darwin");
@@ -12,8 +14,8 @@ async function openVault(page) {
 }
 
 async function addLogin(dialog, { name, url, user, pass }) {
-  await dialog.getByRole("button", { name: "账号密码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号密码" }).click();
+  await openAccountCategory(dialog.page(), "登录");
+  await accountAddButton(dialog.page()).click();
   await dialog.getByPlaceholder("例如：Shopify 后台").fill(name);
   if (url) await dialog.getByPlaceholder("shopify.com").fill(url);
   await dialog.getByLabel("用户名 / 邮箱").fill(user);
@@ -24,7 +26,7 @@ async function addLogin(dialog, { name, url, user, pass }) {
 
 test("账号密码: add, hold to show, copy, generate a password, and the 全部 tab groups by website and by type", async ({ page }) => {
   const dialog = await openVault(page);
-  await expect(dialog).toContainText("保险箱还是空的");
+  await expect(dialog).toContainText("还没有账号");
   await addLogin(dialog, { name: "Shopify 后台", url: "admin.shopify.com", user: "boss@example.com", pass: "s3cret!Pass" });
   // The password is hidden until the eye button is held.
   await expect(dialog).toContainText("••••••••••");
@@ -46,7 +48,7 @@ test("账号密码: add, hold to show, copy, generate a password, and the 全部
   expect(stored).not.toContain("shopify");
   // A second login for the same site, and one for another site.
   await addLogin(dialog, { name: "Shopify 备用号", url: "shopify.com", user: "backup@example.com", pass: "s3cret!Pass" });
-  await dialog.getByRole("button", { name: "添加账号密码" }).click();
+  await accountAddButton(page).click();
   await dialog.getByPlaceholder("例如：Shopify 后台").fill("某供应商");
   await dialog.getByLabel("用户名 / 邮箱").fill("me");
   await dialog.getByRole("button", { name: "生成密码" }).click();
@@ -54,29 +56,27 @@ test("账号密码: add, hold to show, copy, generate a password, and the 全部
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("button", { name: /某供应商/ })).toBeVisible();
   // 全部: by website (default), Shopify has both logins under it.
-  await dialog.getByRole("button", { name: "全部", exact: true }).click();
+  await openAll(page);
   const shopify = dialog.getByRole("region", { name: "Shopify" });
   await expect(shopify).toContainText("Shopify 后台");
   await expect(shopify).toContainText("Shopify 备用号");
   await expect(shopify.locator(".vault-count")).toHaveText("2");
   await expect(dialog.getByRole("region", { name: "某供应商" })).toBeVisible();
-  // By type: one group.
-  await dialog.getByRole("radio", { name: "按类型" }).or(dialog.getByRole("button", { name: "按类型" })).click();
-  await expect(dialog.getByRole("region", { name: "账号密码" })).toContainText("某供应商");
-  // Clicking an entry opens it in its own tab, expanded.
-  await dialog.getByRole("button", { name: /Shopify 后台/ }).click();
+  // Clicking an entry opens it, expanded.
+  await dialog.locator(".vault-entry", { hasText: "Shopify 后台" }).click();
   await expect(dialog.getByRole("button", { name: "复制密码" })).toBeVisible();
 });
 
 test("账号密码: the same password is flagged, a linked 验证码 shows its code, and the overview mixes all types by site", async ({ page }) => {
   const dialog = await openVault(page);
-  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号" }).click();
+  await openAccountCategory(page, "验证码");
+  await accountAddButton(page).click();
   await dialog.getByLabel("密钥或链接").fill("otpauth://totp/Google:me@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Google");
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("button", { name: "复制 Google 的验证码" })).toBeVisible();
   await addLogin(dialog, { name: "Google 账号", url: "google.com", user: "me@example.com", pass: "Same-pass-1" });
-  await dialog.getByRole("button", { name: "添加账号密码" }).click();
+  await openAccountCategory(page, "登录");
+  await accountAddButton(page).click();
   await dialog.getByPlaceholder("例如：Shopify 后台").fill("Gmail 备用");
   await dialog.getByLabel("密码", { exact: true }).fill("Same-pass-1");
   await expect(dialog).toContainText("建议换一个");
@@ -86,7 +86,7 @@ test("账号密码: the same password is flagged, a linked 验证码 shows its c
   await expect(dialog.getByRole("button", { name: "复制验证码" })).toBeVisible();
   await expect(dialog.locator(".login-code")).toContainText(/\d{3} \d{3}/);
   // 全部 by website: Google holds the 验证码 and both logins, each marked with its type.
-  await dialog.getByRole("button", { name: "全部", exact: true }).click();
+  await openAll(page);
   const google = dialog.getByRole("region", { name: "Google" });
-  await expect(google.locator(".vault-type-chip")).toHaveText(["密码", "密码", "验证码"]);
+  await expect(google.locator(".vault-type-chip")).toHaveText(["登录", "登录", "验证码"]);
 });

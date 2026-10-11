@@ -76,7 +76,9 @@ import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
-import { VaultDialog } from "./vault-dialog";
+import { AccountPage, type AddRequest } from "./account-page";
+import { countByKind, useAccountEntries } from "./account-entries";
+import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
 import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
@@ -245,6 +247,11 @@ export default function Home() {
   const totpUnlocked = !PLAIN_NOTES;
   // Bumped after 清除/恢复范例 so the 秘密 page reads the vault again.
   const [vaultRev, setVaultRev] = useState(0);
+  // The 账号 page (Mac): which category the sidebar shows, a 新增 request for the page, and the type menu next to 新增.
+  const [vaultCat, setVaultCat] = useState<EntryKind | "all">("all");
+  const [vaultAdd, setVaultAdd] = useState<AddRequest | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const pendingLegacyOpen = useRef("");
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -404,6 +411,9 @@ export default function Home() {
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
   const miniFavorites = useMemo(() => windowMode === "mini" && activeKind === "snippet" ? pickMiniFavorites(activeKindItems) : [], [windowMode, activeKind, activeKindItems]);
   const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret }))), [items]);
+  const accountMode = !PLAIN_NOTES && activeKind === "secret" && !imageView;
+  const account = useAccountEntries(deviceKey, legacySecrets, accountMode, vaultRev);
+  const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
   const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
 
@@ -426,6 +436,14 @@ export default function Home() {
     if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, 50);
     return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
   }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders, englishSearch]);
+  // Opening an old entry from the 账号 list leads to the 「其他」 list with that entry selected.
+  useEffect(() => {
+    if (!pendingLegacyOpen.current || vaultCat !== "other") return;
+    const index = filtered.findIndex((item) => item.id === pendingLegacyOpen.current);
+    if (index < 0) return;
+    pendingLegacyOpen.current = "";
+    selectRow(index);
+  });
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
   const selectedCardId = filtered[safeSelected]?.id || "";
@@ -1035,7 +1053,7 @@ export default function Home() {
     }
     if (event.key === "ArrowDown") { event.preventDefault(); moveSelection((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
     if (event.key === "ArrowUp") { event.preventDefault(); moveSelection((value) => Math.max(0, value - 1)); }
-    if (event.key === "Enter" && activeFolder !== "trash" && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
+    if (event.key === "Enter" && activeFolder !== "trash" && !(accountMode && activeFolder === "all" && vaultCat !== "other") && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
     if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
   }
 
@@ -1452,6 +1470,19 @@ export default function Home() {
     setFill(null);
   }
 
+  function openLegacyEntry(id: string) {
+    pendingLegacyOpen.current = id;
+    setQuery("");
+    setVaultCat("other");
+  }
+
+  // 新增 on the 账号 page: in 「全部」 it asks for the type first; inside a category it creates that type directly.
+  function addAccount(tab: EntryKind) {
+    setAddMenuOpen(false);
+    if (tab === "other") { setVaultCat("other"); openEditor(null); return; }
+    setVaultAdd((current) => ({ tab, n: (current?.n ?? 0) + 1 }));
+  }
+
   function selectFolder(folder: string) {
     setActiveFolder(folder);
     if (folder === "trash") setProductFilter("全部产品");
@@ -1639,13 +1670,13 @@ export default function Home() {
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
-    ? (activeKind === "snippet" ? "全部话术" : `全部${SECRET_WORD}`)
+    ? (activeKind === "snippet" ? "全部话术" : !PLAIN_NOTES && vaultCat !== "all" ? CATEGORY_LABEL[vaultCat] : `全部${SECRET_WORD}`)
     : activeFolder === "pinned" ? "收藏"
       : activeFolder === "recent" ? "最近使用"
       : activeFolder === "trash" ? "回收站"
         : activeFolder === "uncategorized" ? "未分类"
           : activeFolder.slice(7);
-  const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : englishSearch ? "搜索英文单词" : "搜索标题、编号或内容";
+  const searchPlaceholder = imageView ? "搜索图片标题" : accountMode && activeFolder === "all" ? "搜索名称、网站、用户名" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : englishSearch ? "搜索英文单词" : "搜索标题、编号或内容";
   // Mac: the 秘密 section IS the 保险箱 (its folders such as 回收站 still show the old list).
   const vaultPage = !PLAIN_NOTES && activeKind === "secret" && !imageView && activeFolder === "all";
   const kindSwitch = (
@@ -1892,8 +1923,18 @@ export default function Home() {
             {kindSwitch}
             {imageView ? <ImageFolderNav library={imageLibrary} /> : <>
             <nav className="nav-list" aria-label="快捷入口">
-              {directoryShortcuts.map((shortcut) => <button key={shortcut.id} type="button" className={`nav-item ${activeFolder === shortcut.id ? "active" : ""}`} onClick={() => selectFolder(shortcut.id)}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{shortcut.count}</b></button>)}
+              {directoryShortcuts.map((shortcut) => {
+                const accountAll = accountMode && shortcut.id === "all";
+                const active = activeFolder === shortcut.id && (!accountAll || vaultCat === "all");
+                return <button key={shortcut.id} type="button" className={`nav-item ${active ? "active" : ""}`} onClick={() => { selectFolder(shortcut.id); if (accountAll) setVaultCat("all"); }}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{accountAll && account.entries ? account.entries.length : shortcut.count}</b></button>;
+              })}
             </nav>
+            {accountMode && <>
+              <div className="nav-heading"><span>分类</span></div>
+              <nav className="nav-list account-categories" aria-label="分类">
+                {CATEGORY_ORDER.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
+              </nav>
+            </>}
             <div className="nav-heading">
               <span>目录</span>
               <button ref={folderCreateButtonRef} type="button" onClick={startNewFolder} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
@@ -1937,21 +1978,32 @@ export default function Home() {
           <section className="content-panel">
             <UpdateNotice />
             <header className="toolbar drag-region">
-              {vaultPage ? <span className="spacer" /> : <div className="native-search">
+              <div className="native-search">
                 <Icon name="search" className="search-glyph" />
                 {searchInput}
-              </div>}
+              </div>
               {imageView
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
                 : <>
-                  {!vaultPage && canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+                  {vaultPage
+                    ? <span className="add-menu-wrap">
+                      <button type="button" className="primary-button add-button" aria-label="新增条目" aria-haspopup={vaultCat === "all" ? "menu" : undefined} aria-expanded={vaultCat === "all" ? addMenuOpen : undefined}
+                        onClick={() => { if (vaultCat === "all") setAddMenuOpen((open) => !open); else addAccount(vaultCat); }}><Icon name="plus" />新增</button>
+                      {addMenuOpen && vaultCat === "all" && <>
+                        <div className="menu-scrim" role="presentation" onMouseDown={() => setAddMenuOpen(false)} />
+                        <div className="dropdown acct-menu" role="menu" aria-label="新增什么">
+                          {CATEGORY_ORDER.map((id) => <button key={id} type="button" role="menuitem" onClick={() => addAccount(id)}>{CATEGORY_LABEL[id]}</button>)}
+                        </div>
+                      </>}
+                    </span>
+                    : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
                 </>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
             {vaultPage && <>
-              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note"><Icon name="lock" />本机加密</span></div>
-              <VaultDialog key={vaultRev} inline deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={(id) => { const index = filtered.findIndex((item) => item.id === id); if (index >= 0) selectRow(index); }} onClose={() => {}} onToast={flashToast}
-                legacyView={<>{canAddItemInFolder(activeFolder) && <div className="legacy-add"><button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button></div>}{legacyList}</>} />
+              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
+              <AccountPage deviceKey={deviceKey} entries={account.entries} marks={account.marks} error={account.error} category={vaultCat} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onToast={flashToast}
+                legacyView={legacyList} />
             </>}
             {!vaultPage && <div className="section-head">
               <h1>{sectionTitle}</h1>

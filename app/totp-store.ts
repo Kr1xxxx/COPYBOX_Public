@@ -1,5 +1,6 @@
 // Encrypted store for the hidden 验证码 accounts (Mac). One AES-GCM envelope in its own localStorage key, keyed from the
 // device key by PBKDF2 like the vault, but kept apart from it: never in the vault. It goes into a 秘密 backup only as its own password-encrypted block (vault-backup.ts).
+import { VAULT_CHANGED_EVENT } from "./secret-items-store.ts";
 import { TOTP_MAX_ACCOUNTS, type TotpAccount } from "./totp-core.ts";
 
 export const TOTP_STORAGE_KEY = "clipbox.totp.v1";
@@ -55,6 +56,7 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
     const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: LABEL }, key, plain);
     const envelope: Envelope = { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(encrypted)), iterations: ITERATIONS };
     storage.setItem(TOTP_STORAGE_KEY, JSON.stringify(envelope));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
     return accounts;
   }
 

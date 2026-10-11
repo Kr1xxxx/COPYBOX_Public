@@ -56,11 +56,11 @@ function TotpRow({ account, now, copied, confirming, onCopy, onAskDelete, onCanc
   );
 }
 
-export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: (message: string) => void }) {
+export function TotpPanel({ deviceKey, onToast, startAdding }: { deviceKey: string; onToast: (message: string) => void; startAdding?: boolean }) {
   const storeRef = useRef<TotpStore | null>(null);
   const [accounts, setAccounts] = useState<TotpAccount[] | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(Boolean(startAdding));
   const [secret, setSecret] = useState("");
   const [name, setName] = useState("");
   const [formError, setFormError] = useState("");
@@ -132,7 +132,7 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
     <>
     {loadError && <p className="settings-note" role="alert">{loadError}</p>}
     {!loadError && accounts === null && <p className="settings-note">正在读取…</p>}
-    {accounts && accounts.length === 0 && !adding && <p className="totp-empty">还没有账号。点下面的「添加账号」，粘贴密钥或 otpauth:// 链接。</p>}
+    {accounts && accounts.length === 0 && !adding && <p className="totp-empty">还没有验证码。点右上角「新增」，粘贴密钥或 otpauth:// 链接。</p>}
     {accounts && accounts.length > 0 && (
       <ul className="totp-list">
         {accounts.map((account) => (
@@ -153,7 +153,7 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
       </form>
     )}
     {!adding && accounts && <div className="totp-actions">
-      <button type="button" className="primary-button" onClick={() => setAdding(true)}><Icon name="plus" />添加账号</button>
+      <button type="button" className="primary-button" onClick={() => setAdding(true)}><Icon name="plus" />添加验证码</button>
     </div>}
     </>
   );

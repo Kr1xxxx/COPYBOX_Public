@@ -3,6 +3,8 @@
 // totp-store.ts) and are not touched, so older data stays readable without any migration.
 import type { ApiKeyItem, LoginItem, MarkItem, PaymentItem, RecoveryItem } from "./payment-core.ts";
 
+// Fired after every write, so the sidebar counts of the 账号 page stay right.
+export const VAULT_CHANGED_EVENT = "clipbox:vault-changed";
 export const SECRET_ITEMS_KEY = "clipbox.vault-items.v1";
 const ITERATIONS = 310_000;
 const LABEL = new TextEncoder().encode("clipbox-vault-items:items");
@@ -58,6 +60,7 @@ export function openSecretItemsStore(deviceKey: string, storage: SecretItemsStor
     const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: LABEL }, key, new TextEncoder().encode(JSON.stringify({ items })));
     const envelope: Envelope = { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(encrypted)), iterations: ITERATIONS };
     storage.setItem(SECRET_ITEMS_KEY, JSON.stringify(envelope));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
     return items;
   }
 

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs";
 
 async function open(page, platform) {
   await asDesktop(page, platform);
@@ -17,8 +17,8 @@ test("Mac: the 账号 page is the 保险箱, accounts are kept and copy works", 
   await tapVersion(page);
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号" }).click();
+  await openAccountCategory(dialog.page(), "验证码");
+  await accountAddButton(dialog.page()).click();
   await dialog.getByLabel("密钥或链接").fill("not a secret!");
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("alert")).toContainText("密钥不对");
@@ -38,8 +38,8 @@ test("Mac: the 账号 page is the 保险箱, accounts are kept and copy works", 
   await page.waitForSelector(".app-shell");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "验证码", exact: true }).click();
-  await expect(page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
+  await openAccountCategory(page, "验证码");
+  await expect(page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "复制验证码 公司邮箱" })).toBeVisible();
 });
 
 test("Mac: only three sections; the 保险箱 sits inside 账号, no hidden unlock", async ({ page }) => {
@@ -80,8 +80,8 @@ test("Mac: a QR picture fills in the link; unreadable pictures say so", async ({
   await open(page, "darwin");
   await tapVersion(page);
   const dialog = page.getByRole("region", { name: "保险箱" });
-  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号" }).click();
+  await openAccountCategory(dialog.page(), "验证码");
+  await accountAddButton(dialog.page()).click();
   const png = { name: "qr.png", mimeType: "image/png", buffer: Buffer.from("x") };
   await dialog.getByLabel("选二维码图片").setInputFiles(png);
   await expect(dialog.getByRole("alert")).toBeVisible();
@@ -101,8 +101,8 @@ test("Mac: copying a code with few seconds left says so", async ({ page }) => {
   await open(page, "darwin");
   await tapVersion(page);
   const dialog = page.getByRole("region", { name: "保险箱" });
-  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号" }).click();
+  await openAccountCategory(dialog.page(), "验证码");
+  await accountAddButton(dialog.page()).click();
   await dialog.getByLabel("密钥或链接").fill("JBSWY3DPEHPK3PXP");
   await dialog.getByLabel("名称（可不填）").fill("急用");
   await dialog.getByRole("button", { name: "保存" }).click();

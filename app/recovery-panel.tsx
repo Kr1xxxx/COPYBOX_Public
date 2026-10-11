@@ -19,12 +19,12 @@ function whenText(at: number) {
 const siteOf = (item: Pick<RecoveryItem, "site" | "name">) => detectSite(/^[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(item.site.trim()) ? { url: item.site, name: item.name } : { name: item.site || item.name });
 
 // 恢复码 in the hidden 保险箱: the backup codes a site gives out once. Hidden until the eye button is held; each code or all of them can be copied.
-export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
+export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const [items, setItems] = useState<RecoveryItem[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openId, setOpenId] = useState(focusId ?? "");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState("");
   const [shown, setShown] = useState("");
@@ -122,7 +122,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: stri
 
   return (
     <>
-      {items.length === 0 && <p className="totp-empty">还没有恢复码。网站给你的备用恢复码一般只出现一次，点下面的「添加恢复码」存起来。</p>}
+      {items.length === 0 && <p className="totp-empty">还没有恢复码。网站给你的备用恢复码一般只出现一次，点右上角「新增」存起来。</p>}
       {items.length > 0 && (
         <ul className="totp-list pay-list">
           {items.map((item) => {

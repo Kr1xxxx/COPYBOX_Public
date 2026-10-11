@@ -1076,7 +1076,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-collapse:hover { background: var(--fill); color: var(--ink); }
 .var-collapse:active { scale: .96; }
 .vault-inline{flex:1;min-height:0;overflow:auto;padding:0 18px 18px}
-.legacy-add{display:flex;justify-content:flex-end;margin-bottom:8px}
+.account-categories{margin:-6px 0 4px}
+.add-menu-wrap{position:relative;display:inline-flex}
+.acct-menu{z-index:40}
+.acct-menu-wrap{position:relative;display:inline-flex}
+.acct-row{grid-template-columns:minmax(0,1fr) auto auto}
+.acct-copy.copied{color:var(--accent)}
+.vault-inline .vault-panel .totp-actions{display:none}
 
 /* 设置: clear sections. Each group is a bordered card; rows have the label on the left and the control on the right,
    with a divider between rows (the look of Claude's account settings). */

@@ -40,14 +40,14 @@ function LinkedCode({ account, onCopy }: { account: TotpAccount; onCopy: (code: 
 }
 
 // 账号密码 in the hidden 保险箱. The password is hidden until the eye button is held; each field copies on its own.
-export function LoginPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
+export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const scanSiteIcons = useSiteIconScan();
   const [items, setItems] = useState<LoginItem[] | null>(null);
   const [totps, setTotps] = useState<TotpAccount[]>([]);
   const [loadError, setLoadError] = useState("");
   const [openId, setOpenId] = useState(focusId ?? "");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmSave, setConfirmSave] = useState(false);
   const [deleteId, setDeleteId] = useState("");
@@ -172,7 +172,7 @@ export function LoginPanel({ deviceKey, onToast, focusId }: { deviceKey: string;
 
   return (
     <>
-      {items.length === 0 && <p className="totp-empty">还没有账号。点下面的「添加账号密码」，记下网站的用户名和密码。</p>}
+      {items.length === 0 && <p className="totp-empty">还没有登录信息。点右上角「新增」，记下网站的用户名和密码。</p>}
       {items.length > 0 && (
         <ul className="totp-list pay-list">
           {items.map((item) => {
@@ -217,7 +217,7 @@ export function LoginPanel({ deviceKey, onToast, focusId }: { deviceKey: string;
         </ul>
       )}
       <div className="totp-actions">
-        <button type="button" className="primary-button" onClick={() => { setDraft({ ...EMPTY }); setErrors({}); setConfirmSave(false); }}><Icon name="plus" />添加账号密码</button>
+        <button type="button" className="primary-button" onClick={() => { setDraft({ ...EMPTY }); setErrors({}); setConfirmSave(false); }}><Icon name="plus" />添加登录</button>
       </div>
     </>
   );

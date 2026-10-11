@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { asDesktop, openAccountCategory } from "./helpers.mjs";
 
 const PNG_FILE = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
 const JPG_FILE = fileURLToPath(new URL("../fixtures/sample-photo.jpg", import.meta.url));
@@ -44,7 +44,7 @@ test("macOS: the sections are 话术, 账号 and 图片, and 账号 still opens"
   await openApp(page, "darwin");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
+  await openAccountCategory(page, "其他");
   await expect(page.locator("body")).toContainText("默认只复制引用");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await expect(page.locator("body")).toContainText("还没有图片，先添加第一张");

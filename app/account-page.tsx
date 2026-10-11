@@ -1,0 +1,62 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
+import { AccountList } from "./account-list";
+import type { AccountEntry, EntryKind } from "./account-view";
+import { ApiKeyPanel } from "./apikey-panel";
+import { LoginPanel } from "./login-panel";
+import type { MarkItem } from "./payment-core";
+import { PaymentPanel } from "./payment-panel";
+import { RecoveryPanel } from "./recovery-panel";
+import { SiteIconsProvider } from "./site-icons-context";
+import { TotpPanel } from "./totp-dialog";
+
+export type AddRequest = { tab: EntryKind; n: number };
+type Panel = { tab: EntryKind; focusId: string; adding: boolean; n: number };
+
+// The 账号 page (Mac): the list of everything, or one entry's panel (to open, change or add). The category and the search
+// text come from the page (sidebar and toolbar); `legacyView` is the old 秘密 list that the 「其他」 category shows.
+export function AccountPage({ deviceKey, entries, marks, error, category, query, addRequest, onOpenLegacy, onToast, legacyView }: {
+  deviceKey: string; entries: AccountEntry[] | null; marks: Record<string, MarkItem>; error: string; category: EntryKind | "all"; query: string;
+  addRequest: AddRequest | null; onOpenLegacy: (id: string) => void; onToast: (message: string) => void; legacyView: ReactNode;
+}) {
+  const [panel, setPanel] = useState<Panel | null>(null);
+  // Changing category or asking for 新增 from outside changes what is shown (set while rendering, no effect needed).
+  const [seenCategory, setSeenCategory] = useState(category);
+  const [seenAdd, setSeenAdd] = useState(addRequest?.n ?? 0);
+  if (seenCategory !== category) { setSeenCategory(category); setPanel(null); }
+  if ((addRequest?.n ?? 0) !== seenAdd) {
+    setSeenAdd(addRequest?.n ?? 0);
+    if (addRequest) setPanel({ tab: addRequest.tab, focusId: "", adding: true, n: addRequest.n });
+  }
+
+  const back = () => setPanel(null);
+  function open(entry: AccountEntry) {
+    if (entry.legacy) onOpenLegacy(entry.id);
+    else setPanel({ tab: entry.tab, focusId: entry.id, adding: false, n: Date.now() });
+  }
+
+  let body: ReactNode;
+  if (category === "other") body = legacyView;
+  else if (panel) {
+    const common = { deviceKey, onToast, focusId: panel.focusId, startAdding: panel.adding };
+    body = (
+      <div key={`${panel.tab}:${panel.n}`} className="vault-panel">
+        <div><button type="button" className="secondary-button" onClick={back}>‹ 返回列表</button></div>
+        {panel.tab === "login" && <LoginPanel {...common} />}
+        {panel.tab === "payment" && <PaymentPanel {...common} />}
+        {panel.tab === "apikey" && <ApiKeyPanel {...common} />}
+        {panel.tab === "recovery" && <RecoveryPanel {...common} />}
+        {panel.tab === "totp" && <TotpPanel deviceKey={deviceKey} onToast={onToast} startAdding={panel.adding} />}
+      </div>
+    );
+  } else if (error) body = <p className="settings-note" role="alert">{error}</p>;
+  else if (entries === null) body = <p className="settings-note">正在读取…</p>;
+  else body = <div className="vault-panel"><AccountList deviceKey={deviceKey} entries={entries} marks={marks} category={category} query={query} onOpen={open} onToast={onToast} /></div>;
+
+  return (
+    <SiteIconsProvider deviceKey={deviceKey}>
+      <section className="vault-inline" aria-label="保险箱">{body}</section>
+    </SiteIconsProvider>
+  );
+}

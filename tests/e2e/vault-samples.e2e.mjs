@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs";
+
+const openAll = (page) => page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ }).click();
 
 async function open(page) {
   await asDesktop(page, "darwin");
@@ -15,8 +17,11 @@ async function open(page) {
 test("a new 保险箱 opens with clearly fake examples of each type, which one tap removes for good", async ({ page }) => {
   const dialog = await open(page);
   await expect(dialog).toContainText("范例");
-  await dialog.getByRole("button", { name: "按类型" }).click();
-  for (const group of ["账号密码", "收款信息", "API 密钥", "恢复码", "验证码"]) await expect(dialog.getByRole("region", { name: group })).toContainText("【范例】");
+  for (const group of ["登录", "收款信息", "API 密钥", "恢复码", "验证码"]) {
+    await openAccountCategory(page, group);
+    await expect(dialog).toContainText("【范例】");
+  }
+  await openAll(page);
   await dialog.getByRole("button", { name: "删除范例…" }).click();
   await expect(dialog).toContainText("将删除 5 条");
   await expect(dialog).toContainText("【范例】接口密钥");
@@ -24,14 +29,14 @@ test("a new 保险箱 opens with clearly fake examples of each type, which one t
   await expect(dialog).toContainText("里面带了几条");
   await dialog.getByRole("button", { name: "删除范例…" }).click();
   await dialog.getByRole("button", { name: "确认删除" }).click();
-  await expect(dialog).toContainText("保险箱还是空的");
+  await expect(dialog).toContainText("还没有账号");
   expect(await page.evaluate(() => localStorage.getItem("clipbox.totp.v1"))).toBeTruthy();
   // Closed and opened again, after a restart: they do not come back.
   await page.keyboard.press("Escape");
   await page.reload();
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await expect(page.getByRole("region", { name: "保险箱" })).toContainText("保险箱还是空的");
+  await expect(page.getByRole("region", { name: "保险箱" })).toContainText("还没有账号");
 });
 
 test("examples are added beside data that is already there and leave it untouched", async ({ page }) => {
@@ -40,14 +45,14 @@ test("examples are added beside data that is already there and leave it untouche
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.getByRole("button", { name: "账号" }).first().click();
-  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
+  await openAccountCategory(page, "其他");
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await editor.locator("input").first().fill("仓库地址");
   await editor.locator("textarea").first().fill("台北市信义区 123 号");
   await editor.locator(".editor-save").first().click();
   await expect(page.locator(".native-row", { hasText: "仓库地址" })).toBeVisible();
-  await page.locator(".vault-tabs").getByRole("button", { name: "全部" }).click();
+  await page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await expect(dialog).toContainText("【范例】");
@@ -56,22 +61,22 @@ test("examples are added beside data that is already there and leave it untouche
 test("设置 → 清除范例 / 恢复范例 only touch the examples: own entries and edited examples stay", async ({ page }) => {
   const dialog = await open(page);
   // The user's own entries: a 验证码 and a 账号密码.
-  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号" }).click();
+  await openAccountCategory(dialog.page(), "验证码");
+  await accountAddButton(dialog.page()).click();
   await dialog.getByLabel("密钥或链接").fill("MFRGGZDFMZTWQ2LKNNWG23TP");
   await dialog.getByLabel("名称（可不填）").fill("我的邮箱");
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("button", { name: "复制 我的邮箱 的验证码" })).toBeVisible();
-  await dialog.getByRole("button", { name: "账号密码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号密码" }).click();
+  await openAccountCategory(dialog.page(), "登录");
+  await accountAddButton(dialog.page()).click();
   await dialog.getByPlaceholder("例如：Shopify 后台").fill("我的店铺");
   await dialog.getByLabel("用户名 / 邮箱").fill("me@mine.test");
   await dialog.getByLabel("密码", { exact: true }).fill("mine-Pass-1");
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("button", { name: /我的店铺/ })).toBeVisible();
   // One example is edited, so it counts as the user's.
-  await dialog.getByRole("button", { name: "收款信息", exact: true }).click();
-  await dialog.getByRole("button", { name: /【范例】美元电汇/ }).click();
+  await openAccountCategory(dialog.page(), "收款信息");
+  await dialog.locator(".vault-entry", { hasText: "【范例】美元电汇" }).click();
   await dialog.getByRole("button", { name: "修改" }).click();
   await dialog.getByLabel("银行名称").fill("My Own Bank");
   await dialog.getByRole("button", { name: "保存" }).click();
@@ -92,7 +97,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await page.keyboard.press("Escape");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const after = page.getByRole("region", { name: "保险箱" });
-  await after.getByRole("button", { name: "按类型" }).click();
+  await openAll(page);
   await expect(after).toContainText("我的邮箱");
   await expect(after).toContainText("我的店铺");
   await expect(after).toContainText("美元电汇");
@@ -110,7 +115,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   }
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const restored = page.getByRole("region", { name: "保险箱" });
-  await restored.getByRole("button", { name: "按类型" }).click();
+  await openAll(page);
   await expect(restored.getByText("【范例】接口密钥")).toHaveCount(1);
   await expect(restored.getByText("【范例】Example 后台")).toHaveCount(1);
   await expect(restored.getByText("【范例】美元电汇")).toHaveCount(1);

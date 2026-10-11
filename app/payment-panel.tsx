@@ -19,12 +19,12 @@ type Draft = { id: string | null; kind: PaymentKind; name: string; fields: Recor
 const EMPTY_DRAFT: Draft = { id: null, kind: "bank", name: "", fields: {} };
 
 // 收款信息 in the hidden 保险箱. Shown as plain text on purpose (it is sent to customers); changing an entry asks twice.
-export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
+export function PaymentPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const [items, setItems] = useState<PaymentItem[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openId, setOpenId] = useState(focusId ?? "");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY_DRAFT } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmSave, setConfirmSave] = useState(false);
   const [deleteId, setDeleteId] = useState("");
@@ -142,7 +142,7 @@ export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: strin
 
   return (
     <>
-      {items.length === 0 && <p className="totp-empty">还没有收款信息。点下面的「添加收款信息」，选择银行电汇、PayPal 等方式。</p>}
+      {items.length === 0 && <p className="totp-empty">还没有收款信息。点右上角「新增」，选择银行电汇、PayPal 等方式。</p>}
       {items.length > 0 && (
         <ul className="totp-list pay-list">
           {items.map((item) => {
