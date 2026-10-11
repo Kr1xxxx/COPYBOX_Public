@@ -96,10 +96,10 @@ test("账号 收藏 and 最近使用 list the new types too", async ({ page }) =
   await expect(dialog).toContainText("还没有收藏内容");
   // Copying puts an entry on 最近使用.
   await shortcut(page, "全部").click();
-  await expect(shortcut(page, "最近使用")).toContainText("0");
+  await expect(shortcut(page, "最近")).toContainText("0");
   await dialog.getByRole("button", { name: "复制密码 【范例】Example 后台" }).click();
-  await expect(shortcut(page, "最近使用")).toContainText("1");
-  await shortcut(page, "最近使用").click();
+  await expect(shortcut(page, "最近")).toContainText("1");
+  await shortcut(page, "最近").click();
   await expect(dialog.locator(".vault-entry")).toHaveText([/Example 后台/]);
 });
 

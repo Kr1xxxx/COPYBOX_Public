@@ -5,7 +5,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
 
 const DETECT = readFileSync(new URL("./layout-detect.js", import.meta.url), "utf8");
 const PNG = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
@@ -149,10 +149,8 @@ for (const { platform, theme, size } of cases) {
       if (!mini) {
         // 验证码 lives inside the 保险箱, which is the 账号 page itself.
         await state("totp-add", async () => {
-          const vault = page.getByRole("region", { name: "保险箱" });
-          await vault.waitFor();
-          await vault.getByRole("button", { name: "验证码", exact: true }).click();
-          await vault.getByRole("button", { name: "添加账号" }).click();
+          await openAccountCategory(page, "验证码");
+          await accountAddButton(page).click();
         });
       }
     }
