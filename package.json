@@ -4,7 +4,6 @@
   "description": "本地加密的秘密与话术复制盒",
   "author": "Clipbox",
   "private": true,
-  "main": "desktop/main.cjs",
   "engines": {
     "node": ">=22.18.0"
   },
@@ -15,11 +14,7 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc -p tsconfig.typecheck.json",
-    "desktop:dev": "npm run build && electron .",
-    "desktop:pack": "npm run build && node desktop/prepare-standalone.mjs && electron-builder --mac dir --arm64",
-    "desktop:pack:win": "npm run build && node desktop/prepare-standalone.mjs && electron-builder --win nsis --x64",
     "db:generate": "drizzle-kit generate",
-    "test:desktop-idle": "node --test tests/desktop-idle.integration.mjs",
     "test:e2e": "npm run build && playwright test",
     "preview:build": "node tools/preview/build.mjs",
     "preview:serve": "node tools/preview/serve.mjs",
@@ -50,8 +45,6 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
-    "electron": "^37.2.6",
-    "electron-builder": "^26.0.12",
     "eslint": "9.39.4",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
@@ -66,41 +59,5 @@
     "wrangler": "4.92.0",
     "write-excel-file": "4.1.1"
   },
-  "type": "module",
-  "build": {
-    "appId": "com.clipbox.desktop",
-    "productName": "Clipbox",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "desktop/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "dist/desktop-standalone",
-        "to": "standalone"
-      }
-    ],
-    "win": {
-      "icon": "desktop/assets/Clipbox.ico",
-      "target": [
-        "nsis"
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "perMachine": false
-    },
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "desktop/assets/Clipbox.icns",
-      "identity": null,
-      "target": [
-        "dir"
-      ]
-    }
-  }
+  "type": "module"
 }

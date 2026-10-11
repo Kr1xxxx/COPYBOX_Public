@@ -25,7 +25,7 @@ export function noteSaysWhat(text) {
  */
 export function checkHandoff(changes, { readFile = () => "", labels = [] } = {}) {
   const files = changes.map((change) => change.file);
-  const touchesApp = files.some((file) => /^(app|desktop)\//.test(file) || file === "package.json");
+  const touchesApp = files.some((file) => /^(app|src-tauri)\//.test(file) || file === "package.json");
   const addedLog = changes.some((change) => change.status === "A" && LOG_ENTRY.test(change.file) && noteSaysWhat(readFile(change.file)));
   const updatedHandoff = files.includes("docs/HANDOFF.md");
   const previewFiles = files.filter((file) => PREVIEW_OWNED.includes(file));
@@ -53,7 +53,7 @@ function main() {
     console.error("Take them out of this PR; the 【話術】 thread bumps the version and writes the changelog.");
   }
   if (!result.handoffOk) {
-    console.error("This PR changes app/, desktop/ or package.json but has no usable handoff note.");
+    console.error("This PR changes app/, src-tauri/ or package.json but has no usable handoff note.");
     console.error("Add a new file docs/log/YYYY-MM-DD-short-name.md with a '- What changed: ...' line (see docs/log/README.md).");
   }
   if (!result.ok) process.exit(1);

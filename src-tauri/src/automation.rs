@@ -1,5 +1,5 @@
 // The command line door (macOS and Linux): a unix socket that takes one JSON command per connection, passes it to
-// the page and sends the page's answer back. Same protocol as desktop/automation-server.cjs and automation-bridge.cjs,
+// the page and sends the page's answer back. Same protocol as the former Electron shell (automation-server.cjs, automation-bridge.cjs),
 // so the existing `clipbox` command keeps working.
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ const MAX_BYTES: usize = 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(10);
 /// The command line script the app installs next to the user's other tools.
 #[cfg(unix)]
-const CLI_SCRIPT: &str = include_str!("../../desktop/clipbox-cli.cjs");
+const CLI_SCRIPT: &str = include_str!("../../tools/clipbox-cli.cjs");
 
 pub type Failure = (String, String);
 
@@ -314,5 +314,20 @@ mod tests {
     #[test]
     fn the_shipped_command_line_is_the_node_script() {
         assert!(CLI_SCRIPT.starts_with("#!/usr/bin/env node"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_launcher_is_installed_executable_and_replaced_when_it_differs() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = std::env::temp_dir().join(format!("clipbox-cli-test-{}", std::process::id()));
+        let target = home.join(".local").join("bin").join("clipbox");
+        install_cli(&home).unwrap();
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), CLI_SCRIPT);
+        assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o755);
+        std::fs::write(&target, "old").unwrap();
+        install_cli(&home).unwrap();
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), CLI_SCRIPT);
+        let _ = std::fs::remove_dir_all(&home);
     }
 }

@@ -10,7 +10,7 @@ export const TOTAL_LINE_LIMIT = 500;
 
 // Files that change how the product or the process works — always the owner's call.
 const OWNER_PATHS = [
-  /^desktop\//, /^package(-lock)?\.json$/, /^\.github\//, /^scripts\//,
+  /^src-tauri\//, /^package(-lock)?\.json$/, /^\.github\//, /^scripts\//,
   /^AGENTS\.md$/, /^CLAUDE\.md$/, /^CONTRIBUTING\.md$/, /^docs\/DECISIONS\.md$/, /^docs\/decisions\//,
   /^eslint\.config\./, /^playwright\.config\./, /^vite\.config\./, /^next\.config\./, /^tsconfig.*\.json$/,
 ];

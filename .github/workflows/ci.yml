@@ -9,9 +9,6 @@ jobs:
   check:
     name: lint + tests
     runs-on: ubuntu-latest
-    env:
-      # Unit tests do not launch Electron, so skip the large binary download.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,8 +23,6 @@ jobs:
   e2e:
     name: browser end-to-end
     runs-on: ubuntu-latest
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -42,7 +42,7 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    files: ["desktop/**/*.cjs", "tests/fixtures/**/*.cjs"],
+    files: ["tools/**/*.cjs", "tests/fixtures/**/*.cjs"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },
