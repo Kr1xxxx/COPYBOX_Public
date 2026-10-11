@@ -80,7 +80,7 @@
 </style>
 <div class="page">
   <header class="topbar">
-    <div class="brand"><b>Clipbox</b><span class="ver" title="网页测试版的版本号">v__VERSION__</span><span class="ver-time" title="这个版本的更新时间">__UPDATED__</span><span>网页测试版 · 软件窗口之外是预览工具</span></div>
+    <div class="brand"><b>Clipbox</b><span class="ver" title="网页测试版的版本号">v__VERSION__</span><span class="ver-time" data-at="__UPDATED_ISO__" title="这个版本的更新时间（你的本地时间）">__UPDATED__</span><span>网页测试版 · 软件窗口之外是预览工具</span></div>
     <div class="seg" role="radiogroup" aria-label="软件版本">
       <button type="button" role="radio" aria-checked="true" data-os="win">Windows 版</button>
       <button type="button" role="radio" aria-checked="false" data-os="mac">Mac 版</button>
@@ -116,6 +116,26 @@
   </div>
 </div>
 <div class="busy" id="busy" hidden><span id="busyText"></span></div>
+<script>
+// The update time in the viewer's own clock, and how long ago it was; refreshed while the page stays open.
+(function () {
+  var el = document.querySelector(".ver-time");
+  var at = el && new Date(el.getAttribute("data-at"));
+  if (!el || !at || isNaN(at.getTime())) return;
+  function two(n) { return (n < 10 ? "0" : "") + n; }
+  function paint() {
+    var now = new Date();
+    var sameDay = at.toDateString() === now.toDateString();
+    var clock = two(at.getHours()) + ":" + two(at.getMinutes());
+    var day = sameDay ? "" : two(at.getMonth() + 1) + "-" + two(at.getDate()) + " ";
+    var mins = Math.max(0, Math.floor((now - at) / 60000));
+    var ago = mins < 1 ? "刚刚" : mins < 60 ? mins + " 分钟前" : mins < 1440 ? Math.floor(mins / 60) + " 小时前" : Math.floor(mins / 1440) + " 天前";
+    el.textContent = day + clock + " 更新 · " + ago;
+  }
+  paint();
+  setInterval(paint, 20000);
+})();
+</script>
 <script type="module">
 import { seedTestImages } from "./seed.js";
 const win = document.getElementById("win"), frame = document.getElementById("app"), note = document.getElementById("note");

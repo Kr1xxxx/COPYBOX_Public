@@ -62,8 +62,8 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
   return html.replace("<head>", () => "<head>" + shim);
 }
 
-export function renderWrapper(template, version, updated = "") {
-  return template.replaceAll("__VERSION__", String(version).trim()).replaceAll("__UPDATED__", updated);
+export function renderWrapper(template, version, updated = "", updatedIso = "") {
+  return template.replaceAll("__VERSION__", String(version).trim()).replaceAll("__UPDATED_ISO__", updatedIso).replaceAll("__UPDATED__", updated);
 }
 
 export function ensureTitle(html) {
@@ -152,7 +152,7 @@ export async function main(argv = process.argv.slice(2)) {
   writeFileSync(join(out, "app-win.html"), withDesktopShim(html, "win32", info));
   writeFileSync(join(out, "app-mac.html"), withDesktopShim(html, "darwin", info));
   const updated = new Date(info.updatedAt).toLocaleString("sv-SE", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short" });
-  writeFileSync(join(out, "index.html"), renderWrapper(readFileSync(join(here, "wrapper.html"), "utf8"), version, updated));
+  writeFileSync(join(out, "index.html"), renderWrapper(readFileSync(join(here, "wrapper.html"), "utf8"), version, updated, info.updatedAt));
   cpSync(join(here, "seed.js"), join(out, "seed.js"));
   cpSync(join(here, "samples"), join(out, "samples"), { recursive: true });
   cpSync(join(here, "changelog.json"), join(out, "changelog.json"));
