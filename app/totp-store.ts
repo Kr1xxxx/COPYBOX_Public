@@ -1,5 +1,6 @@
 // Encrypted store for the hidden 验证码 accounts (Mac). One AES-GCM envelope in its own localStorage key, keyed from the
 // device key by PBKDF2 like the vault, but kept apart from it: never in the vault. It goes into a 秘密 backup only as its own password-encrypted block (vault-backup.ts).
+import { VAULT_CHANGED_EVENT } from "./secret-items-store.ts";
 import { TOTP_MAX_ACCOUNTS, type TotpAccount } from "./totp-core.ts";
 
 export const TOTP_STORAGE_KEY = "clipbox.totp.v1";
@@ -11,6 +12,8 @@ type Envelope = { version: 1; salt: string; iv: string; ciphertext: string; iter
 export type TotpStore = {
   list(): Promise<TotpAccount[]>;
   add(account: TotpAccount): Promise<TotpAccount[]>;
+  // Replaces the account with the same id (used for 收藏, 回收站 and last-copied marks).
+  put(account: TotpAccount): Promise<TotpAccount[]>;
   remove(id: string): Promise<TotpAccount[]>;
   // Used when restoring a backup: writes the whole list at once.
   replaceAll(accounts: TotpAccount[]): Promise<TotpAccount[]>;
@@ -55,6 +58,7 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
     const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: LABEL }, key, plain);
     const envelope: Envelope = { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(encrypted)), iterations: ITERATIONS };
     storage.setItem(TOTP_STORAGE_KEY, JSON.stringify(envelope));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
     return accounts;
   }
 
@@ -73,6 +77,10 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
       if (accounts.length >= TOTP_MAX_ACCOUNTS) throw new Error(`最多保存 ${TOTP_MAX_ACCOUNTS} 个账号`);
       if (accounts.some((entry) => entry.secret === account.secret && entry.issuer === account.issuer && entry.name === account.name)) throw new Error("这个账号已经添加过了");
       return write([...accounts, account]);
+    }),
+    put: (account) => serial(async () => {
+      const accounts = await read();
+      return write(accounts.some((entry) => entry.id === account.id) ? accounts.map((entry) => (entry.id === account.id ? account : entry)) : [...accounts, account]);
     }),
     remove: (id) => serial(async () => write((await read()).filter((entry) => entry.id !== id))),
     replaceAll: (accounts) => serial(async () => write(accounts)),

@@ -19,12 +19,12 @@ type Draft = { id: string | null; kind: PaymentKind; name: string; fields: Recor
 const EMPTY_DRAFT: Draft = { id: null, kind: "bank", name: "", fields: {} };
 
 // 收款信息 in the hidden 保险箱. Shown as plain text on purpose (it is sent to customers); changing an entry asks twice.
-export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
+export function PaymentPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const [items, setItems] = useState<PaymentItem[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openId, setOpenId] = useState(focusId ?? "");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY_DRAFT } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmSave, setConfirmSave] = useState(false);
   const [deleteId, setDeleteId] = useState("");
@@ -36,7 +36,7 @@ export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: strin
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
@@ -82,12 +82,13 @@ export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: strin
     const now = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: PaymentItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "payment", kind: draft.kind, name: clampPaymentName(draft.name),
       fields: normalizePaymentFields(draft.kind, draft.fields), createdAt: existing?.createdAt ?? now, updatedAt: now,
     };
     try {
       const list = await store.put(item);
-      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment"));
+      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
       setConfirmSave(false);
@@ -98,9 +99,11 @@ export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: strin
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      const list = await storeRef.current!.remove(id);
-      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment"));
+      const list = await storeRef.current!.put({ ...found, trashedAt: Date.now() });
+      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {
@@ -142,7 +145,7 @@ export function PaymentPanel({ deviceKey, onToast, focusId }: { deviceKey: strin
 
   return (
     <>
-      {items.length === 0 && <p className="totp-empty">还没有收款信息。点下面的「添加收款信息」，选择银行电汇、PayPal 等方式。</p>}
+      {items.length === 0 && <p className="totp-empty">还没有收款信息。点右上角「新增」，选择银行电汇、PayPal 等方式。</p>}
       {items.length > 0 && (
         <ul className="totp-list pay-list">
           {items.map((item) => {

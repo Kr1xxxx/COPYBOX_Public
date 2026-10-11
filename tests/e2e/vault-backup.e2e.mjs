@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
 
 async function openSettings(page, tab = "数据") {
   await page.getByRole("button", { name: /设置/ }).first().click();
@@ -14,14 +14,14 @@ test("Mac: a 账号 backup carries the 保险箱 (验证码 and API 密钥) encr
   await seedSnippets(page);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const vault = page.getByRole("region", { name: "保险箱" });
-  await vault.getByRole("button", { name: "验证码", exact: true }).click();
-  await vault.getByRole("button", { name: "添加账号" }).click();
+  await openAccountCategory(vault.page(), "验证码");
+  await accountAddButton(vault.page()).click();
   await vault.getByLabel("密钥或链接").fill("JBSWY3DPEHPK3PXP");
   await vault.getByLabel("名称（可不填）").fill("公司邮箱");
   await vault.getByRole("button", { name: "保存" }).click();
   await expect(vault.getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
-  await vault.getByRole("button", { name: "API 密钥", exact: true }).click();
-  await vault.getByRole("button", { name: "添加 API 密钥" }).click();
+  await openAccountCategory(vault.page(), "API 密钥");
+  await accountAddButton(vault.page()).click();
   await vault.getByPlaceholder("例如：客服 AI 接口").fill("客服 AI 接口");
   await vault.getByLabel("密钥", { exact: true }).fill("sk-ant-api03-ABCDEFGH1234");
   await vault.getByRole("button", { name: "保存" }).click();
@@ -49,8 +49,8 @@ test("Mac: a 账号 backup carries the 保险箱 (验证码 and API 密钥) encr
   await expect(importDialog).toHaveCount(0);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const back = page.getByRole("region", { name: "保险箱" });
-  await back.getByRole("button", { name: "验证码", exact: true }).click();
-  await expect(back.getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
-  await back.getByRole("button", { name: "API 密钥", exact: true }).click();
-  await expect(back.getByRole("button", { name: /客服 AI 接口/ })).toBeVisible();
+  await openAccountCategory(back.page(), "验证码");
+  await expect(back.getByRole("button", { name: "复制验证码 公司邮箱" })).toBeVisible();
+  await openAccountCategory(back.page(), "API 密钥");
+  await expect(back.locator(".vault-entry", { hasText: "客服 AI 接口" })).toBeVisible();
 });

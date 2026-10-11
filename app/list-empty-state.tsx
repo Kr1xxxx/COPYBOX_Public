@@ -26,7 +26,7 @@ export function ListEmptyState({ firstRun, activeKind, activeFolder, query, sear
           {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={onImportSheet}>导入话术表格</button>}
           <button type="button" className="secondary-button" onClick={onImportBackup}>导入备份</button>
         </div>
-        <small>内容用 AES-256 加密，只保存在这台设备上</small>
+        {activeKind === "snippet" && <small>内容用 AES-256 加密，只保存在这台设备上</small>}
       </div>
     );
   }

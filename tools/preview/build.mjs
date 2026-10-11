@@ -43,6 +43,16 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
     platform: "${platform}",
     copyText: function (text) { return navigator.clipboard.writeText(text); },
     copyImage: function (png) { return navigator.clipboard.write([new ClipboardItem({ "image/png": new Blob([png], { type: "image/png" }) })]); },
+    // The real app compresses through TinyPNG; a browser cannot call it, so here a picture is re-encoded to look the same way.
+    compressImage: function (bytes) {
+      var type = bytes[0] === 0x89 ? "image/png" : bytes[0] === 0xff ? "image/jpeg" : "image/webp";
+      return createImageBitmap(new Blob([bytes], { type: type })).then(function (bitmap) {
+        var canvas = document.createElement("canvas"); canvas.width = bitmap.width; canvas.height = bitmap.height;
+        canvas.getContext("2d").drawImage(bitmap, 0, 0);
+        return new Promise(function (resolve) { canvas.toBlob(function (blob) { resolve(blob); }, type, 0.6); });
+      }).then(function (blob) { return blob.arrayBuffer(); }).then(function (buffer) { return { ok: true, bytes: new Uint8Array(buffer) }; })
+        .catch(function () { return { ok: false, reason: "service" }; });
+    },
     didCopy: function () {},
     getVersion: function () { return Promise.resolve(${JSON.stringify(info.version)}); },
     getBuildTime: function () { return Promise.resolve(${JSON.stringify(info.updatedAt)}); },

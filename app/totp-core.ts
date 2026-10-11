@@ -3,6 +3,10 @@
 export type TotpAlgorithm = "SHA1" | "SHA256" | "SHA512";
 
 export type TotpAccount = {
+  // 收藏, last copied, and when it went to the 回收站 (optional: older data has none).
+  pinned?: boolean;
+  lastUsedAt?: number;
+  trashedAt?: number;
   id: string;
   issuer: string;
   name: string;

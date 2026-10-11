@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs";
 
 async function openVault(page) {
   await asDesktop(page, "darwin");
@@ -8,13 +8,13 @@ async function openVault(page) {
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "收款信息" }).click();
+  await openAccountCategory(page, "收款信息");
   return dialog;
 }
 
 test("收款信息: add a bank transfer with checks, copy a field and the English block, edit needs a second confirm, delete", async ({ page }) => {
   const dialog = await openVault(page);
-  await dialog.getByRole("button", { name: "添加收款信息" }).click();
+  await accountAddButton(page).click();
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("alert").first()).toBeVisible();
   await dialog.getByPlaceholder("例如：美元电汇 - 招行").fill("美元电汇 - 汇丰");
@@ -54,13 +54,13 @@ test("收款信息: add a bank transfer with checks, copy a field and the Englis
   await page.reload();
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "收款信息" }).click();
+  await openAccountCategory(page, "收款信息");
   await expect(page.getByRole("region", { name: "保险箱" })).toContainText("美元电汇 - 汇丰");
 });
 
 test("收款信息: PayPal needs a valid e-mail; delete asks to confirm", async ({ page }) => {
   const dialog = await openVault(page);
-  await dialog.getByRole("button", { name: "添加收款信息" }).click();
+  await accountAddButton(page).click();
   await dialog.getByRole("button", { name: "PayPal" }).click();
   await dialog.getByPlaceholder("例如：美元电汇 - 招行").fill("PayPal 主号");
   await dialog.getByLabel("PayPal 邮箱").fill("nope");

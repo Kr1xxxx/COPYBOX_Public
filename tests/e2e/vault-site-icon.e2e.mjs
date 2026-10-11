@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -15,8 +15,8 @@ async function open(page, fetchSiteIcon, arg) {
 }
 
 async function addLogin(dialog, name, url) {
-  await dialog.getByRole("button", { name: "账号密码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号密码" }).click();
+  await openAccountCategory(dialog.page(), "登录");
+  await accountAddButton(dialog.page()).click();
   await dialog.getByPlaceholder("例如：Shopify 后台").fill(name);
   await dialog.getByPlaceholder("shopify.com").fill(url);
   await dialog.getByLabel("用户名 / 邮箱").fill("boss@example.com");
@@ -49,7 +49,7 @@ test("a site's own icon is fetched once, shown, kept encrypted and not fetched a
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const again = page.getByRole("region", { name: "保险箱" });
-  await again.getByRole("button", { name: "账号密码", exact: true }).click();
+  await openAccountCategory(again.page(), "登录");
   await expect(again.locator(".site-badge-fetched img").first()).toBeVisible();
   expect(await page.evaluate(() => window.__iconCalls)).toEqual([]);
 });

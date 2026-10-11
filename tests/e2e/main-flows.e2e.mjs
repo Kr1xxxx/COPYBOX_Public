@@ -635,3 +635,14 @@ test("the standard 话术 folders can be dragged to a new place and the order is
   await expect(page.getByRole("menuitem", { name: "重命名" })).toBeDisabled();
   await expect(page.getByRole("menuitem", { name: "删除目录…" })).toBeDisabled();
 });
+
+test("the 发送前确认 and 发送前核实 ticks are gone and copying does not wait for them", async ({ page }) => {
+  await page.locator(".native-row", { hasText: "催付款" }).first().locator(".row-main").click();
+  const row = page.locator(".native-row.selected").first();
+  await expect(row.locator(".snippet-fill")).toBeVisible();
+  await expect(row.locator(".copy-checks")).toHaveCount(0);
+  await expect(row).not.toContainText("发送前确认");
+  await expect(row).not.toContainText("已确认");
+  await expect(row.locator(".copy-warning")).toHaveCount(0);
+  await expect(row).not.toContainText("发送前核实");
+});

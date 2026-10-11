@@ -4,6 +4,7 @@ import { ArcSegmented } from "./arc/segmented";
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aiRewrite } from "./ai-client";
 import { formatSecretReference } from "./clipbox-automation";
+import { displaySnippetNumber } from "./clipbox-order";
 import {
   attemptEditorSave,
   combineSecretSegments,
@@ -222,7 +223,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
       <header className="inline-editor-head">
         <div className={`editor-kind ${kind}`}>
           <span>{item ? "编辑" : "新增"}{kind === "secret" ? SECRET_WORD : "话术"}</span>
-          {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{item.snippetNumber}</b>}
+          {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{displaySnippetNumber(item.snippetNumber)}</b>}
           {kind === "secret" && !PLAIN_NOTES && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
         </div>
         <span className="inline-editor-hint">{kind === "secret" ? (PLAIN_NOTES ? "加密保存在这台电脑上" : "加密保存在这台设备上") : structured ? "中英文和使用规则一起加密保存" : "小提示只给自己看；内容可用 AI 润色或整理"}</span>

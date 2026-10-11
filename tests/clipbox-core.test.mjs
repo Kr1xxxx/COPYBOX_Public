@@ -557,3 +557,12 @@ test("snippet folders keep a saved order that has every standard folder (D-035);
   const once = normalizeVaultData({ items: [], folders: { secret: [], snippet: reordered } });
   assert.deepEqual(normalizeVaultData(once).folders.snippet, reordered);
 });
+
+test("snippet numbers are shown as #001 while the stored CB-0001 value stays", async () => {
+  const { displaySnippetNumber, formatSnippetNumber } = await import("../app/clipbox-order.ts");
+  assert.equal(displaySnippetNumber("CB-0001"), "#001");
+  assert.equal(displaySnippetNumber("CB-0014"), "#014");
+  assert.equal(displaySnippetNumber("CB-1000"), "#1000");
+  assert.equal(displaySnippetNumber(undefined), "");
+  assert.equal(formatSnippetNumber(1), "CB-0001");
+});

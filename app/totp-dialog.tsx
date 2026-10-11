@@ -7,6 +7,8 @@ import { openTotpStore, type TotpStore } from "./totp-store";
 import { scanQrFromBlob } from "./qr-scan";
 import { Icon } from "./ui-atoms";
 
+const stamp = () => Date.now();
+
 // Hidden 验证码 (Mac only): 6-digit codes with a countdown, click a row to copy. Secrets never leave the encrypted store.
 function useNow(interval = 250) {
   const [now, setNow] = useState(() => Date.now());
@@ -56,11 +58,11 @@ function TotpRow({ account, now, copied, confirming, onCopy, onAskDelete, onCanc
   );
 }
 
-export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: (message: string) => void }) {
+export function TotpPanel({ deviceKey, onToast, startAdding }: { deviceKey: string; onToast: (message: string) => void; startAdding?: boolean }) {
   const storeRef = useRef<TotpStore | null>(null);
   const [accounts, setAccounts] = useState<TotpAccount[] | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(Boolean(startAdding));
   const [secret, setSecret] = useState("");
   const [name, setName] = useState("");
   const [formError, setFormError] = useState("");
@@ -74,7 +76,7 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
     let live = true;
     const store = openTotpStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setAccounts(list); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setAccounts(list.filter((account) => !account.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => { if (adding) secretRef.current?.focus(); }, [adding]);
@@ -112,7 +114,7 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
       // A name typed here wins over the one inside an otpauth:// link.
       if (name.trim()) draft.name = Array.from(name.trim().replace(/\s+/g, " ")).slice(0, TOTP_NAME_MAX).join("");
       const account: TotpAccount = { ...draft, id: crypto.randomUUID(), createdAt: Date.now() };
-      setAccounts(await store.add(account));
+      setAccounts((await store.add(account)).filter((entry) => !entry.trashedAt));
       setSecret(""); setName(""); setFormError(""); setAdding(false);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "添加失败，请重试");
@@ -121,7 +123,9 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
 
   async function remove(id: string) {
     try {
-      setAccounts(await storeRef.current!.remove(id));
+      const found = accounts?.find((account) => account.id === id);
+      if (!found) return;
+      setAccounts((await storeRef.current!.put({ ...found, trashedAt: stamp() })).filter((entry) => !entry.trashedAt));
       setDeleteId("");
     } catch {
       onToast("删除失败，请重试");
@@ -132,7 +136,7 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
     <>
     {loadError && <p className="settings-note" role="alert">{loadError}</p>}
     {!loadError && accounts === null && <p className="settings-note">正在读取…</p>}
-    {accounts && accounts.length === 0 && !adding && <p className="totp-empty">还没有账号。点下面的「添加账号」，粘贴密钥或 otpauth:// 链接。</p>}
+    {accounts && accounts.length === 0 && !adding && <p className="totp-empty">还没有验证码。点右上角「新增」，粘贴密钥或 otpauth:// 链接。</p>}
     {accounts && accounts.length > 0 && (
       <ul className="totp-list">
         {accounts.map((account) => (
@@ -153,7 +157,7 @@ export function TotpPanel({ deviceKey, onToast }: { deviceKey: string; onToast: 
       </form>
     )}
     {!adding && accounts && <div className="totp-actions">
-      <button type="button" className="primary-button" onClick={() => setAdding(true)}><Icon name="plus" />添加账号</button>
+      <button type="button" className="primary-button" onClick={() => setAdding(true)}><Icon name="plus" />添加验证码</button>
     </div>}
     </>
   );

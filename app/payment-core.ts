@@ -49,7 +49,10 @@ export const PAYMENT_NAME_MAX = 40;
 export const PAYMENT_FIELD_MAX = 300;
 export const PAYMENT_MAX_ITEMS = 50;
 
-export type LoginItem = {
+// Optional on every typed entry (older data simply has none): 收藏, last copied, and when it went to the 回收站.
+export type EntryMeta = { pinned?: boolean; lastUsedAt?: number; trashedAt?: number };
+
+export type LoginItem = EntryMeta & {
   id: string;
   type: "login";
   name: string;
@@ -64,7 +67,7 @@ export type LoginItem = {
 };
 
 // Backup codes a site gives out once ("恢复码"): one text with a code per line.
-export type RecoveryItem = {
+export type RecoveryItem = EntryMeta & {
   id: string;
   type: "recovery";
   name: string;
@@ -87,7 +90,7 @@ export type MarkItem = {
   updatedAt: number;
 };
 
-export type ApiKeyItem = {
+export type ApiKeyItem = EntryMeta & {
   id: string;
   type: "apikey";
   name: string;
@@ -103,7 +106,7 @@ export type ApiKeyItem = {
   updatedAt: number;
 };
 
-export type PaymentItem = {
+export type PaymentItem = EntryMeta & {
   id: string;
   type: "payment";
   kind: PaymentKind;

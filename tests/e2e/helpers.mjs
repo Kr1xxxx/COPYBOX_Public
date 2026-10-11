@@ -39,3 +39,9 @@ export async function asDesktop(page, platform, { imageView } = {}) {
     document.addEventListener("DOMContentLoaded", () => document.documentElement.classList.add("desktop-app", `platform-${pl}`));
   }, platform);
 }
+
+// 账号 page (Mac): the sidebar 分类 list and the toolbar 新增 button.
+export async function openAccountCategory(page, name) {
+  await page.getByRole("navigation", { name: "分类" }).getByRole("button", { name: new RegExp(`^${name}`) }).click();
+}
+export const accountAddButton = (page) => page.getByRole("button", { name: "新增条目" });

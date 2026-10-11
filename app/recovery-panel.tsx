@@ -19,12 +19,12 @@ function whenText(at: number) {
 const siteOf = (item: Pick<RecoveryItem, "site" | "name">) => detectSite(/^[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(item.site.trim()) ? { url: item.site, name: item.name } : { name: item.site || item.name });
 
 // 恢复码 in the hidden 保险箱: the backup codes a site gives out once. Hidden until the eye button is held; each code or all of them can be copied.
-export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
+export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const [items, setItems] = useState<RecoveryItem[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openId, setOpenId] = useState(focusId ?? "");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState("");
   const [shown, setShown] = useState("");
@@ -36,7 +36,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: stri
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is RecoveryItem => entry.type === "recovery")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
@@ -77,11 +77,12 @@ export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: stri
     const at = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: RecoveryItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "recovery", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, 40).join(""),
       site: draft.site.trim().slice(0, 60), codes, note: draft.note.trim(), createdAt: existing?.createdAt ?? at, updatedAt: at,
     };
     try {
-      setItems((await store.put(item)).filter((entry): entry is RecoveryItem => entry.type === "recovery"));
+      setItems((await store.put(item)).filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
     } catch (error) {
@@ -90,8 +91,10 @@ export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: stri
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      setItems((await storeRef.current!.remove(id)).filter((entry): entry is RecoveryItem => entry.type === "recovery"));
+      setItems((await storeRef.current!.put({ ...found, trashedAt: Date.now() })).filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {
@@ -122,7 +125,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId }: { deviceKey: stri
 
   return (
     <>
-      {items.length === 0 && <p className="totp-empty">还没有恢复码。网站给你的备用恢复码一般只出现一次，点下面的「添加恢复码」存起来。</p>}
+      {items.length === 0 && <p className="totp-empty">还没有恢复码。网站给你的备用恢复码一般只出现一次，点右上角「新增」存起来。</p>}
       {items.length > 0 && (
         <ul className="totp-list pay-list">
           {items.map((item) => {

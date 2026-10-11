@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
 
 test("Windows: the second section is 图片 (no 备注) and there is no empty title band", async ({ page }) => {
   await asDesktop(page, "win32");
@@ -17,7 +17,7 @@ test("macOS: the second section is still 账号 with masking and references", as
   await seedSnippets(page);
   expect(await page.locator(".sidebar-top").evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(40);
   await page.getByRole("button", { name: "账号" }).first().click();
-  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
+  await openAccountCategory(page, "其他");
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await expect(editor).toContainText("被什么引用");
@@ -59,6 +59,6 @@ test("macOS: the empty 账号 page still says only the reference is copied", asy
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   await page.getByRole("button", { name: "账号" }).first().click();
-  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
+  await openAccountCategory(page, "其他");
   await expect(page.locator("body")).toContainText("默认只复制引用");
 });

@@ -8,6 +8,8 @@ export type ClipboxDesktop = {
   platform?: string;
   copyText: (text: string) => Promise<void>;
   copyImage?: (png: Uint8Array) => Promise<void>;
+  // TinyPNG compression done by the desktop shell; resolves with the smaller picture or the reason it failed.
+  compressImage?: (bytes: Uint8Array, key: string) => Promise<{ ok: true; bytes: Uint8Array } | { ok: false; reason: string }>;
   didCopy: () => void;
   setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { asDesktop } from "./helpers.mjs";
+import { asDesktop, openAccountCategory } from "./helpers.mjs";
 
 const PNG_FILE = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
 const JPG_FILE = fileURLToPath(new URL("../fixtures/sample-photo.jpg", import.meta.url));
@@ -44,7 +44,7 @@ test("macOS: the sections are 话术, 账号 and 图片, and 账号 still opens"
   await openApp(page, "darwin");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
+  await openAccountCategory(page, "其他");
   await expect(page.locator("body")).toContainText("默认只复制引用");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await expect(page.locator("body")).toContainText("还没有图片，先添加第一张");
@@ -398,4 +398,63 @@ test("a copy that fails says so and leaves the image alone", async ({ page }) =>
   await page.getByRole("button", { name: "复制 sample-gradient" }).click();
   await expect(page.locator(".toast")).toContainText("图片复制失败，请重试");
   await expect(rows(page)).toHaveCount(1);
+});
+
+// 图片 are shrunk with TinyPNG before they are stored (D-037): at most 100 a month, never losing the picture.
+async function withCompressor(page, behaviour) {
+  await page.addInitScript((mode) => {
+    window.__compressCalls = 0;
+    const desktop = () => window.clipboxDesktop;
+    Object.defineProperty(window, "__installCompressor", { value: () => {
+      desktop().compressImage = async () => {
+        window.__compressCalls += 1;
+        if (mode === "fail") return { ok: false, reason: "network" };
+        // a real, much smaller picture (a 1×1 PNG)
+        return { ok: true, bytes: Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0)) };
+      };
+    } });
+    document.addEventListener("DOMContentLoaded", () => window.__installCompressor());
+  }, behaviour);
+}
+
+test("a new picture is compressed, the saving is shown, and 设置 counts it", async ({ page }) => {
+  await asDesktop(page, "win32", { imageView: "list" });
+  await withCompressor(page, "ok");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await addImages(page, PNG_FILE);
+  await expect(page.locator(".toast")).toContainText(/已压缩 .* → /);
+  await expect(rows(page)).toHaveCount(1);
+  expect(await page.evaluate(() => window.__compressCalls)).toBe(1);
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.locator(".settings-dialog").getByRole("tab", { name: "数据" }).click();
+  await expect(page.locator(".settings-dialog")).toContainText("1 / 100 张");
+});
+
+test("when the compression service cannot be reached the original picture is still saved, and the user is told", async ({ page }) => {
+  await asDesktop(page, "win32", { imageView: "list" });
+  await withCompressor(page, "fail");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await addImages(page, PNG_FILE);
+  await expect(page.locator(".toast")).toContainText("没有连上压缩服务，已保存原图");
+  await expect(rows(page)).toHaveCount(1);
+});
+
+test("after 100 compressed pictures in a month, adding another is refused with a clear message", async ({ page }) => {
+  await asDesktop(page, "win32", { imageView: "list" });
+  await withCompressor(page, "ok");
+  await page.addInitScript(() => {
+    const now = new Date();
+    localStorage.setItem("clipbox.tinify.usage.v1", JSON.stringify({ month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, count: 100 }));
+  });
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await addImages(page, PNG_FILE);
+  await expect(page.locator(".toast")).toContainText("本月图片压缩次数已用完（100/100）");
+  await expect(rows(page)).toHaveCount(0);
+  expect(await page.evaluate(() => window.__compressCalls)).toBe(0);
 });

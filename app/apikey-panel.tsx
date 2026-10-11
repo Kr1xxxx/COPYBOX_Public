@@ -21,12 +21,12 @@ function siteOf(item: Pick<ApiKeyItem, "key" | "endpoint" | "service" | "name">)
 }
 
 // API 密钥 in the hidden 保险箱. Key and Secret are hidden until the eye button is held; the service is guessed from the key's prefix.
-export function ApiKeyPanel({ deviceKey, onToast, focusId }: { deviceKey: string; onToast: (message: string) => void; focusId?: string }) {
+export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const [items, setItems] = useState<ApiKeyItem[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openId, setOpenId] = useState(focusId ?? "");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState("");
   const [shown, setShown] = useState("");
@@ -39,7 +39,7 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId }: { deviceKey: string
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is ApiKeyItem => entry.type === "apikey")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
@@ -84,12 +84,13 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId }: { deviceKey: string
     const at = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: ApiKeyItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "apikey", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, 40).join(""),
       service: draft.service.trim() || siteFromApiKey(key)?.name || "", key, secret,
       endpoint: draft.endpoint.trim() ? normalizeUrl(draft.endpoint) : "", expires: draft.expires, createdAt: existing?.createdAt ?? at, updatedAt: at,
     };
     try {
-      setItems((await store.put(item)).filter((entry): entry is ApiKeyItem => entry.type === "apikey"));
+      setItems((await store.put(item)).filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
     } catch (error) {
@@ -98,8 +99,10 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId }: { deviceKey: string
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      setItems((await storeRef.current!.remove(id)).filter((entry): entry is ApiKeyItem => entry.type === "apikey"));
+      setItems((await storeRef.current!.put({ ...found, trashedAt: Date.now() })).filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {
@@ -136,7 +139,7 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId }: { deviceKey: string
 
   return (
     <>
-      {items.length === 0 && <p className="totp-empty">还没有 API 密钥。点下面的「添加 API 密钥」，粘贴后会按开头自动识别是哪个服务的。</p>}
+      {items.length === 0 && <p className="totp-empty">还没有 API 密钥。点右上角「新增」，粘贴后会按开头自动识别是哪个服务的。</p>}
       {items.length > 0 && (
         <ul className="totp-list pay-list">
           {items.map((item) => {
