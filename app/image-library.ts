@@ -3,8 +3,8 @@
 // The image library shared by the 图片 sidebar (folders) and the 图片 list: one place owns the encrypted store handle,
 // the images, the folders and the selected folder filter, so the two never disagree.
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { IMAGE_FILTER_ALL, resolveImageFilter, type ImageFilter } from "./image-folders-core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { activeImages, expiredTrashedImages, IMAGE_FILTER_ALL, resolveImageFilter, trashedImages, type ImageFilter } from "./image-folders-core";
 import { normalizeFolderName, openImageStore, type ImageFolder, type ImageMeta, type ImageStore } from "./image-store";
 
 export const LOAD_FAILED = "图片读取失败，原数据没有改动。";
@@ -30,14 +30,21 @@ export type ImageLibrary = {
   ready: boolean;
   loadError: string;
   retry: () => void;
+  // Images that are not in the trash; `trashed` holds the ones that are (newest deletion first).
   images: ImageMeta[] | null;
+  trashed: ImageMeta[];
   folders: ImageFolder[];
   filter: ImageFilter;
   setFilter: (filter: ImageFilter) => void;
   // Throws the store's short Chinese message when the image is refused.
   addImage: (file: Blob, title: string, folder: string | null) => Promise<ImageMeta>;
   rename: (id: string, title: string) => Promise<ImageMeta>;
+  // Permanent. Normal deleting is `trash`; this is for the 回收站 and the automatic cleanup.
   remove: (id: string) => Promise<void>;
+  trash: (id: string) => Promise<boolean>;
+  restore: (id: string) => Promise<boolean>;
+  // Permanently removes the trashed images older than `days` (0 = never). Returns how many.
+  purgeExpired: (days: number) => Promise<number>;
   getBlob: (id: string) => Promise<Blob>;
   getThumb: (id: string) => Promise<Blob>;
   markUsed: (id: string) => Promise<void>;
@@ -56,7 +63,9 @@ export type ImageLibrary = {
 export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (message: string) => void): ImageLibrary {
   const [wanted, setWanted] = useState(false);
   if (enabled && !wanted) setWanted(true);
-  const [images, setImages] = useState<ImageMeta[] | null>(null);
+  const [allImages, setImages] = useState<ImageMeta[] | null>(null);
+  const images = useMemo(() => allImages && activeImages(allImages), [allImages]);
+  const trashed = useMemo(() => allImages ? trashedImages(allImages) : [], [allImages]);
   const [folders, setFolders] = useState<ImageFolder[]>([]);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -115,6 +124,40 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
   async function remove(id: string) {
     await (await loadStore(deviceKey)).remove(id);
     setImages((current) => current?.filter((meta) => meta.id !== id) ?? current);
+  }
+
+  async function trash(id: string) {
+    try {
+      const updated = await (await loadStore(deviceKey)).trash(id);
+      setImages((list) => list?.map((meta) => meta.id === updated.id ? updated : meta) ?? list);
+      return true;
+    } catch (error) {
+      toast(readableMessage(error, "删除失败，图片没有改动"));
+      return false;
+    }
+  }
+
+  async function restore(id: string) {
+    try {
+      const updated = await (await loadStore(deviceKey)).restore(id);
+      setImages((list) => list?.map((meta) => meta.id === updated.id ? updated : meta) ?? list);
+      return true;
+    } catch (error) {
+      toast(readableMessage(error, "恢复失败，图片仍在回收站"));
+      return false;
+    }
+  }
+
+  async function purgeExpired(days: number) {
+    const expired = expiredTrashedImages(allImages ?? [], days, Date.now());
+    if (expired.length === 0) return 0;
+    const target = await loadStore(deviceKey);
+    const gone = new Set<string>();
+    for (const meta of expired) {
+      try { await target.remove(meta.id); gone.add(meta.id); } catch { /* kept in the trash, tried again next time */ }
+    }
+    if (gone.size > 0) setImages((list) => list?.filter((meta) => !gone.has(meta.id)) ?? list);
+    return gone.size;
   }
 
   async function togglePinned(id: string) {
@@ -201,5 +244,5 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  return { ready, loadError, retry, images, folders, filter, setFilter: setRawFilter, addImage, rename, remove, getBlob, getThumb, markUsed, moveImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, deleteFolder };
+  return { ready, loadError, retry, images, trashed, folders, filter, setFilter: setRawFilter, addImage, rename, remove, trash, restore, purgeExpired, getBlob, getThumb, markUsed, moveImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, deleteFolder };
 }
