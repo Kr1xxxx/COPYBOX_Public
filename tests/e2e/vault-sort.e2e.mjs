@@ -49,7 +49,8 @@ test("old 秘密 entries are sorted by content in 全部, unknown ones go to 其
   // Kept after a restart.
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   await expect(page.getByRole("dialog", { name: "保险箱" }).getByRole("region", { name: "Google" })).toContainText("仓库地址");
   // 恢复自动: clearing the website and the type goes back to the guess.
   const again = page.getByRole("dialog", { name: "保险箱" });

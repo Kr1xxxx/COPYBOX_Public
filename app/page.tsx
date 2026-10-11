@@ -143,11 +143,6 @@ function writeStoredChoice(key: string, value: string | number) {
   try { localStorage.setItem(key, String(value)); } catch { /* keep the in-memory choice for this session */ }
 }
 
-const TOTP_UNLOCK_KEY = "clipbox.totp.unlocked";
-
-function readStoredFlag(key: string) {
-  try { return localStorage.getItem(key) === "1"; } catch { return false; }
-}
 
 const STORAGE_KEY = "clipbox.vault.v1";
 const DEVICE_KEY = "clipbox.device-key.v1";
@@ -245,7 +240,8 @@ export default function Home() {
   const [imageViewMode, setImageViewMode] = useImageView();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
-  const [totpUnlocked, setTotpUnlocked] = useState(() => !PLAIN_NOTES && readStoredFlag(TOTP_UNLOCK_KEY));
+  // 保险箱 is the 秘密 section now (Mac): no hidden unlock any more.
+  const totpUnlocked = !PLAIN_NOTES;
   const [totpOpen, setTotpOpen] = useState(false);
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
@@ -1622,11 +1618,10 @@ export default function Home() {
       className={`kind-switch ${isMini ? "compact" : ""}`}
       label="内容板块"
       value={imageView ? "image" : activeKind}
-      onSelect={(next) => { if (next === "totp") setTotpOpen(true); else if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
       options={[
         ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
         { value: "image", label: "图片" },
-        ...(totpUnlocked ? [{ value: "totp", label: "保险箱" }] : []),
       ]}
     />
   );
@@ -1646,8 +1641,6 @@ export default function Home() {
       onImportSamples={PLAIN_NOTES ? undefined : async () => {
         try {
           const result = await restoreSampleEntries(deviceKey);
-          writeStoredChoice(TOTP_UNLOCK_KEY, "1");
-          setTotpUnlocked(true);
           setTotpOpen(true);
           flashToast(result.added === 0 ? "范例都在，没有缺的" : `已导入 ${result.added} 条范例`);
         } catch { flashToast("导入失败，数据没有改动"); }
@@ -1830,7 +1823,10 @@ export default function Home() {
               </div>
               {imageView
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
-                : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+                : <>
+                  {activeKind === "secret" && !PLAIN_NOTES && <button type="button" className="secondary-button vault-open" onClick={() => setTotpOpen(true)}>保险箱</button>}
+                  {canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+                </>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
             <div className="section-head">
@@ -1964,8 +1960,7 @@ export default function Home() {
           </section>
         </>}
       </section>
-      {totpOpen && <VaultDialog deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={() => { setTotpOpen(false); switchKind("secret"); }} onClose={() => setTotpOpen(false)} onToast={flashToast}
-        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("保险箱入口已隐藏"); }} />}
+      {totpOpen && <VaultDialog deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={() => { setTotpOpen(false); switchKind("secret"); }} onClose={() => setTotpOpen(false)} onToast={flashToast} />}
       {settingsOpen && <SettingsDialog
         onPreviewSamples={PLAIN_NOTES || !totpUnlocked ? undefined : () => previewClearSamples(deviceKey)}
         onClearSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
@@ -1980,7 +1975,7 @@ export default function Home() {
             flashToast(result.added === 0 ? "范例都在，没有缺的" : `已补回 ${result.added} 条范例`);
           } catch { flashToast("恢复失败，数据没有改动"); }
         }}
-        onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
+        onUnlockTotp={PLAIN_NOTES ? undefined : () => { setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
         buildTime={buildTime}
         isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}

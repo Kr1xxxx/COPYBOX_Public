@@ -55,7 +55,8 @@ test("收款信息: add a bank transfer with checks, copy a field and the Englis
   // Survives a reload.
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   await page.getByRole("dialog", { name: "保险箱" }).getByRole("button", { name: "收款信息" }).click();
   await expect(page.getByRole("dialog", { name: "保险箱" })).toContainText("美元电汇 - 汇丰");
 });

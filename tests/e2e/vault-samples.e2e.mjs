@@ -32,7 +32,8 @@ test("a new 保险箱 opens with clearly fake examples of each type, which one t
   await page.keyboard.press("Escape");
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   await expect(page.getByRole("dialog", { name: "保险箱" })).toContainText("保险箱还是空的");
 });
 
@@ -94,7 +95,8 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await s.getByRole("button", { name: "确认清除" }).click();
   await expect(page.getByText("已清除 4 条范例，1 条你改过的已保留")).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   const after = page.getByRole("dialog", { name: "保险箱" });
   await after.getByRole("button", { name: "按类型" }).click();
   await expect(after).toContainText("我的邮箱");
@@ -112,7 +114,8 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
     await expect(page.getByText(round === 0 ? "已补回 4 条范例" : "范例都在，没有缺的")).toBeVisible();
     await page.keyboard.press("Escape");
   }
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   const restored = page.getByRole("dialog", { name: "保险箱" });
   await restored.getByRole("button", { name: "按类型" }).click();
   await expect(restored.getByText("【范例】接口密钥")).toHaveCount(1);

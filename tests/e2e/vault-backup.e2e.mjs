@@ -50,7 +50,8 @@ test("Mac: a 秘密 backup carries the 保险箱 (验证码 and API 密钥) encr
   await importDialog.getByRole("button", { name: /合并/ }).first().click();
   await importDialog.getByRole("button", { name: /验证并/ }).click();
   await expect(importDialog).toHaveCount(0);
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   const back = page.getByRole("dialog", { name: "保险箱" });
   await back.getByRole("button", { name: "验证码", exact: true }).click();
   await expect(back.getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();

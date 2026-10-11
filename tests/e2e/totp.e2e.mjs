@@ -38,20 +38,19 @@ test("Mac: tapping the version 5 times opens the hidden 保险箱, accounts are 
   expect(stored).not.toContain("JBSWY3DPEHPK3PXP");
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片", "保险箱"]);
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   await page.getByRole("dialog", { name: "保险箱" }).getByRole("button", { name: "验证码", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "保险箱" }).getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
 });
 
-test("Mac: 隐藏入口 removes the tab again", async ({ page }) => {
+test("Mac: only three sections; the 保险箱 sits inside 秘密, no hidden unlock", async ({ page }) => {
   await open(page, "darwin");
-  await tapVersion(page);
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
-  await dialog.getByRole("button", { name: "隐藏入口" }).click();
-  await dialog.getByRole("button", { name: "确认隐藏" }).click();
-  await expect(dialog).toBeHidden();
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
+  await expect(page.getByRole("dialog", { name: "保险箱" })).toBeVisible();
 });
 
 test("Mac: fewer than 5 taps do nothing; Windows never gets the feature", async ({ page }) => {

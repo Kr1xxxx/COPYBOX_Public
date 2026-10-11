@@ -49,7 +49,8 @@ test("a site's own icon is fetched once, shown, kept encrypted and not fetched a
   await page.evaluate(() => { window.__iconCalls = []; });
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
   const again = page.getByRole("dialog", { name: "保险箱" });
   await again.getByRole("button", { name: "账号密码", exact: true }).click();
   await expect(again.locator(".site-badge-fetched img").first()).toBeVisible();

@@ -50,3 +50,8 @@
 
 - What changed: the 保险箱 now adds the 范例 the first time it opens even when old 秘密 or 验证码 already exist (before, it stayed bare, so nobody with test data ever saw them). Only missing 范例 are added; nothing existing is changed. 清除范例 / 恢复范例 work as before.
 - Also: the empty 秘密 page (Mac) has an 「导入案例」 button next to 「新增第一条」; it adds the missing 范例 (same logic as 恢复范例, no duplicates) and opens the 保险箱. Not shown on Windows (no 秘密 section there).
+
+## Patch 16: Mac has three sections (话术 | 秘密 | 图片)
+
+- What changed: the separate 「保险箱」 section is gone. On Mac the 保险箱 is always there, as a 「保险箱」 button next to 「新增」 on the 秘密 page; the hidden unlock (tap the version 5 times) and the 「隐藏入口」 button are removed from the screen (the 5 taps still open it as a spare shortcut, to be removed later). No data moved: old 秘密 entries stay where they are and show in the 保险箱 as before, so backups and old backups are unchanged.
+- User-visible change: the Mac window shows 话术 | 秘密 | 图片; on 秘密 a 「保险箱」 button sits left of 「新增」.

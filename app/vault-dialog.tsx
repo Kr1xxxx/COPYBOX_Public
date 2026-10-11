@@ -13,13 +13,12 @@ import { VaultOverview, type LegacySecret, type VaultTab } from "./vault-overvie
 
 // The hidden 保险箱 (Mac only). 全部 groups everything by website or type; the other tabs add and edit one type each.
 // One tab each for 账号密码, 收款信息, API 密钥, 恢复码 and 验证码.
-export function VaultDialog({ deviceKey, legacySecrets, onOpenLegacy, onClose, onHide, onToast }: {
-  deviceKey: string; legacySecrets: LegacySecret[]; onOpenLegacy: (id: string) => void; onClose: () => void; onHide: () => void; onToast: (message: string) => void;
+export function VaultDialog({ deviceKey, legacySecrets, onOpenLegacy, onClose, onToast }: {
+  deviceKey: string; legacySecrets: LegacySecret[]; onOpenLegacy: (id: string) => void; onClose: () => void; onToast: (message: string) => void;
 }) {
   const [tab, setTab] = useState<VaultTab>("all");
   // Opening an entry from 全部 switches to its tab with that entry expanded; the key makes the panel start fresh.
   const [focus, setFocus] = useState<{ id: string; n: number }>({ id: "", n: 0 });
-  const [confirmHide, setConfirmHide] = useState(false);
   // Examples go in once, next to anything already there; the panels start after that check so they never miss them.
   const [ready, setReady] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -75,10 +74,7 @@ export function VaultDialog({ deviceKey, legacySecrets, onOpenLegacy, onClose, o
             {tab === "totp" && <TotpPanel deviceKey={deviceKey} onToast={onToast} />}
           </div>}
           <div className="totp-actions vault-foot">
-            <p className="settings-note">用本机密钥加密保存；导出「秘密备份」时会一起加密带上。隐藏入口后，在设置里连点版本号 5 次可重新打开。</p>
-            {confirmHide
-              ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmHide(false)}>取消</button><button type="button" className="secondary-button" onClick={onHide}>确认隐藏</button></span>
-              : <button type="button" className="secondary-button" onClick={() => setConfirmHide(true)} title="隐藏后入口消失；内容仍保存在本机">隐藏入口</button>}
+            <p className="settings-note">用本机密钥加密保存；导出「秘密备份」时会一起加密带上。</p>
           </div>
         </div>
       </section>
