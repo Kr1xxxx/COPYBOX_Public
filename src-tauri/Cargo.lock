@@ -368,6 +368,7 @@ dependencies = [
 name = "clipbox"
 version = "0.2.24"
 dependencies = [
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",
