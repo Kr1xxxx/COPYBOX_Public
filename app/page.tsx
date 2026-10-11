@@ -64,6 +64,7 @@ import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
+import { pickMiniFavorites } from "./mini-favorites";
 import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
@@ -396,6 +397,7 @@ export default function Home() {
   const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
+  const miniFavorites = useMemo(() => windowMode === "mini" && activeKind === "snippet" ? pickMiniFavorites(activeKindItems) : [], [windowMode, activeKind, activeKindItems]);
   const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret }))), [items]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
   const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
@@ -1657,6 +1659,9 @@ export default function Home() {
               </label>}
             </div>
           </div>
+          {!imageView && activeKind === "snippet" && !query.trim() && miniFavorites.length > 0 && <div className="mini-favorites" role="group" aria-label="最常用">
+            {miniFavorites.map((item) => <button key={item.id} type="button" className={`mini-chip ${item.pinned ? "pinned" : ""} ${copiedId === item.id ? "copied" : ""}`} title={item.label} onClick={() => void copyRaw(item)}>{copiedId === item.id ? "已复制" : item.label}</button>)}
+          </div>}
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
           {!imageView && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
