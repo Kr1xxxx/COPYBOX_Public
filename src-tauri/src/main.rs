@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ai;
+mod automation;
 mod shell;
 mod update;
 mod window_mode;
@@ -38,6 +39,7 @@ fn main() {
         .manage(WindowMode::default())
         .manage(Shell::default())
         .manage(Updates::default())
+        .manage(automation::Bridge::default())
         .invoke_handler(tauri::generate_handler![
             window_mode::set_window_mode,
             window_mode::get_window_mode,
@@ -56,6 +58,8 @@ fn main() {
             ai::ai_request,
             update::check_update,
             update::open_update,
+            automation::automation_ready,
+            automation::automation_response,
         ])
         .setup(|app| {
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
@@ -75,6 +79,7 @@ fn main() {
                 .traffic_light_position(tauri::LogicalPosition::new(14.0, 19.0));
             let window = builder.build()?;
             shell::build_tray(app.handle())?;
+            automation::start(app.handle());
 
             // If the page never reports in, show the window anyway (unless Clipbox was started quietly).
             if !start_hidden() {
@@ -108,6 +113,7 @@ fn main() {
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => shell::show_window(app, false),
         RunEvent::ExitRequested { .. } => {
+            automation::cleanup(app);
             if let Some(window) = app.get_webview_window("main") {
                 app.state::<WindowMode>().save_now(&window);
             }
