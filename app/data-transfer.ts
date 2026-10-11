@@ -5,6 +5,11 @@
 
 export class TransferError extends Error {}
 
+// The copy of the current data taken before an import lives in its own small database until the import has finished,
+// so a power cut half-way leaves something to restore from (see restoreStashedBackup). It is not part of any export.
+const STASH_DB = "clipbox-import-backup";
+const STASH_ID = "last";
+
 export const TRANSFER_FORMAT = "clipbox-data-move";
 export const TRANSFER_VERSION = 1;
 const ITERATIONS = 600_000;
@@ -135,6 +140,57 @@ function validatePayload(value: unknown): TransferPayload {
   return payload;
 }
 
+async function openStash(factory: IDBFactory): Promise<IDBDatabase> {
+  const open = factory.open(STASH_DB, 1);
+  open.onupgradeneeded = () => {
+    if (!open.result.objectStoreNames.contains("backup")) open.result.createObjectStore("backup", { keyPath: "id" });
+  };
+  return request(open);
+}
+
+async function writeStash(factory: IDBFactory, backup: TransferPayload | null): Promise<void> {
+  const db = await openStash(factory);
+  try {
+    const tx = db.transaction("backup", "readwrite");
+    const store = tx.objectStore("backup");
+    store.clear();
+    if (backup) store.put({ id: STASH_ID, json: JSON.stringify(backup) });
+    await done(tx);
+  } finally {
+    db.close();
+  }
+}
+
+export async function hasStashedBackup(factory: IDBFactory = indexedDB): Promise<boolean> {
+  try {
+    const present = await existingDatabases(factory);
+    if (!present.has(STASH_DB)) return false;
+    const db = await openStash(factory);
+    try {
+      return (await request(db.transaction("backup").objectStore("backup").getAll())).length > 0;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return false;
+  }
+}
+
+// Puts back what was here before an import that was cut off (power loss, crash). No-op when nothing is stashed.
+export async function restoreStashedBackup(storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<boolean> {
+  const db = await openStash(factory);
+  let rows: { json?: string }[];
+  try {
+    rows = (await request(db.transaction("backup").objectStore("backup").getAll())) as { json?: string }[];
+  } finally {
+    db.close();
+  }
+  if (!rows[0]?.json) return false;
+  await writePayload(validatePayload(JSON.parse(rows[0].json)), storage, factory);
+  await writeStash(factory, null);
+  return true;
+}
+
 // What the person sees in the confirmation: pictures only (the two bookkeeping rows are not pictures).
 export function countImages(payload: TransferPayload): number {
   const rows = payload.indexedDB["clipbox-images"]?.meta ?? [];
@@ -182,6 +238,7 @@ export async function applyPayload(input: TransferPayload, storage: Storage = lo
   let backup: TransferPayload;
   try {
     backup = await collectPayload(storage, factory);
+    await writeStash(factory, backup);
   } catch {
     throw new TransferError("没能先备份现有内容，所以没有导入。现有内容没有改动。");
   }
@@ -190,11 +247,13 @@ export async function applyPayload(input: TransferPayload, storage: Storage = lo
   } catch {
     try {
       await writePayload(backup, storage, factory);
+      await writeStash(factory, null).catch(() => undefined);
     } catch {
       throw new TransferError("导入中断了，而且没能恢复原来的内容。请不要关闭这个窗口，马上联系管理员。");
     }
     throw new TransferError("导入没有成功（可能是磁盘空间不够）。现有内容已经原样保留，没有改动。");
   }
+  await writeStash(factory, null).catch(() => undefined);
 }
 
 async function passwordKey(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {

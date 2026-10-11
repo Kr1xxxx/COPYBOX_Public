@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { applyPayload, collectPayload, countImages, countPayload, openTransfer, TransferError, type TransferPayload, parseTransferFile, sealTransfer, transferFileName, type TransferFile } from "./data-transfer";
+import { applyPayload, collectPayload, countImages, countPayload, hasStashedBackup, openTransfer, restoreStashedBackup, TransferError, type TransferPayload, parseTransferFile, sealTransfer, transferFileName, type TransferFile } from "./data-transfer";
 
 // One-time move of all local data between the old (Electron) and new (Tauri) desktop app. Reuses the backup dialog's look.
 export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | "import"; itemCount: number; onClose: () => void }) {
@@ -18,6 +18,25 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   // After the password checks out, the import waits for one more click that says what will be replaced.
+  const [leftover, setLeftover] = useState(false);
+  useEffect(() => {
+    if (exporting) return;
+    let cancelled = false;
+    void hasStashedBackup().then((found) => { if (!cancelled) setLeftover(found); });
+    return () => { cancelled = true; };
+  }, [exporting]);
+  async function restoreLeftover() {
+    setBusy(true);
+    setError("");
+    try {
+      if (await restoreStashedBackup()) window.location.reload();
+      else setLeftover(false);
+    } catch {
+      setError("没能恢复，请再试一次");
+    } finally {
+      setBusy(false);
+    }
+  }
   const [pending, setPending] = useState<{ payload: TransferPayload; currentImages: number } | null>(null);
 
   useEffect(() => {
@@ -105,7 +124,8 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
             )}
             <label className="backup-field"><span>密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={exporting ? "至少 8 个字符，建议更长" : "输入导出时设置的密码"} autoComplete="off" /></label>
             {exporting && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认密码" autoComplete="off" /></label>}
-            {pending && <p className="backup-error" role="alert">密码正确。继续会用文件里的内容（含 {countImages(pending.payload)} 张图片）替换现有的 {itemCount} 条内容、{pending.currentImages} 张图片，替换后不能撤销。</p>}
+            {leftover && !pending && <p className="backup-warning" role="status">上一次导入没有完成。<button type="button" className="secondary-button" onClick={() => void restoreLeftover()} disabled={busy}>恢复导入前的内容</button></p>}
+            {pending && <p className="backup-warning" role="alert">密码正确。继续会用文件里的内容（含 {countImages(pending.payload)} 张图片）替换现有的 {itemCount} 条内容、{pending.currentImages} 张图片，替换后不能撤销。</p>}
             {error && <p className="backup-error">{error}</p>}
             <p className="backup-note">{exporting ? "密码越长越安全，建议用 12 个字符以上。请妥善保存，Clipbox 无法找回。AI 的密钥不会带走，到新版里重新填一次。" : "导入成功后会自动重新打开。"}</p>
             <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={exporting ? "primary" : "danger"} disabled={busy}>{busy ? (exporting ? "正在加密…" : "正在导入…") : exporting ? "加密并导出" : pending ? "确认替换" : "验证并替换"}</button></div>
