@@ -8,8 +8,8 @@ const page = readUiSource();
 const dialogs = fs.readFileSync(new URL("../app/dialogs.tsx", import.meta.url), "utf8");
 const fillPanel = fs.readFileSync(new URL("../app/fill-panel.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
-const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
-const preload = fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8");
+const bridge = fs.readFileSync(new URL("../src-tauri/bridge.js", import.meta.url), "utf8");
+const shellMain = fs.readFileSync(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
 
 test("editing, filling variables and creating folders happen in place, not in popups", () => {
   assert.match(page, /className="inline-editor"/);
@@ -43,15 +43,14 @@ test("theme follows the system by default and can be forced, with dark tokens de
   assert.match(css, /@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\)/);
   assert.match(css, /:root\[data-theme="dark"\] \{/);
   assert.match(css, /--bg: #1c1b19/);
-  assert.match(preload, /setTheme/);
-  assert.match(main, /nativeTheme\.themeSource = theme/);
+  assert.match(bridge, /setTheme: function \(theme\) \{ fireAndForget\("set_theme"/);
+  assert.match(shellMain, /window_mode::set_theme/);
 });
 
 test("settings show last backup time and open the data folder on desktop", () => {
   assert.match(page, /还没有导出过/);
   assert.match(page, /clipbox\.last-backup-at/);
   assert.match(page, /打开文件夹/);
-  assert.match(preload, /openDataFolder/);
-  assert.match(main, /shell\.openPath\(app\.getPath\("userData"\)\)/);
-  assert.match(main, /webContents !== event\.sender\) throw/);
+  assert.match(bridge, /openDataFolder: function \(\) \{ return invoke\("open_data_folder"\)/);
+  assert.match(shellMain, /shell::open_data_folder/);
 });

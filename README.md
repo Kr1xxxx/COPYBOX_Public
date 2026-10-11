@@ -26,21 +26,20 @@ Then open `http://localhost:3000/`.
 ## Windows desktop app
 
 ```bash
-npm run desktop:pack:win
+npm run tauri:build
 ```
 
-Run it on Windows; the NSIS installer (`Clipbox Setup x.y.z.exe`) ends up in `release/`. The app starts its
-local server internally and stores data in `%APPDATA%\Clipbox`. This has not yet been run on a real Windows
-machine — watch for errors on the first build.
+Run it on Windows (needs Rust); the NSIS installer ends up in `src-tauri/target/release/bundle/nsis/`. The app
+stores data in the WebView2 profile under `%LOCALAPPDATA%`. Moving from the old Electron version: in the old app
+open 设置 → 数据 → 导出到新版, then 从旧版导入 in the new one (D-032).
 
 ## macOS desktop app (Apple silicon only)
 
 ```bash
-npm run desktop:pack
+npm run tauri:build
 ```
 
-The app ends up in `release/mac-arm64/Clipbox.app`. It starts its local server internally — no browser needed —
-and stores data in Clipbox's own macOS application-data folder.
+The app ends up in `src-tauri/target/release/bundle/macos/Clipbox.app`. Data stays in the WebKit storage of the app.
 
 ## Features
 

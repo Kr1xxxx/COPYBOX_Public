@@ -31,7 +31,7 @@ that every command it calls is registered.
 | One version number | package.json | step 7: Tauri reads package.json; Cargo.toml checked by test | test |
 | Installer | NSIS / dmg | NSIS (current user) + .app from CI | CI only; not run on a real machine |
 
-Not carried over on purpose: the local page server. Left for step 8: moving `clipbox-cli.cjs` out of `desktop/`,
-removing Electron.
+Not carried over on purpose: the local page server. Step 8 (D-034) moved `clipbox-cli.cjs` to `tools/` and removed
+Electron (`desktop/`, the electron packages, the Electron-only tests). Rust tests in `src-tauri/` now cover what those tests checked.
 
 Unsigned installers: Windows will show the SmartScreen warning as it does for the Electron installer today.

@@ -14,8 +14,8 @@ test("docs and test additions are small", () => {
   assert.equal(run([file("docs/handoff-log.md", 40), file("tests/e2e/new.e2e.mjs", 120)]).size, "small");
 });
 
-test("desktop, dependencies, CI, scripts and the rulebook wait for the owner", () => {
-  for (const path of ["desktop/main.cjs", "package.json", "package-lock.json", ".github/workflows/ci.yml", "scripts/classify-pr.mjs", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "docs/DECISIONS.md", "docs/decisions/D-030-new-rule.md", "eslint.config.mjs", "playwright.config.mjs"]) {
+test("the desktop shell, dependencies, CI, scripts and the rulebook wait for the owner", () => {
+  for (const path of ["src-tauri/src/main.rs", "package.json", "package-lock.json", ".github/workflows/ci.yml", "scripts/classify-pr.mjs", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "docs/DECISIONS.md", "docs/decisions/D-030-new-rule.md", "eslint.config.mjs", "playwright.config.mjs"]) {
     assert.equal(run([file(path)]).size, "big", path);
   }
 });

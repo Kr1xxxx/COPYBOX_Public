@@ -9,16 +9,13 @@ import test from "node:test";
 
 const require = createRequire(import.meta.url);
 let cli;
-let automationServer;
 try {
-  cli = require("../desktop/clipbox-cli.cjs");
-  automationServer = require("../desktop/automation-server.cjs");
+  cli = require("../tools/clipbox-cli.cjs");
 } catch {
   cli = undefined;
-  automationServer = undefined;
 }
 
-const cliPath = path.resolve("desktop/clipbox-cli.cjs");
+const cliPath = path.resolve("tools/clipbox-cli.cjs");
 
 function temporaryPath(name = "automation.sock") {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "clipbox-cli-"));
@@ -269,21 +266,4 @@ test("uses nonzero exits for server errors and a closed application", async () =
   assert.equal(closed.code, 2);
   assert.equal(closed.stderr, "Clipbox 未打开，请先打开应用。");
   fs.rmSync(temporary.directory, { recursive: true, force: true });
-});
-
-test("installs and idempotently updates an executable launcher", () => {
-  assert.equal(typeof automationServer?.installAutomationCli, "function");
-  const temporary = temporaryPath("clipbox");
-  const sourcePath = path.join(temporary.directory, "source.cjs");
-  fs.writeFileSync(sourcePath, "#!/usr/bin/env node\nconsole.log('one');\n");
-  try {
-    automationServer.installAutomationCli({ sourcePath, targetPath: temporary.target });
-    assert.equal(fs.readFileSync(temporary.target, "utf8").includes("one"), true);
-    assert.equal(fs.statSync(temporary.target).mode & 0o777, 0o755);
-    fs.writeFileSync(sourcePath, "#!/usr/bin/env node\nconsole.log('two');\n");
-    automationServer.installAutomationCli({ sourcePath, targetPath: temporary.target });
-    assert.equal(fs.readFileSync(temporary.target, "utf8").includes("two"), true);
-  } finally {
-    fs.rmSync(temporary.directory, { recursive: true, force: true });
-  }
 });
