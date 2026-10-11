@@ -40,15 +40,15 @@ test("examples are added beside data that is already there and leave it untouche
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await editor.locator("input").first().fill("仓库地址");
   await editor.locator("textarea").first().fill("台北市信义区 123 号");
   await editor.locator(".editor-save").first().click();
   await expect(page.locator(".native-row", { hasText: "仓库地址" })).toBeVisible();
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "全部" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
-  await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await expect(dialog).toContainText("【范例】");
 });

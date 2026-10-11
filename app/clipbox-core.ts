@@ -293,9 +293,13 @@ function normalizeFolderList(values: unknown, extracted: string[]) {
 }
 
 function normalizeSnippetFolderList(values: unknown, extracted: string[]) {
+  const ordered = normalizeFolderList(values, extracted);
+  // A saved list that has every standard folder keeps its order, so the standard folders can be sorted too (D-035).
+  const present = new Set(ordered);
+  if (STANDARD_SNIPPET_FOLDERS.every((folder) => present.has(folder))) return ordered;
+  // Anything older or incomplete is rebuilt as before: the standard folders first, then the others.
   const standard = new Set<string>(STANDARD_SNIPPET_FOLDERS);
-  const custom = normalizeFolderList(values, extracted).filter((folder) => !standard.has(folder));
-  return [...STANDARD_SNIPPET_FOLDERS, ...custom];
+  return [...STANDARD_SNIPPET_FOLDERS, ...ordered.filter((folder) => !standard.has(folder))];
 }
 
 function stripLegacySnippetPriority(item: SecretItem) {

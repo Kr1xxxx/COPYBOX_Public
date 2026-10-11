@@ -31,7 +31,10 @@ test("folders can be drag-sorted in Settings; standard folders cannot", async ({
   await page.mouse.move(from.x + 8, to.y + to.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect.poll(async () => (await names()).indexOf("甲")).toBeGreaterThan(before.indexOf("甲"));
-  await expect(dialog.locator(".settings-folder", { hasText: "询盘接待" }).locator("button.settings-folder-grip")).toHaveCount(0);
+  // The standard folders can be sorted too (D-035), but not renamed or deleted.
+  const standardRow = dialog.locator(".settings-folder", { hasText: "询盘接待" });
+  await expect(standardRow.locator("button.settings-folder-grip")).toHaveCount(1);
+  await expect(standardRow.getByRole("button", { name: /^(改名|删除)/ })).toHaveCount(0);
 });
 
 test("AI settings: empty prompts cannot be saved; presets fill URL and model", async ({ page }) => {
