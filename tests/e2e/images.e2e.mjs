@@ -51,14 +51,15 @@ test("macOS: the sections are 话术, 秘密 and 图片, and 秘密 still opens"
   await expect(page.locator(".kind-switch button.active")).toHaveText("话术");
 });
 
-test("the empty 图片 page invites the first image and hides folders, trash and favourites", async ({ page }) => {
+test("the empty 图片 page invites the first image and hides folders and favourites (the 回收站 entry is always there)", async ({ page }) => {
   await openImages(page);
   await expect(page.locator("body")).toContainText("还没有图片，先添加第一张");
   await expect(page.locator("body")).toContainText("把常发的图片存进来，一键复制。");
   await expect(page.getByRole("button", { name: "新增第一张" })).toBeVisible();
   await expect(page.getByPlaceholder("搜索图片标题")).toBeVisible();
   await expect(page.locator(".sidebar .nav-item", { hasText: "全部图片" })).toBeVisible();
-  for (const hidden of ["回收站", "最近", "新建目录"]) await expect(page.locator(".sidebar")).not.toContainText(hidden);
+  await expect(page.locator(".sidebar .nav-footer").getByRole("button", { name: /回收站/ })).toBeVisible();
+  for (const hidden of ["最近", "新建目录"]) await expect(page.locator(".sidebar")).not.toContainText(hidden);
   await expect(page.locator(".sidebar").getByRole("button", { name: "设置" })).toBeVisible();
 });
 
@@ -156,27 +157,116 @@ test("the search box filters images by title", async ({ page }) => {
   expect(await page.evaluate(() => window.__copied)).toBeUndefined();
 });
 
-test("删除 asks first and removes the image for good", async ({ page }) => {
+test("删除 moves the image to the 回收站 with an undo; 恢复 brings it back; 永久删除 asks first and removes only that one", async ({ page }) => {
   await openImages(page);
   await addImages(page, PNG_FILE);
   await rows(page).first().locator(".row-main").click();
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+  await expect(rows(page)).toHaveCount(0);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.locator(".toast")).toContainText("图片已移入回收站");
+
+  // 撤销 puts it back right away.
+  await page.locator(".toast").getByRole("button", { name: "撤销" }).click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator(".nav-footer .nav-item", { hasText: "回收站" })).not.toContainText("1");
+
+  // Delete again, then work from the 回收站.
+  await rows(page).first().locator(".row-main").click();
+  await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+  await expect(rows(page)).toHaveCount(0);
+  const trashNav = page.locator(".nav-footer .nav-item", { hasText: "回收站" });
+  await expect(trashNav).toContainText("1");
+  await trashNav.click();
+  await expect(page.locator(".trash-row")).toHaveCount(1);
+  // It survives a reload.
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
+  await expect(page.locator(".trash-row")).toHaveCount(1);
+
+  await page.locator(".trash-row").getByRole("button", { name: /^永久删除/ }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("永久删除这张图片？");
   await expect(dialog).toContainText("删除后无法恢复。");
   await dialog.getByRole("button", { name: "取消" }).click();
-  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".trash-row")).toHaveCount(1);
+
+  await page.locator(".trash-row").getByRole("button", { name: /^恢复/ }).click();
+  await expect(page.locator(".trash-row")).toHaveCount(0);
+  await expect(page.locator("body")).toContainText("回收站是空的");
+  await page.locator(".sidebar .nav-item", { hasText: "全部图片" }).click();
   await expect(rows(page)).toHaveCount(1);
 
+  // Permanent deletion: gone for good, also after a reload.
+  await rows(page).first().locator(".row-main").click();
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+  await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
+  await page.locator(".trash-row").getByRole("button", { name: /^永久删除/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "永久删除" }).click();
-  await expect(rows(page)).toHaveCount(0);
-  await expect(page.locator("body")).toContainText("还没有图片，先添加第一张");
-  await expect(page.locator(".toast")).toContainText("图片已删除");
+  await expect(page.locator(".trash-row")).toHaveCount(0);
+  await expect(page.locator(".toast")).toContainText("已永久删除");
   await page.reload();
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await expect(page.locator("body")).toContainText("还没有图片，先添加第一张");
+  await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
+  await expect(page.locator("body")).toContainText("回收站是空的");
+});
+
+test("永久删除 in the 回收站 removes only the chosen image, and trashed images are not counted or listed in the folders", async ({ page }) => {
+  await openImages(page);
+  const buffer = readFileSync(PNG_FILE);
+  await addImages(page, ["甲", "乙", "丙"].map((name) => ({ name: `${name}.png`, mimeType: "image/png", buffer })));
+  await expect(rows(page)).toHaveCount(3);
+  for (const title of ["甲", "乙"]) {
+    await rows(page).filter({ hasText: title }).locator(".row-main").click();
+    await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+    await expect(rows(page).filter({ hasText: title })).toHaveCount(0);
+  }
+  await expect(page.locator(".sidebar .nav-item", { hasText: "全部图片" })).toContainText("1");
+  await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
+  await expect(page.locator(".trash-row")).toHaveCount(2);
+  await page.locator(".trash-row", { hasText: "乙" }).getByRole("button", { name: /^永久删除/ }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "永久删除" }).click();
+  await expect(page.locator(".trash-row")).toHaveCount(1);
+  await expect(page.locator(".trash-row")).toContainText("甲");
+  await page.locator(".trash-row").getByRole("button", { name: /^恢复/ }).click();
+  await page.locator(".sidebar .nav-item", { hasText: "全部图片" }).click();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(rows(page).filter({ hasText: "乙" })).toHaveCount(0);
+});
+
+test("the 回收站 empties itself after the chosen days (7 by default); an image deleted today stays", async ({ page }) => {
+  await openImages(page);
+  const buffer = readFileSync(PNG_FILE);
+  await addImages(page, ["旧", "新"].map((name) => ({ name: `${name}.png`, mimeType: "image/png", buffer })));
+  await expect(rows(page)).toHaveCount(2);
+  await rows(page).filter({ hasText: "旧" }).locator(".row-main").click();
+  await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+  await expect(rows(page)).toHaveCount(1);
+
+  // Eight days later (the page clock moves, the stored deletion time does not): the old one is removed for good.
+  await page.clock.setFixedTime(new Date(Date.now() + 8 * 86_400_000));
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator(".nav-footer .nav-item", { hasText: "回收站" })).not.toContainText("1");
+  await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
+  await expect(page.locator("body")).toContainText("回收站是空的");
+
+  // An image deleted now is still there a day later.
+  await page.locator(".sidebar .nav-item", { hasText: "全部图片" }).click();
+  await rows(page).first().locator(".row-main").click();
+  await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+  await page.clock.setFixedTime(new Date(Date.now() + 9 * 86_400_000));
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
+  await expect(page.locator(".trash-row")).toHaveCount(1);
 });
 
 test("images survive a reload and the stored records do not reveal the title or the picture", async ({ page }) => {

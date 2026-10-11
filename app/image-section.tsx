@@ -16,6 +16,7 @@ import { ImageMoveMenu, MoreGlyph, ChevronGlyph } from "./image-folders";
 import {
   IMAGE_FILTER_ALL,
   IMAGE_FILTER_PINNED,
+  IMAGE_FILTER_TRASH,
   filterImagesByFolder,
   folderOfImageFilter,
   imageFolderColors,
@@ -197,7 +198,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
   );
 }
 
-export function ImageSection({ library, query, compact, view, paused, onToast, onCounts, ref }: {
+export function ImageSection({ library, query, compact, view, paused, onToast, onTrashed, onCounts, ref }: {
   // Images and folders are owned by the page (image-library.ts), so the sidebar and this list never disagree.
   library: ImageLibrary;
   query: string;
@@ -207,10 +208,15 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   // A dialog is open on top of the page: drops and pastes must not add images behind it.
   paused: boolean;
   onToast: (message: string) => void;
+  // An image went to the 回收站: the page offers the 6-second 撤销 for it.
+  onTrashed: (meta: ImageMeta) => void;
   onCounts: (counts: ImageCounts) => void;
   ref?: Ref<ImageSectionHandle>;
 }) {
-  const { images, folders, filter, ready, loadError, getBlob, getThumb, markUsed } = library;
+  const { images, trashed, folders, filter: chosenFilter, ready, loadError, getBlob, getThumb, markUsed } = library;
+  // The 回收站 is not in the mini window; there the list falls back to all pictures.
+  const filter = compact && chosenFilter === IMAGE_FILTER_TRASH ? IMAGE_FILTER_ALL : chosenFilter;
+  const trashView = filter === IMAGE_FILTER_TRASH;
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   // The opened picture's full-size copy; until it has loaded the detail shows the thumbnail.
   const [fulls, setFulls] = useState<Record<string, string>>({});
@@ -251,7 +257,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   // Tiles and rows show the small thumbnail (made once, then kept); only an opened picture loads its full-size original.
   useEffect(() => {
     if (!ready || !images) return;
-    for (const meta of images) {
+    for (const meta of [...images, ...trashed]) {
       if (thumbUrls.current.has(meta.id) || thumbPending.current.has(meta.id)) continue;
       thumbPending.current.add(meta.id);
       getThumb(meta.id)
@@ -264,14 +270,15 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
         })
         .catch(() => { thumbPending.current.delete(meta.id); });
     }
-  }, [ready, images, getThumb]);
+  }, [ready, images, trashed, getThumb]);
 
-  const inFolder = useMemo(() => filterImagesByFolder(images ?? [], filter, folders), [images, filter, folders]);
+  const inFolder = useMemo(() => trashView ? trashed : filterImagesByFolder(images ?? [], filter, folders), [images, trashed, trashView, filter, folders]);
   const shown = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     // Like the 话术 list: favourites first, except while searching.
+    if (trashView) return terms.length === 0 ? inFolder : inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
     return terms.length === 0 ? pinnedFirst(inFolder) : inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
-  }, [inFolder, query]);
+  }, [inFolder, query, trashView]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
   const total = images?.length ?? 0;
   useEffect(() => { onCounts({ total, shown: shown.length }); }, [onCounts, total, shown.length]);
@@ -453,6 +460,19 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     }
   }
 
+  // Deleting only moves the picture to the 回收站 (with an undo); nothing is removed until it is deleted there.
+  async function trashImage(meta: ImageMeta) {
+    setMoveMenu(null);
+    if (!(await library.trash(meta.id))) return;
+    setSelectedId("");
+    onTrashed(meta);
+  }
+
+  async function restoreImage(meta: ImageMeta) {
+    if (await library.restore(meta.id)) onToast("已恢复");
+  }
+
+  // Permanent: only from the 回收站, after the confirmation.
   async function confirmDelete() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
@@ -460,7 +480,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     forgetThumb(id);
     setDeleteTarget(null);
     setSelectedId("");
-    onToast("图片已删除");
+    onToast("已永久删除");
   }
 
   function toggleRow(id: string) {
@@ -517,7 +537,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
       onCopy={() => void copyImage(meta)}
       onRename={() => setRenaming({ id: meta.id, value: meta.title })}
       onTogglePinned={() => void library.togglePinned(meta.id)}
-      onDelete={() => setDeleteTarget(meta)}
+      onDelete={() => void trashImage(meta)}
     />
   );
 
@@ -544,10 +564,23 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     const folderName = folderOfImageFilter(filter);
     body = query.trim() || inFolder.length > 0
       ? <div className="native-empty"><strong>没有匹配的图片</strong><span>换个词搜索试试</span></div>
+      : trashView
+      ? <div className="native-empty"><strong>回收站是空的</strong><span>删除的图片会先放在这里，可以恢复</span></div>
       : <div className="native-empty">
         <strong>{filter === IMAGE_FILTER_PINNED ? "还没有收藏图片" : folderName ? "这个目录还是空的" : "没有未分类的图片"}</strong>
         <span>{filter === IMAGE_FILTER_PINNED ? "点图片上的星标添加收藏" : compact ? "回到完整窗口添加图片" : folderName ? "点右上角的「新增图片」，会放进这个目录" : "新增的图片会先放在这里"}</span>
       </div>;
+  } else if (trashView) {
+    body = shown.map((meta) => (
+      <article key={meta.id} data-image-id={meta.id} className="native-row trash-row image-row">
+        {thumb(meta)}
+        <div className="row-main trash-row-main">
+          <span className="row-copy"><strong>{meta.title}</strong><small>{sizeLabel(meta)}</small></span>
+        </div>
+        <button type="button" className="trash-restore" onClick={() => void restoreImage(meta)} aria-label={`恢复 ${meta.title}`}>恢复</button>
+        <button type="button" className="trash-permanent" onClick={() => setDeleteTarget(meta)} aria-label={`永久删除 ${meta.title}`}>永久删除</button>
+      </article>
+    ));
   } else if (compact) {
     body = shown.map((meta) => (
       <article key={meta.id} className={`mini-row image-row image-tile mini-tile ${copiedId === meta.id ? "copied" : ""}`}>
@@ -622,7 +655,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   }
 
   // Only real pictures lay out as a grid; loading, errors and empty states keep the plain centred layout.
-  const gridShown = !loadError && !!images && shown.length > 0 && (compact || view === "grid");
+  const gridShown = !loadError && !!images && !trashView && shown.length > 0 && (compact || view === "grid");
 
   return (
     <div

@@ -31,6 +31,9 @@ export type ImageMeta = {
   folder?: string;
   // 收藏. Optional on purpose: records saved before it existed simply do not have it (= not a favourite), so nothing is migrated.
   pinned?: boolean;
+  // 回收站. Set (to the time of deletion) while the image sits in the trash; records without it are normal images.
+  // Moving to and from the trash only rewrites this one field; the original and the thumbnail stay where they are.
+  deletedAt?: number;
 };
 
 export type ImageFolder = { name: string; color?: string };
@@ -39,7 +42,10 @@ export type ImageStore = {
   list(): Promise<ImageMeta[]>;
   add(file: Blob, title: string, folder?: string | null): Promise<ImageMeta>;
   rename(id: string, title: string): Promise<ImageMeta>;
+  // Permanent: removes the record, the original and the thumbnail. Normal deleting uses trash().
   remove(id: string): Promise<void>;
+  trash(id: string): Promise<ImageMeta>;
+  restore(id: string): Promise<ImageMeta>;
   getBlob(id: string): Promise<Blob>;
   // A small copy for the grid and list; made from the original on first use, then kept for next time.
   getThumb(id: string): Promise<Blob>;
@@ -371,6 +377,23 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       const renamed = { ...meta, title: normalizeImageTitle(title, meta.title), updatedAt: now() };
       await writeMeta(renamed);
       return renamed;
+    },
+
+    async trash(id) {
+      if (isReservedId(id)) throw new Error("找不到这张图片");
+      const meta = await readMeta(id);
+      const trashed: ImageMeta = { ...meta, deletedAt: now() };
+      await writeMeta(trashed);
+      return trashed;
+    },
+
+    async restore(id) {
+      if (isReservedId(id)) throw new Error("找不到这张图片");
+      const meta = await readMeta(id);
+      const restored: ImageMeta = { ...meta };
+      delete restored.deletedAt;
+      await writeMeta(restored);
+      return restored;
     },
 
     async remove(id) {

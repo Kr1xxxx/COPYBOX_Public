@@ -3,6 +3,10 @@ import test from "node:test";
 import {
   countImagesByFolder,
   countPinnedImages,
+  activeImages,
+  trashedImages,
+  expiredTrashedImages,
+  IMAGE_FILTER_TRASH,
   pinnedFirst,
   filterImagesByFolder,
   folderOfImageFilter,
@@ -66,4 +70,22 @@ test("a chosen colour wins over the automatic one", () => {
   assert.match(colors["收款码"], /^#[0-9A-F]{6}$/i);
   assert.notEqual(colors["收款码"], colors["价目表"]);
   assert.deepEqual(imageFolderColors([]), {});
+});
+
+test("回收站: active and trashed images are split, trashed ones are newest-deleted first, and expiry follows the chosen days", () => {
+  const DAY = 86_400_000;
+  const now = 100 * DAY;
+  const images = [
+    { id: "a", folder: "x" },
+    { id: "b", deletedAt: now - 8 * DAY },
+    { id: "c", deletedAt: now - 1 * DAY },
+    { id: "d", deletedAt: now - 7 * DAY - 1 },
+    { id: "e", deletedAt: now - 6 * DAY },
+  ];
+  assert.deepEqual(activeImages(images).map((image) => image.id), ["a"]);
+  assert.deepEqual(trashedImages(images).map((image) => image.id), ["c", "e", "d", "b"]);
+  assert.deepEqual(expiredTrashedImages(images, 7, now).map((image) => image.id), ["b", "d"], "only the ones past 7 days; active images never expire");
+  assert.deepEqual(expiredTrashedImages(images, 0, now), [], "0 days = keep forever");
+  assert.equal(resolveImageFilter(IMAGE_FILTER_TRASH, []), IMAGE_FILTER_TRASH);
+  assert.equal(imageFilterTitle(IMAGE_FILTER_TRASH), "回收站");
 });

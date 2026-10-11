@@ -165,16 +165,12 @@ test("rename, move to a folder and delete all work from the card", async ({ page
   await expect(card(page).getByRole("button", { name: /^目录：收款码/ })).toBeVisible();
   await expect(sidebar(page).locator(".nav-item", { hasText: "收款码" })).toContainText("1");
 
+  // 删除 only moves it to the 回收站 (no question, an undo instead).
   await card(page).getByRole("button", { name: "删除", exact: true }).click();
-  const dialog = page.getByRole("alertdialog");
-  await expect(dialog).toContainText("永久删除这张图片？");
-  await dialog.getByRole("button", { name: "取消" }).click();
-  await expect(tiles(page)).toHaveCount(4);
-  await card(page).getByRole("button", { name: "删除", exact: true }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "永久删除" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(tiles(page)).toHaveCount(3);
   await expect(card(page)).toHaveCount(0);
-  await expect(page.locator(".toast")).toContainText("图片已删除");
+  await expect(page.locator(".toast")).toContainText("图片已移入回收站");
 });
 
 test("the 宫格 | 列表 switch changes the view and the choice survives a reload", async ({ page }) => {
@@ -360,15 +356,14 @@ test("the tile's copy icon turns into a check and back, and the toast appears an
 
   await tile(page, "图二").getByRole("button", { name: "展开 图二" }).click();
   await card(page).getByRole("button", { name: "删除", exact: true }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "永久删除" }).click();
   const toast = page.locator(".toast");
-  await expect(toast).toContainText("图片已删除");
+  await expect(toast).toContainText("图片已移入回收站");
   await page.waitForTimeout(500); // the toast rises with a short spring
   const box = await toast.boundingBox();
   const viewport = page.viewportSize();
   expect(box.y + box.height).toBeLessThan(viewport.height - 20);
   expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(2);
-  await expect(toast).toHaveCount(0, { timeout: 6000 });
+  await expect(toast).toHaveCount(0, { timeout: 9000 });
 });
 
 test("opening a tile scrolls so the clicked picture is fully visible", async ({ page }) => {

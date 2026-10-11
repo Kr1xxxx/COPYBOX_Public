@@ -10,6 +10,7 @@ export type ImageFilter = string;
 export const IMAGE_FILTER_ALL: ImageFilter = "all";
 export const IMAGE_FILTER_UNCATEGORIZED: ImageFilter = "uncategorized";
 export const IMAGE_FILTER_PINNED: ImageFilter = "pinned";
+export const IMAGE_FILTER_TRASH: ImageFilter = "trash";
 const FOLDER_PREFIX = "folder:";
 
 export function imageFolderFilter(name: string): ImageFilter {
@@ -24,7 +25,7 @@ export function folderOfImageFilter(filter: ImageFilter): string | null {
 // A folder that no longer exists (renamed or deleted elsewhere) falls back to 全部图片.
 export function resolveImageFilter(filter: ImageFilter, folders: readonly ImageFolder[]): ImageFilter {
   const name = folderOfImageFilter(filter);
-  if (name === null) return filter === IMAGE_FILTER_UNCATEGORIZED || filter === IMAGE_FILTER_PINNED ? filter : IMAGE_FILTER_ALL;
+  if (name === null) return filter === IMAGE_FILTER_UNCATEGORIZED || filter === IMAGE_FILTER_PINNED || filter === IMAGE_FILTER_TRASH ? filter : IMAGE_FILTER_ALL;
   return folders.some((folder) => folder.name === name) ? filter : IMAGE_FILTER_ALL;
 }
 
@@ -67,6 +68,7 @@ export function countImagesByFolder(images: readonly ImageMeta[], folders: reado
 export function imageFilterTitle(filter: ImageFilter): string {
   if (filter === IMAGE_FILTER_ALL) return "全部图片";
   if (filter === IMAGE_FILTER_PINNED) return "收藏";
+  if (filter === IMAGE_FILTER_TRASH) return "回收站";
   return folderOfImageFilter(filter) ?? "未分类";
 }
 
@@ -75,4 +77,24 @@ export function imageFolderColors(folders: readonly ImageFolder[]): Record<strin
   const colors = buildCategoryColorMap(folders.map((folder) => folder.name));
   for (const folder of folders) if (folder.color) colors[folder.name] = folder.color;
   return colors;
+}
+
+export function isTrashedImage(meta: ImageMeta): boolean {
+  return typeof meta.deletedAt === "number";
+}
+
+export function activeImages(images: readonly ImageMeta[]): ImageMeta[] {
+  return images.filter((meta) => !isTrashedImage(meta));
+}
+
+// Newest deletion first.
+export function trashedImages(images: readonly ImageMeta[]): ImageMeta[] {
+  return images.filter(isTrashedImage).toSorted((a, b) => (b.deletedAt as number) - (a.deletedAt as number));
+}
+
+// Trashed images that have sat there longer than `days` (0 = keep forever, like the 话术 trash).
+export function expiredTrashedImages(images: readonly ImageMeta[], days: number, now: number): ImageMeta[] {
+  if (days <= 0) return [];
+  const cutoff = now - days * 86_400_000;
+  return images.filter((meta) => isTrashedImage(meta) && (meta.deletedAt as number) < cutoff);
 }
