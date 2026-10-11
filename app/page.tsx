@@ -1663,20 +1663,15 @@ export default function Home() {
   const bulkCount = bulkIds.filter((id) => filtered.some((item) => item.id === id)).length;
   const isStandardFolder = (folder: string) => Boolean(folderEditBlocker(activeKind, folder));
 
-  // The sidebar list keeps the fixed standard folders in front; a sortable folder can only swap with another sortable one.
-  const canMoveFolder = (folder: string, delta: -1 | 1) => {
-    const movable = activeFolders.filter((name) => !isStandardFolder(name));
-    const neighbour = movable[movable.indexOf(folder) + delta];
-    return Boolean(neighbour);
-  };
+  // Every folder, the standard 话术 ones too (D-035), can move to any other place in the list.
+  const canMoveFolder = (folder: string, delta: -1 | 1) => Boolean(activeFolders[activeFolders.indexOf(folder) + delta]);
   // Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
   const canMoveCard = (item: SecretItem, delta: -1 | 1) => {
     const group = filtered.filter((entry) => Boolean(entry.pinned) === Boolean(item.pinned));
     return Boolean(group[group.findIndex((entry) => entry.id === item.id) + delta]);
   };
   const renderFolderRow = (folder: string) => {
-    const standard = isStandardFolder(folder);
-    const sortable = !standard;
+    const sortable = true;
     const active = activeFolder === `folder:${folder}`;
     const renaming = renamingFolder?.from === folder;
     const count = activeKindItems.filter((item) => item.folder === folder).length;

@@ -546,3 +546,14 @@ test("formatBuildTime shows date and time to the minute, empty when missing or i
   assert.equal(core.formatBuildTime(undefined), "");
   assert.equal(core.formatBuildTime("not a date"), "");
 });
+
+test("snippet folders keep a saved order that has every standard folder (D-035); incomplete lists are rebuilt standard-first as before", () => {
+  const standard = ["询盘接待", "产品样品", "报价成交", "定制生产", "客户跟进", "物流清关", "售后争议"];
+  const reordered = ["产品样品", "自定义", "询盘接待", "报价成交", "定制生产", "客户跟进", "物流清关", "售后争议"];
+  assert.deepEqual(normalizeVaultData({ items: [], folders: { secret: [], snippet: reordered } }).folders.snippet, reordered, "a full saved list keeps its order, standard folders included");
+  assert.deepEqual(normalizeVaultData({ items: [], folders: { secret: [], snippet: ["自定义", "产品样品"] } }).folders.snippet, [...standard, "自定义"], "an incomplete list is rebuilt: standard first, then the others");
+  assert.deepEqual(normalizeVaultData({ items: [], folders: { secret: [], snippet: [] } }).folders.snippet, standard, "a fresh vault starts in the standard order");
+  // Normalizing twice changes nothing.
+  const once = normalizeVaultData({ items: [], folders: { secret: [], snippet: reordered } });
+  assert.deepEqual(normalizeVaultData(once).folders.snippet, reordered);
+});

@@ -477,8 +477,8 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
     await expect(page.locator(".sidebar .directory-row", { hasText: name })).toBeVisible();
   }
   const row = (name) => page.locator(".sidebar .directory-row", { hasText: name });
-  // Standard folders are fixed: no handle.
-  await expect(row("询盘接待").locator(".folder-drag-handle")).toHaveCount(0);
+  // Standard folders can be sorted too (D-035): they have a handle.
+  await expect(row("询盘接待").locator(".folder-drag-handle")).toHaveCount(1);
 
   // The handle is on the far left, over the colour dot, and appears on hover.
   await row("甲").hover();
@@ -554,7 +554,8 @@ test("a click on a drag handle opens 上移 / 下移, greyed at the ends, and a 
   const menu = page.getByRole("menu", { name: "拖动目录 甲" });
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText(["上移", "下移"]);
-  await expect(menu.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+  // 甲 is the first custom folder: it may move up past the standard ones (D-035).
+  await expect(menu.getByRole("menuitem", { name: "上移" })).toBeEnabled();
   await menu.getByRole("menuitem", { name: "下移" }).click();
   await expect(menu).toHaveCount(0);
   await expect.poll(async () => { const n = await names(); return n.indexOf("乙") < n.indexOf("甲"); }).toBe(true);
@@ -573,4 +574,41 @@ test("a click on a drag handle opens 上移 / 下移, greyed at the ends, and a 
   await expect(cardMenu.getByRole("menuitem", { name: "上移" })).toBeDisabled();
   await cardMenu.getByRole("menuitem", { name: "下移" }).click();
   await expect.poll(async () => (await titles())[0]).not.toBe(first[0]);
+});
+
+test("the standard 话术 folders can be dragged to a new place and the order is kept after a reload; they still cannot be renamed or deleted", async ({ page }) => {
+  const names = () => page.locator(".sidebar .directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")).filter(Boolean));
+  const row = (n) => page.locator(".sidebar .directory-row", { hasText: n });
+  const before = await names();
+  expect(before.slice(0, 3)).toEqual(["询盘接待", "产品样品", "报价成交"]);
+  await row("询盘接待").hover();
+  const handle = row("询盘接待").locator(".folder-drag-handle");
+  await expect(handle).toHaveCSS("opacity", "1");
+  const h = await handle.boundingBox();
+  const target = await row("报价成交").boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
+  await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await names()).indexOf("询盘接待")).toBeGreaterThan(1);
+  const after = await names();
+  expect([...after].sort()).toEqual([...before].sort());
+  await expect(page.locator(".toast")).toContainText("目录顺序已更新");
+  await page.waitForTimeout(1500); // the vault is saved a moment after a change
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  expect(await names()).toEqual(after);
+
+  // 点一下把手 also moves it; the menu is greyed at the top.
+  const first = (await names())[0];
+  await row(first).hover();
+  await row(first).locator(".folder-drag-handle").click();
+  await expect(page.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  // Rename and delete stay blocked for the standard folders.
+  await row("产品样品").locator(".folder-more").click();
+  await expect(page.getByRole("menuitem", { name: "重命名" })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "删除目录…" })).toBeDisabled();
 });
