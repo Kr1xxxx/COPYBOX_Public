@@ -563,3 +563,52 @@ test("reorderFolders moves a folder to another's place, keeps images and colours
   await assert.rejects(store.reorderFolders("甲", "没有"), { message: "找不到这个目录" });
   assert.equal(JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))])), blobsBefore, "image bytes untouched");
 });
+
+test("回收站: trash only marks the image; restore brings it back unchanged; remove (permanent) is separate and deletes just that one", async () => {
+  const { open, rows } = setup();
+  const store = await open();
+  await store.createFolder("产品图");
+  const a = await store.add(pngBlob(), "甲", "产品图");
+  const b = await store.add(pngBlob(), "乙", null);
+  const c = await store.add(pngBlob(), "丙", null);
+  assert.equal("deletedAt" in a, false, "a new or older record has no deletedAt");
+  const blobsBefore = JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.id, row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+
+  const trashed = await store.trash(a.id);
+  assert.equal(typeof trashed.deletedAt, "number");
+  assert.deepEqual({ ...trashed, deletedAt: undefined }, { ...a, deletedAt: undefined }, "only deletedAt changed");
+  const list = await (await open()).list();
+  assert.equal(list.length, 3, "still stored, a new session sees all three");
+  assert.equal(typeof list.find((image) => image.id === a.id).deletedAt, "number");
+  assert.equal("deletedAt" in list.find((image) => image.id === b.id), false, "other images are untouched");
+  assert.equal(JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.id, row.iv, Array.from(new Uint8Array(row.ciphertext))])), blobsBefore, "trashing never touches the original bytes");
+  assert.deepEqual(new Uint8Array(await (await store.getBlob(a.id)).arrayBuffer()), pngBytes, "the original can still be read while trashed");
+
+  const restored = await store.restore(a.id);
+  assert.equal("deletedAt" in restored, false);
+  assert.deepEqual(restored, a, "restored exactly as before (folder, title, times)");
+
+  // Permanent deletion removes only the chosen image.
+  await store.trash(b.id);
+  await store.trash(c.id);
+  await store.remove(b.id);
+  assert.deepEqual((await store.list()).map((image) => image.id).sort(), [a.id, c.id].sort());
+  assert.equal(rows("blobs").has(b.id), false);
+  assert.equal(rows("blobs").has(c.id), true, "the other trashed image is still there and can be restored");
+  assert.equal("deletedAt" in (await store.restore(c.id)), false);
+
+  await assert.rejects(store.trash("missing"), { message: "找不到这张图片" });
+  await assert.rejects(store.restore("settings"), { message: "找不到这张图片" });
+  await assert.rejects(store.trash("settings"), { message: "找不到这张图片" });
+});
+
+test("回收站: deleting a folder also clears the folder of trashed images, so a restored image lands in 未分类", async () => {
+  const { open } = setup();
+  const store = await open();
+  await store.createFolder("产品图");
+  const image = await store.add(pngBlob(), "甲", "产品图");
+  await store.trash(image.id);
+  await store.deleteFolder("产品图");
+  const restored = await store.restore(image.id);
+  assert.equal(restored.folder, undefined);
+});

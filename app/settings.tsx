@@ -7,6 +7,7 @@ import { AiSettingsSection } from "./ai-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, type SecretItem } from "./clipbox-core";
 import { UsageSection } from "./usage-section";
+import { DataMoveDialog } from "./data-move";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
@@ -58,6 +59,7 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
   // null = not asking; otherwise the names a clear would remove, shown before anything is deleted.
   const [confirmClearSamples, setConfirmClearSamples] = useState<string[] | null>(null);
   const [versionCopied, setVersionCopied] = useState(false);
+  const [dataMove, setDataMove] = useState<"export" | "import" | null>(null);
   // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
   const [openedAt] = useState(() => Date.now());
   const builtAt = formatBuildTime(buildTime);
@@ -126,6 +128,8 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
             {onRestoreSamples && row("恢复范例", "把缺少的范例补回来，已有的内容不会重复或改动", () => void onRestoreSamples(), "恢复")}
             {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
             {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
+            {isDesktop && row("导出到新版", "话术、图片和设置打包成一个加密文件，换到新版 Clipbox 时用", () => setDataMove("export"), "导出…")}
+            {isDesktop && row("从旧版导入", "读取旧版导出的文件，替换这里现有的全部内容", () => setDataMove("import"), "选择文件…")}
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
             {isDesktop
               ? row("数据位置", "在文件夹中打开 Clipbox 的本机数据", onOpenDataFolder, "打开文件夹")
@@ -179,6 +183,7 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
         </div>
         </div>
       </section>
+      {dataMove && <DataMoveDialog mode={dataMove} itemCount={itemCount} onClose={() => setDataMove(null)} />}
     </div>
   );
 }

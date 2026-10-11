@@ -71,8 +71,8 @@ import { pickMiniFavorites } from "./mini-favorites";
 import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
-import { countImagesByFolder, imageFilterTitle, imageFolderColors } from "./image-folders-core";
-import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
+import { countImagesByFolder, IMAGE_FILTER_TRASH, imageFilterTitle, imageFolderColors } from "./image-folders-core";
+import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
@@ -287,6 +287,7 @@ export default function Home() {
   const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; grab: number; element: HTMLElement } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
+  const [undoImage, setUndoImage] = useState<ImageMeta | null>(null);
   const undoTimerRef = useRef<number | null>(null);
   const [productFilter, setProductFilter] = useState("全部产品");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
@@ -605,6 +606,8 @@ export default function Home() {
 
   // A newer message replaces the older one and its timer, so it is never cut short.
   function flashToast(message: string, ms = 2200) {
+    // The newest message wins over a pending 撤销 for a picture.
+    setUndoImage(null);
     if (flashToastTimer.current) clearTimeout(flashToastTimer.current);
     setToast(message);
     flashToastTimer.current = setTimeout(() => setToast(""), ms);
@@ -1215,6 +1218,7 @@ export default function Home() {
     setSelected(0);
     setRevealedId("");
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setUndoImage(null);
     setUndoTrash(list);
     undoTimerRef.current = window.setTimeout(() => setUndoTrash(null), 6000);
   }
@@ -1232,6 +1236,22 @@ export default function Home() {
       setToast("恢复失败，内容仍保留在回收站");
     }
     window.setTimeout(() => setToast(""), 2200);
+  }
+
+  // A picture went to the 回收站: the same 6-second 撤销 as for 话术.
+  function offerImageUndo(meta: ImageMeta) {
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setUndoTrash(null);
+    setUndoImage(meta);
+    undoTimerRef.current = window.setTimeout(() => setUndoImage(null), 6000);
+  }
+
+  async function undoImageTrash() {
+    const meta = undoImage;
+    if (!meta) return;
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setUndoImage(null);
+    if (await imageLibrary.restore(meta.id)) flashToast("已恢复");
   }
 
   function exitBulk() {
@@ -1320,6 +1340,14 @@ export default function Home() {
     void persist((current) => ({ ...current, items: current.items.filter((item) => !(ids.has(item.id) && isTrashedItem(item))) }))
       .catch(() => setToast("自动清理回收站失败，内容已保留"));
   }, [loading, trashDays, items, persist]);
+
+  // Pictures that have sat in the 回收站 longer than the chosen retention are removed for good (same setting as 话术).
+  // Runs once the 图片 section has been read (nothing is opened before that).
+  const { ready: imagesReady, purgeExpired: purgeExpiredImages, trashed: trashedImagesList } = imageLibrary;
+  useEffect(() => {
+    if (!imagesReady || trashDays === 0 || trashedImagesList.length === 0) return;
+    void purgeExpiredImages(trashDays);
+  }, [imagesReady, trashDays, trashedImagesList, purgeExpiredImages]);
 
   const renamingFrom = renamingFolder?.from;
   useEffect(() => {
@@ -1743,7 +1771,7 @@ export default function Home() {
           {!imageView && activeKind === "snippet" && !query.trim() && miniFavorites.length > 0 && <div className="mini-favorites" role="group" aria-label="最常用">
             {miniFavorites.map((item) => <button key={item.id} type="button" className={`mini-chip ${item.pinned ? "pinned" : ""} ${copiedId === item.id ? "copied" : ""}`} title={item.label} onClick={() => void copyRaw(item)}>{copiedId === item.id ? "已复制" : item.label}</button>)}
           </div>}
-          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
@@ -1795,6 +1823,7 @@ export default function Home() {
             </div></>}
             <div className="nav-footer">
               {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length > 0 && <b>{trashedKindItems.length}</b>}</button>}
+              {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
               <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
@@ -1857,7 +1886,7 @@ export default function Home() {
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>
-            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onCounts={setImageCounts} />}
+            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
             {!imageView && <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
               {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
@@ -2022,9 +2051,9 @@ export default function Home() {
       />}
       {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={PLAIN_NOTES ? "" : SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
       <ArcToast
-        message={undoTrash ? (undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站") : toast}
-        className={undoTrash ? "undo-toast" : undefined}
-        action={undoTrash ? { label: "撤销", onClick: () => void undoTrashNow() } : undefined}
+        message={undoImage ? "图片已移入回收站" : undoTrash ? (undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站") : toast}
+        className={undoTrash || undoImage ? "undo-toast" : undefined}
+        action={undoImage ? { label: "撤销", onClick: () => void undoImageTrash() } : undoTrash ? { label: "撤销", onClick: () => void undoTrashNow() } : undefined}
       />
     </main>
   );

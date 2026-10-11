@@ -1063,3 +1063,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory-option .var-grip .grip-pill { width: 14px; height: 20px; background: transparent; }
 .var-memory-option .var-grip .grip-pill .icon { width: 14px; height: 20px; }
 .var-memory-pick { min-width: 0; padding: 3px 10px 3px 2px; border: 0; background: transparent; color: inherit; font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+
+.backup-warning{margin:0;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;background:#fff4e9;color:#8b5b37;font-size:12px;line-height:1.5}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .backup-warning{background:var(--warn-bg);color:var(--warn)}}
+:root[data-theme="dark"] .backup-warning{background:var(--warn-bg);color:var(--warn)}
+.backup-dialog.data-move .backup-intro,.backup-dialog.data-move .backup-note,.backup-dialog.data-move .backup-field{color:#5b5b60}.backup-dialog.data-move .backup-head p{color:#7a5a43}.backup-dialog.data-move:focus{outline:0}
