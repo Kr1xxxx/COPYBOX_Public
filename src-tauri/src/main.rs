@@ -2,6 +2,7 @@
 
 mod ai;
 mod automation;
+mod flush;
 mod shared_library;
 mod site_icon;
 mod shell;
@@ -40,6 +41,7 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(WindowMode::default())
         .manage(Shell::default())
+        .manage(flush::Flush::default())
         .manage(Updates::default())
         .manage(automation::Bridge::default())
         .invoke_handler(tauri::generate_handler![
@@ -54,6 +56,7 @@ fn main() {
             shell::set_launch_at_login,
             shell::open_data_folder,
             shell::relaunch,
+            flush::flush_done,
             ai::ai_status,
             ai::ai_save,
             ai::ai_clear,
@@ -117,7 +120,13 @@ fn main() {
         // Clicking the Dock icon brings the window back.
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => shell::show_window(app, false),
-        RunEvent::ExitRequested { .. } => {
+        RunEvent::ExitRequested { api, .. } => {
+            // First ask the page to save what it is still holding back, then exit for real.
+            if !app.state::<flush::Flush>().done_before_exit.load(std::sync::atomic::Ordering::SeqCst) {
+                api.prevent_exit();
+                flush::then_after_flush(app, |app| app.exit(0));
+                return;
+            }
             automation::cleanup(app);
             if let Some(window) = app.get_webview_window("main") {
                 app.state::<WindowMode>().save_now(&window);
