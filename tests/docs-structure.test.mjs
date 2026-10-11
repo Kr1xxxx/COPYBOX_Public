@@ -23,8 +23,8 @@ test("an empty or placeholder note does not count", () => {
 
 test("editing an existing note or a badly named file is not a handoff note", () => {
   const context = { readFile: goodNote };
-  assert.equal(checkHandoff([mod("desktop/main.cjs"), mod("docs/log/2026-10-09-grid.md")], context).ok, false);
-  assert.equal(checkHandoff([mod("desktop/main.cjs"), add("docs/log/notes.md")], context).ok, false);
+  assert.equal(checkHandoff([mod("src-tauri/src/main.rs"), mod("docs/log/2026-10-09-grid.md")], context).ok, false);
+  assert.equal(checkHandoff([mod("src-tauri/src/main.rs"), add("docs/log/notes.md")], context).ok, false);
   assert.equal(checkHandoff([mod("package.json"), add("docs/log/2026-10-09-Grid.md")], context).ok, false);
 });
 

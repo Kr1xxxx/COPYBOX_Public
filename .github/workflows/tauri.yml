@@ -1,7 +1,7 @@
 name: Tauri build
 
-# D-029: the desktop app is moving from Electron to Tauri. This only builds the Tauri shell on both platforms;
-# it does not ship anything. The Electron app keeps shipping until the Tauri build reaches parity.
+# D-029: the desktop app is Tauri (Electron was removed in step 8). This only builds the Tauri shell on both platforms;
+# it does not ship anything.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
@@ -31,8 +31,6 @@ jobs:
         # once it carries the label `mac-check` (add it before merging a PR that touches Tauri code); main always builds both.
         include: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'mac-check')) && '[{"name":"Windows","os":"windows-latest"},{"name":"macOS arm64","os":"macos-latest"}]' || '[{"name":"Windows","os":"windows-latest"}]') }}
     runs-on: ${{ matrix.os }}
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

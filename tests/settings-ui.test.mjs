@@ -108,8 +108,9 @@ test("there are no keyboard-shortcut hints or modifier shortcuts anywhere", () =
   assert.doesNotMatch(page, /<kbd|<Keys|function Keys|homeShortcutAction|handleCardSortKey|handleFolderSortKey/);
   assert.doesNotMatch(page, /event\.(metaKey|ctrlKey)/);
   assert.doesNotMatch(css, /(^|\n)kbd \{|\.k-mac|\.k-win|\.enter-key/);
-  const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
-  assert.doesNotMatch(main, /globalShortcut|GLOBAL_HOTKEY|accelerator/);
+  const shell = fs.readFileSync(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
+  assert.doesNotMatch(shell, /global_shortcut|GLOBAL_HOTKEY|accelerator/);
+  assert.doesNotMatch(fs.readFileSync(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8"), /global-shortcut/);
 });
 
 test("settings → 目录: each group folds open on click and 图片目录 can be edited there", () => {
@@ -133,6 +134,6 @@ test("the company library section lives in settings, starts without an address a
   assert.match(section, /placeholder="还没有地址，先不填也可以"/);
   const client = fs.readFileSync(new URL("../app/shared-library-client.ts", import.meta.url), "utf8");
   assert.match(client, /readSharedUrl\(\) \{ return \(read\(SHARED_URL_KEY\) \|\| ""\)\.trim\(\); \}/);
-  assert.match(fs.readFileSync(new URL("../desktop/preload.cjs", import.meta.url), "utf8"), /fetchSharedLibrary: \(url\) => ipcRenderer\.invoke\("clipbox:fetch-shared-library", url\)/);
-  assert.match(fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8"), /ipcMain\.handle\("clipbox:fetch-shared-library"[^]*isTrustedClipboardRequest/);
+  assert.match(fs.readFileSync(new URL("../src-tauri/bridge.js", import.meta.url), "utf8"), /fetchSharedLibrary: function \(url\) \{ return invoke\("fetch_shared_library"/);
+  assert.match(fs.readFileSync(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8"), /shared_library::fetch_shared_library/);
 });
