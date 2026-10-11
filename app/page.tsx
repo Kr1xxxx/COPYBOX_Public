@@ -58,6 +58,7 @@ import {
   snippetCopyReadiness,
   type SnippetImportPreview,
 } from "./snippet-import";
+import { createLazyWriter, type LazyWriter } from "./lazy-writer";
 import { FolderRow } from "./folder-row";
 import { ListEmptyState } from "./list-empty-state";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
@@ -314,6 +315,7 @@ export default function Home() {
   const sharedSeenRef = useRef<string[] | undefined>(undefined);
   const nextSnippetNumberRef = useRef(1);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lazyWriterRef = useRef<LazyWriter | null>(null);
   const { prepareSortAnimation } = useSortFlipAnimation();
 
   useEffect(() => {
@@ -463,7 +465,7 @@ export default function Home() {
 
   async function persistCardOrder(update: (items: SecretItem[]) => SecretItem[], successMessage = "顺序已更新", animate = false) {
     try {
-      await persist((current) => {
+      await persistLazy((current) => {
         if (animate) prepareSortAnimation("card");
         return { ...current, items: update(current.items) };
       });
@@ -477,7 +479,7 @@ export default function Home() {
 
   async function persistFolderOrder(update: (names: string[]) => string[], successMessage = "目录顺序已更新", animate = false) {
     try {
-      await persist((current) => {
+      await persistLazy((current) => {
         if (animate) prepareSortAnimation("folder");
         return { ...current, folders: { ...current.folders, [activeKind]: update(current.folders[activeKind]) } };
       });
@@ -564,6 +566,7 @@ export default function Home() {
     setRefreshing(true);
     let relaunching = false;
     try {
+      await lazyWriterRef.current?.flush();
       await persistQueueRef.current.catch(() => undefined);
       const opened = await readLocalEncryptedVault();
       const nextActiveFolder = resolveRefreshedActiveFolder(activeKind, opened.data.folders[activeKind], activeFolder);
@@ -709,11 +712,13 @@ export default function Home() {
     return queued;
   }, []);
 
-  const writeVault = useCallback(async (nextData: VaultData) => {
-    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber, nextData.folderColors, nextData.sharedSeen ?? sharedSeenRef.current);
+  const storeVault = useCallback(async (data: VaultData) => {
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as VaultEnvelope | null;
     const envelope = await encryptVault(data, deviceKey, current?.salt);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+  }, [deviceKey]);
+
+  const commitVaultToMemory = useCallback((data: VaultData) => {
     itemsRef.current = data.items;
     foldersRef.current = data.folders;
     folderColorsRef.current = data.folderColors;
@@ -722,11 +727,52 @@ export default function Home() {
     setItems(data.items);
     setFolders(data.folders);
     setFolderColors(data.folderColors);
-  }, [deviceKey]);
+  }, []);
+
+  // Saves at once. It writes everything currently in memory, so it also covers any lazy changes still waiting.
+  const writeVault = useCallback(async (nextData: VaultData) => {
+    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber, nextData.folderColors, nextData.sharedSeen ?? sharedSeenRef.current);
+    await storeVault(data);
+    commitVaultToMemory(data);
+    lazyWriterRef.current?.cancel();
+  }, [storeVault, commitVaultToMemory]);
 
   const persist = useCallback((update: (current: VaultData) => VaultData) => (
     enqueueVaultTask(() => writeVault(update(readVault())))
   ), [enqueueVaultTask, readVault, writeVault]);
+
+  // For small, frequent changes (usage counts, pins, order): memory and screen update now, the disk write follows
+  // one second after the last change. Quitting, hiding the window, sleep and reload save it first (flushLazyVault).
+  const persistLazy = useCallback((update: (current: VaultData) => VaultData) => (
+    enqueueVaultTask(async () => {
+      const next = update(readVault());
+      commitVaultToMemory(synchronizeVaultData(next.items, next.folders, next.nextSnippetNumber, next.folderColors, next.sharedSeen ?? sharedSeenRef.current));
+      lazyWriterRef.current?.markDirty();
+    })
+  ), [enqueueVaultTask, readVault, commitVaultToMemory]);
+
+  useEffect(() => {
+    if (loading || !deviceKey) return;
+    const writer = createLazyWriter({
+      write: () => enqueueVaultTask(() => storeVault(readVault())),
+      onError: () => { setToast("最近的改动保存失败，请再操作一次"); },
+    });
+    lazyWriterRef.current = writer;
+    const flush = () => { void writer.flush(); };
+    const flushWhenHidden = () => { if (document.hidden) flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flushWhenHidden);
+    const removeFlushRequest = window.clipboxDesktop?.onFlushRequest?.(() => {
+      void writer.flush().finally(() => window.clipboxDesktop?.flushDone?.());
+    });
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", flushWhenHidden);
+      removeFlushRequest?.();
+      void writer.flush();
+      if (lazyWriterRef.current === writer) lazyWriterRef.current = null;
+    };
+  }, [loading, deviceKey, enqueueVaultTask, storeVault, readVault]);
 
   useEffect(() => {
     if (loading || !deviceKey || !window.clipboxDesktop?.onAutomationCommand) return;
@@ -798,7 +844,7 @@ export default function Home() {
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
-    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow(), useCount: (value.useCount || 0) + 1 } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
+    void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow(), useCount: (value.useCount || 0) + 1 } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
@@ -1338,7 +1384,7 @@ export default function Home() {
   }
 
   function togglePinned(item: SecretItem) {
-    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) })).catch(() => setToast("收藏保存失败，请重试"));
+    void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) })).catch(() => setToast("收藏保存失败，请重试"));
   }
 
   function showImages() {
