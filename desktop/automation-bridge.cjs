@@ -8,15 +8,19 @@ function createRendererCommandBridge({
   createId,
   isReady,
   send,
+  ensureReady,
   timeoutMs = 10_000,
 }) {
   const pending = new Map();
   let closed = false;
 
   return {
-    forward(command) {
-      if (closed) return Promise.reject(bridgeError("APP_CLOSING", "Clipbox 正在退出"));
-      if (!isReady()) return Promise.reject(bridgeError("WINDOW_UNAVAILABLE", "Clipbox 窗口尚未就绪"));
+    async forward(command) {
+      if (closed) throw bridgeError("APP_CLOSING", "Clipbox 正在退出");
+      // A quiet start has no window yet: let the app open one (hidden) before giving up.
+      if (!isReady() && ensureReady) await ensureReady().catch(() => undefined);
+      if (closed) throw bridgeError("APP_CLOSING", "Clipbox 正在退出");
+      if (!isReady()) throw bridgeError("WINDOW_UNAVAILABLE", "Clipbox 窗口尚未就绪");
       const requestId = createId();
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {

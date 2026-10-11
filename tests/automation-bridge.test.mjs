@@ -97,3 +97,30 @@ test("preload exposes only narrow automation receive and response methods", () =
   remove();
   assert.equal(listeners.has("clipbox:automation-command"), false);
 });
+
+test("a quiet start has no window yet: the bridge asks for one before it gives up", async () => {
+  let ready = false;
+  const sent = [];
+  const bridge = bridgeModule.createRendererCommandBridge({
+    createId: () => "request-2",
+    isReady: () => ready,
+    send: (request) => sent.push(request),
+    ensureReady: async () => { ready = true; },
+    timeoutMs: 100,
+  });
+  const pending = bridge.forward({ action: "status" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent, [{ requestId: "request-2", command: { action: "status" } }]);
+  bridge.respond({ requestId: "request-2", response: { ok: true } });
+  assert.deepEqual(await pending, { ok: true });
+});
+
+test("still reports the window as unavailable when it cannot be opened", async () => {
+  const bridge = bridgeModule.createRendererCommandBridge({
+    createId: () => "request-3",
+    isReady: () => false,
+    send() {},
+    ensureReady: async () => { throw new Error("no server"); },
+  });
+  await assert.rejects(bridge.forward({ action: "status" }), { code: "WINDOW_UNAVAILABLE" });
+});

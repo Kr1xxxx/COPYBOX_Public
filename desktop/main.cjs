@@ -1,8 +1,9 @@
-const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
+const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, safeStorage, screen, session, shell, Tray } = require("electron");
 const { fetchSiteIcon } = require("./site-icon.cjs");
 const { createClipboardWriter, createImageClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { createAiStore } = require("./ai.cjs");
 const { fetchSharedText } = require("./shared-fetch.cjs");
+const { createFlushRequester } = require("./flush-request.cjs");
 const { spawn } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
@@ -33,8 +34,9 @@ let automationRendererReady = false;
 const appOrigin = APP_ORIGIN;
 const isMac = process.platform === "darwin";
 const isWindows = process.platform === "win32";
-// Launch-at-login starts Clipbox quietly in the tray.
-const startHidden = process.argv.includes("--hidden");
+// Launch-at-login starts Clipbox quietly in the tray: only the tray icon, no server and no window until the
+// first click (or the first command from the command line).
+let startHidden = process.argv.includes("--hidden");
 const loginItemOptions = isWindows ? { args: ["--hidden"] } : {};
 let closeBehavior = "tray"; // "tray" | "taskbar" (Windows) | "quit"
 const WINDOW_STATE_SAVE_DELAY = 180;
@@ -143,6 +145,11 @@ async function startAutomation() {
     createId: randomUUID,
     isReady: () => Boolean(automationRendererReady && mainWindow && !mainWindow.isDestroyed()),
     send: (request) => mainWindow.webContents.send("clipbox:automation-command", request),
+    ensureReady: async () => {
+      await ensureWindow();
+      const deadline = Date.now() + 8000;
+      while (!automationRendererReady && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 80));
+    },
   });
   automationServer = createAutomationServer({
     socketPath,
@@ -164,6 +171,7 @@ async function relaunchApplication() {
   if (quitting) return;
   saveWindowBounds();
   quitting = true;
+  await flushRequester.request();
   await stopAutomation();
   await stopServer();
   app.relaunch();
@@ -304,6 +312,8 @@ function createWindow() {
     saveMiniPosition();
     if (!quitting) {
       if (closeBehavior === "quit") {
+        // Keep the window open until quitting has saved what is still waiting (see before-quit); quitting itself closes it.
+        event.preventDefault();
         quitting = true;
         app.quit();
         return;
@@ -320,16 +330,42 @@ function createWindow() {
   void mainWindow.loadURL(appOrigin);
 }
 
+// The server and the window are only started when needed, so a quiet start (launch at login) costs a tray icon.
+let windowPromise;
+function ensureWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) return Promise.resolve();
+  if (!windowPromise) {
+    windowPromise = (async () => {
+      if (!serverProcess) startServer(APP_PORT);
+      await waitForServer();
+      createWindow();
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, 15000);
+        const done = () => { clearTimeout(timer); resolve(); };
+        mainWindow.webContents.once("did-finish-load", done);
+        mainWindow.webContents.once("did-fail-load", done);
+      });
+    })().finally(() => { windowPromise = undefined; });
+  }
+  return windowPromise;
+}
+
 // A tray click or "快速搜索" opens the mini window and (by setting) hides it again
 // after a copy. Other ways of opening Clipbox return to the full window.
 function showWindow(asQuickSearch = false) {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    ensureWindow().then(() => showWindow(asQuickSearch)).catch(() => {
+      dialog.showErrorBox("Clipbox 无法启动", "本地服务未能启动，请重新打开应用。");
+    });
+    return;
+  }
   if (asQuickSearch) enterMiniMode(true);
   else enterFullMode();
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
-  mainWindow.webContents.send("clipbox:focus-search");
+  if (mainWindow.webContents.isLoading()) mainWindow.webContents.once("did-finish-load", () => mainWindow?.webContents.send("clipbox:focus-search"));
+  else mainWindow.webContents.send("clipbox:focus-search");
 }
 
 function createTray() {
@@ -356,10 +392,11 @@ app.whenReady().then(async () => {
     callback(permission === "clipboard-read" || permission === "clipboard-sanitized-write");
   });
   if (isWindows) Menu.setApplicationMenu(null);
+  // macOS has no start argument for login items; it reports that it was opened at login.
+  if (isMac && app.getLoginItemSettings().wasOpenedAtLogin) startHidden = true;
+  for (const event of ["suspend", "lock-screen", "shutdown"]) powerMonitor.on(event, () => { void flushRequester.request(); });
   try {
-    startServer(APP_PORT);
-    await waitForServer();
-    createWindow();
+    if (!startHidden) await ensureWindow();
     // The automation CLI is a macOS/Linux unix-socket helper; Windows does not use it.
     if (!isWindows) await startAutomation();
     createTray();
@@ -369,21 +406,34 @@ app.whenReady().then(async () => {
   }
 });
 
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0 && serverProcess) createWindow();
-  else showWindow(false);
-});
+app.on("activate", () => showWindow(false));
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+let flushedBeforeQuit = false;
+app.on("before-quit", (event) => {
   saveMiniPosition();
   saveWindowBounds();
   quitting = true;
+  // Let the page save anything it is still holding back, then quit again.
+  if (!flushedBeforeQuit) {
+    flushedBeforeQuit = true;
+    event.preventDefault();
+    void flushRequester.request().finally(() => app.quit());
+    return;
+  }
   void stopAutomation();
   if (serverProcess && !serverProcess.killed) serverProcess.kill("SIGTERM");
+});
+
+const flushRequester = createFlushRequester({
+  canRequest: () => Boolean(mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()),
+  send: () => mainWindow.webContents.send("clipbox:flush"),
+});
+ipcMain.on("clipbox:flush-done", (event) => {
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents === event.sender) flushRequester.done();
 });
 
 let miniHidePolicy = "hotkey"; // "hotkey" | "always" | "never"
