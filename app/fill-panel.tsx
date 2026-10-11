@@ -10,7 +10,6 @@ export type SnippetFillState = {
   itemId: string;
   language: CopyLanguage;
   values: Record<string, string>;
-  checkedInputs: string[];
   verificationConfirmed: boolean;
   /** Variables that were prefilled from the last copy and not touched yet. */
   remembered: string[];
@@ -23,7 +22,7 @@ export function emptyFillState(item: SecretItem, remembered: Record<string, stri
   const carried = Object.keys(values);
   // Name starts as Friend, so a reply with no choice made still goes out. This is not a carried-over value: it needs no second look.
   for (const name of item.snippetMeta?.placeholders || []) if (!values[name] && DEFAULT_VALUES[name]) values[name] = DEFAULT_VALUES[name];
-  return { itemId: item.id, language, values, checkedInputs: [], verificationConfirmed: false, remembered: carried };
+  return { itemId: item.id, language, values, verificationConfirmed: false, remembered: carried };
 }
 
 // A variable shows as a highlighted block without its brackets. Static in the collapsed list, a field in the open card.
@@ -109,7 +108,6 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
           isPinned={isPinned}
         />
       </p>
-      {meta.requiredInputs.length > 0 && <fieldset className="copy-checks"><legend>发送前确认</legend>{meta.requiredInputs.map((input) => <label key={input}><input type="checkbox" checked={state.checkedInputs.includes(input)} onChange={(event) => onState((current) => ({ ...current, checkedInputs: event.target.checked ? [...current.checkedInputs, input] : current.checkedInputs.filter((value) => value !== input) }))} /><span>已确认 {input}</span></label>)}</fieldset>}
       {meta.requiresVerification && <label className="copy-warning"><input type="checkbox" checked={state.verificationConfirmed} onChange={(event) => onState((current) => ({ ...current, verificationConfirmed: event.target.checked }))} /><span><strong>发送前核实</strong> 金额、库存、地址或时效已按当前情况检查</span></label>}
     </div>
   );

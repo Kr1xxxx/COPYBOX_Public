@@ -223,18 +223,16 @@ test("matches structured product groups without hiding legacy snippets in the de
   assert.equal(matchesSnippetProduct(legacy, "睫毛"), false);
 });
 
-test("requires placeholder values, checklist confirmations, and verification confirmation before copy", () => {
+test("requires placeholder values and the verification confirmation before copy; the old 发送前确认 ticks no longer matter", () => {
   const item = normalizeSnippetRow(baseRow, 2).item;
-  assert.deepEqual(snippetCopyReadiness(item, {}, [], false), {
+  assert.deepEqual(snippetCopyReadiness(item, {}, false), {
     ready: false,
     missingPlaceholders: ["Customer Name"],
-    missingChecks: ["Price"],
     needsVerification: true,
   });
-  assert.deepEqual(snippetCopyReadiness(item, { "Customer Name": "Mia" }, ["Price"], true), {
+  assert.deepEqual(snippetCopyReadiness(item, { "Customer Name": "Mia" }, true), {
     ready: true,
     missingPlaceholders: [],
-    missingChecks: [],
     needsVerification: false,
   });
 });
@@ -256,8 +254,8 @@ test("offers optional preparation without blocking standard copy", () => {
 test("readiness for the Chinese text only needs the variables that text uses", () => {
   const item = { id: "x", label: "x", secret: "Hi [Name], best [Sender]", note: "", color: "#fff", kind: "snippet", createdAt: 1, updatedAt: 1,
     snippetMeta: { stage: "询盘接待", scene: "s", action: "a", productGroups: [], rawProduct: "", chineseText: "此致 [Sender]", placeholders: ["Name", "Sender"], requiredInputs: [], usageNote: "", requiresVerification: false } };
-  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, [], false, "zh").missingPlaceholders, []);
-  assert.equal(snippetCopyReadiness(item, { Sender: "Amy" }, [], false, "zh").ready, true);
-  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, [], false, "en").missingPlaceholders, ["Name"]);
-  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, [], false).missingPlaceholders, ["Name"]);
+  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, false, "zh").missingPlaceholders, []);
+  assert.equal(snippetCopyReadiness(item, { Sender: "Amy" }, false, "zh").ready, true);
+  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, false, "en").missingPlaceholders, ["Name"]);
+  assert.deepEqual(snippetCopyReadiness(item, { Sender: "Amy" }, false).missingPlaceholders, ["Name"]);
 });

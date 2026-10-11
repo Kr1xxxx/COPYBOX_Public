@@ -876,17 +876,17 @@ export default function Home() {
     const state = pickedValues ? { ...fillFor(item), values: pickedValues } : fillFor(item);
     const source = resolveSnippetCopySource(item, state.language);
     if (!source) return;
-    const readiness = snippetCopyReadiness(item, state.values, state.checkedInputs, state.verificationConfirmed, state.language);
+    const readiness = snippetCopyReadiness(item, state.values, state.verificationConfirmed, state.language);
     if (!readiness.ready) {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== safeSelected) selectRow(index);
       const missing = readiness.missingPlaceholders;
-      setToast(missing.length > 0 ? `先填写：${missing.join("、")}` : readiness.missingChecks.length > 0 ? "先勾选“发送前确认”" : "先勾选“发送前核实”");
+      setToast(missing.length > 0 ? `先填写：${missing.join("、")}` : "先勾选“发送前核实”");
       window.setTimeout(() => setToast(""), 2200);
       window.setTimeout(() => {
         const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
         if (missing.length > 0) Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
-        else row?.querySelector<HTMLInputElement>(".copy-checks input:not(:checked), .copy-warning input:not(:checked)")?.focus();
+        else row?.querySelector<HTMLInputElement>(".copy-warning input:not(:checked)")?.focus();
       }, 60);
       return;
     }
