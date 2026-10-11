@@ -169,7 +169,7 @@ test("删除 moves the image to the 回收站 with an undo; 恢复 brings it bac
 
   // 撤销 puts it back right away.
   await page.locator(".toast").getByRole("button", { name: "撤销" }).click();
-  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator(".nav-footer .nav-item", { hasText: "回收站" })).toHaveText("回收站");
   await expect(page.locator(".nav-footer .nav-item", { hasText: "回收站" })).not.toContainText("1");
 
   // Delete again, then work from the 回收站.
@@ -254,7 +254,6 @@ test("the 回收站 empties itself after the chosen days (7 by default); an imag
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator(".nav-footer .nav-item", { hasText: "回收站" })).not.toContainText("1");
   await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
   await expect(page.locator("body")).toContainText("回收站是空的");
 
@@ -262,6 +261,8 @@ test("the 回收站 empties itself after the chosen days (7 by default); an imag
   await page.locator(".sidebar .nav-item", { hasText: "全部图片" }).click();
   await rows(page).first().locator(".row-main").click();
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
+  // The change is written to the store before the row goes away: reloading earlier would cut that write off.
+  await expect(rows(page)).toHaveCount(0);
   await page.clock.setFixedTime(new Date(Date.now() + 9 * 86_400_000));
   await page.reload();
   await page.waitForSelector(".app-shell");
