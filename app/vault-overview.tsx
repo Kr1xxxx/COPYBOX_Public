@@ -84,7 +84,7 @@ export function VaultOverview({ deviceKey, legacySecrets, onOpen, onOpenLegacy }
       for (const account of totps) add({ id: account.id, tab: "totp", title: accountTitle(account), hint: account.name && account.issuer ? account.name : "验证码", site: detectSite({ issuer: account.issuer, name: account.name }) });
       for (const secret of legacySecrets) {
         const tab = classifySecret(secret.label, secret.secret);
-        add({ id: secret.id, tab, legacy: true, title: secret.label || "（没有标题）", hint: "来自「秘密」", site: knownSiteOrOther(detectSite({ apiKey: tab === "apikey" ? secret.secret : undefined, name: secret.label })) });
+        add({ id: secret.id, tab, legacy: true, title: secret.label || "（没有标题）", hint: "来自「其他」", site: knownSiteOrOther(detectSite({ apiKey: tab === "apikey" ? secret.secret : undefined, name: secret.label })) });
       }
       setMarks(found);
       setBase(list);

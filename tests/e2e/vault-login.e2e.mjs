@@ -5,10 +5,8 @@ async function openVault(page) {
   await asDesktop(page, "darwin");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
-  for (let i = 0; i < 5; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   return dialog;
 }

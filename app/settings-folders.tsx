@@ -5,6 +5,8 @@ import { ArcCollapsible } from "./arc/collapsible";
 import { CATEGORY_PALETTE } from "./category-colors";
 import type { ItemKind } from "./clipbox-core";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import { ReorderHandle } from "./reorder-handle";
+import { Icon } from "./ui-atoms";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 
@@ -75,11 +77,11 @@ export function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, on
             const previous = group.folders[index - 1];
             const next = group.folders[index + 1];
             return (
-              <div className={`settings-folder ${reorder.draggingId === key ? "dragging" : ""} ${reorder.overId === key && reorder.draggingId !== key ? "drag-over" : ""}`} key={key} {...(folder.locked || !group.sortable ? {} : { "data-sort-scope": "settings-folder", "data-sort-id": key })}>
+              <div className={`settings-folder ${reorder.draggingId === key ? "dragging" : ""} ${reorder.overId === key && reorder.draggingId !== key ? "drag-over" : ""}`} key={key} {...(!group.sortable ? {} : { "data-sort-scope": "settings-folder", "data-sort-id": key })}>
                 <div className="settings-folder-row">
-                  {folder.locked || !group.sortable || editing?.key === key
+                  {!group.sortable || editing?.key === key
                     ? <span className="settings-folder-grip placeholder" aria-hidden="true" />
-                    : <button type="button" className="settings-folder-grip" aria-label={`拖动排序 ${folder.name}`} title="按住拖动排序" onPointerDown={(event) => reorder.beginPointerDrag(event, key)}><span aria-hidden="true">⠿</span></button>}
+                    : <ReorderHandle className="settings-folder-grip" label={`拖动排序 ${folder.name}`} title="按住拖动，点一下可上移下移" canMoveUp={Boolean(previous)} canMoveDown={Boolean(next)} onBeginDrag={(event) => reorder.beginPointerDrag(event, key)} onMove={(delta) => onMove(group.kind, folder.name, delta)}><Icon name="grip" /></ReorderHandle>}
                   <button type="button" className="settings-folder-dot" style={{ background: folder.color }} aria-label={`修改颜色 ${folder.name}`} aria-expanded={colorKey === key} onClick={() => setColorKey(colorKey === key ? "" : key)} />
                   {editing?.key === key ? (
                     <form className="settings-folder-form" data-local-esc onSubmit={(event) => { event.preventDefault(); void finish(onRename(group.kind, folder.name, editing.value), () => setEditing(null)); }}>
@@ -93,8 +95,8 @@ export function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, on
                       <small className="settings-folder-count">{folder.count} {group.unit}</small>
                       {folder.locked ? <span className="settings-folder-fixed" title="标准话术目录不能改名或删除">固定</span> : <span className="settings-folder-actions">
                         {group.sortable && <>
-                        <button type="button" className="settings-mini-button" aria-label={`上移 ${folder.name}`} title="上移" disabled={folder.locked || !previous || previous.locked} onClick={() => onMove(group.kind, folder.name, -1)}>↑</button>
-                        <button type="button" className="settings-mini-button" aria-label={`下移 ${folder.name}`} title="下移" disabled={folder.locked || !next || next.locked} onClick={() => onMove(group.kind, folder.name, 1)}>↓</button>
+                        <button type="button" className="settings-mini-button" aria-label={`上移 ${folder.name}`} title="上移" disabled={!previous} onClick={() => onMove(group.kind, folder.name, -1)}>↑</button>
+                        <button type="button" className="settings-mini-button" aria-label={`下移 ${folder.name}`} title="下移" disabled={!next} onClick={() => onMove(group.kind, folder.name, 1)}>↓</button>
                         </>}
                         <button type="button" className="settings-mini-button" disabled={folder.locked} title={folder.locked ? "标准话术目录不能改名" : undefined} onClick={() => { setError(""); setArmKey(""); setEditing({ key, value: folder.name }); }}>改名</button>
                         {armKey === key

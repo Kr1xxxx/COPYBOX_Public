@@ -145,16 +145,11 @@ for (const { platform, theme, size } of cases) {
     if (!mini) await state("images-new-folder", async () => { await page.getByRole("button", { name: "新建目录" }).first().click(); await page.keyboard.type("收款码很长的图片目录名"); });
 
     if (platform === "darwin") {
-      await state("secrets", async () => { await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click(); });
+      await state("secrets", async () => { await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click(); });
       if (!mini) {
-        // 验证码 now lives inside the hidden 保险箱: 设置 → 关于, tap the version 5 times, then 验证码 → 添加账号.
+        // 验证码 lives inside the 保险箱, which is the 账号 page itself.
         await state("totp-add", async () => {
-          await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
-          await settingsBtn().click();
-          const settings = page.getByRole("dialog", { name: "设置" });
-          await settings.getByRole("tab", { name: "关于" }).click();
-          for (let i = 0; i < 5; i++) await settings.getByText(/^Clipbox v/).click();
-          const vault = page.getByRole("dialog", { name: "保险箱" });
+          const vault = page.getByRole("region", { name: "保险箱" });
           await vault.waitFor();
           await vault.getByRole("button", { name: "验证码", exact: true }).click();
           await vault.getByRole("button", { name: "添加账号" }).click();

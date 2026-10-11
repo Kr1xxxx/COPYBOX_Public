@@ -117,14 +117,18 @@ button { -webkit-tap-highlight-color: transparent; }
 .directory-row .directory-main { flex: 1 1 auto; min-width: 0; }
 /* The handle sits on the far left, over the colour dot: on hover the dot gives way to three bars (press and drag). */
 .directory-row .folder-drag-handle { position: absolute; left: 4px; top: 4px; z-index: 1; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: grab; touch-action: none; opacity: 0; transition: opacity .14s; }
-.directory-row .folder-drag-handle .icon { width: 14px; height: 14px; }
+.directory-row .folder-drag-handle .icon { width: 16px; height: 20px; padding: 3px 0; box-sizing: border-box; border-radius: 999px; background: var(--hover); }
+/* One handle look everywhere: a rounded pill with two columns of three dots. */
+.grip-pill, .settings-folder-grip .icon { display: grid; place-items: center; border-radius: 999px; background: var(--hover); }
+.grip-pill { width: 16px; height: 22px; }
+.grip-pill .icon, .settings-folder-grip .icon { width: 16px; height: 22px; }
 .directory-row:hover .folder-drag-handle, .folder-drag-handle:focus-visible, .directory-row.dragging .folder-drag-handle { opacity: 1; }
 .directory-row:has(.folder-drag-handle):hover .directory-color-marker, .directory-row:has(.folder-drag-handle:focus-visible) .directory-color-marker, .directory-row.dragging .directory-color-marker { opacity: 0; }
 .directory-row .directory-color-marker { transition: opacity .14s; }
 .directory-row .folder-drag-handle:hover { color: var(--ink); }
 .folder-drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .folder-drag-handle:active { cursor: grabbing; }
-.directory-row.dragging { z-index: 5; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
+.directory-row.dragging { z-index: 5; opacity: .8; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .directory-row.drag-over::after { content: ""; position: absolute; left: 5px; right: 5px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 .nav-footer { flex: 0 0 auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
 .menu-wrap { position: relative; }
@@ -178,11 +182,11 @@ button { -webkit-tap-highlight-color: transparent; }
 .secret-row .row-line { height: 44px; }
 .native-row:not(.selected):hover { background: var(--hover); }
 .drag-handle { width: 26px; height: 100%; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: grab; touch-action: none; }
-.drag-handle i { width: 8px; height: 8px; border-radius: 50%; transition: transform .16s, box-shadow .16s; }
-.drag-handle:hover i, .drag-handle:focus-visible i { transform: scale(1.35); box-shadow: 0 0 0 3px rgba(31,30,28,.06); }
+.drag-handle .grip-pill { transition: transform .16s; }
+.drag-handle:hover .grip-pill, .drag-handle:focus-visible .grip-pill { transform: scale(1.08); }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle:disabled { cursor: default; }
-.drag-handle:disabled:hover i { transform: none; box-shadow: none; }
+.drag-handle:disabled:hover .grip-pill { transform: none; }
 .row-main { flex: 1 1 auto; min-width: 0; height: 100%; padding: 0 6px 0 4px; display: flex; align-items: center; border: 0; border-radius: 6px; background: none; color: inherit; text-align: left; cursor: pointer; }
 .row-copy { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
 .row-title { min-width: 0; display: flex; align-items: baseline; gap: 9px; }
@@ -244,7 +248,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .row-hint { margin: -2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 /* Reordering */
-.native-row.dragging { z-index: 10; opacity: .96; animation: none; background: var(--card); box-shadow: 0 18px 40px rgba(31,30,28,.18); }
+.native-row.dragging { z-index: 10; opacity: .8; animation: none; background: var(--card); box-shadow: 0 18px 40px rgba(31,30,28,.18); }
 .native-row.drag-over::after { content: ""; position: absolute; left: 12px; right: 12px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 
 /* Trash */
@@ -277,6 +281,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .mini-folder { position: relative; height: 26px; max-width: 110px; display: flex; align-items: center; border-left: 1px solid var(--line-soft); color: var(--ink-2); }
 .mini-folder select { height: 100%; max-width: 110px; padding: 0 22px 0 9px; border: 0; outline: 0; background: transparent; color: inherit; font-size: 12px; font-weight: 500; appearance: none; cursor: pointer; }
 .mini-folder .icon { position: absolute; right: 7px; width: 11px; height: 11px; pointer-events: none; }
+.mini-favorites { flex: 0 0 auto; display: flex; gap: 4px; padding: 0 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
+.mini-search:has(+ .mini-favorites) { border-bottom: 0; }
+.mini-chip { flex: 1 1 0; min-width: 0; height: 28px; padding: 0 4px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: transform .12s ease, background-color .12s ease; }
+.mini-chip:hover { background: var(--hover); }
+.mini-chip:active { transform: scale(.97); }
+.mini-chip.pinned { border-color: var(--accent); color: var(--accent-ink); }
+.mini-chip.copied { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); }
 .mini-list { padding: 6px 6px 8px; gap: 1px; }
 .mini-row .row-main { min-height: 46px; padding: 0 10px 0 12px; gap: 10px; border-radius: 9px; }
 .mini-row .row-copy small { font-size: 12px; }
@@ -525,9 +536,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-chip[data-filled] { background: color-mix(in srgb, var(--accent-soft) 70%, var(--card)); }
 .var-memory { display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .var-memory::-webkit-scrollbar { display: none; }
-.var-memory .var-help { position: sticky; right: 0; margin-left: auto; box-shadow: 0 0 0 4px var(--card); }
+.var-memory .var-tail { position: sticky; right: 0; margin-left: auto; display: inline-flex; align-items: center; gap: 2px; flex: none; background: var(--card); box-shadow: 0 0 0 4px var(--card); }
 .var-memory-option { flex: 0 1 auto; min-width: 0; max-width: 130px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; animation: var-memory-in .16s cubic-bezier(.22,1,.36,1); transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
-.var-memory-option:hover, .var-memory-option[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.var-memory-option:hover, .var-memory-option[data-selected] { background: var(--accent-soft); color: var(--accent-ink); }
 .var-memory-option:active { scale: .96; }
 @keyframes var-memory-in { from { opacity: 0; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .var-memory-option { animation: none; transition: none; } .var-memory-option:active { scale: 1; } }
@@ -541,6 +552,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .folder-more:hover { background: var(--fill); color: var(--ink); }
 .directory-row:hover .directory-main b { opacity: 0; }
 .directory-row.fixed:hover .directory-main b { opacity: 0; }
+.reorder-menu { position: fixed; right: auto; width: 168px; z-index: 40; }
+.reorder-menu .icon { width: 15px; height: 15px; color: var(--muted); }
 .menu-scrim { position: fixed; inset: 0; z-index: 38; background: transparent; }
 .folder-menu { position: fixed; z-index: 40; width: 196px; right: auto; }
 .folder-menu .swatches { margin: 2px 6px 6px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
@@ -674,9 +687,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-folder:last-of-type { border-bottom: 0; }
 .settings-folder-row { min-height: 40px; display: flex; align-items: center; gap: 9px; }
 .settings-folder { position: relative; }
-.settings-folder.dragging { z-index: 5; border-radius: 8px; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
+.settings-folder.dragging { z-index: 5; opacity: .8; border-radius: 8px; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .settings-folder.drag-over::after { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
-.settings-folder-grip { width: 16px; height: 24px; flex: none; margin-left: -4px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; cursor: grab; touch-action: none; opacity: .55; transition: opacity .14s, background .14s; }
+.settings-folder-grip { width: 16px; height: 24px; flex: none; margin-left: 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; cursor: grab; touch-action: none; opacity: .55; transition: opacity .14s, background .14s; }
 .settings-folder-grip:hover, .settings-folder-grip:focus-visible { opacity: 1; background: var(--hover); }
 .settings-folder-grip:active { cursor: grabbing; }
 .settings-folder-grip.placeholder { cursor: default; opacity: 0; pointer-events: none; }
@@ -925,6 +938,19 @@ button { -webkit-tap-highlight-color: transparent; }
 .totp-error{margin:0;color:var(--danger);font-size:12px}
 .totp-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
 @media (prefers-reduced-motion: reduce){.totp-main,.totp-main:active{transition:none;scale:1}.totp-main.copied .totp-copy-icon{animation:none}.totp-ring-arc{transition:none}}
+
+/* 设置 → 使用排行 */
+.usage-block { display: grid; gap: 4px; padding: 10px 0 4px; }
+.usage-block h4 { margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.usage-count { color: var(--muted); font-size: 11.5px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.usage-empty { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.usage-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.usage-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .15s ease; }
+.usage-row:hover { background: var(--hover, rgba(127, 127, 127, .12)); }
+.usage-row:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: -2px; }
+.usage-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.usage-note { flex: none; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.usage-more { padding: 4px 10px; color: var(--muted); font-size: 11.5px; }
 /* Menu on a remembered value, and dragging one. */
 .var-menu { position: fixed; z-index: 130; min-width: 96px; display: grid; gap: 1px; padding: 4px; border-radius: 10px; background: var(--card); box-shadow: 0 0 0 1px var(--line), 0 8px 22px rgba(0, 0, 0, .16); animation: var-popup-in .12s cubic-bezier(.22,1,.36,1); }
 .var-menu button { padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
@@ -933,7 +959,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-menu button:disabled { opacity: .4; cursor: default; }
 .var-menu button.danger { color: var(--danger, #c0392b); }
 .var-memory-option { touch-action: none; user-select: none; -webkit-user-select: none; }
-.var-memory-option:active { cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) { .var-menu { animation: none; } .var-menu button { transition: none; } .var-menu button:active:not(:disabled) { scale: 1; } }
 /* Setting variable blocks by hand in the editor. */
 .inline-editor .variable-actions { display: inline-flex; gap: 6px; margin-left: auto; margin-right: 8px; }
@@ -943,8 +968,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory-group { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .var-memory-name { font-size: 11.5px; color: var(--muted); }
 .var-memory { flex: 0 1 auto; }
-.var-popup[data-below] { transform: translate(-50%, 6px); }
-.var-memory-option[data-dragging] { z-index: 2; position: relative; scale: 1.06; box-shadow: 0 4px 12px rgba(0,0,0,.18); cursor: grabbing; }
+.var-memory-option[data-dragging] { z-index: 2; opacity: .8; position: relative; scale: 1.06; box-shadow: 0 4px 12px rgba(0,0,0,.18); cursor: grabbing; }
 
 .settings-build-time { font-variant-numeric: tabular-nums; }
 .native-row, .row-detail, .row-actions { min-width: 0; }
@@ -1030,8 +1054,27 @@ button { -webkit-tap-highlight-color: transparent; }
 .totp-qr-pick{position:relative;justify-self:start;cursor:pointer}
 .totp-qr-pick input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
 .totp-qr-pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+/* 话术内容 / 中文翻译: the box follows its text (JS sets the textarea height, three lines at least, nine at most) */
+.inline-editor .snippet-content .soft-textarea, .inline-editor .chinese-field .soft-textarea { height: auto; }
+.inline-editor .snippet-content .soft-textarea textarea, .inline-editor .chinese-field .soft-textarea textarea { display: block; height: auto; min-height: 0; overflow-y: auto; }
+.var-memory-option { display: inline-flex; align-items: center; padding: 0; }
+.var-memory-option .var-grip { flex: none; display: grid; place-items: center; width: 22px; height: 24px; padding: 0 0 0 5px; border: 0; background: transparent; color: inherit; cursor: grab; touch-action: none; }
+.var-memory-option .var-grip .grip-pill { width: 14px; height: 20px; background: transparent; }
+.var-memory-option .var-grip .grip-pill .icon { width: 14px; height: 20px; }
+.var-memory-pick { min-width: 0; padding: 3px 10px 3px 2px; border: 0; background: transparent; color: inherit; font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 
 .backup-warning{margin:0;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;background:#fff4e9;color:#8b5b37;font-size:12px;line-height:1.5}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .backup-warning{background:var(--warn-bg);color:var(--warn)}}
 :root[data-theme="dark"] .backup-warning{background:var(--warn-bg);color:var(--warn)}
 .backup-dialog.data-move .backup-intro,.backup-dialog.data-move .backup-note,.backup-dialog.data-move .backup-field{color:#5b5b60}.backup-dialog.data-move .backup-head p{color:#7a5a43}.backup-dialog.data-move:focus{outline:0}
+/* 英文/中文 sits in the card's top row, just left of the favourite star */
+.row-line .copy-language.row-language { width: auto; height: 24px; margin: 0 4px; padding: 2px; display: inline-flex; flex: none; border-radius: 8px; background: var(--fill); }
+.row-line .copy-language.row-language button { padding: 0 9px 1px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.row-line .copy-language.row-language button.active { background: var(--card); color: var(--ink); }
+/* 收起 / 展开 the remembered values, beside the ? */
+.var-collapse { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px 2px 8px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), color .12s, scale .12s cubic-bezier(.22,1,.36,1); }
+.var-collapse .icon { width: 12px; height: 12px; }
+.var-collapse:hover { background: var(--fill); color: var(--ink); }
+.var-collapse:active { scale: .96; }
+.vault-inline{flex:1;min-height:0;overflow:auto;padding:0 18px 18px}
+.legacy-add{display:flex;justify-content:flex-end;margin-bottom:8px}

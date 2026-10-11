@@ -28,8 +28,8 @@ test("settings shows the version and the editor calls the snippet note 小提示
   assert.doesNotMatch(page, /<label htmlFor="summary-input">\{structured \? "核心动作" : "总结"/);
 });
 
-test("the secrets section is called 备注 on Windows and 秘密 on macOS", () => {
-  assert.match(page, /const SECRET_WORD = .*platform === "darwin" \? "秘密" : "备注"/);
+test("the secrets section is called 备注 on Windows and 账号 on macOS", () => {
+  assert.match(page, /const SECRET_WORD = .*platform === "darwin" \? "账号" : "备注"/);
   assert.match(page, /label: kind === "snippet" \? "话术" : SECRET_WORD/);
 });
 
@@ -49,8 +49,8 @@ const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf
 
 test("settings folders can be dragged as well as moved with the arrow buttons", () => {
   assert.match(page, /scope: "settings-folder"/);
-  assert.match(page, /className="settings-folder-grip"[^>]*onPointerDown=\{\(event\) => reorder\.beginPointerDrag\(event, key\)\}/);
-  assert.match(page, /folder\.locked \|\| !group\.sortable \? \{\} : \{ "data-sort-scope": "settings-folder"/, "standard folders and image folders (no saved order) are neither draggable nor drop targets");
+  assert.match(page, /className="settings-folder-grip"[^>]*onBeginDrag=\{\(event\) => reorder\.beginPointerDrag\(event, key\)\}/);
+  assert.match(page, /!group\.sortable \? \{\} : \{ "data-sort-scope": "settings-folder"/, "every folder in a sortable group, the standard 话术 ones too (D-035), can be dragged and dropped on");
   assert.match(page, /onMove=\{onFolderMove\} onReorder=\{onFolderReorder\}/);
   assert.match(page, /document\.querySelector\("\.settings-folder\.dragging"\)/, "Esc cancels the drag, not the dialog");
   assert.match(css, /\.settings-folder\.dragging/);

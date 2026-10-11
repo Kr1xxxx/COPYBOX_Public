@@ -61,3 +61,8 @@ test("the shim answers getVersion and getBuildTime, and the wrapper shows the up
   assert.ok(out.includes('Promise.resolve("2026-10-10T21:37:00+08:00")'));
   assert.ok(renderWrapper("v__VERSION__ __UPDATED__", "1.13", "2026-10-10 21:37") === "v1.13 2026-10-10 21:37");
 });
+
+test("renderWrapper also hands the update moment to the page, which shows it in the viewer's clock", () => {
+  const html = renderWrapper('<span data-at="__UPDATED_ISO__">__UPDATED__</span>', "1.39", "2026-10-11 20:02", "2026-10-11T20:02:00+08:00");
+  assert.equal(html, '<span data-at="2026-10-11T20:02:00+08:00">2026-10-11 20:02</span>');
+});

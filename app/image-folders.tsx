@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArcMenu } from "./arc/menu";
 import { Icon } from "./ui-atoms";
+import { ReorderHandle } from "./reorder-handle";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import {
@@ -166,9 +167,10 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
     const name = folder.name;
     const active = filter === imageFolderFilter(name);
     const isRenaming = renaming?.from === name;
+    const order = folders.map((entry) => entry.name);
     return (
       <div key={name} data-sort-scope="image-folder" data-sort-id={name} className={`directory-row ${active ? "active" : ""} ${reorder.draggingId === name ? "dragging" : ""} ${reorder.overId === name && reorder.draggingId !== name ? "drag-over" : ""}`}>
-        {!isRenaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${name}`} title="按住拖动排序" onPointerDown={(event) => reorder.beginPointerDrag(event, name)}><Icon name="grip" /></button>}
+        {!isRenaming && <ReorderHandle className="folder-drag-handle" label={`拖动目录 ${name}`} title="按住拖动，点一下可上移下移" canMoveUp={order.indexOf(name) > 0} canMoveDown={order.indexOf(name) < order.length - 1} onBeginDrag={(event) => reorder.beginPointerDrag(event, name)} onMove={(delta) => { const neighbour = order[order.indexOf(name) + delta]; if (neighbour) { prepareSortAnimation("image-folder"); void library.reorderFolder(name, neighbour); } }}><Icon name="grip" /></ReorderHandle>}
         {isRenaming ? (
           <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(); }}>
             <i className="directory-color-marker" aria-hidden="true" style={{ background: colors[name] }} />

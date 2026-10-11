@@ -9,12 +9,11 @@ async function openSettings(page, tab = "数据") {
   return dialog;
 }
 
-test("Mac: a 秘密 backup carries the 保险箱 (验证码 and API 密钥) encrypted and restores it; old backups still import", async ({ page }) => {
+test("Mac: a 账号 backup carries the 保险箱 (验证码 and API 密钥) encrypted and restores it; old backups still import", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
-  const settings = await openSettings(page, "关于");
-  for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipbox v/).click();
-  const vault = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  const vault = page.getByRole("region", { name: "保险箱" });
   await vault.getByRole("button", { name: "验证码", exact: true }).click();
   await vault.getByRole("button", { name: "添加账号" }).click();
   await vault.getByLabel("密钥或链接").fill("JBSWY3DPEHPK3PXP");
@@ -27,11 +26,9 @@ test("Mac: a 秘密 backup carries the 保险箱 (验证码 and API 密钥) encr
   await vault.getByLabel("密钥", { exact: true }).fill("sk-ant-api03-ABCDEFGH1234");
   await vault.getByRole("button", { name: "保存" }).click();
   await expect(vault.getByRole("button", { name: /客服 AI 接口/ })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(vault).toHaveCount(0);
 
-  await (await openSettings(page)).locator(".settings-row", { hasText: "导出秘密备份" }).getByRole("button", { name: "导出…" }).click();
-  const dialog = page.getByRole("dialog", { name: "导出秘密备份" });
+  await (await openSettings(page)).locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button", { name: "导出…" }).click();
+  const dialog = page.getByRole("dialog", { name: "导出账号备份" });
   await dialog.getByPlaceholder("至少 8 个字符").fill("secrets-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("secrets-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
@@ -50,8 +47,8 @@ test("Mac: a 秘密 backup carries the 保险箱 (验证码 and API 密钥) encr
   await importDialog.getByRole("button", { name: /合并/ }).first().click();
   await importDialog.getByRole("button", { name: /验证并/ }).click();
   await expect(importDialog).toHaveCount(0);
-  await page.locator(".kind-switch").getByRole("button", { name: "保险箱" }).click();
-  const back = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  const back = page.getByRole("region", { name: "保险箱" });
   await back.getByRole("button", { name: "验证码", exact: true }).click();
   await expect(back.getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
   await back.getByRole("button", { name: "API 密钥", exact: true }).click();

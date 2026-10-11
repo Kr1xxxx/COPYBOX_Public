@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test("folders can be drag-sorted in Settings; standard folders cannot", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
-  // The first group is 话术; the second one (备注/秘密) is only on macOS, so the browser and Windows have one group.
+  // The first group is 话术; the second one (备注/账号) is only on macOS, so the browser and Windows have one group.
   await dialog.getByRole("tab", { name: "目录" }).click();
   const group = dialog.locator(".settings-folder-group").nth(0);
   await group.getByRole("button", { name: /话术目录/ }).click();
@@ -31,7 +31,10 @@ test("folders can be drag-sorted in Settings; standard folders cannot", async ({
   await page.mouse.move(from.x + 8, to.y + to.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect.poll(async () => (await names()).indexOf("甲")).toBeGreaterThan(before.indexOf("甲"));
-  await expect(dialog.locator(".settings-folder", { hasText: "询盘接待" }).locator("button.settings-folder-grip")).toHaveCount(0);
+  // The standard folders can be sorted too (D-035), but not renamed or deleted.
+  const standardRow = dialog.locator(".settings-folder", { hasText: "询盘接待" });
+  await expect(standardRow.locator("button.settings-folder-grip")).toHaveCount(1);
+  await expect(standardRow.getByRole("button", { name: /^(改名|删除)/ })).toHaveCount(0);
 });
 
 test("AI settings: empty prompts cannot be saved; presets fill URL and model", async ({ page }) => {
@@ -56,7 +59,7 @@ test("目录 groups start folded and open on click; 图片目录 can be created,
   const dialog = page.locator(".settings-dialog");
   await dialog.getByRole("tab", { name: "目录" }).click();
   const groups = dialog.locator(".settings-folder-group");
-  // Browser and Windows: 话术目录 and 图片目录 (备注/秘密 is only on macOS).
+  // Browser and Windows: 话术目录 and 图片目录 (备注/账号 is only on macOS).
   await expect(groups).toHaveCount(2);
   for (const title of ["话术目录", "图片目录"]) {
     await expect(dialog.getByRole("button", { name: new RegExp(title) })).toHaveAttribute("aria-expanded", "false");
@@ -115,7 +118,7 @@ test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
 test("Settings has two columns: groups on the left, the chosen group on the right, 外观 first", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   const tabs = dialog.getByRole("tab");
-  await expect(tabs).toHaveText(["外观", "目录", "数据", "窗口", "AI", "关于"]);
+  await expect(tabs).toHaveText(["外观", "目录", "数据", "使用排行", "窗口", "AI", "关于"]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   // Only the chosen group is shown.
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeVisible();
@@ -129,6 +132,8 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog).toContainText("加密后只保存在这台电脑上");
   // Arrow keys move between groups.
   await dialog.getByRole("tab", { name: "数据" }).press("ArrowDown");
+  await expect(dialog.getByRole("tab", { name: "使用排行" })).toHaveAttribute("aria-selected", "true");
+  await dialog.getByRole("tab", { name: "使用排行" }).press("ArrowDown");
   await expect(dialog.getByRole("tab", { name: "窗口" })).toHaveAttribute("aria-selected", "true");
   await expect(dialog.getByText("迷你模式")).toBeVisible();
 });
