@@ -47,6 +47,8 @@ jobs:
       # The shell embeds the saved page at compile time, so it has to exist before cargo test.
       - run: npm run tauri:frontend
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+      # The app version follows tools/preview/VERSION (D-036).
+      - run: node scripts/sync-version.mjs
       - run: npx tauri build
         env:
           CI: "true"
