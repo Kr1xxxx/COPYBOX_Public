@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { applyPayload, collectPayload, countImages, countPayload, openTransfer, TransferError, type TransferPayload, parseTransferFile, sealTransfer, transferFileName, type TransferFile } from "./data-transfer";
 
 // One-time move of all local data between the old (Electron) and new (Tauri) desktop app. Reuses the backup dialog's look.
