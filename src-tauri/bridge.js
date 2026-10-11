@@ -97,9 +97,22 @@
     wake();
   }
 
+  // Tauri ignores the CSS drag region (macOS has no title bar): press on the top band to move the window,
+  // double-click zooms it on macOS. Controls inside the band keep working.
+  function watchTitleDrag() {
+    var controls = "button, input, select, textarea, label, a, [role='button'], .drag-handle, .folder-drag-handle";
+    document.addEventListener("mousedown", function (event) {
+      if (event.button !== 0 || !event.target.closest || !event.target.closest(".drag-region") || event.target.closest(controls)) return;
+      event.preventDefault();
+      if (event.detail === 2 && platform === "darwin") invoke("plugin:window|toggle_maximize").catch(noop);
+      else if (event.detail !== 2) invoke("plugin:window|start_dragging").catch(noop);
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.documentElement.classList.add("desktop-app", "platform-" + platform);
     watchIdle();
+    watchTitleDrag();
   }, { once: true });
 
   // Show the window once the page has painted, so it never opens as a white flash.
