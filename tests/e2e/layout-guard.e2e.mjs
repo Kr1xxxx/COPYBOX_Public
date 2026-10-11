@@ -145,9 +145,9 @@ for (const { platform, theme, size } of cases) {
     if (!mini) await state("images-new-folder", async () => { await page.getByRole("button", { name: "新建目录" }).first().click(); await page.keyboard.type("收款码很长的图片目录名"); });
 
     if (platform === "darwin") {
-      await state("secrets", async () => { await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click(); });
+      await state("secrets", async () => { await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click(); });
       if (!mini) {
-        // 验证码 lives inside the 保险箱, which is the 秘密 page itself.
+        // 验证码 lives inside the 保险箱, which is the 账号 page itself.
         await state("totp-add", async () => {
           const vault = page.getByRole("region", { name: "保险箱" });
           await vault.waitFor();

@@ -11,26 +11,26 @@ async function addSecret(page, label, text) {
 }
 
 async function openVault(page) {
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await page.locator(".vault-tabs").getByRole("button", { name: "全部" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   return dialog;
 }
 
-test("old 秘密 entries are sorted by content in 全部, unknown ones go to 其他, and Lock can change type and website by hand", async ({ page }) => {
+test("old 账号 entries are sorted by content in 全部, unknown ones go to 其他, and Lock can change type and website by hand", async ({ page }) => {
   await asDesktop(page, "darwin");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await seedSnippets(page);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await addSecret(page, "客服 AI", "sk-ant-api03-ABCDEFGH1234");
   await addSecret(page, "仓库地址", "台北市信义区 123 号");
   await addSecret(page, "邮箱", "密码: hunter2");
   const dialog = await openVault(page);
   await expect(dialog.getByRole("region", { name: "Anthropic" })).toContainText("客服 AI");
-  await expect(dialog.getByRole("region", { name: "Anthropic" })).toContainText("来自「秘密」");
+  await expect(dialog.getByRole("region", { name: "Anthropic" })).toContainText("来自「其他」");
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await dialog.getByRole("button", { name: "按类型" }).click();
   await expect(dialog.getByRole("region", { name: "其他" })).toContainText("仓库地址");
@@ -49,7 +49,7 @@ test("old 秘密 entries are sorted by content in 全部, unknown ones go to 其
   // Kept after a restart.
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" }).getByRole("region", { name: "Google" })).toContainText("仓库地址");
   // 恢复自动: clearing the website and the type goes back to the guess.
   const again = page.getByRole("region", { name: "保险箱" });
@@ -98,11 +98,11 @@ test("恢复码: add many at once, hidden until held, copy one or all, and 全�
   await expect(dialog.getByRole("region", { name: "Google" })).toContainText("Google 恢复码");
 });
 
-test("Mac: 秘密 is the 保险箱 itself, with 新增 only inside 其他, and Windows has none of it", async ({ page }) => {
+test("Mac: 账号 is the 保险箱 itself, with 新增 only inside 其他, and Windows has none of it", async ({ page }) => {
   await asDesktop(page, "darwin");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
   await expect(page.locator(".vault-tabs button")).toHaveText(["全部", "账号密码", "收款信息", "API 密钥", "恢复码", "验证码", "其他"]);
   await expect(page.locator(".toolbar").getByRole("button", { name: /^新增/ })).toHaveCount(0);

@@ -8,12 +8,12 @@ async function open(page, platform) {
 }
 
 async function tapVersion(page) {
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
 }
 
-test("Mac: the 秘密 page is the 保险箱, accounts are kept and copy works", async ({ page }) => {
+test("Mac: the 账号 page is the 保险箱, accounts are kept and copy works", async ({ page }) => {
   await open(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
   await tapVersion(page);
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
@@ -36,20 +36,20 @@ test("Mac: the 秘密 page is the 保险箱, accounts are kept and copy works", 
   expect(stored).not.toContain("JBSWY3DPEHPK3PXP");
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "验证码", exact: true }).click();
   await expect(page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
 });
 
-test("Mac: only three sections; the 保险箱 sits inside 秘密, no hidden unlock", async ({ page }) => {
+test("Mac: only three sections; the 保险箱 sits inside 账号, no hidden unlock", async ({ page }) => {
   await open(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
 });
 
-test("Windows: no 秘密 page, so no 保险箱", async ({ page }) => {
+test("Windows: no 账号 page, so no 保险箱", async ({ page }) => {
   await open(page, "win32");
   await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片"]);

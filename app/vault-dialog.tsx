@@ -73,7 +73,7 @@ export function VaultDialog({ deviceKey, legacySecrets, onOpenLegacy, onClose, o
         {tab === "legacy" && legacyView}
       </div>}
       <div className="totp-actions vault-foot">
-        <p className="settings-note">用本机密钥加密保存；导出「秘密备份」时会一起加密带上。</p>
+        <p className="settings-note">用本机密钥加密保存；导出「账号备份」时会一起加密带上。</p>
       </div>
     </div>
   );

@@ -65,3 +65,8 @@
 ## Patch 18: examples reach people who already opened an earlier 保险箱
 
 - What changed: the "examples added" flag is now `clipbox.vault.samples.v2`. Browsers that opened the 保险箱 earlier with data in it (flag v1, no examples) get the missing examples once, beside their own data, when they open 秘密. No button needed. 清除范例 / 恢复范例 work as before (a clear sets v2, so cleared examples do not return).
+
+## Patch 19: 秘密 is now called 账号 (Mac)
+
+- What changed: the Mac section name 「秘密」 is now 「账号」 everywhere users see it (tab, page title, empty state, settings rows 「导出账号备份」, backup dialog, vault footer). Label only: no data, storage key or backup format changed; Windows still says 备注. Old entries in 全部 say 「来自「其他」」. The command-line tool texts are unchanged.
+- User-visible change: Mac tabs read 话术 | 账号 | 图片.

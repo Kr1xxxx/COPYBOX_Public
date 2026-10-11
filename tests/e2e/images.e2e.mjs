@@ -37,13 +37,13 @@ test("Windows: the sections are 话术 and 图片, and 备注 is gone", async ({
   const settings = page.getByRole("dialog", { name: "设置" });
   await expect(settings).toContainText("导出话术备份");
   await expect(settings).not.toContainText("备注");
-  await expect(settings).not.toContainText("秘密");
+  await expect(settings).not.toContainText("账号");
 });
 
-test("macOS: the sections are 话术, 秘密 and 图片, and 秘密 still opens", async ({ page }) => {
+test("macOS: the sections are 话术, 账号 and 图片, and 账号 still opens", async ({ page }) => {
   await openApp(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator("body")).toContainText("默认只复制引用");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();

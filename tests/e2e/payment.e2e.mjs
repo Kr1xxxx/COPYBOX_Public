@@ -5,7 +5,7 @@ async function openVault(page) {
   await asDesktop(page, "darwin");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "收款信息" }).click();
@@ -53,7 +53,7 @@ test("收款信息: add a bank transfer with checks, copy a field and the Englis
   // Survives a reload.
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "收款信息" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toContainText("美元电汇 - 汇丰");
 });

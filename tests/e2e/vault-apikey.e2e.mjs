@@ -5,7 +5,7 @@ async function openVault(page) {
   await asDesktop(page, "darwin");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "API 密钥", exact: true }).click();

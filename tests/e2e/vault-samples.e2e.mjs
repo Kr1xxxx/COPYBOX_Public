@@ -6,7 +6,7 @@ async function open(page) {
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   return dialog;
@@ -30,7 +30,7 @@ test("a new 保险箱 opens with clearly fake examples of each type, which one t
   await page.keyboard.press("Escape");
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toContainText("保险箱还是空的");
 });
 
@@ -39,7 +39,7 @@ test("examples are added beside data that is already there and leave it untouche
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
@@ -90,7 +90,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await s.getByRole("button", { name: "确认清除" }).click();
   await expect(page.getByText("已清除 4 条范例，1 条你改过的已保留")).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const after = page.getByRole("region", { name: "保险箱" });
   await after.getByRole("button", { name: "按类型" }).click();
   await expect(after).toContainText("我的邮箱");
@@ -108,7 +108,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
     await expect(page.getByText(round === 0 ? "已补回 4 条范例" : "范例都在，没有缺的")).toBeVisible();
     await page.keyboard.press("Escape");
   }
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const restored = page.getByRole("region", { name: "保险箱" });
   await restored.getByRole("button", { name: "按类型" }).click();
   await expect(restored.getByText("【范例】接口密钥")).toHaveCount(1);
@@ -129,12 +129,12 @@ test("清除范例 and 恢复范例 are not offered on Windows", async ({ page }
   await expect(s).not.toContainText("范例");
 });
 
-test("someone who opened an earlier 保险箱 (old flag set, own data present) still gets the examples on 秘密", async ({ page }) => {
+test("someone who opened an earlier 保险箱 (old flag set, own data present) still gets the examples on 账号", async ({ page }) => {
   await asDesktop(page, "darwin");
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); localStorage.setItem("clipbox.vault.samples.v1", "1"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const vault = page.getByRole("region", { name: "保险箱" });
   await expect(vault).toContainText("【范例】");
 });

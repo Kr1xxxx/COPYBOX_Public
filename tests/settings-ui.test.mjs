@@ -28,8 +28,8 @@ test("settings shows the version and the editor calls the snippet note 小提示
   assert.doesNotMatch(page, /<label htmlFor="summary-input">\{structured \? "核心动作" : "总结"/);
 });
 
-test("the secrets section is called 备注 on Windows and 秘密 on macOS", () => {
-  assert.match(page, /const SECRET_WORD = .*platform === "darwin" \? "秘密" : "备注"/);
+test("the secrets section is called 备注 on Windows and 账号 on macOS", () => {
+  assert.match(page, /const SECRET_WORD = .*platform === "darwin" \? "账号" : "备注"/);
   assert.match(page, /label: kind === "snippet" \? "话术" : SECRET_WORD/);
 });
 

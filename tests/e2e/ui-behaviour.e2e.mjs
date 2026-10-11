@@ -112,12 +112,12 @@ test.describe("snippet list", () => {
   });
 });
 
-test("snippets and 秘密 are exported to separate files, never one combined backup", async ({ page }) => {
+test("snippets and 账号 are exported to separate files, never one combined backup", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   const settings = await openSettings(page);
   await expect(settings.locator(".settings-row", { hasText: "导出话术备份" })).toBeVisible();
-  await expect(settings.locator(".settings-row", { hasText: "导出秘密备份" })).toBeVisible();
+  await expect(settings.locator(".settings-row", { hasText: "导出账号备份" })).toBeVisible();
   await expect(settings).not.toContainText("导出安全备份");
   await expect(settings).not.toContainText("导出全部");
 

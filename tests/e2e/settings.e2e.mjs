@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test("folders can be drag-sorted in Settings; standard folders cannot", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
-  // The first group is 话术; the second one (备注/秘密) is only on macOS, so the browser and Windows have one group.
+  // The first group is 话术; the second one (备注/账号) is only on macOS, so the browser and Windows have one group.
   await dialog.getByRole("tab", { name: "目录" }).click();
   const group = dialog.locator(".settings-folder-group").nth(0);
   await group.getByRole("button", { name: /话术目录/ }).click();
@@ -59,7 +59,7 @@ test("目录 groups start folded and open on click; 图片目录 can be created,
   const dialog = page.locator(".settings-dialog");
   await dialog.getByRole("tab", { name: "目录" }).click();
   const groups = dialog.locator(".settings-folder-group");
-  // Browser and Windows: 话术目录 and 图片目录 (备注/秘密 is only on macOS).
+  // Browser and Windows: 话术目录 and 图片目录 (备注/账号 is only on macOS).
   await expect(groups).toHaveCount(2);
   for (const title of ["话术目录", "图片目录"]) {
     await expect(dialog.getByRole("button", { name: new RegExp(title) })).toHaveAttribute("aria-expanded", "false");

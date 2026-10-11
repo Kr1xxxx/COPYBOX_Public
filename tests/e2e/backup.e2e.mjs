@@ -9,10 +9,10 @@ async function openSettings(page) {
   return dialog;
 }
 
-test("macOS: 秘密 can be exported to its own encrypted file and imported back", async ({ page }) => {
+test("macOS: 账号 can be exported to its own encrypted file and imported back", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
@@ -22,9 +22,9 @@ test("macOS: 秘密 can be exported to its own encrypted file and imported back"
   await expect(page.locator(".native-row")).toHaveCount(1);
 
   const settings = await openSettings(page);
-  await settings.locator(".settings-row", { hasText: "导出秘密备份" }).getByRole("button", { name: "导出…" }).click();
-  const dialog = page.getByRole("dialog", { name: "导出秘密备份" });
-  await expect(dialog).toContainText("只备份秘密");
+  await settings.locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button", { name: "导出…" }).click();
+  const dialog = page.getByRole("dialog", { name: "导出账号备份" });
+  await expect(dialog).toContainText("只备份账号");
   await dialog.getByPlaceholder("至少 8 个字符").fill("secrets-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("secrets-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
@@ -33,9 +33,9 @@ test("macOS: 秘密 can be exported to its own encrypted file and imported back"
   const backup = JSON.parse(readFileSync(file, "utf8"));
   expect(backup).toMatchObject({ format: "clipbox-secure-backup", version: 3, scope: "secret" });
   expect(readFileSync(file, "utf8")).not.toContain("台北市");
-  await expect(page.locator(".toast, [role=status]").filter({ hasText: "秘密备份已导出" }).first()).toBeVisible();
+  await expect(page.locator(".toast, [role=status]").filter({ hasText: "账号备份已导出" }).first()).toBeVisible();
 
-  // Move the entry to the trash, then restore it with 覆盖: only 秘密 is replaced, the 34 snippets stay.
+  // Move the entry to the trash, then restore it with 覆盖: only 账号 is replaced, the 34 snippets stay.
   await page.getByRole("button", { name: "更多操作 公司地址" }).click();
   await page.getByRole("menuitem", { name: "移到回收站" }).click();
   await expect(page.locator(".native-row")).toHaveCount(0);
@@ -47,17 +47,17 @@ test("macOS: 秘密 can be exported to its own encrypted file and imported back"
   await importDialog.getByRole("button", { name: /覆盖/ }).first().click();
   await importDialog.getByRole("button", { name: "验证并覆盖" }).click();
   await expect(importDialog).toHaveCount(0);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator(".native-row")).toContainText(["公司地址"]);
   await page.getByRole("button", { name: "话术" }).first().click();
   await expect(page.locator(".native-row")).toHaveCount(34);
 });
 
-test("macOS: importing with 合并 brings a trashed 秘密 back instead of skipping it", async ({ page }) => {
+test("macOS: importing with 合并 brings a trashed 账号 back instead of skipping it", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
@@ -67,8 +67,8 @@ test("macOS: importing with 合并 brings a trashed 秘密 back instead of skipp
   await expect(page.locator(".native-row")).toHaveCount(1);
 
   const settings = await openSettings(page);
-  await settings.locator(".settings-row", { hasText: "导出秘密备份" }).getByRole("button", { name: "导出…" }).click();
-  const dialog = page.getByRole("dialog", { name: "导出秘密备份" });
+  await settings.locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button", { name: "导出…" }).click();
+  const dialog = page.getByRole("dialog", { name: "导出账号备份" });
   await dialog.getByPlaceholder("至少 8 个字符").fill("secrets-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("secrets-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
@@ -86,21 +86,21 @@ test("macOS: importing with 合并 brings a trashed 秘密 back instead of skipp
   await importDialog.getByPlaceholder("输入导出时设置的密码").fill("secrets-backup-1");
   await importDialog.getByRole("button", { name: "验证并合并" }).click();
   await expect(importDialog).toHaveCount(0);
-  await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.getByRole("button", { name: "账号" }).first().click();
   await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator(".native-row")).toContainText(["公司地址"]);
   await expect(page.locator(".native-row")).toHaveCount(1);
   await expect(trashBadge).toHaveCount(0);
 });
 
-test("macOS: the snippet backup still leaves 秘密 out", async ({ page }) => {
+test("macOS: the snippet backup still leaves 账号 out", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   const settings = await openSettings(page);
   await settings.locator(".settings-row", { hasText: "导出话术备份" }).getByRole("button", { name: "导出…" }).click();
   const dialog = page.getByRole("dialog", { name: "导出话术备份" });
   await expect(dialog).toContainText("只备份话术");
-  await expect(dialog).toContainText("秘密不会包含在文件中");
+  await expect(dialog).toContainText("账号不会包含在文件中");
   await dialog.getByPlaceholder("至少 8 个字符").fill("snippet-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("snippet-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
