@@ -3,6 +3,7 @@
 mod ai;
 mod automation;
 mod flush;
+mod power;
 mod shared_library;
 mod site_icon;
 mod shell;
@@ -87,6 +88,7 @@ fn main() {
                 .traffic_light_position(tauri::LogicalPosition::new(14.0, 19.0));
             let window = builder.build()?;
             shell::build_tray(app.handle())?;
+            power::watch_window(app.handle(), &window);
             automation::start(app.handle());
 
             // If the page never reports in, show the window anyway (unless Clipbox was started quietly).
