@@ -518,3 +518,48 @@ test("an encrypted thumbnail row from the first version is ignored and replaced,
   const row = thumbRows().get("img-1");
   assert.ok(row.bytes && row.ciphertext === undefined, "the old row is replaced by a plain one");
 });
+
+test("收藏: setPinned keeps every other field, survives a new session, and records without the field are simply not favourites", async () => {
+  const { open, rows } = setup();
+  const store = await open();
+  await store.createFolder("产品图");
+  const meta = await store.add(pngBlob(), "主图", "产品图");
+  const other = await store.add(pngBlob(), "副图", null);
+  assert.equal("pinned" in meta, false, "a new or older record has no pinned field");
+  const originalBefore = JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+
+  const pinned = await store.setPinned(meta.id, true);
+  assert.equal(pinned.pinned, true);
+  assert.deepEqual({ ...pinned, pinned: undefined }, { ...meta, pinned: undefined }, "nothing else changed (title, folder, size, times)");
+  const again = await (await open()).list();
+  assert.equal(again.find((image) => image.id === meta.id).pinned, true, "a new session reads it back");
+  assert.equal("pinned" in again.find((image) => image.id === other.id), false, "other images are untouched");
+
+  const unpinned = await store.setPinned(meta.id, false);
+  assert.equal("pinned" in unpinned, false, "unpinning removes the field again");
+  await assert.rejects(store.setPinned("missing", true), { message: "找不到这张图片" });
+
+  const originalAfter = JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+  assert.equal(originalAfter, originalBefore, "the original image bytes are never touched");
+});
+
+test("reorderFolders moves a folder to another's place, keeps images and colours, and survives a new session", async () => {
+  const { open, rows } = setup();
+  const store = await open();
+  for (const name of ["甲", "乙", "丙"]) await store.createFolder(name);
+  await store.setFolderColor("乙", "#112233");
+  const image = await store.add(pngBlob(), "图", "丙");
+  const blobsBefore = JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))]));
+
+  assert.deepEqual((await store.reorderFolders("甲", "丙")).map((folder) => folder.name), ["乙", "丙", "甲"]);
+  assert.deepEqual((await store.reorderFolders("丙", "乙")).map((folder) => folder.name), ["丙", "乙", "甲"]);
+  assert.deepEqual((await store.reorderFolders("乙", "乙")).map((folder) => folder.name), ["丙", "乙", "甲"], "same folder is a no-op");
+
+  const again = await (await open()).listFolders();
+  assert.deepEqual(again.map((folder) => folder.name), ["丙", "乙", "甲"]);
+  assert.equal(again.find((folder) => folder.name === "乙").color, "#112233", "colours stay");
+  assert.equal((await (await open()).list()).find((entry) => entry.id === image.id).folder, "丙", "images keep their folder");
+  await assert.rejects(store.reorderFolders("没有", "甲"), { message: "找不到这个目录" });
+  await assert.rejects(store.reorderFolders("甲", "没有"), { message: "找不到这个目录" });
+  assert.equal(JSON.stringify(Array.from(rows("blobs").values()).map((row) => [row.iv, Array.from(new Uint8Array(row.ciphertext))])), blobsBefore, "image bytes untouched");
+});

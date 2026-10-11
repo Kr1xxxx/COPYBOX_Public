@@ -21,6 +21,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   shield: <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3z" />,
   chevron: <path d="m6 9 6 6 6-6" />,
+  grip: <path d="M5 8h14M5 12h14M5 16h14" />,
 };
 
 export function Icon({ name, filled = false, className }: { name: keyof typeof ICON_PATHS; filled?: boolean; className?: string }) {

@@ -27,6 +27,7 @@ async function closeOptions(page, platform) {
   await asDesktop(page, platform);
   await seedSnippets(page);
   await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "窗口" }).click();
   const group = page.getByRole("radiogroup", { name: "点击窗口关闭按钮时" });
   await group.scrollIntoViewIfNeeded();
   return group;

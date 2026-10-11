@@ -21,12 +21,15 @@ export async function seedSnippets(page) {
 export async function asDesktop(page, platform, { imageView } = {}) {
   if (imageView) await page.addInitScript((view) => { try { localStorage.setItem("clipbox.image-view", view); } catch { /* optional */ } }, imageView);
   await page.addInitScript((pl) => {
+    // The 保险箱 examples go in on first open; tests start without them unless they clear this.
+    try { localStorage.setItem("clipbox.vault.samples.v1", "1"); } catch { /* optional */ }
     window.clipboxDesktop = {
       platform: pl,
       copyText: async (text) => { window.__copied = text; },
       copyImage: async (png) => { window.__copiedImage = Array.from(png.slice(0, 8)); window.__copiedImageLength = png.length; },
       didCopy() {},
       getVersion: async () => "0.0.0-test",
+      getBuildTime: async () => "2026-10-10T21:37:00",
       onFocusSearch: () => () => {},
       onAutomationCommand: () => () => {},
       respondAutomationCommand() {},

@@ -24,7 +24,16 @@ export function patchPreloadHelper(js) {
 
 const platformLabels = { win32: "Windows", darwin: "macOS" };
 
-export function withDesktopShim(html, platform) {
+// Version and update time shown in Settings → 关于 and in the page header. The time is the newest changelog entry's
+// "at" ("YYYY-MM-DD HH:MM", China time) or, when that entry has none, the moment of this build.
+export function previewBuildInfo(changelog, version, now = new Date()) {
+  const at = String(changelog?.[0]?.at ?? "").trim();
+  const match = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})$/.exec(at);
+  const updatedAt = match ? `${match[1]}T${match[2]}:00+08:00` : now.toISOString();
+  return { version: String(version).trim(), updatedAt };
+}
+
+export function withDesktopShim(html, platform, info = { version: "网页测试版", updatedAt: "" }) {
   const label = platformLabels[platform];
   if (!label) throw new Error(`Unknown platform: ${platform}`);
   const shim = `<script>
@@ -35,7 +44,8 @@ export function withDesktopShim(html, platform) {
     copyText: function (text) { return navigator.clipboard.writeText(text); },
     copyImage: function (png) { return navigator.clipboard.write([new ClipboardItem({ "image/png": new Blob([png], { type: "image/png" }) })]); },
     didCopy: function () {},
-    getVersion: function () { return Promise.resolve("网页测试版"); },
+    getVersion: function () { return Promise.resolve(${JSON.stringify(info.version)}); },
+    getBuildTime: function () { return Promise.resolve(${JSON.stringify(info.updatedAt)}); },
     onFocusSearch: function () { return function () {}; },
     onAutomationCommand: function () { return function () {}; },
     respondAutomationCommand: function () {},
@@ -52,8 +62,8 @@ export function withDesktopShim(html, platform) {
   return html.replace("<head>", () => "<head>" + shim);
 }
 
-export function renderWrapper(template, version) {
-  return template.replaceAll("__VERSION__", String(version).trim());
+export function renderWrapper(template, version, updated = "") {
+  return template.replaceAll("__VERSION__", String(version).trim()).replaceAll("__UPDATED__", updated);
 }
 
 export function ensureTitle(html) {
@@ -137,11 +147,12 @@ export async function main(argv = process.argv.slice(2)) {
 
   const html = ensureTitle(relativizeAssets(raw));
   if (html.replaceAll("__next", "").includes("_next/")) throw new Error("Page still points at _next/.");
-  writeFileSync(join(out, "app-win.html"), withDesktopShim(html, "win32"));
-  writeFileSync(join(out, "app-mac.html"), withDesktopShim(html, "darwin"));
-
   const version = readFileSync(join(here, "VERSION"), "utf8").trim();
-  writeFileSync(join(out, "index.html"), renderWrapper(readFileSync(join(here, "wrapper.html"), "utf8"), version));
+  const info = previewBuildInfo(JSON.parse(readFileSync(join(here, "changelog.json"), "utf8")), version);
+  writeFileSync(join(out, "app-win.html"), withDesktopShim(html, "win32", info));
+  writeFileSync(join(out, "app-mac.html"), withDesktopShim(html, "darwin", info));
+  const updated = new Date(info.updatedAt).toLocaleString("sv-SE", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short" });
+  writeFileSync(join(out, "index.html"), renderWrapper(readFileSync(join(here, "wrapper.html"), "utf8"), version, updated));
   cpSync(join(here, "seed.js"), join(out, "seed.js"));
   cpSync(join(here, "samples"), join(out, "samples"), { recursive: true });
   cpSync(join(here, "changelog.json"), join(out, "changelog.json"));

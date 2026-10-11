@@ -1,4 +1,5 @@
 const { app, clipboard, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, session, shell, Tray } = require("electron");
+const { fetchSiteIcon } = require("./site-icon.cjs");
 const { createClipboardWriter, createImageClipboardWriter, isTrustedClipboardRequest } = require("./clipboard.cjs");
 const { createAiStore } = require("./ai.cjs");
 const { fetchSharedText } = require("./shared-fetch.cjs");
@@ -460,7 +461,17 @@ ipcMain.handle("clipbox:fetch-shared-library", (event, url) => {
   return fetchSharedText(url);
 });
 
+// A website's own small icon for the 保险箱 (Mac): one plain GET to the site itself, nothing else is contacted.
+ipcMain.handle("clipbox:fetch-site-icon", (event, host) => {
+  if (!isTrustedClipboardRequest(event, mainWindow, appOrigin)) throw new Error("Request denied");
+  return fetchSiteIcon(host);
+});
+
 ipcMain.handle("clipbox:get-version", () => app.getVersion());
+// The packaged app (or, in development, the project folder) changes when a new version is installed.
+ipcMain.handle("clipbox:get-build-time", () => {
+  try { return fs.statSync(app.getAppPath()).mtime.toISOString(); } catch { return ""; }
+});
 
 const updateChecker = createUpdateChecker({ url: UPDATE_URL, currentVersion: app.getVersion() });
 ipcMain.handle("clipbox:check-update", () => updateChecker.check());

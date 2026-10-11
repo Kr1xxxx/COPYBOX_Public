@@ -109,7 +109,7 @@ export function buildDirectoryShortcuts(items: SecretItem[], kind: ItemKind) {
   return [
     { id: "all", label: kind === "snippet" ? "全部话术" : "全部", count: activeItems.length },
     { id: "pinned", label: "收藏", count: activeItems.filter((item) => item.pinned).length },
-    { id: "recent", label: "最近使用", count: activeItems.filter((item) => itemMatchesActiveFolder(item, "recent")).length },
+    { id: "recent", label: "最近", count: activeItems.filter((item) => itemMatchesActiveFolder(item, "recent")).length },
   ];
 }
 
@@ -608,4 +608,13 @@ function mergeFolderColors(current?: FolderColors, incoming?: FolderColors): Fol
     secret: { ...(incoming?.secret || {}), ...(current?.secret || {}) },
     snippet: { ...(incoming?.snippet || {}), ...(current?.snippet || {}) },
   };
+}
+
+// "2026-10-10 21:37" in the viewer's own time zone; "" when the value is missing or not a date.
+export function formatBuildTime(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
 }

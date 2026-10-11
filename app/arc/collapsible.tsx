@@ -10,14 +10,14 @@ import { motionTokens } from "./motion-tokens";
 
 const panelOpen: TargetAndTransition = { height: "auto", opacity: 1, visibility: "visible" };
 const panelClosed: TargetAndTransition = { height: 0, opacity: 0, transitionEnd: { visibility: "hidden" } };
-const contentOpen: TargetAndTransition = { y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } };
-const contentClosed: TargetAndTransition = { y: -6, filter: `blur(${motionTokens.blur.subtle}px)` };
+const contentOpen: TargetAndTransition = { y: 0 };
+const contentClosed: TargetAndTransition = { y: -6 };
 const panelMotion: Variants = {
   open: { ...panelOpen, transition: { height: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] } } },
   closed: { ...panelClosed, transition: { height: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.standard] } } },
 };
 const contentMotion: Variants = {
-  open: { ...contentOpen, transition: { y: motionTokens.spring.smooth, filter: { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] } } },
+  open: { ...contentOpen, transition: { y: motionTokens.spring.smooth } },
   closed: { ...contentClosed, transition: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.standard] } },
 };
 const panelStill: Variants = { open: { ...panelOpen, transition: { duration: 0 } }, closed: { ...panelClosed, transition: { duration: 0 } } };

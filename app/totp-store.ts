@@ -1,5 +1,5 @@
 // Encrypted store for the hidden 验证码 accounts (Mac). One AES-GCM envelope in its own localStorage key, keyed from the
-// device key by PBKDF2 like the vault, but kept apart from it: never in the vault and never in a backup file.
+// device key by PBKDF2 like the vault, but kept apart from it: never in the vault. It goes into a 秘密 backup only as its own password-encrypted block (vault-backup.ts).
 import { TOTP_MAX_ACCOUNTS, type TotpAccount } from "./totp-core.ts";
 
 export const TOTP_STORAGE_KEY = "clipbox.totp.v1";
@@ -12,6 +12,8 @@ export type TotpStore = {
   list(): Promise<TotpAccount[]>;
   add(account: TotpAccount): Promise<TotpAccount[]>;
   remove(id: string): Promise<TotpAccount[]>;
+  // Used when restoring a backup: writes the whole list at once.
+  replaceAll(accounts: TotpAccount[]): Promise<TotpAccount[]>;
 };
 
 export type TotpStorage = Pick<Storage, "getItem" | "setItem">;
@@ -73,5 +75,6 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
       return write([...accounts, account]);
     }),
     remove: (id) => serial(async () => write((await read()).filter((entry) => entry.id !== id))),
+    replaceAll: (accounts) => serial(async () => write(accounts)),
   };
 }

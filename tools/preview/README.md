@@ -15,7 +15,7 @@ collects those notes into the changelog.
 
 Every bump of `VERSION` also needs a new entry at the top of `changelog.json` (version, date, short plain-Chinese
 items). The preview page shows that file as the 版本更新 panel on the left, newest first, so the owner can see what
-each version changed.
+each version changed. Add `"at": "YYYY-MM-DD HH:MM"` (China time) to the entry: it is the update time shown in Settings → 关于 and in the page header (without it the build time is used).
 
 ## Build and try it
 

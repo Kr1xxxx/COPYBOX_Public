@@ -103,7 +103,7 @@ test("a block offers its last three values; clicking one fills it and copies whe
   }
   // only the newest three are offered, newest first
   await row.locator("input[data-var=Name]").click();
-  const options = row.locator(".var-memory-option");
+  const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
   await expect(options).toHaveText(["Dana", "Cara", "Bella"]);
   // every other block is filled, so one click fills and copies
   await options.nth(2).click();
@@ -111,13 +111,13 @@ test("a block offers its last three values; clicking one fills it and copies whe
   // the copy moved Bella to the front: [Bella, Dana, Cara]; with another block empty, a click only fills and moves on
   await row.locator("input[data-var=Company]").fill("");
   await row.locator("input[data-var=Name]").click();
-  await row.locator(".var-memory-option").nth(1).click();
+  await row.locator("[aria-label='Name 最近用过的'] .var-memory-option").nth(1).click();
   await expect(row.locator("input[data-var=Name]")).toHaveValue("Dana");
   await expect(row.locator("input[data-var=Company]")).toBeFocused();
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
 });
 
-test("Name offers beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
+test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
   const row = page.locator(".native-row.selected");
@@ -128,10 +128,15 @@ test("Name offers beautiful, Friend and Lovely above the block; Friend goes out 
   const chip = row.locator(".var-chip", { has: page.locator("input[data-var=Name]") });
   await row.locator("input[data-var=Name]").click();
   const popup = page.locator(".var-popup");
-  await expect(popup.locator(".var-popup-option")).toHaveText(["beautiful", "Friend", "Lovely"]);
+  await expect(popup.locator(".var-popup-option")).toHaveText(["Beautiful", "Friend", "Lovely"]);
   const chipBox = await chip.boundingBox();
   const popupBox = await popup.boundingBox();
-  expect(popupBox.y + popupBox.height).toBeLessThanOrEqual(chipBox.y + 1);
+  // this card has the 英文/中文 switch above its text, so the choices open below the block and never cover it
+  await expect(row.locator(".copy-language")).toBeVisible();
+  const switchBox = await row.locator(".copy-language").boundingBox();
+  expect(popupBox.y).toBeGreaterThan(chipBox.y);
+  const overlap = Math.min(popupBox.y + popupBox.height, switchBox.y + switchBox.height) - Math.max(popupBox.y, switchBox.y);
+  expect(overlap).toBeLessThanOrEqual(0);
   await popup.getByRole("option", { name: "Lovely" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
 });
@@ -146,17 +151,20 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   // clicking the same block again and again keeps all three
   for (let round = 0; round < 4; round += 1) {
     await name.click();
-    await expect(row.locator(".var-memory-option")).toHaveCount(3);
+    await expect(row.locator("[aria-label='Name 最近用过的'] .var-memory-option")).toHaveCount(3);
   }
   // pin Amanda from the list, then push three newer values through
-  await row.locator(".var-memory-option", { hasText: "Amanda" }).click({ button: "right" });
+  await row.locator("[aria-label='Name 最近用过的'] .var-memory-option", { hasText: "Amanda" }).click({ button: "right" });
+  await expect(page.locator(".var-menu button")).toHaveText(["固定", "解锁", "删除"]);
+  await expect(page.getByRole("menuitem", { name: "解锁" })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "固定" }).click();
   await expect(page.getByText("已固定「Amanda」")).toBeVisible();
   // only the pinned value is kept on the device, so it is still there after a reload
   expect(await page.evaluate(() => localStorage.getItem("clipbox.pinned-values.v1"))).toBe('{"Name":["Amanda"]}');
   for (const value of ["Dana", "Eve", "Fay"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
   await name.click();
-  await expect(row.locator(".var-memory-option")).toHaveText(["Amanda", "Fay", "Eve"]);
-  await expect(row.locator(".var-memory-option[data-pinned]")).toHaveText(["Amanda"]);
+  await expect(row.locator("[aria-label='Name 最近用过的'] .var-memory-option")).toHaveText(["Amanda", "Fay", "Eve"]);
+  await expect(row.locator("[aria-label='Name 最近用过的'] .var-memory-option[data-pinned]")).toHaveText(["Amanda"]);
   // right-click on the block itself unpins its current value
   await name.fill("Amanda");
   await row.locator(".var-chip", { has: page.locator("input[data-var=Name]") }).click({ button: "right" });
@@ -167,6 +175,56 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   await expect(hint).toBeVisible();
   // the whole sentence shows, nothing is cut off by an ellipsis
   expect(await hint.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
+test("a right-click on a remembered value offers 固定, 解锁 and 删除; holding and moving one changes its place", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  for (const value of ["Amanda", "Bella", "Cara"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  await name.click();
+  const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
+  await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
+  // drag Amanda (last) in front of Cara by holding and moving
+  const from = await options.nth(2).boundingBox();
+  const to = await options.nth(0).boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  // while held, the value follows the pointer with a lift; the others slide instead of jumping
+  const held = row.locator(".var-memory-option[data-dragging]");
+  await expect(held).toHaveText("Amanda");
+  expect(await held.evaluate((element) => element.style.transform)).toMatch(/translateX/);
+  await page.mouse.up();
+  await expect(row.locator(".var-memory-option[data-dragging]")).toHaveCount(0);
+  await expect(options).toHaveText(["Amanda", "Cara", "Bella"]);
+  // dropping did not count as a click: nothing was filled or copied
+  await expect(name).toHaveValue("Cara");
+  // pin Bella, then unpin her again from the menu
+  await options.filter({ hasText: "Bella" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "固定" }).click();
+  await expect(options.filter({ hasText: "Bella" })).toHaveAttribute("data-pinned", "");
+  await expect(options.first()).toHaveText("Bella");
+  // leave the block so its choices (which open below it on this card) no longer sit over the list
+  await name.blur();
+  // bring the list fully into view first: a scroll after the menu opened would close it
+  await options.first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  await options.first().click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "固定" })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "解锁" }).click();
+  await expect(options.filter({ hasText: "Bella" })).not.toHaveAttribute("data-pinned", "");
+  // delete Cara
+  await options.filter({ hasText: "Cara" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "删除" }).click();
+  await expect(options).toHaveCount(2);
+  await expect(options.filter({ hasText: "Cara" })).toHaveCount(0);
+  // Escape closes the menu without doing anything
+  await options.first().click({ button: "right" });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".var-menu")).toHaveCount(0);
 });
 
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {
@@ -204,6 +262,39 @@ test("the snippet note field is called 小提示", async ({ page }) => {
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   await expect(page.locator(".inline-editor")).toContainText("小提示");
   await expect(page.locator(".inline-editor")).not.toContainText("备注");
+});
+
+test("when adding a 话术 by hand, selected words can be set as highlighted blocks", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  await editor.locator("input").first().fill("手动高亮测试");
+  const area = editor.getByRole("textbox", { name: "话术内容" });
+  await area.fill("Hi dear friend, welcome to our shop!");
+  await expect(editor).toContainText("设为高亮");
+  // nothing selected: refused with a plain message
+  await area.evaluate((element) => element.setSelectionRange(3, 3));
+  await editor.getByRole("button", { name: "设为高亮" }).click();
+  await expect(editor.locator(".variable-hint")).toContainText("先选中一段文字");
+  // select "dear friend" and set it
+  await area.evaluate((element) => { const at = element.value.indexOf("dear friend"); element.setSelectionRange(at, at + "dear friend".length); });
+  await editor.getByRole("button", { name: "设为高亮" }).click();
+  await expect(area).toHaveValue("Hi [dear friend], welcome to our shop!");
+  await expect(editor.locator(".variable-hint")).toContainText("高亮块：dear friend");
+  // the caret is inside the block: take it off again, then set it once more
+  await editor.getByRole("button", { name: "取消高亮" }).click();
+  await expect(area).toHaveValue("Hi dear friend, welcome to our shop!");
+  await area.evaluate((element) => { const at = element.value.indexOf("dear friend"); element.setSelectionRange(at, at + "dear friend".length); });
+  await editor.getByRole("button", { name: "设为高亮" }).click();
+  await editor.locator(".editor-save").first().click();
+  // the saved 话术 shows a highlighted block that can be filled, and copies the filled text
+  await page.locator(".native-row", { hasText: "手动高亮测试" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const field = row.locator("input[data-var='dear friend']");
+  await expect(field).toBeVisible();
+  await field.fill("Amanda");
+  await field.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda, welcome to our shop!");
 });
 
 test("the 全部产品 filter and the row menu close on an outside click and on Esc", async ({ page }) => {
@@ -271,4 +362,125 @@ test("English word search is a separate mode next to the pinyin one", async ({ p
   await expect(page.locator(".native-row")).toHaveCount(0);
   await search.fill("");
   await expect(search).toHaveAttribute("placeholder", "搜索标题、编号或内容");
+});
+
+test("the sidebar entry says 最近 (it used to be cut off); its page is still titled 最近使用", async ({ page }) => {
+  await page.goto("/");
+  const entry = page.locator(".sidebar .nav-item", { hasText: "最近" });
+  await expect(entry).toBeVisible();
+  await expect(entry).not.toContainText("最近使用");
+  // The whole label fits: no ellipsis cut-off.
+  const label = entry.locator("span").first();
+  expect(await label.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await entry.click();
+  await expect(page.locator("h1")).toHaveText("最近使用");
+});
+
+test("dialog backdrops fade in by tint only: the blurred page behind is not re-blurred every frame (Mac smoothness)", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "设置" }).click();
+  const backdrop = page.locator(".settings-backdrop");
+  await expect(backdrop).toBeVisible();
+  const info = await backdrop.evaluate((el) => {
+    const style = getComputedStyle(el);
+    let keyframes = "";
+    for (const sheet of document.styleSheets) for (const rule of sheet.cssRules) if (rule.type === CSSRule.KEYFRAMES_RULE && rule.name === style.animationName) keyframes = rule.cssText;
+    return { blur: style.backdropFilter || style.webkitBackdropFilter, name: style.animationName, keyframes };
+  });
+  expect(info.blur).toContain("blur");
+  expect(info.name).toBe("backdrop-in");
+  expect(info.keyframes).not.toMatch(/opacity/);
+  expect(info.keyframes).toMatch(/background-color/);
+});
+
+test("remembered values are always shown with the ? at their right end, and not inside the text", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  await row.locator("input[data-var=Name]").fill("Amanda");
+  await row.locator("input[data-var=Name]").press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Amanda");
+  // click away from every block: the strip stays
+  await row.locator(".row-actions").click({ position: { x: 2, y: 2 } });
+  await expect(row.locator("input:focus")).toHaveCount(0);
+  await expect(row.locator(".var-memory-option", { hasText: "Amanda" }).first()).toBeVisible();
+  await expect(row.locator(".var-chip .var-help")).toHaveCount(0);
+  const help = row.locator(".var-memory .var-help");
+  await expect(help).toBeVisible();
+  // the strip stays on the same line as the buttons, to the right of 编辑 (Lock's placement), and never pushes the card wider
+  const edit = await row.getByRole("button", { name: "编辑", exact: true }).boundingBox();
+  const strip = await row.locator(".var-memory").boundingBox();
+  expect(strip.x).toBeGreaterThanOrEqual(edit.x + edit.width);
+  expect(Math.abs((strip.y + strip.height / 2) - (edit.y + edit.height / 2))).toBeLessThan(10);
+  expect(await page.locator(".native-list").evaluate((list) => list.scrollWidth <= list.clientWidth)).toBe(true);
+});
+
+test("a 话术 written by hand can carry its own 中文翻译, kept exactly as typed", async ({ page }) => {
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  await expect(editor.getByLabel(/中文翻译/)).toBeVisible();
+  await editor.locator("input").first().fill("手写问候");
+  await editor.locator("textarea").first().fill("Hello there");
+  await editor.getByLabel(/中文翻译/).fill("你好呀");
+  await editor.locator(".editor-save").first().click();
+  const row = page.locator(".native-row", { hasText: "手写问候" });
+  await row.locator(".row-main").click();
+  await expect(page.locator(".native-row.selected .copy-language")).toBeVisible();
+  await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
+  await expect(page.locator(".inline-editor").getByLabel(/中文翻译/)).toHaveValue("你好呀");
+});
+
+test("the 新建目录 field keeps its whole border and placeholder inside the narrow sidebar", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "新建目录" }).first().click();
+  const form = page.locator(".directory-new");
+  await expect(form).toBeVisible();
+  // The folder list scrolls, so an outer ring would be clipped on both sides: the ring must be drawn inside the box.
+  expect(await form.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/inset/);
+  const [box, side] = await Promise.all([form.boundingBox(), page.locator(".sidebar").boundingBox()]);
+  expect(box.x).toBeGreaterThanOrEqual(side.x);
+  expect(box.x + box.width).toBeLessThanOrEqual(side.x + side.width);
+  // The whole placeholder fits in the input (no cut-off text).
+  const input = form.locator("input");
+  expect(await input.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
+test("a folder can be dragged by the three-bar handle on its left, right in the sidebar, and Settings shows the same order", async ({ page }) => {
+  const names = () => page.locator(".sidebar .directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")));
+  for (const name of ["甲", "乙", "丙"]) {
+    await page.getByRole("button", { name: "新建目录" }).first().click();
+    await page.locator(".directory-new input").fill(name);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".sidebar .directory-row", { hasText: name })).toBeVisible();
+  }
+  const row = (name) => page.locator(".sidebar .directory-row", { hasText: name });
+  // Standard folders are fixed: no handle.
+  await expect(row("询盘接待").locator(".folder-drag-handle")).toHaveCount(0);
+
+  // The handle is on the far left, over the colour dot, and appears on hover.
+  await row("甲").hover();
+  const handle = row("甲").locator(".folder-drag-handle");
+  await expect(handle).toHaveCSS("opacity", "1");
+  const [h, label, rowBox] = await Promise.all([handle.boundingBox(), row("甲").locator(".directory-main").boundingBox(), row("甲").boundingBox()]);
+  expect(h.x - rowBox.x).toBeLessThanOrEqual(8);
+  expect(h.x + h.width).toBeLessThan(label.x + label.width / 2);
+  await expect(row("甲").locator(".directory-color-marker")).toHaveCSS("opacity", "0");
+
+  const before = await names();
+  const target = await row("丙").boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
+  await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await names()).indexOf("甲")).toBeGreaterThan(before.indexOf("甲"));
+  const after = await names();
+
+  // The same list lives in Settings.
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.locator(".settings-dialog").getByRole("tab", { name: "目录" }).click();
+  const group = page.locator(".settings-dialog .settings-folder-group").nth(0);
+  await group.getByRole("button", { name: /话术目录/ }).click();
+  expect(await group.locator(".settings-folder-name").allInnerTexts()).toEqual(after);
 });

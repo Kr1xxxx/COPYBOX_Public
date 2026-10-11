@@ -26,6 +26,7 @@ export function FolderRow({ folder, sortable, active, count, color, dragging, dr
 }) {
   return (
     <div {...(sortable ? { "data-sort-scope": "folder", "data-sort-id": folder } : {})} className={`directory-row ${sortable ? "" : "fixed"} ${active ? "active" : ""} ${dragging ? "dragging" : ""} ${dragOver ? "drag-over" : ""}`}>
+      {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="按住拖动排序" onPointerDown={onBeginDrag}><Icon name="grip" /></button>}
       {renaming ? (
         <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); onSubmitRename(); }}>
           <i className="directory-color-marker" aria-hidden="true" style={{ background: color }} />
@@ -40,7 +41,7 @@ export function FolderRow({ folder, sortable, active, count, color, dragging, dr
       )}
       {!renaming && <button type="button" className="folder-more" aria-label={`管理目录 ${folder}`} aria-haspopup="menu" aria-expanded={menuOpen} title="重命名、颜色、删除"
         onClick={(event) => onOpenMenu(event.currentTarget.getBoundingClientRect())}><Icon name="more" /></button>}
-      {sortable && !renaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${folder}`} title="拖动排序" onPointerDown={onBeginDrag}><span aria-hidden="true">⠿</span></button>}
+      
     </div>
   );
 }

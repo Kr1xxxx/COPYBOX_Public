@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   getLaunchAtLogin: () => ipcRenderer.invoke("clipbox:get-launch-at-login"),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("clipbox:set-launch-at-login", enabled),
   getVersion: () => ipcRenderer.invoke("clipbox:get-version"),
+  getBuildTime: () => ipcRenderer.invoke("clipbox:get-build-time"),
   checkUpdate: () => ipcRenderer.invoke("clipbox:check-update"),
   openUpdate: () => ipcRenderer.invoke("clipbox:open-update"),
   aiStatus: () => ipcRenderer.invoke("clipbox:ai-status"),
@@ -50,6 +51,7 @@ contextBridge.exposeInMainWorld("clipboxDesktop", {
   aiClear: () => ipcRenderer.invoke("clipbox:ai-clear"),
   aiRequest: (payload) => ipcRenderer.invoke("clipbox:ai-request", payload),
   fetchSharedLibrary: (url) => ipcRenderer.invoke("clipbox:fetch-shared-library", url),
+  fetchSiteIcon: (host) => ipcRenderer.invoke("clipbox:fetch-site-icon", host),
   relaunch: () => ipcRenderer.send("clipbox:relaunch"),
   onFocusSearch: (callback) => {
     const listener = () => callback();

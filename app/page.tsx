@@ -72,7 +72,11 @@ import { IMAGE_FOLDER_NAME_MAX } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
-import { TotpDialog } from "./totp-dialog";
+import { VaultDialog } from "./vault-dialog";
+import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
+import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
+import { openSecretItemsStore } from "./secret-items-store";
+import { openTotpStore } from "./totp-store";
 import { ArcMenu } from "./arc/menu";
 import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
@@ -82,8 +86,8 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
 import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
-import { SnippetFill, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
-import { NAME_OPTIONS, PINNED_KEY, isPinned, latestValues, memoryOptions, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
+import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
@@ -108,9 +112,9 @@ type LegacyDeviceBackup = {
 
 type SecureBackup =
   | { format: "clipbox-secure-backup"; version: 2; createdAt: number; envelope: VaultEnvelope }
-  | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope };
+  | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope; vaultBox?: VaultBoxEnvelope };
 
-type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope };
+type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope; vaultBox?: VaultBoxEnvelope };
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -278,6 +282,9 @@ export default function Home() {
   const [pinnedValues, setPinnedValues] = useState<PinnedValues>(() => { try { return parsePinned(localStorage.getItem(PINNED_KEY)); } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedValues)); } catch { /* pins last for this session only */ } }, [pinnedValues]);
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
+  const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
+  const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; element: HTMLButtonElement } | null>(null);
+  const suppressOptionClick = useRef(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -286,6 +293,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [startupError, setStartupError] = useState("");
   const [appVersion, setAppVersion] = useState("");
+  const [buildTime, setBuildTime] = useState("");
   const [windowMode, setWindowMode] = useState<WindowMode>("full");
   const [revealedId, setRevealedId] = useState("");
   const [rowMenuId, setRowMenuId] = useState("");
@@ -375,6 +383,9 @@ export default function Home() {
     window.clipboxDesktop?.getVersion()
       .then((version) => { if (!cancelled) setAppVersion(version); })
       .catch(() => undefined);
+    window.clipboxDesktop?.getBuildTime?.()
+      .then((value) => { if (!cancelled) setBuildTime(value); })
+      .catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
 
@@ -385,6 +396,7 @@ export default function Home() {
   const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
+  const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret }))), [items]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
   const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
 
@@ -632,6 +644,26 @@ export default function Home() {
     return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
   }, [dropdownOpen]);
 
+  // A row's ⋯ menu opens downward, but flips above the button when it would run past the bottom of the window.
+  useEffect(() => {
+    if (!rowMenuId) return;
+    const frame = requestAnimationFrame(() => {
+      const menu = document.querySelector<HTMLElement>(".row-menu");
+      const anchor = menu?.parentElement?.querySelector<HTMLElement>(".icon-button");
+      if (!menu || !anchor) return;
+      const height = menu.offsetHeight;
+      const room = window.innerHeight - anchor.getBoundingClientRect().bottom - 12;
+      const above = anchor.getBoundingClientRect().top - 12;
+      const up = height > room && above > room;
+      menu.style.top = up ? "auto" : "";
+      menu.style.bottom = up ? "34px" : "";
+      menu.style.transformOrigin = up ? "bottom right" : "";
+      menu.style.maxHeight = `${Math.max(120, Math.floor(up ? above : room))}px`;
+      menu.style.overflowY = "auto";
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [rowMenuId]);
+
   useEffect(() => {
     if (loading) return;
     const shortcut = (event: KeyboardEvent) => {
@@ -827,6 +859,78 @@ export default function Home() {
     else { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); setToast(outcome.result === "pinned" ? `已固定「${value.trim()}」，不会被新值顶掉` : `已取消固定「${value.trim()}」`); }
     window.setTimeout(() => setToast(""), 2400);
   }
+  // Delete a remembered value everywhere; the menu on a listed value calls this.
+  function removeValue(name: string, value: string) {
+    const outcome = deleteValue(valueMemory, pinnedValues, name, value);
+    setValueMemory(outcome.memory);
+    setPinnedValues(outcome.pins);
+    setToast(`已删除「${value}」`);
+    window.setTimeout(() => setToast(""), 2000);
+  }
+  // Holding a listed value and moving it drags it to another place in the list.
+  // The other values slide to their new places while one is dragged (first, last, invert, play).
+  const optionLefts = useRef<Map<string, number>>(new Map());
+  useLayoutEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next = new Map<string, number>();
+    document.querySelectorAll<HTMLElement>(".var-memory-option").forEach((element) => {
+      const key = `${element.closest(".var-memory-group")?.getAttribute("aria-label")}|${element.dataset.optionValue}`;
+      next.set(key, element.offsetLeft);
+      const before = optionLefts.current.get(key);
+      if (reduce || before === undefined || before === element.offsetLeft || "dragging" in element.dataset) return;
+      element.animate([{ transform: `translateX(${before - element.offsetLeft}px)` }, { transform: "none" }], { duration: 180, easing: "cubic-bezier(.22,1,.36,1)" });
+    });
+    optionLefts.current = next;
+  });
+
+  function startOptionDrag(event: React.PointerEvent<HTMLButtonElement>, name: string, value: string) {
+    if (event.button !== 0) return;
+    dragOption.current = { name, value, startX: event.clientX, startLeft: event.currentTarget.offsetLeft, moved: false, element: event.currentTarget };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    // Reordering moves the button in the page, which can drop the pointer capture; the window still hears the release.
+    const release = () => { window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); endOptionDrag(); };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+  }
+  function moveOptionDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = dragOption.current;
+    if (!drag) return;
+    if (!drag.moved && Math.abs(event.clientX - drag.startX) < 6) return;
+    if (!drag.moved) { drag.element.dataset.dragging = ""; drag.element.style.transition = "none"; }
+    drag.moved = true;
+    // Hit-test on layout positions (not painted ones), so values that are still sliding do not confuse the swap.
+    const shift = event.clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft);
+    const centre = drag.element.offsetLeft + shift + drag.element.offsetWidth / 2;
+    const over = Array.from(drag.element.parentElement?.querySelectorAll<HTMLElement>(".var-memory-option") || []).find((element) => element !== drag.element && centre >= element.offsetLeft && centre <= element.offsetLeft + element.offsetWidth);
+    if (over) {
+    const outcome = moveOption(valueMemory, pinnedValues, drag.name, drag.value, over.dataset.optionValue || "");
+    if (outcome.memory !== valueMemory || outcome.pins !== pinnedValues) { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); }
+    }
+    // the held value follows the pointer, even after the others have slid into new places
+    drag.element.style.transform = `translateX(${shift}px)`;
+  }
+  function endOptionDrag() {
+    const held = dragOption.current;
+    if (held?.moved) {
+      const element = held.element;
+      delete element.dataset.dragging;
+      element.style.transition = "transform .18s cubic-bezier(.22,1,.36,1)";
+      element.style.transform = "";
+      window.setTimeout(() => { element.style.transition = ""; }, 200);
+    }
+    if (dragOption.current?.moved) { suppressOptionClick.current = true; window.setTimeout(() => { suppressOptionClick.current = false; }, 0); }
+    dragOption.current = null;
+  }
+
+  // Variable blocks, checks, or a 中文翻译 all mean the card offers the 英文/中文 switch and prepares the copy.
+  function hasPreparedCopy(item: SecretItem) {
+    return hasOptionalSnippetPreparation(item) || Boolean(item.snippetMeta?.chineseText?.trim());
+  }
+
+  function variableNames(item: SecretItem) {
+    return [...new Set([...item.secret.matchAll(/\[([^[\]\n]+)\]/g)].map((match) => match[1].trim()))];
+  }
+
   function showVariableHelp() {
     setToast("最多记 3 个值，右键固定，固定的不会被新值顶掉");
     window.setTimeout(() => setToast(""), 4200);
@@ -845,7 +949,7 @@ export default function Home() {
   }
 
   async function copy(item: SecretItem, language: CopyLanguage = "en") {
-    if (item.kind === "snippet" && hasOptionalSnippetPreparation(item)) { await copyPrepared(item); return; }
+    if (item.kind === "snippet" && hasPreparedCopy(item)) { await copyPrepared(item); return; }
     await copyRaw(item, language);
   }
 
@@ -983,14 +1087,18 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  // Image folders have no saved order (not sortable in Settings), so only the vault kinds move.
   function settingsFolderMove(kind: SettingsFolderKind, folder: string, delta: -1 | 1) {
-    if (kind === "image") return;
+    if (kind === "image") {
+      const names = imageLibrary.folders.map((entry) => entry.name);
+      const neighbour = names[names.indexOf(folder) + delta];
+      if (neighbour) void imageLibrary.reorderFolder(folder, neighbour);
+      return;
+    }
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: moveName(data.folders[kind], folder, delta) } } }), "目录顺序已更新");
   }
 
   function settingsFolderReorder(kind: SettingsFolderKind, source: string, target: string) {
-    if (kind === "image") return;
+    if (kind === "image") { void imageLibrary.reorderFolder(source, target); return; }
     void commitFolderChange((data) => ({ data: { ...data, folders: { ...data.folders, [kind]: reorderNames(data.folders[kind], source, target) } } }), "目录顺序已更新");
   }
 
@@ -1019,7 +1127,7 @@ export default function Home() {
       title: "图片目录",
       unit: "张",
       nameMax: IMAGE_FOLDER_NAME_MAX,
-      sortable: false,
+      sortable: true,
       autoColor: false,
       folders: imageLibrary.folders.map(({ name }) => ({ name, count: imageCountsByFolder[name] ?? 0, color: imageColors[name] || UNCATEGORIZED_COLOR, locked: false })),
     }];
@@ -1300,7 +1408,17 @@ export default function Home() {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, sharedSeen: sharedSeenRef.current };
     const scopedData = vaultDataForBackupScope(currentData, scope);
     const envelope = await encryptVault(scopedData, password);
-    const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope, createdAt: Date.now(), envelope };
+    let vaultBox: VaultBoxEnvelope | undefined;
+    if (scope === "secret" && !PLAIN_NOTES) {
+      try {
+        const payload: VaultBoxPayload = { totp: await openTotpStore(deviceKey).list(), items: await openSecretItemsStore(deviceKey).list() };
+        if (!isVaultBoxEmpty(payload)) vaultBox = await encryptVaultBox(payload, password);
+      } catch {
+        window.alert("保险箱里的内容读不出来，备份没有生成，数据没有改动。");
+        return;
+      }
+    }
+    const backup: SecureBackup = { format: "clipbox-secure-backup", version: 3, scope, createdAt: Date.now(), envelope, ...(vaultBox ? { vaultBox } : {}) };
     const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -1329,7 +1447,7 @@ export default function Home() {
         if (!parsed.envelope?.ciphertext || !parsed.envelope?.salt) throw new Error();
         if (parsed.version === 3) {
           if (parsed.scope !== "snippet" && parsed.scope !== "secret") throw new Error();
-          setPendingImport({ envelope: parsed.envelope, scope: parsed.scope });
+          setPendingImport({ envelope: parsed.envelope, scope: parsed.scope, ...(looksLikeVaultBox(parsed.vaultBox) ? { vaultBox: parsed.vaultBox } : {}) });
         } else if (parsed.version === 2) {
           setPendingImport({ envelope: parsed.envelope });
         } else {
@@ -1353,6 +1471,8 @@ export default function Home() {
   async function applyImport(password: string, strategy: ImportStrategy) {
     if (!pendingImport) return;
     const importedData = pendingImport.legacyData || await decryptVault(pendingImport.envelope as VaultEnvelope, password);
+    // Opened before anything is written, so a bad block cannot leave a half-restored backup.
+    const importedBox = pendingImport.vaultBox && !PLAIN_NOTES ? await decryptVaultBox(pendingImport.vaultBox, password) : null;
     const result = await enqueueVaultTask(async () => {
       const result = mergeImportedVaultData(
         readVault(),
@@ -1364,6 +1484,13 @@ export default function Home() {
       await writeVault(result.data);
       return result;
     });
+    if (importedBox) {
+      const totpStore = openTotpStore(deviceKey);
+      const itemStore = openSecretItemsStore(deviceKey);
+      const merged = mergeVaultBox({ totp: await totpStore.list(), items: await itemStore.list() }, importedBox, strategy);
+      await totpStore.replaceAll(merged.totp);
+      await itemStore.replaceAll(merged.items);
+    }
     setPendingImport(null);
     setBackupMode(null);
     setToast(strategy === "replace" ? `已恢复 ${result.importedCount} 条内容` : `已安全导入 ${result.importedCount} 条内容`);
@@ -1423,7 +1550,7 @@ export default function Home() {
       options={[
         ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
         { value: "image", label: "图片" },
-        ...(totpUnlocked ? [{ value: "totp", label: "验证码" }] : []),
+        ...(totpUnlocked ? [{ value: "totp", label: "保险箱" }] : []),
       ]}
     />
   );
@@ -1562,7 +1689,7 @@ export default function Home() {
               {newFolder && (
                 <form className="directory-new" onSubmit={(event) => { event.preventDefault(); void submitNewFolder(); }}>
                   <i className="directory-color-marker hollow" aria-hidden="true" />
-                  <input ref={newFolderInputRef} value={newFolder.name} placeholder="目录名称，回车创建" aria-label="新目录名称" aria-invalid={Boolean(newFolder.error)} maxLength={30}
+                  <input ref={newFolderInputRef} value={newFolder.name} placeholder="目录名称" title="输入名称，回车创建" aria-label="新目录名称" aria-invalid={Boolean(newFolder.error)} maxLength={30}
                     onChange={(event) => setNewFolder({ name: event.target.value, error: "" })}
                     onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelNewFolder(); } }}
                     onBlur={() => window.setTimeout(() => setNewFolder((current) => current && !current.name.trim() ? null : current), 120)} />
@@ -1679,7 +1806,7 @@ export default function Home() {
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
                       {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
-                      {isSnippet ? (hasOptionalSnippetPreparation(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => setActiveVar(name ? { id: item.id, name } : null)} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} onHelp={showVariableHelp} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
@@ -1689,10 +1816,15 @@ export default function Home() {
                           <button type="button" className="primary-button copy-main" aria-label={copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"} data-copied={copiedId === item.id ? "" : undefined} onClick={() => void copy(item)}><span className="copy-main-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span><span className="copy-main-label"><span>{isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</span><span>已复制</span></span></button>
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
-                          {isSnippet && !closing && activeVar?.id === item.id && activeVar.name === "Name" && <VariablePopup rowId={item.id} name="Name" options={NAME_OPTIONS} current={fillFor(item).values.Name || ""} onPick={(value) => pickRemembered(item, "Name", value)} />}
-                          {isSnippet && activeVar?.id === item.id && memoryOptions(valueMemory, pinnedValues, activeVar.name).length > 0 && <span className="var-memory" role="listbox" aria-label={`${activeVar.name} 最近用过的`}>
+                          {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
+                          {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
+                            {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="listbox" aria-label={`${name} 最近用过的`}>
+                            {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
-                            {memoryOptions(valueMemory, pinnedValues, activeVar.name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[activeVar.name]} data-pinned={isPinned(pinnedValues, activeVar.name, option) ? "" : undefined} title={isPinned(pinnedValues, activeVar.name, option) ? `${option}（已固定，右键取消）` : `${option}（右键固定）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} onContextMenu={(event) => { event.preventDefault(); pinValue(item, activeVar.name, option); }} onClick={() => pickRemembered(item, activeVar.name, option)}>{option}</button>)}
+                            {memoryOptions(valueMemory, pinnedValues, name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[name]} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} title={`${option}（右键：固定 / 解锁 / 删除，按住可拖动）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onPointerDown={(event) => startOptionDrag(event, name, option)} onPointerMove={moveOptionDrag} onPointerUp={endOptionDrag} onPointerCancel={endOptionDrag} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }} onClick={() => { if (suppressOptionClick.current) return; pickRemembered(item, name, option); }}>{option}</button>)}
+                            </span>)}
+                            <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button>
+                            {valueMenu && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
                           </span>}
                           <span className="spacer" />
                           <div className="menu-wrap">
@@ -1727,11 +1859,25 @@ export default function Home() {
           </section>
         </>}
       </section>
-      {totpOpen && <TotpDialog deviceKey={deviceKey} onClose={() => setTotpOpen(false)} onToast={flashToast}
-        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("验证码入口已隐藏"); }} />}
+      {totpOpen && <VaultDialog deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={() => { setTotpOpen(false); switchKind("secret"); }} onClose={() => setTotpOpen(false)} onToast={flashToast}
+        onHide={() => { writeStoredChoice(TOTP_UNLOCK_KEY, "0"); setTotpUnlocked(false); setTotpOpen(false); flashToast("保险箱入口已隐藏"); }} />}
       {settingsOpen && <SettingsDialog
+        onPreviewSamples={PLAIN_NOTES || !totpUnlocked ? undefined : () => previewClearSamples(deviceKey)}
+        onClearSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
+          try {
+            const result = await clearSampleEntries(deviceKey);
+            flashToast(result.removed === 0 ? "没有可清除的范例" : result.keptEdited > 0 ? `已清除 ${result.removed} 条范例，${result.keptEdited} 条你改过的已保留` : `已清除 ${result.removed} 条范例`);
+          } catch { flashToast("清除失败，数据没有改动"); }
+        }}
+        onRestoreSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
+          try {
+            const result = await restoreSampleEntries(deviceKey);
+            flashToast(result.added === 0 ? "范例都在，没有缺的" : `已补回 ${result.added} 条范例`);
+          } catch { flashToast("恢复失败，数据没有改动"); }
+        }}
         onUnlockTotp={PLAIN_NOTES ? undefined : () => { writeStoredChoice(TOTP_UNLOCK_KEY, "1"); setTotpUnlocked(true); setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
+        buildTime={buildTime}
         isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}
         refreshing={refreshing}
         trashCount={items.filter((item) => isTrashedItem(item)).length}

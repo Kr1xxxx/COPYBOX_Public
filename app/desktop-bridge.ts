@@ -16,6 +16,8 @@ export type ClipboxDesktop = {
   setTheme?: (theme: ThemeChoice) => void;
   openDataFolder?: () => Promise<string>;
   getVersion: () => Promise<string>;
+  // When this build was made or last updated, as an ISO date string.
+  getBuildTime?: () => Promise<string>;
   checkUpdate?: () => Promise<UpdateInfo>;
   openUpdate?: () => Promise<boolean>;
   aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
@@ -23,6 +25,8 @@ export type ClipboxDesktop = {
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiRequest?: (payload: { url: string; body?: unknown; method?: "GET" | "POST" }) => Promise<{ ok: boolean; status: number; text: string }>;
   fetchSharedLibrary?: (url: string) => Promise<string>;
+  // The site's own small icon as a data: URL, or "" when it has none.
+  fetchSiteIcon?: (host: string) => Promise<string>;
   relaunch: () => void;
   onFocusSearch: (callback: () => void) => () => void;
   onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;

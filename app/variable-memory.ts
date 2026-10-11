@@ -1,9 +1,19 @@
 // What each variable block remembers. Held in memory only (never saved): the values are often customer names.
 export const MEMORY_SIZE = 3;
 
-// Every variable called Name starts with these three, so a quick reply needs no typing. The first one is not used by default.
-export const NAME_OPTIONS = ["beautiful", "Friend", "Lovely"] as const;
+// Fixed options: always on offer above a block, whatever was typed before. To give another block fixed options, add its name here;
+// they are then never kept in the recent list (see isFixedOption) and need no other change.
+export const FIXED_OPTIONS: Record<string, readonly string[]> = {
+  Name: ["Beautiful", "Friend", "Lovely"],
+};
+export const NAME_OPTIONS = FIXED_OPTIONS.Name;
+export function fixedOptions(name: string): readonly string[] { return FIXED_OPTIONS[name] || []; }
 export const DEFAULT_VALUES: Record<string, string> = { Name: "Friend" };
+
+// A fixed option never takes a place in the recent list.
+export function isFixedOption(name: string, value: string): boolean {
+  return fixedOptions(name).some((option) => option.toLowerCase() === value.trim().toLowerCase());
+}
 
 export type ValueMemory = Record<string, string[]>;
 // The values the person pinned, per name. A pinned value is also in the memory and is never pushed out by a new one.
@@ -18,7 +28,7 @@ export function rememberValues(memory: ValueMemory, values: Record<string, strin
   const next = { ...memory };
   for (const [name, raw] of Object.entries(values)) {
     const value = raw.trim();
-    if (!value) continue;
+    if (!value || (isFixedOption(name, value) && !isPinned(pins, name, value))) continue;
     const list = [value, ...(next[name] || []).filter((entry) => entry !== value)];
     while (list.length > MEMORY_SIZE) {
       let drop = -1;
@@ -34,7 +44,7 @@ export function rememberValues(memory: ValueMemory, values: Record<string, strin
 // Pinned values first, in the order they were pinned (they survive a reload), then the recent ones newest first, three in all.
 export function memoryOptions(memory: ValueMemory, pins: PinnedValues, name: string): string[] {
   const pinned = pins[name] || [];
-  return [...pinned, ...(memory[name] || []).filter((value) => !pinned.includes(value))].slice(0, MEMORY_SIZE);
+  return [...pinned, ...(memory[name] || []).filter((value) => !pinned.includes(value) && !isFixedOption(name, value))].slice(0, MEMORY_SIZE);
 }
 
 export function latestValues(memory: ValueMemory): Record<string, string> {
@@ -66,4 +76,28 @@ export function parsePinned(raw: string | null): PinnedValues {
     }
     return pins;
   } catch { return {}; }
+}
+
+// Remove a remembered value everywhere: from the list and from the pinned ones.
+export function deleteValue(memory: ValueMemory, pins: PinnedValues, name: string, raw: string): { memory: ValueMemory; pins: PinnedValues } {
+  const value = raw.trim();
+  return {
+    memory: { ...memory, [name]: (memory[name] || []).filter((entry) => entry !== value) },
+    pins: { ...pins, [name]: (pins[name] || []).filter((entry) => entry !== value) },
+  };
+}
+
+// Drag one value onto the place of another. Pinned values stay in front of the others, so a value can only change places inside its own group.
+export function moveOption(memory: ValueMemory, pins: PinnedValues, name: string, value: string, target: string): { memory: ValueMemory; pins: PinnedValues } {
+  const options = memoryOptions(memory, pins, name);
+  const from = options.indexOf(value);
+  const to = options.indexOf(target);
+  const pinnedNow = isPinned(pins, name, value);
+  if (from < 0 || to < 0 || from === to || pinnedNow !== isPinned(pins, name, target)) return { memory, pins };
+  const next = [...options];
+  next.splice(from, 1);
+  next.splice(to, 0, value);
+  const pinnedList = next.filter((entry) => isPinned(pins, name, entry));
+  const known = new Set(memory[name] || []);
+  return { memory: { ...memory, [name]: next.filter((entry) => known.has(entry)) }, pins: { ...pins, [name]: pinnedList } };
 }

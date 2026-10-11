@@ -6,8 +6,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArcMenu } from "./arc/menu";
+import { Icon } from "./ui-atoms";
+import { usePointerReorder } from "./use-pointer-reorder";
+import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import {
   IMAGE_FILTER_ALL,
+  IMAGE_FILTER_PINNED,
+  countPinnedImages,
   IMAGE_FILTER_UNCATEGORIZED,
   countImagesByFolder,
   imageFolderColors,
@@ -60,6 +65,7 @@ export function ImageFolderSelect({ library }: { library: ImageLibrary }) {
       <span className="sr-only">目录</span>
       <select value={library.filter} onChange={(event) => library.setFilter(event.target.value)}>
         <option value={IMAGE_FILTER_ALL}>全部</option>
+        <option value={IMAGE_FILTER_PINNED}>收藏</option>
         {library.folders.map((folder) => <option key={folder.name} value={imageFolderFilter(folder.name)}>{folder.name}</option>)}
         <option value={IMAGE_FILTER_UNCATEGORIZED}>未分类</option>
       </select>
@@ -72,7 +78,14 @@ export function ImageFolderSelect({ library }: { library: ImageLibrary }) {
 export function ImageFolderNav({ library }: { library: ImageLibrary }) {
   const { folders, filter, setFilter } = library;
   const counts = useMemo(() => countImagesByFolder(library.images ?? [], folders), [library.images, folders]);
+  const pinnedCount = useMemo(() => countPinnedImages(library.images ?? []), [library.images]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
+  const { prepareSortAnimation } = useSortFlipAnimation();
+  const reorder = usePointerReorder({
+    enabled: true,
+    scope: "image-folder",
+    onDrop: (source, target) => { prepareSortAnimation("image-folder"); void library.reorderFolder(source, target); },
+  });
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ from: string; value: string } | null>(null);
   const [menu, setMenu] = useState("");
@@ -154,7 +167,8 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
     const active = filter === imageFolderFilter(name);
     const isRenaming = renaming?.from === name;
     return (
-      <div key={name} className={`directory-row fixed ${active ? "active" : ""}`}>
+      <div key={name} data-sort-scope="image-folder" data-sort-id={name} className={`directory-row ${active ? "active" : ""} ${reorder.draggingId === name ? "dragging" : ""} ${reorder.overId === name && reorder.draggingId !== name ? "drag-over" : ""}`}>
+        {!isRenaming && <button type="button" className="folder-drag-handle" aria-label={`拖动目录 ${name}`} title="按住拖动排序" onPointerDown={(event) => reorder.beginPointerDrag(event, name)}><Icon name="grip" /></button>}
         {isRenaming ? (
           <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(); }}>
             <i className="directory-color-marker" aria-hidden="true" style={{ background: colors[name] }} />
@@ -189,6 +203,9 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
         <button type="button" className={`nav-item image-all ${filter === IMAGE_FILTER_ALL ? "active" : ""}`} aria-current={filter === IMAGE_FILTER_ALL ? "page" : undefined} onClick={() => setFilter(IMAGE_FILTER_ALL)}>
           <span className="nav-icon"><GridGlyph /></span><span className="nav-label">全部图片</span><b>{counts.total}</b>
         </button>
+        <button type="button" className={`nav-item image-pinned ${filter === IMAGE_FILTER_PINNED ? "active" : ""}`} aria-current={filter === IMAGE_FILTER_PINNED ? "page" : undefined} onClick={() => setFilter(IMAGE_FILTER_PINNED)}>
+          <span className="nav-icon"><Icon name="star" /></span><span className="nav-label">收藏</span><b>{pinnedCount}</b>
+        </button>
       </nav>
       <div className="nav-heading">
         <span>目录</span>
@@ -199,7 +216,7 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
         {newFolder !== null && (
           <form className="directory-new" onSubmit={(event) => { event.preventDefault(); void submitNewFolder(); }}>
             <i className="directory-color-marker hollow" aria-hidden="true" />
-            <input ref={newInputRef} value={newFolder} placeholder="目录名称，回车创建" aria-label="新目录名称" maxLength={IMAGE_FOLDER_NAME_MAX}
+            <input ref={newInputRef} value={newFolder} placeholder="目录名称" title="输入名称，回车创建" aria-label="新目录名称" maxLength={IMAGE_FOLDER_NAME_MAX}
               onChange={(event) => setNewFolder(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelNewFolder(); } }}
               onBlur={() => window.setTimeout(() => setNewFolder((current) => current !== null && !current.trim() ? null : current), 120)} />

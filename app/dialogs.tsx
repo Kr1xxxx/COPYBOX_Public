@@ -91,9 +91,12 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
   const [strategy, setStrategy] = useState<ImportStrategy>("merge");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
   const exporting = mode !== "import";
   const exportWord = mode === "export-secret" ? secretWord : "话术";
   const otherWord = mode === "export-secret" ? "话术" : secretWord;
+  useDialogKeyboard(dialogRef, onClose, busy);
+  useEffect(() => { dialogRef.current?.querySelector<HTMLElement>("input")?.focus(); }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -114,9 +117,9 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
 
   return (
     <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-      <section className="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+      <section ref={dialogRef} className="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
         <header className="backup-head">
-          <div><p>{mode === "export" ? "SNIPPET EXPORT" : mode === "export-secret" ? "NOTES EXPORT" : "SAFE IMPORT"}</p><h2 id="backup-title">{exporting ? `导出${exportWord}备份` : "导入备份"}</h2></div>
+          <div><p>{mode === "export" ? "话术备份" : mode === "export-secret" ? "备注备份" : "安全导入"}</p><h2 id="backup-title">{exporting ? `导出${exportWord}备份` : "导入备份"}</h2></div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
         </header>
         <form className="backup-form" onSubmit={submit}>

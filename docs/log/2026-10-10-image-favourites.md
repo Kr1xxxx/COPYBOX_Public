@@ -1,0 +1,9 @@
+# 图片 收藏 (favourites)
+
+- Date: 2026-10-10 · Thread/agent: 【圖片】宮格與動效
+- What changed: a picture can be starred, like a snippet. Entry points match 话术: a "收藏" entry (star icon + count) under 全部图片 in the sidebar and a 收藏 option in the mini-window select; the page title is 收藏; favourites sort first (not while searching); a star on each grid tile (hover or keyboard focus to show, a favourite keeps its star in view), the `.native-pin` star on list rows, and a 收藏/已收藏 button in the opened picture's actions. Empty list says 还没有收藏图片.
+- Storage: `ImageMeta` gets an optional `pinned?: boolean` inside the already-encrypted meta record (written through the same `writeMeta` that rename and move use). No new store, no key or encryption-format change, no migration: older records have no `pinned` and read as "not a favourite"; unpinning removes the field. The original image bytes are never touched (unit test compares them). I judge this additive and compatible, but it does write the meta record, so the owner may still call it a storage change.
+- Tests: store (`setPinned` keeps other fields, survives a new session, old records fine, original bytes untouched), core (filter, title, count, favourites-first), e2e (star, count, order, 收藏 list, reload, unstar). Two old e2e assertions that said the 图片 sidebar hides 收藏, and the mini select options, were updated to the new behaviour.
+- User-visible change (plain Chinese, for the preview changelog): 图片也可以收藏了:图片上点星标,左侧出现"收藏"入口,收藏的图片排在最前面。
+- Not done / risks: no star in the mini window's tiles (it copies on click; the mini select can still show 收藏); a favourite's star sits over a corner of the frosted margin (the owner wanted the whole picture visible, so only favourites keep it in view). Checked in the browser with Windows and Mac styling, light and dark; not on a real desktop. Local commit only (freeze).
+- Next step: owner decides whether this counts as a storage change before merging.

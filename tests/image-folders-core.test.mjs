@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   countImagesByFolder,
+  countPinnedImages,
+  pinnedFirst,
   filterImagesByFolder,
   folderOfImageFilter,
   imageFilterTitle,
@@ -30,6 +32,16 @@ test("a folder that no longer exists falls back to all images", () => {
   assert.equal(resolveImageFilter("uncategorized", folders), "uncategorized");
   assert.equal(resolveImageFilter("whatever", folders), "all");
   assert.equal(resolveImageFilter("folder:收款码", []), "all");
+});
+
+test("收藏: its own filter, title and count; favourites go first and the rest keep their order", () => {
+  const list = [{ id: "a" }, { id: "b", pinned: true }, { id: "c" }, { id: "d", pinned: true }];
+  assert.equal(imageFilterTitle("pinned"), "收藏");
+  assert.equal(resolveImageFilter("pinned", []), "pinned");
+  assert.deepEqual(filterImagesByFolder(list, "pinned", []).map((value) => value.id), ["b", "d"]);
+  assert.equal(countPinnedImages(list), 2);
+  assert.deepEqual(pinnedFirst(list).map((value) => value.id), ["b", "d", "a", "c"]);
+  assert.deepEqual(list.map((value) => value.id), ["a", "b", "c", "d"], "the input is not reordered");
 });
 
 test("filtering by folder keeps the order, and an unknown folder name counts as uncategorized", () => {

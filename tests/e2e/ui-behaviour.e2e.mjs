@@ -6,7 +6,9 @@ import { asDesktop, seedSnippets } from "./helpers.mjs";
 
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
-  return page.getByRole("dialog", { name: "设置" });
+  const dialog = page.getByRole("dialog", { name: "设置" });
+  await dialog.getByRole("tab", { name: "数据" }).click();
+  return dialog;
 }
 
 test.describe("snippet list", () => {
@@ -46,7 +48,15 @@ test.describe("snippet list", () => {
     await expect(status).toHaveAttribute("aria-live", "polite");
     await expect(button).toHaveAttribute("aria-label", /^已复制 /);
     await expect(row).toHaveClass(/copied/);
-    expect(await button.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(47, 155, 98)");
+    // the colour fades in and the copied state is short, so watch it inside the page (a round trip from the test can arrive too late)
+    expect(await button.evaluate((element) => new Promise((resolve) => {
+      const start = performance.now();
+      const look = () => {
+        const color = getComputedStyle(element).color;
+        if (color === "rgb(47, 155, 98)" || performance.now() - start > 1200) resolve(color); else requestAnimationFrame(look);
+      };
+      look();
+    }))).toBe("rgb(47, 155, 98)");
     await expect(page.locator(".copy-feedback")).toHaveCount(0);
 
     await page.keyboard.press("Tab");
@@ -56,14 +66,15 @@ test.describe("snippet list", () => {
     await plain.nth(3).locator(".row-main").click();
     const primary = page.locator(".native-row.selected").locator(".primary-button.copy-main").first();
     await expect(primary).toBeVisible();
-    const before = await primary.boundingBox();
+    // the opening card is still settling (another one folds away), so wait until the button has a stable box
+    let before = null;
+    await expect.poll(async () => { const first = await primary.boundingBox(); await page.waitForTimeout(120); const second = await primary.boundingBox(); before = second; return Boolean(first && second && first.y === second.y && first.width === second.width); }).toBe(true);
     await primary.click();
     await expect(primary).toHaveAttribute("data-copied", "");
     await expect(primary).toHaveAccessibleName("已复制");
     // the button keeps its size once the copy worked
-    const after = await primary.boundingBox();
-    expect(after.width).toBeCloseTo(before.width, 0);
-    expect(after.height).toBeCloseTo(before.height, 0);
+    // (the card re-renders as the copy lands, so measure again until the box is there instead of once)
+    await expect.poll(async () => { const box = await primary.boundingBox(); return box ? [Math.round(box.width), Math.round(box.height)] : null; }).toEqual([Math.round(before.width), Math.round(before.height)]);
   });
 
   test("the card marker is a small round drag handle that can be focused", async ({ page }) => {
@@ -118,4 +129,37 @@ test("snippets and 秘密 are exported to separate files, never one combined bac
   expect(download.suggestedFilename()).toMatch(/^clipbox-snippets-\d{4}-\d{2}-\d{2}\.json$/);
   const { readFileSync } = await import("node:fs");
   expect(JSON.parse(readFileSync(await download.path(), "utf8"))).toMatchObject({ format: "clipbox-secure-backup", version: 3, scope: "snippet" });
+});
+
+test("a row's ⋯ menu stays inside the window, even on the last row", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  const rows = page.locator(".native-row");
+  await rows.last().scrollIntoViewIfNeeded();
+  await rows.last().locator(".row-main").click();
+  await page.waitForTimeout(500);
+  const more = page.locator(".native-row.selected").getByRole("button", { name: /^更多操作/ });
+  await more.click();
+  const menu = page.locator(".row-menu");
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(300);
+  const box = await menu.boundingBox();
+  const size = page.viewportSize();
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+});
+
+test("the backup dialog has a Chinese title, readable gray text, and Esc closes it", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await seedSnippets(page);
+  const settings = await openSettings(page);
+  await settings.locator(".settings-row", { hasText: "导出话术备份" }).getByRole("button", { name: "导出…" }).click();
+  const dialog = page.getByRole("dialog", { name: /导出话术备份/ });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).not.toContainText(/SNIPPET|EXPORT|IMPORT/);
+  const gray = await dialog.locator(".backup-intro").evaluate((element) => getComputedStyle(element).color);
+  const channel = Number(/rgb\((\d+)/.exec(gray)[1]);
+  expect(channel).toBeLessThanOrEqual(110);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
 });

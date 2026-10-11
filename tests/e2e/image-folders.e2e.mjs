@@ -57,7 +57,7 @@ test("the 图片 sidebar lists 全部图片, 目录 with a + button, and 未分�
   await expect(navCount(page, "全部图片")).toHaveText("0");
   await expect(navCount(page, "未分类")).toHaveText("0");
   await expect(sidebar(page).getByRole("button", { name: "设置" })).toBeVisible();
-  for (const hidden of ["回收站", "收藏", "最近使用"]) await expect(sidebar(page)).not.toContainText(hidden);
+  for (const hidden of ["回收站", "最近"]) await expect(sidebar(page)).not.toContainText(hidden);
 });
 
 test("a new folder: Enter creates it, Esc cancels, empty and repeated names are refused", async ({ page }) => {
@@ -66,7 +66,7 @@ test("a new folder: Enter creates it, Esc cancels, empty and repeated names are 
 
   await page.getByRole("button", { name: "新建目录" }).click();
   await expect(input).toBeFocused();
-  await expect(input).toHaveAttribute("placeholder", "目录名称，回车创建");
+  await expect(input).toHaveAttribute("placeholder", "目录名称");
   await input.fill("不会保存");
   await input.press("Escape");
   await expect(input).toHaveCount(0);
@@ -462,7 +462,7 @@ test("the mini window has a folder select next to the search box", async ({ brow
   await page.setViewportSize({ width: 360, height: 440 });
   const select = page.locator(".mini-folder select");
   await expect(select).toBeVisible();
-  await expect(select.locator("option")).toHaveText(["全部", "收款码", "价目表", "未分类"]);
+  await expect(select.locator("option")).toHaveText(["全部", "收藏", "收款码", "价目表", "未分类"]);
   await expect(page.locator(".mini-row")).toHaveCount(4);
   await expect(page.locator(".status-bar")).toContainText("4 张");
 
@@ -493,7 +493,7 @@ test("the 话术 mini window keeps its own folder select", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 440 });
   await expect(page.locator(".mini-folder select option")).toContainText(["全部", "收藏", "最近使用"]);
   await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
-  await expect(page.locator(".mini-folder select option")).toHaveText(["全部", "未分类"]);
+  await expect(page.locator(".mini-folder select option")).toHaveText(["全部", "收藏", "未分类"]);
 });
 
 test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep theirs", async ({ page }) => {
@@ -509,7 +509,7 @@ test("macOS: 图片 has the same folder sidebar while 话术 and 秘密 keep the
 
   await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
   await expect(sidebar(page)).toContainText("收藏");
-  await expect(sidebar(page)).toContainText("最近使用");
+  await expect(sidebar(page)).toContainText("最近");
   await expect(sidebar(page)).toContainText("回收站");
   await expect(sidebar(page)).not.toContainText("全部图片");
   await expect(sidebar(page)).not.toContainText("收款码");
@@ -532,4 +532,37 @@ test("全部图片 is not cut off in the sidebar once there are ten or more imag
   const label = sidebar(page).locator(".nav-item", { hasText: "全部图片" }).locator(".nav-label");
   const fits = await label.evaluate((element) => element.scrollWidth <= element.clientWidth);
   expect(fits).toBe(true);
+});
+
+test("图片 folders can be dragged by the three-bar handle in the sidebar, and Settings shows the same order", async ({ page }) => {
+  await openImages(page);
+  for (const name of ["甲", "乙", "丙"]) await createFolder(page, name);
+  const names = () => sidebar(page).locator(".directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")).filter(Boolean));
+  expect(await names()).toEqual(["甲", "乙", "丙"]);
+  const row = (name) => sidebar(page).locator(".directory-row", { hasText: name });
+  await row("甲").hover();
+  const handle = row("甲").locator(".folder-drag-handle");
+  await expect(handle).toHaveCSS("opacity", "1");
+  const h = await handle.boundingBox();
+  const target = await row("丙").boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
+  await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(names).toEqual(["乙", "丙", "甲"]);
+
+  // The order is saved: it survives a reload, and Settings lists the same order and can move a folder too.
+  await reloadToImages(page);
+  await expect.poll(names).toEqual(["乙", "丙", "甲"]);
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.locator(".settings-dialog").getByRole("tab", { name: "目录" }).click();
+  const group = page.locator(".settings-dialog .settings-folder-group", { hasText: "图片目录" });
+  await group.getByRole("button", { name: /图片目录/ }).click();
+  const settingsNames = () => group.locator(".settings-folder-name").allInnerTexts();
+  expect(await settingsNames()).toEqual(["乙", "丙", "甲"]);
+  await group.locator(".settings-folder", { hasText: "甲" }).getByRole("button", { name: /上移/ }).click();
+  await expect.poll(settingsNames).toEqual(["乙", "甲", "丙"]);
+  await page.keyboard.press("Escape");
+  await expect.poll(names).toEqual(["乙", "甲", "丙"]);
 });

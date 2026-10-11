@@ -77,3 +77,8 @@ test("two quick adds both survive", async () => {
   await Promise.all([store.add(make("x")), store.add(make("y"))]);
   assert.equal((await store.list()).length, 2);
 });
+
+test("secrets shorter than 16 characters are refused", () => {
+  assert.throws(() => parseTotpInput("JBSWY3DP"), /16/);
+  assert.doesNotThrow(() => parseTotpInput("JBSWY3DPEHPK3PXP"));
+});

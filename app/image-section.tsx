@@ -7,6 +7,7 @@ import { ArcCopyIcon } from "./arc/copy-icon";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEvent, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence } from "motion/react";
+import { Icon } from "./ui-atoms";
 import { ArcDropHint } from "./arc/drop-hint";
 import { resolveFocusWrapIndex } from "./clipbox-core";
 import "./desktop-bridge";
@@ -14,9 +15,11 @@ import { UNCATEGORIZED_COLOR } from "./category-colors";
 import { ImageMoveMenu, MoreGlyph, ChevronGlyph } from "./image-folders";
 import {
   IMAGE_FILTER_ALL,
+  IMAGE_FILTER_PINNED,
   filterImagesByFolder,
   folderOfImageFilter,
   imageFolderColors,
+  pinnedFirst,
 } from "./image-folders-core";
 import { readableMessage, type ImageLibrary } from "./image-library";
 import { detailScrollDelta, gridCardInsertIndex, type ImageView } from "./image-view-core";
@@ -143,7 +146,7 @@ function ImageRenameForm({ value, inputRef, thumb, onChange, onSubmit, onCancel 
 
 // The opened picture: large preview, size, 目录 chip and the actions. The list shows it under the opened row, the grid
 // as a full-width card under the opened tile; both use this one component.
-function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMenu, onToggleMenu, onMove, onCopy, onRename, onDelete }: {
+function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMenu, onToggleMenu, onMove, onCopy, onRename, onTogglePinned, onDelete }: {
   meta: ImageMeta;
   src: string | undefined;
   copied: boolean;
@@ -155,6 +158,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
   onMove: (folder: string | null) => void;
   onCopy: () => void;
   onRename: () => void;
+  onTogglePinned: () => void;
   onDelete: () => void;
 }) {
   const menuHere = moveMenu?.id === meta.id ? moveMenu : null;
@@ -181,6 +185,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
       <div className="row-actions">
         <button type="button" className="primary-button" onClick={onCopy}><ArcCopyIcon copied={copied} />{copied ? "已复制" : "复制"}</button>
         <button type="button" className="ghost-button" onClick={onRename}>改名</button>
+        <button type="button" className="ghost-button image-pin-button" onClick={onTogglePinned} aria-pressed={Boolean(meta.pinned)} aria-label={`${meta.pinned ? "取消收藏" : "收藏"} ${meta.title}`}><Icon name="star" filled={Boolean(meta.pinned)} />{meta.pinned ? "已收藏" : "收藏"}</button>
         <span className="spacer" />
         <div className="menu-wrap" data-move-menu>
           <button type="button" className="icon-button" aria-label={`更多操作 ${meta.title}`} aria-haspopup="menu" aria-expanded={menuHere?.anchor === "more"} onClick={(event) => onToggleMenu("more", event.currentTarget)}><MoreGlyph /></button>
@@ -264,7 +269,8 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   const inFolder = useMemo(() => filterImagesByFolder(images ?? [], filter, folders), [images, filter, folders]);
   const shown = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
+    // Like the 话术 list: favourites first, except while searching.
+    return terms.length === 0 ? pinnedFirst(inFolder) : inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
   }, [inFolder, query]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
   const total = images?.length ?? 0;
@@ -510,6 +516,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
       onMove={(folder) => void moveTo(meta, folder)}
       onCopy={() => void copyImage(meta)}
       onRename={() => setRenaming({ id: meta.id, value: meta.title })}
+      onTogglePinned={() => void library.togglePinned(meta.id)}
       onDelete={() => setDeleteTarget(meta)}
     />
   );
@@ -538,8 +545,8 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     body = query.trim() || inFolder.length > 0
       ? <div className="native-empty"><strong>没有匹配的图片</strong><span>换个词搜索试试</span></div>
       : <div className="native-empty">
-        <strong>{folderName ? "这个目录还是空的" : "没有未分类的图片"}</strong>
-        <span>{compact ? "回到完整窗口添加图片" : folderName ? "点右上角的「新增图片」，会放进这个目录" : "新增的图片会先放在这里"}</span>
+        <strong>{filter === IMAGE_FILTER_PINNED ? "还没有收藏图片" : folderName ? "这个目录还是空的" : "没有未分类的图片"}</strong>
+        <span>{filter === IMAGE_FILTER_PINNED ? "点图片上的星标添加收藏" : compact ? "回到完整窗口添加图片" : folderName ? "点右上角的「新增图片」，会放进这个目录" : "新增的图片会先放在这里"}</span>
       </div>;
   } else if (compact) {
     body = shown.map((meta) => (
@@ -561,6 +568,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
             <span className="image-tile-thumb">{tileImage(meta)}</span>
             <strong className="image-tile-title">{meta.title}</strong>
           </button>
+          <button type="button" className="image-tile-pin" onClick={() => void library.togglePinned(meta.id)} aria-pressed={Boolean(meta.pinned)} aria-label={`${meta.pinned ? "取消收藏" : "收藏"} ${meta.title}`} title={meta.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(meta.pinned)} /></button>
           <button type="button" className="image-tile-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}><ArcCopyIcon copied={copied} size={15} /></button>
           {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
         </div>
@@ -590,7 +598,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
       const copied = copiedId === meta.id;
       const editing = open && renaming?.id === meta.id ? renaming : null;
       return (
-        <article key={meta.id} data-image-id={meta.id} className={`native-row image-row ${open ? "selected" : ""} ${copied ? "copied" : ""}`}>
+        <article key={meta.id} data-image-id={meta.id} className={`native-row image-row ${open ? "selected" : ""} ${copied ? "copied" : ""} ${meta.pinned ? "pinned" : ""}`}>
           <div className="row-line">
             {editing ? (
               <ImageRenameForm value={editing.value} inputRef={renameInputRef} thumb={thumb(meta)} onChange={(value) => setRenaming({ id: meta.id, value })} onSubmit={() => void submitRename()} onCancel={() => setRenaming(null)} />
@@ -603,6 +611,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
                 </span>
               </button>
             )}
+            {!editing && <button type="button" className="native-pin" onClick={() => void library.togglePinned(meta.id)} aria-label={`${meta.pinned ? "取消收藏" : "收藏"} ${meta.title}`} aria-pressed={Boolean(meta.pinned)} title={meta.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(meta.pinned)} /></button>}
             {!editing && <button type="button" className="native-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>}
             {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
           </div>
