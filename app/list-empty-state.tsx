@@ -4,7 +4,7 @@ import { Icon, VaultMark } from "./ui-atoms";
 
 // The "nothing here" panel of the list: first-run onboarding or a plain empty folder / no search result
 // (moved out of page.tsx unchanged).
-export function ListEmptyState({ firstRun, activeKind, activeFolder, query, searchAllFolders, isMini, onAdd, onImportSheet, onImportBackup, onImportSamples }: {
+export function ListEmptyState({ firstRun, activeKind, activeFolder, query, searchAllFolders, isMini, onAdd, onImportSheet, onImportBackup }: {
   firstRun: boolean;
   activeKind: ItemKind;
   activeFolder: string;
@@ -14,7 +14,6 @@ export function ListEmptyState({ firstRun, activeKind, activeFolder, query, sear
   onAdd: () => void;
   onImportSheet: () => void;
   onImportBackup: () => void;
-  onImportSamples?: () => void;
 }) {
   if (firstRun) {
     return (
@@ -25,7 +24,6 @@ export function ListEmptyState({ firstRun, activeKind, activeFolder, query, sear
         <div className="onboarding-actions">
           <button type="button" className="primary-button" onClick={onAdd}><Icon name="plus" />新增第一条</button>
           {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={onImportSheet}>导入话术表格</button>}
-          {activeKind === "secret" && onImportSamples && <button type="button" className="secondary-button" onClick={onImportSamples}>导入案例</button>}
           <button type="button" className="secondary-button" onClick={onImportBackup}>导入备份</button>
         </div>
         <small>内容用 AES-256 加密，只保存在这台设备上</small>

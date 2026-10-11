@@ -3,13 +3,11 @@ import { asDesktop } from "./helpers.mjs";
 
 async function open(page) {
   await asDesktop(page, "darwin");
-  await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v1"); sessionStorage.setItem("__kept", "1"); } });
+  await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
-  for (let i = 0; i < 5; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -33,13 +31,12 @@ test("a new 保险箱 opens with clearly fake examples of each type, which one t
   await page.reload();
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
-  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
-  await expect(page.getByRole("dialog", { name: "保险箱" })).toContainText("保险箱还是空的");
+  await expect(page.getByRole("region", { name: "保险箱" })).toContainText("保险箱还是空的");
 });
 
 test("examples are added beside data that is already there and leave it untouched", async ({ page }) => {
   await asDesktop(page, "darwin");
-  await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v1"); sessionStorage.setItem("__kept", "1"); } });
+  await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.getByRole("button", { name: "秘密" }).first().click();
@@ -49,10 +46,8 @@ test("examples are added beside data that is already there and leave it untouche
   await editor.locator("textarea").first().fill("台北市信义区 123 号");
   await editor.locator(".editor-save").first().click();
   await expect(page.locator(".native-row", { hasText: "仓库地址" })).toBeVisible();
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
-  for (let i = 0; i < 5; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await expect(dialog).toContainText("【范例】");
@@ -96,8 +91,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await expect(page.getByText("已清除 4 条范例，1 条你改过的已保留")).toBeVisible();
   await page.keyboard.press("Escape");
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
-  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
-  const after = page.getByRole("dialog", { name: "保险箱" });
+  const after = page.getByRole("region", { name: "保险箱" });
   await after.getByRole("button", { name: "按类型" }).click();
   await expect(after).toContainText("我的邮箱");
   await expect(after).toContainText("我的店铺");
@@ -115,8 +109,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
     await page.keyboard.press("Escape");
   }
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
-  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
-  const restored = page.getByRole("dialog", { name: "保险箱" });
+  const restored = page.getByRole("region", { name: "保险箱" });
   await restored.getByRole("button", { name: "按类型" }).click();
   await expect(restored.getByText("【范例】接口密钥")).toHaveCount(1);
   await expect(restored.getByText("【范例】Example 后台")).toHaveCount(1);
@@ -136,22 +129,12 @@ test("清除范例 and 恢复范例 are not offered on Windows", async ({ page }
   await expect(s).not.toContainText("范例");
 });
 
-test("the empty 秘密 page has 导入案例, which brings the examples in once, only on Mac", async ({ page }) => {
+test("someone who opened an earlier 保险箱 (old flag set, own data present) still gets the examples on 秘密", async ({ page }) => {
   await asDesktop(page, "darwin");
+  await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); localStorage.setItem("clipbox.vault.samples.v1", "1"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
-  await page.getByRole("button", { name: "秘密" }).first().click();
-  await expect(page.getByText("还没有秘密，先添加第一条")).toBeVisible();
-  await page.getByRole("button", { name: "导入案例" }).click();
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
-  await expect(dialog).toContainText("【范例】");
-  await page.keyboard.press("Escape");
-  await expect(page.getByText(/已导入 \d+ 条范例/)).toBeVisible();
-});
-
-test("导入案例 is not on Windows", async ({ page }) => {
-  await asDesktop(page, "win32");
-  await page.goto("/");
-  await page.waitForSelector(".app-shell");
-  await expect(page.getByRole("button", { name: "导入案例" })).toHaveCount(0);
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  const vault = page.getByRole("region", { name: "保险箱" });
+  await expect(vault).toContainText("【范例】");
 });

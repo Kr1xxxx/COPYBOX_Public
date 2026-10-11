@@ -17,6 +17,7 @@ test("macOS: the second section is still 秘密 with masking and references", as
   await seedSnippets(page);
   expect(await page.locator(".sidebar-top").evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(40);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await expect(editor).toContainText("被什么引用");
@@ -58,5 +59,6 @@ test("macOS: the empty 秘密 page still says only the reference is copied", asy
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator("body")).toContainText("默认只复制引用");
 });

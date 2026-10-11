@@ -11,10 +11,9 @@ async function addSecret(page, label, text) {
 }
 
 async function openVault(page) {
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
-  for (let i = 0; i < 5; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "全部" }).click();
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -25,6 +24,7 @@ test("old 秘密 entries are sorted by content in 全部, unknown ones go to 其
   await page.waitForSelector(".app-shell");
   await seedSnippets(page);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await addSecret(page, "客服 AI", "sk-ant-api03-ABCDEFGH1234");
   await addSecret(page, "仓库地址", "台北市信义区 123 号");
   await addSecret(page, "邮箱", "密码: hunter2");
@@ -50,20 +50,19 @@ test("old 秘密 entries are sorted by content in 全部, unknown ones go to 其
   await page.reload();
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
-  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
-  await expect(page.getByRole("dialog", { name: "保险箱" }).getByRole("region", { name: "Google" })).toContainText("仓库地址");
+  await expect(page.getByRole("region", { name: "保险箱" }).getByRole("region", { name: "Google" })).toContainText("仓库地址");
   // 恢复自动: clearing the website and the type goes back to the guess.
-  const again = page.getByRole("dialog", { name: "保险箱" });
+  const again = page.getByRole("region", { name: "保险箱" });
   const row2 = again.locator(".vault-entry-row", { hasText: "仓库地址" });
   await row2.getByRole("button", { name: "改归类" }).click();
   await row2.getByLabel("类型").selectOption("other");
   await row2.getByLabel("所属网站").fill("");
   await row2.getByRole("button", { name: "保存" }).click();
   await expect(again.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
-  // Opening an old entry leads back to the 秘密 list.
+  // Opening an old entry shows it in the 其他 tab, where it can be edited, copied and trashed as before.
   await again.getByRole("button", { name: /邮箱/ }).first().click();
-  await expect(page.getByRole("dialog", { name: "保险箱" })).toHaveCount(0);
-  await expect(page.locator(".kind-switch button[aria-pressed=true]")).toHaveText("秘密");
+  await expect(page.locator(".vault-tabs button[aria-pressed=true]")).toHaveText("其他");
+  await expect(page.locator(".native-row", { hasText: "邮箱" })).toBeVisible();
 });
 
 test("恢复码: add many at once, hidden until held, copy one or all, and 全部 groups it by site", async ({ page }) => {
@@ -97,4 +96,15 @@ test("恢复码: add many at once, hidden until held, copy one or all, and 全�
   await expect(dialog).not.toContainText("a1b2-c3d4");
   await dialog.getByRole("button", { name: "全部", exact: true }).click();
   await expect(dialog.getByRole("region", { name: "Google" })).toContainText("Google 恢复码");
+});
+
+test("Mac: 秘密 is the 保险箱 itself, with 新增 only inside 其他, and Windows has none of it", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
+  await expect(page.locator(".vault-tabs button")).toHaveText(["全部", "账号密码", "收款信息", "API 密钥", "恢复码", "验证码", "其他"]);
+  await expect(page.locator(".toolbar").getByRole("button", { name: /^新增/ })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "保险箱" })).toHaveCount(0);
 });

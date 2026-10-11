@@ -1076,3 +1076,5 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-collapse .icon { width: 12px; height: 12px; }
 .var-collapse:hover { background: var(--fill); color: var(--ink); }
 .var-collapse:active { scale: .96; }
+.vault-inline{flex:1;min-height:0;overflow:auto;padding:0 18px 18px}
+.legacy-add{display:flex;justify-content:flex-end;margin-bottom:8px}

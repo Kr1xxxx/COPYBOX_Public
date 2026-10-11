@@ -55,3 +55,13 @@
 
 - What changed: the separate 「保险箱」 section is gone. On Mac the 保险箱 is always there, as a 「保险箱」 button next to 「新增」 on the 秘密 page; the hidden unlock (tap the version 5 times) and the 「隐藏入口」 button are removed from the screen (the 5 taps still open it as a spare shortcut, to be removed later). No data moved: old 秘密 entries stay where they are and show in the 保险箱 as before, so backups and old backups are unchanged.
 - User-visible change: the Mac window shows 话术 | 秘密 | 图片; on 秘密 a 「保险箱」 button sits left of 「新增」.
+
+## Patch 17: 秘密 = 保险箱 (one thing)
+
+- What changed: on Mac the 秘密 page now shows the 保险箱 directly (全部, 账号密码, 收款信息, API 密钥, 恢复码, 验证码, and a last tab 其他). 其他 is the old 秘密 list with all its features (新增, copy, reveal, trash, folders); opening an old entry from 全部 jumps to it there. The 「保险箱」 button, the 「隐藏入口」 button and the 5-taps-on-version gesture are gone. 清除/恢复范例 and importing a backup refresh the page. Folders (收藏, 回收站, 目录) in the sidebar still show the old list.
+- No data moved and no storage format changed: nothing to migrate, old backups restore as before.
+- User-visible change: Mac 秘密 opens straight on the 保险箱 tabs; the old 秘密 entries sit under 其他.
+
+## Patch 18: examples reach people who already opened an earlier 保险箱
+
+- What changed: the "examples added" flag is now `clipbox.vault.samples.v2`. Browsers that opened the 保险箱 earlier with data in it (flag v1, no examples) get the missing examples once, beside their own data, when they open 秘密. No button needed. 清除范例 / 恢复范例 work as before (a clear sets v2, so cleared examples do not return).

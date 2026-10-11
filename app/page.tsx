@@ -243,7 +243,8 @@ export default function Home() {
   // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
   // 保险箱 is the 秘密 section now (Mac): no hidden unlock any more.
   const totpUnlocked = !PLAIN_NOTES;
-  const [totpOpen, setTotpOpen] = useState(false);
+  // Bumped after 清除/恢复范例 so the 秘密 page reads the vault again.
+  const [vaultRev, setVaultRev] = useState(0);
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -460,7 +461,7 @@ export default function Home() {
       }).catch(() => undefined);
     }
   }, [closingIds, selectedCardId]);
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || totpOpen);
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -1593,6 +1594,7 @@ export default function Home() {
       const merged = mergeVaultBox({ totp: await totpStore.list(), items: await itemStore.list() }, importedBox, strategy);
       await totpStore.replaceAll(merged.totp);
       await itemStore.replaceAll(merged.items);
+      setVaultRev((n) => n + 1);
     }
     setPendingImport(null);
     setBackupMode(null);
@@ -1644,6 +1646,8 @@ export default function Home() {
         : activeFolder === "uncategorized" ? "未分类"
           : activeFolder.slice(7);
   const searchPlaceholder = imageView ? "搜索图片标题" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : englishSearch ? "搜索英文单词" : "搜索标题、编号或内容";
+  // Mac: the 秘密 section IS the 保险箱 (its folders such as 回收站 still show the old list).
+  const vaultPage = !PLAIN_NOTES && activeKind === "secret" && !imageView && activeFolder === "all";
   const kindSwitch = (
     <ArcSegmented
       className={`kind-switch ${isMini ? "compact" : ""}`}
@@ -1669,13 +1673,6 @@ export default function Home() {
       onAdd={() => openEditor(null)}
       onImportSheet={() => spreadsheetFileRef.current?.click()}
       onImportBackup={() => fileRef.current?.click()}
-      onImportSamples={PLAIN_NOTES ? undefined : async () => {
-        try {
-          const result = await restoreSampleEntries(deviceKey);
-          setTotpOpen(true);
-          flashToast(result.added === 0 ? "范例都在，没有缺的" : `已导入 ${result.added} 条范例`);
-        } catch { flashToast("导入失败，数据没有改动"); }
-      }}
     />
   );
   const showFolderChip = searching && (searchWholeVault || activeFolder === "pinned" || activeFolder === "recent");
@@ -1743,6 +1740,102 @@ export default function Home() {
   };
   const menuFolder = folderMenu && activeFolders.includes(folderMenu) ? folderMenu : "";
   const menuFolderCount = menuFolder ? activeKindItems.filter((item) => item.folder === menuFolder).length : 0;
+
+  const legacyList = (
+            <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
+              {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
+              {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
+                <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
+                  <span className="trash-row-icon" aria-hidden="true"><Icon name="trash" /></span>
+                  <div className="row-main trash-row-main">
+                    <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong><small>{item.folder || "未分类"}</small></span>
+                  </div>
+                  <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
+                  <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
+                </article>
+              )) : filtered.map((item, index) => {
+                const isSnippet = activeKind === "snippet";
+                if (modalOpen && editing?.id === item.id) {
+                  return <article key={item.id} data-row-index={index} className={`native-row selected editing ${isSnippet ? "snippet-row" : "secret-row"}`}>{editorNode}</article>;
+                }
+                const isSelected = safeSelected === index && !bulkMode;
+                const checked = bulkIds.includes(item.id);
+                const revealed = revealedId === item.id;
+                const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
+                const moveTargets = [...activeFolders, ...(isSnippet ? [] : [""])].filter((folder) => folder !== (item.folder || ""));
+                return (
+                  <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected || closing ? "selected" : ""} ${closing ? "closing-row" : ""} ${checked ? "checked" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
+                    <div className="row-line">
+                      {bulkMode
+                        ? <button type="button" className={`row-check ${checked ? "on" : ""}`} role="checkbox" aria-checked={checked} aria-label={`选择 ${item.label}`} onClick={() => toggleBulk(item.id)}><Icon name="check" /></button>
+                        : <ReorderHandle className="drag-handle" disabled={!cardDragEnabled} label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "按住拖动，点一下可上移下移" : "清除搜索和筛选后可排序"} canMoveUp={canMoveCard(item, -1)} canMoveDown={canMoveCard(item, 1)} onBeginDrag={(event) => cardReorder.beginPointerDrag(event, item.id)} onMove={(delta) => { void persistCardOrder((latest) => moveVisibleItem(latest, filtered.map((entry) => entry.id), item.id, delta), "顺序已更新", true); }}><span className="grip-pill" style={{ color: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }}><Icon name="grip" /></span></ReorderHandle>}
+                      <button type="button" className="row-main" onClick={() => { if (bulkMode) { toggleBulk(item.id); return; } selectRow(index); }} onDoubleClick={() => { if (!bulkMode) void copy(item); }} aria-expanded={bulkMode ? undefined : isSelected} aria-label={bulkMode ? `选择 ${item.label}` : `${isSelected ? "已展开" : "展开"} ${item.label}`}>
+                        <span className="row-copy">
+                          <span className="row-title">
+                            <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
+                            {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{item.snippetNumber}</b>}
+                            {showFolderChip && item.folder && <small className="row-folder">{item.folder}</small>}
+                            {isSnippet && sharedMark(item) && <small className="row-shared-mark" data-mark={sharedMark(item)}>{sharedMark(item) === "update" ? "公司版有更新" : "公司已停用"}</small>}
+                          </span>
+                          {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
+                        </span>
+                      </button>
+                      {!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
+                      <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
+                      {isSelected && isSnippet && hasPreparedCopy(item) && item.snippetMeta?.chineseText?.trim() && <div className="copy-language row-language" role="group" aria-label="复制语言">
+                        <button type="button" className={fillFor(item).language === "en" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "en" }))}>英文</button>
+                        <button type="button" className={fillFor(item).language === "zh" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "zh" }))}>中文</button>
+                      </div>}
+                      <button type="button" className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消收藏" : "收藏"} ${item.label}`} aria-pressed={Boolean(item.pinned)} title={item.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(item.pinned)} /></button>
+                      {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
+                      {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
+                    </div>
+                    {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
+                      {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
+                      {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                        <div className={`row-secret ${revealed ? "revealed" : ""}`}>
+                          <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
+                          <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
+                        </div>
+                      )}
+                      <div className="row-actions">
+                          <button type="button" className="primary-button copy-main" aria-label={copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"} data-copied={copiedId === item.id ? "" : undefined} onClick={() => void copy(item)}><span className="copy-main-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span><span className="copy-main-label"><span>{isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</span><span>已复制</span></span></button>
+                          {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
+                          <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
+                          {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
+                          {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
+                            {valuesCollapsed ? <button type="button" className="var-collapse" aria-expanded="false" aria-label="展开常用值" title="展开常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>常用值<Icon name="chevronDown" /></button> : <>
+                            {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="group" aria-label={`${name} 最近用过的`}>
+                            {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
+                            {/* mousedown is stopped so the block keeps focus until the click lands */}
+                            {memoryOptions(valueMemory, pinnedValues, name).map((option) => <span key={option} role="presentation" data-selected={option === fillFor(item).values[name] ? "" : undefined} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }}>
+                              <ReorderHandle className="var-grip" label={`拖动排序 ${option}`} title="按住拖动，点一下可上移或下移" canMoveUp={canStepOption(name, option, -1)} canMoveDown={canStepOption(name, option, 1)} onBeginDrag={(event) => startOptionDrag(event, name, option)} onMove={(delta) => stepOption(name, option, delta)}><span className="grip-pill" aria-hidden="true"><Icon name="grip" /></span></ReorderHandle>
+                              <button type="button" className="var-memory-pick" title={`${option}（右键：固定 / 解锁 / 删除）`} onClick={() => pickRemembered(item, name, option)}>{option}</button>
+                            </span>)}
+                            </span>)}
+                            <span className="var-tail"><button type="button" className="var-collapse" aria-expanded="true" aria-label="收起常用值" title="收起常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>收起<Icon name="chevronUp" /></button>
+                            <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button></span>
+                            </>}
+                            {valueMenu && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
+                          </span>}
+                          <span className="spacer" />
+                          <div className="menu-wrap">
+                            <button type="button" className="icon-button" aria-label={`更多操作 ${item.label}`} aria-expanded={rowMenuId === item.id} onClick={() => setRowMenuId((value) => value === item.id ? "" : item.id)}><Icon name="more" /></button>
+                            <AnimatePresence>{rowMenuId === item.id && <ArcMenu className="dropdown row-menu">
+                              {moveTargets.length > 0 && <p className="menu-label">移动到</p>}
+                              {moveTargets.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void moveItemToFolder(item, folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
+                              {moveTargets.length > 0 && <div className="menu-divider" />}
+                              <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); void trashNow(item); }}>移到回收站</button>
+                            </ArcMenu>}</AnimatePresence>
+                          </div>
+                        </div>
+                      {!isSnippet && !PLAIN_NOTES && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
+                    </div></div>}
+                  </article>
+                );
+              })}
+            </div>
+  );
 
   return (
     <main className={`desktop-stage ${isMini ? "mini-stage" : ""}`}>
@@ -1849,19 +1942,23 @@ export default function Home() {
           <section className="content-panel">
             <UpdateNotice />
             <header className="toolbar drag-region">
-              <div className="native-search">
+              {vaultPage ? <span className="spacer" /> : <div className="native-search">
                 <Icon name="search" className="search-glyph" />
                 {searchInput}
-              </div>
+              </div>}
               {imageView
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
                 : <>
-                  {activeKind === "secret" && !PLAIN_NOTES && <button type="button" className="secondary-button vault-open" onClick={() => setTotpOpen(true)}>保险箱</button>}
-                  {canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+                  {!vaultPage && canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
                 </>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
-            <div className="section-head">
+            {vaultPage && <>
+              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note"><Icon name="lock" />本机加密</span></div>
+              <VaultDialog key={vaultRev} inline deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={(id) => { const index = filtered.findIndex((item) => item.id === id); if (index >= 0) selectRow(index); }} onClose={() => {}} onToast={flashToast}
+                legacyView={<>{canAddItemInFolder(activeFolder) && <div className="legacy-add"><button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button></div>}{legacyList}</>} />
+            </>}
+            {!vaultPage && <div className="section-head">
               <h1>{sectionTitle}</h1>
               <span className="section-count">{imageView ? imageCounts.shown : filtered.length}</span>
               <span className="spacer" />
@@ -1888,101 +1985,9 @@ export default function Home() {
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
-            </div>
-            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
-            {!imageView && <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
-              {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
-              {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
-                <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
-                  <span className="trash-row-icon" aria-hidden="true"><Icon name="trash" /></span>
-                  <div className="row-main trash-row-main">
-                    <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong><small>{item.folder || "未分类"}</small></span>
-                  </div>
-                  <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
-                  <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
-                </article>
-              )) : filtered.map((item, index) => {
-                const isSnippet = activeKind === "snippet";
-                if (modalOpen && editing?.id === item.id) {
-                  return <article key={item.id} data-row-index={index} className={`native-row selected editing ${isSnippet ? "snippet-row" : "secret-row"}`}>{editorNode}</article>;
-                }
-                const isSelected = safeSelected === index && !bulkMode;
-                const checked = bulkIds.includes(item.id);
-                const revealed = revealedId === item.id;
-                const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
-                const moveTargets = [...activeFolders, ...(isSnippet ? [] : [""])].filter((folder) => folder !== (item.folder || ""));
-                return (
-                  <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected || closing ? "selected" : ""} ${closing ? "closing-row" : ""} ${checked ? "checked" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
-                    <div className="row-line">
-                      {bulkMode
-                        ? <button type="button" className={`row-check ${checked ? "on" : ""}`} role="checkbox" aria-checked={checked} aria-label={`选择 ${item.label}`} onClick={() => toggleBulk(item.id)}><Icon name="check" /></button>
-                        : <ReorderHandle className="drag-handle" disabled={!cardDragEnabled} label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "按住拖动，点一下可上移下移" : "清除搜索和筛选后可排序"} canMoveUp={canMoveCard(item, -1)} canMoveDown={canMoveCard(item, 1)} onBeginDrag={(event) => cardReorder.beginPointerDrag(event, item.id)} onMove={(delta) => { void persistCardOrder((latest) => moveVisibleItem(latest, filtered.map((entry) => entry.id), item.id, delta), "顺序已更新", true); }}><span className="grip-pill" style={{ color: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }}><Icon name="grip" /></span></ReorderHandle>}
-                      <button type="button" className="row-main" onClick={() => { if (bulkMode) { toggleBulk(item.id); return; } selectRow(index); }} onDoubleClick={() => { if (!bulkMode) void copy(item); }} aria-expanded={bulkMode ? undefined : isSelected} aria-label={bulkMode ? `选择 ${item.label}` : `${isSelected ? "已展开" : "展开"} ${item.label}`}>
-                        <span className="row-copy">
-                          <span className="row-title">
-                            <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
-                            {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{item.snippetNumber}</b>}
-                            {showFolderChip && item.folder && <small className="row-folder">{item.folder}</small>}
-                            {isSnippet && sharedMark(item) && <small className="row-shared-mark" data-mark={sharedMark(item)}>{sharedMark(item) === "update" ? "公司版有更新" : "公司已停用"}</small>}
-                          </span>
-                          {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
-                        </span>
-                      </button>
-                      {!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
-                      <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
-                      {isSelected && isSnippet && hasPreparedCopy(item) && item.snippetMeta?.chineseText?.trim() && <div className="copy-language row-language" role="group" aria-label="复制语言">
-                        <button type="button" className={fillFor(item).language === "en" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "en" }))}>英文</button>
-                        <button type="button" className={fillFor(item).language === "zh" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "zh" }))}>中文</button>
-                      </div>}
-                      <button type="button" className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消收藏" : "收藏"} ${item.label}`} aria-pressed={Boolean(item.pinned)} title={item.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(item.pinned)} /></button>
-                      {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
-                      {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
-                    </div>
-                    {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
-                      {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
-                        <div className={`row-secret ${revealed ? "revealed" : ""}`}>
-                          <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
-                          <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
-                        </div>
-                      )}
-                      <div className="row-actions">
-                          <button type="button" className="primary-button copy-main" aria-label={copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"} data-copied={copiedId === item.id ? "" : undefined} onClick={() => void copy(item)}><span className="copy-main-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span><span className="copy-main-label"><span>{isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</span><span>已复制</span></span></button>
-                          {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
-                          <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
-                          {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
-                          {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
-                            {valuesCollapsed ? <button type="button" className="var-collapse" aria-expanded="false" aria-label="展开常用值" title="展开常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>常用值<Icon name="chevronDown" /></button> : <>
-                            {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="group" aria-label={`${name} 最近用过的`}>
-                            {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
-                            {/* mousedown is stopped so the block keeps focus until the click lands */}
-                            {memoryOptions(valueMemory, pinnedValues, name).map((option) => <span key={option} role="presentation" data-selected={option === fillFor(item).values[name] ? "" : undefined} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }}>
-                              <ReorderHandle className="var-grip" label={`拖动排序 ${option}`} title="按住拖动，点一下可上移或下移" canMoveUp={canStepOption(name, option, -1)} canMoveDown={canStepOption(name, option, 1)} onBeginDrag={(event) => startOptionDrag(event, name, option)} onMove={(delta) => stepOption(name, option, delta)}><span className="grip-pill" aria-hidden="true"><Icon name="grip" /></span></ReorderHandle>
-                              <button type="button" className="var-memory-pick" title={`${option}（右键：固定 / 解锁 / 删除）`} onClick={() => pickRemembered(item, name, option)}>{option}</button>
-                            </span>)}
-                            </span>)}
-                            <span className="var-tail"><button type="button" className="var-collapse" aria-expanded="true" aria-label="收起常用值" title="收起常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>收起<Icon name="chevronUp" /></button>
-                            <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button></span>
-                            </>}
-                            {valueMenu && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
-                          </span>}
-                          <span className="spacer" />
-                          <div className="menu-wrap">
-                            <button type="button" className="icon-button" aria-label={`更多操作 ${item.label}`} aria-expanded={rowMenuId === item.id} onClick={() => setRowMenuId((value) => value === item.id ? "" : item.id)}><Icon name="more" /></button>
-                            <AnimatePresence>{rowMenuId === item.id && <ArcMenu className="dropdown row-menu">
-                              {moveTargets.length > 0 && <p className="menu-label">移动到</p>}
-                              {moveTargets.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void moveItemToFolder(item, folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
-                              {moveTargets.length > 0 && <div className="menu-divider" />}
-                              <button type="button" role="menuitem" className="danger" onClick={() => { setRowMenuId(""); void trashNow(item); }}>移到回收站</button>
-                            </ArcMenu>}</AnimatePresence>
-                          </div>
-                        </div>
-                      {!isSnippet && !PLAIN_NOTES && <p className="row-hint">复制引用只复制编号，交给本机其他任务读取，{SECRET_WORD}本身不会出现在聊天或日志里。</p>}
-                    </div></div>}
-                  </article>
-                );
-              })}
             </div>}
+            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
+            {!imageView && !vaultPage && legacyList}
             {bulkMode && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
               <strong>已选 {bulkCount} 条</strong>
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>
@@ -1999,22 +2004,22 @@ export default function Home() {
           </section>
         </>}
       </section>
-      {totpOpen && <VaultDialog deviceKey={deviceKey} legacySecrets={legacySecrets} onOpenLegacy={() => { setTotpOpen(false); switchKind("secret"); }} onClose={() => setTotpOpen(false)} onToast={flashToast} />}
       {settingsOpen && <SettingsDialog
         onPreviewSamples={PLAIN_NOTES || !totpUnlocked ? undefined : () => previewClearSamples(deviceKey)}
         onClearSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
           try {
             const result = await clearSampleEntries(deviceKey);
+            setVaultRev((n) => n + 1);
             flashToast(result.removed === 0 ? "没有可清除的范例" : result.keptEdited > 0 ? `已清除 ${result.removed} 条范例，${result.keptEdited} 条你改过的已保留` : `已清除 ${result.removed} 条范例`);
           } catch { flashToast("清除失败，数据没有改动"); }
         }}
         onRestoreSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
           try {
             const result = await restoreSampleEntries(deviceKey);
+            setVaultRev((n) => n + 1);
             flashToast(result.added === 0 ? "范例都在，没有缺的" : `已补回 ${result.added} 条范例`);
           } catch { flashToast("恢复失败，数据没有改动"); }
         }}
-        onUnlockTotp={PLAIN_NOTES ? undefined : () => { setSettingsOpen(false); setTotpOpen(true); }}
         version={appVersion}
         buildTime={buildTime}
         isDesktop={Boolean(typeof window !== "undefined" && window.clipboxDesktop)}

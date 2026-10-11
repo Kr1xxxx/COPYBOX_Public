@@ -13,6 +13,7 @@ test("macOS: 秘密 can be exported to its own encrypted file and imported back"
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await editor.locator("input").first().fill("公司地址");
@@ -47,6 +48,7 @@ test("macOS: 秘密 can be exported to its own encrypted file and imported back"
   await importDialog.getByRole("button", { name: "验证并覆盖" }).click();
   await expect(importDialog).toHaveCount(0);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator(".native-row")).toContainText(["公司地址"]);
   await page.getByRole("button", { name: "话术" }).first().click();
   await expect(page.locator(".native-row")).toHaveCount(34);
@@ -56,6 +58,7 @@ test("macOS: importing with 合并 brings a trashed 秘密 back instead of skipp
   await asDesktop(page, "darwin");
   await seedSnippets(page);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await page.getByRole("button", { name: /新增/ }).first().click();
   const editor = page.locator(".inline-editor");
   await editor.locator("input").first().fill("公司地址");
@@ -84,6 +87,7 @@ test("macOS: importing with 合并 brings a trashed 秘密 back instead of skipp
   await importDialog.getByRole("button", { name: "验证并合并" }).click();
   await expect(importDialog).toHaveCount(0);
   await page.getByRole("button", { name: "秘密" }).first().click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator(".native-row")).toContainText(["公司地址"]);
   await expect(page.locator(".native-row")).toHaveCount(1);
   await expect(trashBadge).toHaveCount(0);

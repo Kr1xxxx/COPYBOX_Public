@@ -7,17 +7,15 @@ async function open(page, platform) {
   await page.waitForSelector(".app-shell");
 }
 
-async function tapVersion(page, times = 5) {
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "关于" }).click();
-  for (let i = 0; i < times; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
+async function tapVersion(page) {
+  await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
 }
 
-test("Mac: tapping the version 5 times opens the hidden 保险箱, accounts are kept and copy works", async ({ page }) => {
+test("Mac: the 秘密 page is the 保险箱, accounts are kept and copy works", async ({ page }) => {
   await open(page, "darwin");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
   await tapVersion(page);
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "验证码", exact: true }).click();
   await dialog.getByRole("button", { name: "添加账号" }).click();
@@ -40,34 +38,24 @@ test("Mac: tapping the version 5 times opens the hidden 保险箱, accounts are 
   await page.waitForSelector(".app-shell");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
-  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
-  await page.getByRole("dialog", { name: "保险箱" }).getByRole("button", { name: "验证码", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "保险箱" }).getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
+  await page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "验证码", exact: true }).click();
+  await expect(page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "复制 公司邮箱 的验证码" })).toBeVisible();
 });
 
 test("Mac: only three sections; the 保险箱 sits inside 秘密, no hidden unlock", async ({ page }) => {
   await open(page, "darwin");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
-  await page.locator(".toolbar").getByRole("button", { name: "保险箱" }).click();
-  await expect(page.getByRole("dialog", { name: "保险箱" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
 });
 
-test("Mac: fewer than 5 taps do nothing; Windows never gets the feature", async ({ page }) => {
-  await open(page, "darwin");
-  await tapVersion(page, 4);
-  await expect(page.getByRole("dialog", { name: "保险箱" })).toHaveCount(0);
-  await page.close();
-});
-
-test("Windows: tapping the version does nothing", async ({ page }) => {
+test("Windows: no 秘密 page, so no 保险箱", async ({ page }) => {
   await open(page, "win32");
-  await tapVersion(page, 6);
-  await expect(page.getByRole("dialog", { name: "保险箱" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片"]);
 });
 
-test("关于 shows the version and when it was updated; the version still opens 验证码 after 5 taps", async ({ page }) => {
+test("关于 shows the version and when it was updated; tapping the version opens nothing", async ({ page }) => {
   await open(page, "darwin");
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
@@ -76,7 +64,7 @@ test("关于 shows the version and when it was updated; the version still opens 
   const row = settings.locator(".settings-row", { hasText: "更新时间" });
   await expect(row).toContainText("2026-10-10 21:37");
   for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipbox v/).click();
-  await expect(page.getByRole("dialog", { name: "保险箱" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
 });
 
 
@@ -91,7 +79,7 @@ test("Mac: a QR picture fills in the link; unreadable pictures say so", async ({
   });
   await open(page, "darwin");
   await tapVersion(page);
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await dialog.getByRole("button", { name: "验证码", exact: true }).click();
   await dialog.getByRole("button", { name: "添加账号" }).click();
   const png = { name: "qr.png", mimeType: "image/png", buffer: Buffer.from("x") };
@@ -112,7 +100,7 @@ test("Mac: copying a code with few seconds left says so", async ({ page }) => {
   });
   await open(page, "darwin");
   await tapVersion(page);
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  const dialog = page.getByRole("region", { name: "保险箱" });
   await dialog.getByRole("button", { name: "验证码", exact: true }).click();
   await dialog.getByRole("button", { name: "添加账号" }).click();
   await dialog.getByLabel("密钥或链接").fill("JBSWY3DPEHPK3PXP");
@@ -120,24 +108,4 @@ test("Mac: copying a code with few seconds left says so", async ({ page }) => {
   await dialog.getByRole("button", { name: "保存" }).click();
   await dialog.getByRole("button", { name: "复制 急用 的验证码" }).click();
   await expect(page.getByText(/只剩 \d 秒/)).toBeVisible();
-});
-
-test("Mac: the 保险箱 dialog is as tall as its content even when settings dialogs are given a fixed height", async ({ page }) => {
-  await page.addInitScript(() => {
-    document.addEventListener("DOMContentLoaded", () => {
-      const style = document.createElement("style");
-      style.textContent = ".settings-dialog{height:min(560px,100vh - 32px)}";
-      document.head.append(style);
-    });
-  });
-  await open(page, "darwin");
-  await tapVersion(page);
-  const dialog = page.getByRole("dialog", { name: "保险箱" });
-  await dialog.getByRole("button", { name: "验证码", exact: true }).click();
-  await dialog.getByRole("button", { name: "添加账号" }).click();
-  await expect(dialog.getByLabel("密钥或链接")).toBeVisible();
-  const box = await dialog.boundingBox();
-  expect(box.height).toBeLessThan(480);
-  const field = await dialog.getByLabel("密钥或链接").boundingBox();
-  expect(field.x - box.x).toBeGreaterThanOrEqual(16);
 });

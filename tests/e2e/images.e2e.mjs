@@ -44,6 +44,7 @@ test("macOS: the sections are 话术, 秘密 and 图片, and 秘密 still opens"
   await openApp(page, "darwin");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "秘密", "图片"]);
   await page.locator(".kind-switch").getByRole("button", { name: "秘密" }).click();
+  await page.locator(".vault-tabs").getByRole("button", { name: "其他" }).click();
   await expect(page.locator("body")).toContainText("默认只复制引用");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await expect(page.locator("body")).toContainText("还没有图片，先添加第一张");

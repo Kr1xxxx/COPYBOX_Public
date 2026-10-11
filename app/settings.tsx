@@ -23,8 +23,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
-  onUnlockTotp?: () => void;
+export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
   // Only given on a Mac whose 保险箱 is unlocked: remove / put back the 【范例】 entries.
   onPreviewSamples?: () => Promise<string[]>; onClearSamples?: () => Promise<void>; onRestoreSamples?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
@@ -60,16 +59,8 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
   const [confirmClearSamples, setConfirmClearSamples] = useState<string[] | null>(null);
   const [versionCopied, setVersionCopied] = useState(false);
   const [dataMove, setDataMove] = useState<"export" | "import" | null>(null);
-  // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
   const [openedAt] = useState(() => Date.now());
   const builtAt = formatBuildTime(buildTime);
-  const versionTaps = useRef<number[]>([]);
-  function tapVersion() {
-    if (!onUnlockTotp) return;
-    const now = Date.now();
-    versionTaps.current = [...versionTaps.current.filter((at) => now - at < 3000), now];
-    if (versionTaps.current.length >= 5) { versionTaps.current = []; onUnlockTotp(); }
-  }
   const [aiAvailable] = useState(() => typeof window !== "undefined" && "LanguageModel" in window);
   const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
   useEffect(() => {
@@ -176,7 +167,7 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
             <AiSettingsSection localAiAvailable={aiAvailable} />
           </section>
           <section aria-labelledby="set-about" hidden={tab !== "about"}><h3 id="set-about">关于</h3>
-            <div className="settings-row"><div><strong role="presentation" onClick={tapVersion}>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
+            <div className="settings-row"><div><strong>Clipbox {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipbox ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
             {builtAt && <div className="settings-row static"><div><strong>更新时间</strong><small className="settings-build-time">{builtAt}</small></div></div>}
           </section>
