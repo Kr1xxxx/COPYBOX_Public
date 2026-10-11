@@ -536,7 +536,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-chip[data-filled] { background: color-mix(in srgb, var(--accent-soft) 70%, var(--card)); }
 .var-memory { display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .var-memory::-webkit-scrollbar { display: none; }
-.var-memory .var-help { position: sticky; right: 0; margin-left: auto; box-shadow: 0 0 0 4px var(--card); }
+.var-memory .var-tail { position: sticky; right: 0; margin-left: auto; display: inline-flex; align-items: center; gap: 2px; flex: none; background: var(--card); box-shadow: 0 0 0 4px var(--card); }
 .var-memory-option { flex: 0 1 auto; min-width: 0; max-width: 130px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; animation: var-memory-in .16s cubic-bezier(.22,1,.36,1); transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
 .var-memory-option:hover, .var-memory-option[data-selected] { background: var(--accent-soft); color: var(--accent-ink); }
 .var-memory-option:active { scale: .96; }
@@ -968,7 +968,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory-group { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .var-memory-name { font-size: 11.5px; color: var(--muted); }
 .var-memory { flex: 0 1 auto; }
-.var-popup[data-below] { transform: translate(-50%, 6px); }
 .var-memory-option[data-dragging] { z-index: 2; position: relative; scale: 1.06; box-shadow: 0 4px 12px rgba(0,0,0,.18); cursor: grabbing; }
 
 .settings-build-time { font-variant-numeric: tabular-nums; }
@@ -1068,3 +1067,12 @@ button { -webkit-tap-highlight-color: transparent; }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .backup-warning{background:var(--warn-bg);color:var(--warn)}}
 :root[data-theme="dark"] .backup-warning{background:var(--warn-bg);color:var(--warn)}
 .backup-dialog.data-move .backup-intro,.backup-dialog.data-move .backup-note,.backup-dialog.data-move .backup-field{color:#5b5b60}.backup-dialog.data-move .backup-head p{color:#7a5a43}.backup-dialog.data-move:focus{outline:0}
+/* 英文/中文 sits in the card's top row, just left of the favourite star */
+.row-line .copy-language.row-language { width: auto; height: 24px; margin: 0 4px; padding: 2px; display: inline-flex; flex: none; border-radius: 8px; background: var(--fill); }
+.row-line .copy-language.row-language button { padding: 0 9px 1px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.row-line .copy-language.row-language button.active { background: var(--card); color: var(--ink); }
+/* 收起 / 展开 the remembered values, beside the ? */
+.var-collapse { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px 2px 8px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), color .12s, scale .12s cubic-bezier(.22,1,.36,1); }
+.var-collapse .icon { width: 12px; height: 12px; }
+.var-collapse:hover { background: var(--fill); color: var(--ink); }
+.var-collapse:active { scale: .96; }

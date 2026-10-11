@@ -129,19 +129,40 @@ test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out 
   await row.locator("input[data-var=Name]").click();
   const popup = page.locator(".var-popup");
   await expect(popup.locator(".var-popup-option")).toHaveText(["Beautiful", "Friend", "Lovely"]);
-  // this card has the 英文/中文 switch above its text, so the choices open below the block and never cover it
-  await expect(row.locator(".copy-language")).toBeVisible();
-  // the card and the popup settle after a short animation (slower on a busy machine), so read the boxes until they do
+  // the 英文/中文 switch sits in the top row now, so the choices open above the block as before
   await expect.poll(async () => {
     const chipBox = await chip.boundingBox();
     const popupBox = await popup.boundingBox();
-    const switchBox = await row.locator(".copy-language").boundingBox();
-    if (!chipBox || !popupBox || !switchBox) return "waiting";
-    const overlap = Math.min(popupBox.y + popupBox.height, switchBox.y + switchBox.height) - Math.max(popupBox.y, switchBox.y);
-    return popupBox.y > chipBox.y && overlap <= 0 ? "below" : `y ${popupBox.y} chip ${chipBox.y} overlap ${overlap}`;
-  }, { timeout: 5000 }).toBe("below");
+    if (!chipBox || !popupBox) return "waiting";
+    return popupBox.y + popupBox.height <= chipBox.y + 1 ? "above" : `popup ${popupBox.y}+${popupBox.height} chip ${chipBox.y}`;
+  }, { timeout: 5000 }).toBe("above");
   await popup.getByRole("option", { name: "Lovely" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
+});
+
+test("the 英文/中文 switch sits just left of the favourite star, and the 常用值 strip can be folded away and back", async ({ page }) => {
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await row.locator("input[data-var=Company]").fill("Comely");
+  await row.locator("input[data-var=Name]").fill("Dana");
+  await row.getByRole("button", { name: "复制", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Dana");
+  const toggle = row.locator(".row-line .copy-language");
+  await expect(toggle).toBeVisible();
+  const toggleBox = await toggle.boundingBox();
+  const starBox = await row.locator(".native-pin").boundingBox();
+  expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(starBox.x + 1);
+  expect(Math.abs((toggleBox.y + toggleBox.height / 2) - (starBox.y + starBox.height / 2))).toBeLessThan(4);
+  await expect(row.locator(".snippet-fill .copy-language")).toHaveCount(0);
+  // the strip: 收起 leaves a single 展开 button, 展开 brings the values back, and the choice is remembered
+  const options = row.locator(".var-memory .var-memory-option");
+  await expect(options.first()).toBeVisible();
+  await row.getByRole("button", { name: "收起常用值" }).click();
+  await expect(options).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.values-collapsed"))).toBe("1");
+  await page.locator(".native-row.selected").getByRole("button", { name: "展开常用值" }).click();
+  await expect(page.locator(".native-row.selected .var-memory-option").first()).toBeVisible();
 });
 
 test("remembered values stay after many clicks; a right-click pins one so new values never push it out; ? explains", async ({ page }) => {

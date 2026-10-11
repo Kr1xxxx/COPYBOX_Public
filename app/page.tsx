@@ -127,6 +127,7 @@ const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
+const VALUES_COLLAPSED_KEY = "clipbox.values-collapsed";
 
 function readStoredChoice<T extends string | number>(key: string, allowed: readonly T[], fallback: T): T {
   try {
@@ -282,6 +283,8 @@ export default function Home() {
   const lastValues = latestValues(valueMemory);
   const [pinnedValues, setPinnedValues] = useState<PinnedValues>(() => { try { return parsePinned(localStorage.getItem(PINNED_KEY)); } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedValues)); } catch { /* pins last for this session only */ } }, [pinnedValues]);
+  const [valuesCollapsed, setValuesCollapsed] = useState(() => readStoredChoice(VALUES_COLLAPSED_KEY, ["0", "1"], "0") === "1");
+  function toggleValuesCollapsed() { setValuesCollapsed((current) => { writeStoredChoice(VALUES_COLLAPSED_KEY, current ? "0" : "1"); return !current; }); }
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
   const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; grab: number; element: HTMLElement } | null>(null);
@@ -1927,6 +1930,10 @@ export default function Home() {
                       </button>
                       {!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
                       <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
+                      {isSelected && isSnippet && hasPreparedCopy(item) && item.snippetMeta?.chineseText?.trim() && <div className="copy-language row-language" role="group" aria-label="复制语言">
+                        <button type="button" className={fillFor(item).language === "en" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "en" }))}>英文</button>
+                        <button type="button" className={fillFor(item).language === "zh" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "zh" }))}>中文</button>
+                      </div>}
                       <button type="button" className="native-pin" onClick={() => togglePinned(item)} aria-label={`${item.pinned ? "取消收藏" : "收藏"} ${item.label}`} aria-pressed={Boolean(item.pinned)} title={item.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(item.pinned)} /></button>
                       {copiedId === item.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
                       {!PLAIN_NOTES && copiedReferenceId === item.id && <span className="copy-status" role="status" aria-live="polite">引用已复制</span>}
@@ -1945,6 +1952,7 @@ export default function Home() {
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
                           {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
+                            {valuesCollapsed ? <button type="button" className="var-collapse" aria-expanded="false" aria-label="展开常用值" title="展开常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>常用值<Icon name="chevronDown" /></button> : <>
                             {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="group" aria-label={`${name} 最近用过的`}>
                             {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
@@ -1953,7 +1961,9 @@ export default function Home() {
                               <button type="button" className="var-memory-pick" title={`${option}（右键：固定 / 解锁 / 删除）`} onClick={() => pickRemembered(item, name, option)}>{option}</button>
                             </span>)}
                             </span>)}
-                            <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button>
+                            <span className="var-tail"><button type="button" className="var-collapse" aria-expanded="true" aria-label="收起常用值" title="收起常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>收起<Icon name="chevronUp" /></button>
+                            <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button></span>
+                            </>}
                             {valueMenu && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}
                           </span>}
                           <span className="spacer" />
