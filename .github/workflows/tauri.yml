@@ -10,6 +10,11 @@ on:
       - "scripts/tauri-frontend.mjs"
       - ".github/workflows/tauri.yml"
   workflow_dispatch:
+    inputs:
+      publish_test_build:
+        description: "Also publish both installers as a GitHub pre-release (a test build, not the update staff are offered)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -62,3 +67,43 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/macos/*.app
           retention-days: 7
+      # A .app uploaded as an artifact loses its executable bits, so the Mac build is zipped with ditto first.
+      - name: Name the test installers
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build
+        shell: bash
+        run: |
+          mkdir release-files
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp src-tauri/target/release/bundle/nsis/*.exe "release-files/Clipbox-Tauri-test-Windows-setup.exe"
+          else
+            ditto -c -k --keepParent src-tauri/target/release/bundle/macos/Clipbox.app "release-files/Clipbox-Tauri-test-macOS-arm64.zip"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build
+        with:
+          name: release-${{ matrix.name }}
+          path: release-files/*
+          retention-days: 7
+
+  test-release:
+    name: publish test build
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-files
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="tauri-test-${{ github.run_number }}"
+          gh release create "$tag" release-files/* --repo "${{ github.repository }}" --target "${{ github.sha }}" --prerelease \
+            --title "Tauri 测试版 #${{ github.run_number }}(测试用,不是正式版)" \
+            --notes "只用来测试的 Tauri 版本,不是员工收到的更新。Windows:下载 Setup.exe 运行(没有签名,Windows 会提示,选「仍要运行」)。Mac:解压后右键打开(没有签名)。装好后在旧版里「设置 → 数据 → 导出到新版」,再在这个版本里「从旧版导入」。提交 ${{ github.sha }}。"
+          echo "https://github.com/${{ github.repository }}/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
