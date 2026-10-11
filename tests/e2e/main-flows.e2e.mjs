@@ -129,14 +129,17 @@ test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out 
   await row.locator("input[data-var=Name]").click();
   const popup = page.locator(".var-popup");
   await expect(popup.locator(".var-popup-option")).toHaveText(["Beautiful", "Friend", "Lovely"]);
-  const chipBox = await chip.boundingBox();
-  const popupBox = await popup.boundingBox();
   // this card has the 英文/中文 switch above its text, so the choices open below the block and never cover it
   await expect(row.locator(".copy-language")).toBeVisible();
-  const switchBox = await row.locator(".copy-language").boundingBox();
-  expect(popupBox.y).toBeGreaterThan(chipBox.y);
-  const overlap = Math.min(popupBox.y + popupBox.height, switchBox.y + switchBox.height) - Math.max(popupBox.y, switchBox.y);
-  expect(overlap).toBeLessThanOrEqual(0);
+  // the card and the popup settle after a short animation (slower on a busy machine), so read the boxes until they do
+  await expect.poll(async () => {
+    const chipBox = await chip.boundingBox();
+    const popupBox = await popup.boundingBox();
+    const switchBox = await row.locator(".copy-language").boundingBox();
+    if (!chipBox || !popupBox || !switchBox) return "waiting";
+    const overlap = Math.min(popupBox.y + popupBox.height, switchBox.y + switchBox.height) - Math.max(popupBox.y, switchBox.y);
+    return popupBox.y > chipBox.y && overlap <= 0 ? "below" : `y ${popupBox.y} chip ${chipBox.y} overlap ${overlap}`;
+  }, { timeout: 5000 }).toBe("below");
   await popup.getByRole("option", { name: "Lovely" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
 });
