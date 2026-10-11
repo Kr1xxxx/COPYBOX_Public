@@ -69,6 +69,7 @@ impl Shell {
         if let Some(window) = app.get_webview_window("main") {
             mode.save_now(&window);
         }
+        // The exit request makes the page save first (see flush.rs).
         app.exit(0);
     }
 
@@ -213,7 +214,7 @@ pub fn relaunch(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<W
     if let Some(window) = app.get_webview_window("main") {
         mode.save_now(&window);
     }
-    app.restart();
+    crate::flush::then_after_flush(&app, |app| app.restart());
 }
 
 #[cfg(test)]
