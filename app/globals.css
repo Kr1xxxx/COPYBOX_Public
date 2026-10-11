@@ -128,7 +128,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .directory-row .folder-drag-handle:hover { color: var(--ink); }
 .folder-drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .folder-drag-handle:active { cursor: grabbing; }
-.directory-row.dragging { z-index: 5; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
+.directory-row.dragging { z-index: 5; opacity: .8; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .directory-row.drag-over::after { content: ""; position: absolute; left: 5px; right: 5px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 .nav-footer { flex: 0 0 auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
 .menu-wrap { position: relative; }
@@ -248,7 +248,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .row-hint { margin: -2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 /* Reordering */
-.native-row.dragging { z-index: 10; opacity: .96; animation: none; background: var(--card); box-shadow: 0 18px 40px rgba(31,30,28,.18); }
+.native-row.dragging { z-index: 10; opacity: .8; animation: none; background: var(--card); box-shadow: 0 18px 40px rgba(31,30,28,.18); }
 .native-row.drag-over::after { content: ""; position: absolute; left: 12px; right: 12px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 
 /* Trash */
@@ -687,7 +687,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-folder:last-of-type { border-bottom: 0; }
 .settings-folder-row { min-height: 40px; display: flex; align-items: center; gap: 9px; }
 .settings-folder { position: relative; }
-.settings-folder.dragging { z-index: 5; border-radius: 8px; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
+.settings-folder.dragging { z-index: 5; opacity: .8; border-radius: 8px; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .settings-folder.drag-over::after { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
 .settings-folder-grip { width: 16px; height: 24px; flex: none; margin-left: 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; cursor: grab; touch-action: none; opacity: .55; transition: opacity .14s, background .14s; }
 .settings-folder-grip:hover, .settings-folder-grip:focus-visible { opacity: 1; background: var(--hover); }
@@ -968,7 +968,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory-group { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .var-memory-name { font-size: 11.5px; color: var(--muted); }
 .var-memory { flex: 0 1 auto; }
-.var-memory-option[data-dragging] { z-index: 2; position: relative; scale: 1.06; box-shadow: 0 4px 12px rgba(0,0,0,.18); cursor: grabbing; }
+.var-memory-option[data-dragging] { z-index: 2; opacity: .8; position: relative; scale: 1.06; box-shadow: 0 4px 12px rgba(0,0,0,.18); cursor: grabbing; }
 
 .settings-build-time { font-variant-numeric: tabular-nums; }
 .native-row, .row-detail, .row-actions { min-width: 0; }

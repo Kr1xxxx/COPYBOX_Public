@@ -611,6 +611,8 @@ test("the standard 话术 folders can be dragged to a new place and the order is
   await page.mouse.down();
   await page.mouse.move(h.x + h.width / 2, h.y + 20, { steps: 4 });
   await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
+  // the row being dragged is 80% opaque so the place under it stays visible
+  await expect(page.locator(".sidebar .directory-row.dragging")).toHaveCSS("opacity", "0.8");
   await page.mouse.up();
   await expect.poll(async () => (await names()).indexOf("询盘接待")).toBeGreaterThan(1);
   const after = await names();
