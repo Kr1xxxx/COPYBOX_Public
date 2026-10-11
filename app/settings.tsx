@@ -5,13 +5,14 @@ import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "./arc/motion-tokens";
 import { AiSettingsSection } from "./ai-settings";
 import { ArcSegmented } from "./arc/segmented";
-import { formatBuildTime } from "./clipbox-core";
+import { formatBuildTime, type SecretItem } from "./clipbox-core";
+import { UsageSection } from "./usage-section";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
-const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
+const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number][0];
 
 function backupAgeLabel(at: number) {
@@ -21,10 +22,11 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary }: {
+export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
   onUnlockTotp?: () => void;
   // Only given on a Mac whose 保险箱 is unlocked: remove / put back the 【范例】 entries.
   onPreviewSamples?: () => Promise<string[]>; onClearSamples?: () => Promise<void>; onRestoreSamples?: () => Promise<void>;
+  usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   folderGroups: SettingsFolderGroup[];
@@ -57,6 +59,7 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
   const [confirmClearSamples, setConfirmClearSamples] = useState<string[] | null>(null);
   const [versionCopied, setVersionCopied] = useState(false);
   // Secret gesture (Mac only): tap the version line 5 times within 3 seconds.
+  const [openedAt] = useState(() => Date.now());
   const builtAt = formatBuildTime(buildTime);
   const versionTaps = useRef<number[]>([]);
   function tapVersion() {
@@ -141,6 +144,9 @@ export function SettingsDialog({ onUnlockTotp, onPreviewSamples, onClearSamples,
           </section>
           <section aria-labelledby="set-security" hidden={tab !== "data"}><h3 id="set-security">安全</h3>
             <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
+          </section>
+          <section aria-labelledby="set-usage" hidden={tab !== "usage"}><h3 id="set-usage">使用排行</h3>
+            <UsageSection items={usageItems} now={openedAt} onShow={onShowItem} />
           </section>
           <section aria-labelledby="set-window" hidden={tab !== "window"}><h3 id="set-window">窗口</h3>
             {row("迷你模式", "360×440，置顶显示，适合边聊边复制", onMini, "切换到迷你")}

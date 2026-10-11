@@ -47,6 +47,7 @@ import {
   vaultDataForBackupScope,
   moveItemToTrash,
 } from "./clipbox-core";
+import { recordCopy } from "./usage-ranking";
 import {
   buildSnippetImportPreview,
   extractPlaceholders,
@@ -798,7 +799,7 @@ export default function Home() {
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
-    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, lastUsedAt: timestampNow(), useCount: (value.useCount || 0) + 1 } : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
+    void persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? recordCopy(value, timestampNow()) : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
@@ -1345,6 +1346,17 @@ export default function Home() {
     exitBulk();
     if (modalOpen) closeEditor();
     setFill(null);
+  }
+
+  // From 使用排行: close Settings and find that snippet in the list.
+  function showItemInList(item: SecretItem) {
+    setSettingsOpen(false);
+    setImageView(false);
+    setActiveKind("snippet");
+    setActiveFolder("all");
+    setProductFilter("全部产品");
+    setSearchAllFolders(true);
+    setQuery(item.label);
   }
 
   function switchKind(kind: ItemKind) {
@@ -1953,6 +1965,8 @@ export default function Home() {
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
         onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
+        usageItems={items}
+        onShowItem={showItemInList}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
       />}

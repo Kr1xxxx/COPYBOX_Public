@@ -115,7 +115,7 @@ test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
 test("Settings has two columns: groups on the left, the chosen group on the right, 外观 first", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   const tabs = dialog.getByRole("tab");
-  await expect(tabs).toHaveText(["外观", "目录", "数据", "窗口", "AI", "关于"]);
+  await expect(tabs).toHaveText(["外观", "目录", "数据", "使用排行", "窗口", "AI", "关于"]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   // Only the chosen group is shown.
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeVisible();
@@ -129,6 +129,8 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog).toContainText("加密后只保存在这台电脑上");
   // Arrow keys move between groups.
   await dialog.getByRole("tab", { name: "数据" }).press("ArrowDown");
+  await expect(dialog.getByRole("tab", { name: "使用排行" })).toHaveAttribute("aria-selected", "true");
+  await dialog.getByRole("tab", { name: "使用排行" }).press("ArrowDown");
   await expect(dialog.getByRole("tab", { name: "窗口" })).toHaveAttribute("aria-selected", "true");
   await expect(dialog.getByText("迷你模式")).toBeVisible();
 });
