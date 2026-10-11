@@ -1030,3 +1030,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .totp-qr-pick{position:relative;justify-self:start;cursor:pointer}
 .totp-qr-pick input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
 .totp-qr-pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+/* 话术内容 / 中文翻译: the box follows its text (JS sets the textarea height, three lines at least, nine at most) */
+.inline-editor .snippet-content .soft-textarea, .inline-editor .chinese-field .soft-textarea { height: auto; }
+.inline-editor .snippet-content .soft-textarea textarea, .inline-editor .chinese-field .soft-textarea textarea { display: block; height: auto; min-height: 0; overflow-y: auto; }

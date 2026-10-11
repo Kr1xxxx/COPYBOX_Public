@@ -484,3 +484,25 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   await group.getByRole("button", { name: /话术目录/ }).click();
   expect(await group.locator(".settings-folder-name").allInnerTexts()).toEqual(after);
 });
+
+test("the 话术内容 and 中文翻译 boxes are about three lines when short, grow while typing and stop at a limit", async ({ page }) => {
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  const content = editor.getByRole("textbox", { name: "话术内容" });
+  const chinese = editor.getByLabel(/中文翻译/);
+  const heights = async () => [await content.evaluate((e) => e.getBoundingClientRect().height), await chinese.evaluate((e) => e.getBoundingClientRect().height)];
+  const [emptyContent, emptyChinese] = await heights();
+  expect(emptyContent).toBeLessThan(90);
+  expect(emptyChinese).toBeLessThan(90);
+  await content.fill("Hello there");
+  expect((await heights())[0]).toBeLessThan(90);
+  await content.fill(Array.from({ length: 6 }, (_, i) => `line ${i + 1}`).join("\n"));
+  const six = (await heights())[0];
+  expect(six).toBeGreaterThan(emptyContent + 30);
+  await content.fill(Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n"));
+  const many = (await heights())[0];
+  expect(many).toBeLessThan(220);
+  expect(await content.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
+  await chinese.fill("一\n二\n三\n四\n五");
+  expect((await heights())[1]).toBeGreaterThan(emptyChinese + 15);
+});
