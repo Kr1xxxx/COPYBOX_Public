@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod shell;
 mod window_mode;
 mod window_state;
 
+use shell::Shell;
 use std::time::Duration;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use window_mode::WindowMode;
 
 // Same names Electron reports, because the page checks for "darwin".
@@ -18,15 +20,31 @@ fn page_platform() -> &'static str {
     }
 }
 
+/// Launch at login starts Clipbox quietly in the tray.
+fn start_hidden() -> bool {
+    std::env::args().any(|a| a == "--hidden")
+}
+
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        // A second launch brings the first window back instead of opening another.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| shell::show_window(app, false)))
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(WindowMode::default())
+        .manage(Shell::default())
         .invoke_handler(tauri::generate_handler![
             window_mode::set_window_mode,
             window_mode::get_window_mode,
             window_mode::set_theme,
             window_mode::page_ready,
+            shell::set_close_behavior,
+            shell::set_mini_hide_policy,
+            shell::did_copy,
+            shell::get_launch_at_login,
+            shell::set_launch_at_login,
+            shell::open_data_folder,
         ])
         .setup(|app| {
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
@@ -45,23 +63,46 @@ fn main() {
                 .hidden_title(true)
                 .traffic_light_position(tauri::LogicalPosition::new(14.0, 19.0));
             let window = builder.build()?;
+            shell::build_tray(app.handle())?;
 
-            // If the page never reports in, show the window anyway.
-            let fallback = window.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_secs(4));
-                let _ = fallback.show();
-            });
+            // If the page never reports in, show the window anyway (unless Clipbox was started quietly).
+            if !start_hidden() {
+                let fallback = window.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(4));
+                    let _ = fallback.show();
+                });
+            }
 
-            let state = app.state::<WindowMode>().inner().clone();
+            let mode = app.state::<WindowMode>().inner().clone();
+            let shell = app.state::<Shell>().inner().clone();
             let watched = window.clone();
             window.on_window_event(move |event| match event {
-                WindowEvent::Moved(_) | WindowEvent::Resized(_) => state.schedule_save(&watched),
-                WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => state.save_now(&watched),
+                WindowEvent::Moved(_) | WindowEvent::Resized(_) => mode.schedule_save(&watched),
+                WindowEvent::CloseRequested { api, .. } => {
+                    if !shell.on_close_requested(&watched, &mode) {
+                        api.prevent_close();
+                    }
+                }
+                WindowEvent::Destroyed => mode.save_now(&watched),
                 _ => {}
             });
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("Clipbox failed to start");
+
+    app.run(|app, event| match event {
+        // Clicking the Dock icon brings the window back.
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => shell::show_window(app, false),
+        RunEvent::ExitRequested { .. } => {
+            if let Some(window) = app.get_webview_window("main") {
+                app.state::<WindowMode>().save_now(&window);
+            }
+        }
+        _ => {
+            let _ = app;
+        }
+    });
 }
