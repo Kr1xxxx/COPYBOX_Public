@@ -286,8 +286,7 @@ export default function Home() {
   useEffect(() => { try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinnedValues)); } catch { /* pins last for this session only */ } }, [pinnedValues]);
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
-  const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; element: HTMLButtonElement } | null>(null);
-  const suppressOptionClick = useRef(false);
+  const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; grab: number; element: HTMLElement } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -888,23 +887,26 @@ export default function Home() {
   });
 
   function startOptionDrag(event: React.PointerEvent<HTMLButtonElement>, name: string, value: string) {
-    if (event.button !== 0) return;
-    dragOption.current = { name, value, startX: event.clientX, startLeft: event.currentTarget.offsetLeft, moved: false, element: event.currentTarget };
+    const element = event.currentTarget.closest<HTMLElement>(".var-memory-option");
+    if (event.button !== 0 || !element) return;
+    dragOption.current = { name, value, startX: event.clientX, startLeft: element.offsetLeft, moved: false, grab: event.clientX - element.getBoundingClientRect().left, element };
     event.currentTarget.setPointerCapture(event.pointerId);
-    // Reordering moves the button in the page, which can drop the pointer capture; the window still hears the release.
-    const release = () => { window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); endOptionDrag(); };
+    // Reordering moves the value in the page, which can drop the pointer capture; the window still hears the move and the release.
+    const move = (pointerEvent: PointerEvent) => moveOptionDrag(pointerEvent.clientX);
+    const release = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); endOptionDrag(); };
+    window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", release);
     window.addEventListener("pointercancel", release);
   }
-  function moveOptionDrag(event: React.PointerEvent<HTMLButtonElement>) {
+  function moveOptionDrag(clientX: number) {
     const drag = dragOption.current;
     if (!drag) return;
-    if (!drag.moved && Math.abs(event.clientX - drag.startX) < 6) return;
+    if (!drag.moved && Math.abs(clientX - drag.startX) < 6) return;
     if (!drag.moved) { drag.element.dataset.dragging = ""; drag.element.style.transition = "none"; }
     drag.moved = true;
-    // Hit-test on layout positions (not painted ones), so values that are still sliding do not confuse the swap.
-    const shift = event.clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft);
-    const centre = drag.element.offsetLeft + shift + drag.element.offsetWidth / 2;
+    // Hit-test where the pointer is, on layout positions (not painted ones), so values that are still sliding do not confuse the swap.
+    const shift = clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft);
+    const centre = drag.element.offsetLeft + shift + drag.grab;
     const over = Array.from(drag.element.parentElement?.querySelectorAll<HTMLElement>(".var-memory-option") || []).find((element) => element !== drag.element && centre >= element.offsetLeft && centre <= element.offsetLeft + element.offsetWidth);
     if (over) {
     const outcome = moveOption(valueMemory, pinnedValues, drag.name, drag.value, over.dataset.optionValue || "");
@@ -912,6 +914,19 @@ export default function Home() {
     }
     // the held value follows the pointer, even after the others have slid into new places
     drag.element.style.transform = `translateX(${shift}px)`;
+  }
+  // The menu on a value's handle moves it one place; pinned values only change places among themselves.
+  function stepOption(name: string, value: string, step: -1 | 1) {
+    const options = memoryOptions(valueMemory, pinnedValues, name);
+    const target = options[options.indexOf(value) + step];
+    if (target === undefined) return;
+    const outcome = moveOption(valueMemory, pinnedValues, name, value, target);
+    if (outcome.memory !== valueMemory || outcome.pins !== pinnedValues) { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); }
+  }
+  function canStepOption(name: string, value: string, step: -1 | 1) {
+    const options = memoryOptions(valueMemory, pinnedValues, name);
+    const target = options[options.indexOf(value) + step];
+    return target !== undefined && isPinned(pinnedValues, name, value) === isPinned(pinnedValues, name, target);
   }
   function endOptionDrag() {
     const held = dragOption.current;
@@ -922,7 +937,6 @@ export default function Home() {
       element.style.transform = "";
       window.setTimeout(() => { element.style.transition = ""; }, 200);
     }
-    if (dragOption.current?.moved) { suppressOptionClick.current = true; window.setTimeout(() => { suppressOptionClick.current = false; }, 0); }
     dragOption.current = null;
   }
 
@@ -1848,10 +1862,13 @@ export default function Home() {
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
                           {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
-                            {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="listbox" aria-label={`${name} 最近用过的`}>
+                            {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="group" aria-label={`${name} 最近用过的`}>
                             {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
-                            {memoryOptions(valueMemory, pinnedValues, name).map((option) => <button key={option} type="button" role="option" aria-selected={option === fillFor(item).values[name]} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} title={`${option}（右键：固定 / 解锁 / 删除，按住可拖动）`} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onPointerDown={(event) => startOptionDrag(event, name, option)} onPointerMove={moveOptionDrag} onPointerUp={endOptionDrag} onPointerCancel={endOptionDrag} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }} onClick={() => { if (suppressOptionClick.current) return; pickRemembered(item, name, option); }}>{option}</button>)}
+                            {memoryOptions(valueMemory, pinnedValues, name).map((option) => <span key={option} role="presentation" data-selected={option === fillFor(item).values[name] ? "" : undefined} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }}>
+                              <ReorderHandle className="var-grip" label={`拖动排序 ${option}`} title="按住拖动，点一下可上移或下移" canMoveUp={canStepOption(name, option, -1)} canMoveDown={canStepOption(name, option, 1)} onBeginDrag={(event) => startOptionDrag(event, name, option)} onMove={(delta) => stepOption(name, option, delta)}><span className="grip-pill" aria-hidden="true"><Icon name="grip" /></span></ReorderHandle>
+                              <button type="button" className="var-memory-pick" title={`${option}（右键：固定 / 解锁 / 删除）`} onClick={() => pickRemembered(item, name, option)}>{option}</button>
+                            </span>)}
                             </span>)}
                             <button type="button" className="var-help" aria-label="常用值说明" onMouseDown={(event) => event.preventDefault()} onClick={showVariableHelp}>?</button>
                             {valueMenu && <VariableMenu x={valueMenu.x} y={valueMenu.y} pinned={isPinned(pinnedValues, valueMenu.name, valueMenu.value)} onPin={() => pinValue(item, valueMenu.name, valueMenu.value)} onUnpin={() => pinValue(item, valueMenu.name, valueMenu.value)} onDelete={() => removeValue(valueMenu.name, valueMenu.value)} onClose={() => setValueMenu(null)} />}

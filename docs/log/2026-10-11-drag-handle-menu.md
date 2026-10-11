@@ -6,3 +6,4 @@
 - User-visible change (plain Chinese, for the preview changelog): 点一下六点把手会弹出「上移 / 下移」小菜单,到顶或到底的那项变灰;按住拖动照常可用。
 - Not done / risks: not looked at on a real desktop, only in the browser (Windows and Mac style, light and dark). Local commit only (freeze).
 - Next step: Lock decides on 隐藏 and the shortcut hints.
+- Remembered values (常用值) in the 话术 strip got the same six-dot handle (`ReorderHandle`): press and drag reorders, a click opens 上移 / 下移. The value text is its own button that still fills; the right-click menu (固定 / 解锁 / 删除) is unchanged. Dragging now follows the pointer, not the middle of the value. No 隐藏 and no shortcut hints (waiting for Lock). Position of the strip did not move.

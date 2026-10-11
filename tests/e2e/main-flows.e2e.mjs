@@ -177,6 +177,25 @@ test("remembered values stay after many clicks; a right-click pins one so new va
   expect(await hint.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
+test("each remembered value has a six-dot handle; tapping it offers 上移 and 下移, and the value itself still fills", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  await row.locator("input[data-var=Company]").fill("Comely");
+  for (const value of ["Amanda", "Bella", "Cara"]) { await name.fill(value); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  await name.click();
+  const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
+  await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
+  await expect(options.first().locator(".var-grip .icon")).toBeVisible();
+  await options.nth(1).locator(".var-grip").click();
+  await page.getByRole("menuitem", { name: "上移" }).click();
+  await expect(options).toHaveText(["Bella", "Cara", "Amanda"]);
+  await expect(name).toHaveValue("Cara");
+  await options.nth(2).locator(".var-grip").click();
+  await expect(page.getByRole("menuitem", { name: "下移" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+});
 test("a right-click on a remembered value offers 固定, 解锁 and 删除; holding and moving one changes its place", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
@@ -188,7 +207,7 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
   await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
   // drag Amanda (last) in front of Cara by holding and moving
-  const from = await options.nth(2).boundingBox();
+  const from = await options.nth(2).locator(".var-grip").boundingBox();
   const to = await options.nth(0).boundingBox();
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();

@@ -538,7 +538,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-memory::-webkit-scrollbar { display: none; }
 .var-memory .var-help { position: sticky; right: 0; margin-left: auto; box-shadow: 0 0 0 4px var(--card); }
 .var-memory-option { flex: 0 1 auto; min-width: 0; max-width: 130px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; animation: var-memory-in .16s cubic-bezier(.22,1,.36,1); transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
-.var-memory-option:hover, .var-memory-option[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.var-memory-option:hover, .var-memory-option[data-selected] { background: var(--accent-soft); color: var(--accent-ink); }
 .var-memory-option:active { scale: .96; }
 @keyframes var-memory-in { from { opacity: 0; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .var-memory-option { animation: none; transition: none; } .var-memory-option:active { scale: 1; } }
@@ -946,7 +946,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-menu button:disabled { opacity: .4; cursor: default; }
 .var-menu button.danger { color: var(--danger, #c0392b); }
 .var-memory-option { touch-action: none; user-select: none; -webkit-user-select: none; }
-.var-memory-option:active { cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) { .var-menu { animation: none; } .var-menu button { transition: none; } .var-menu button:active:not(:disabled) { scale: 1; } }
 /* Setting variable blocks by hand in the editor. */
 .inline-editor .variable-actions { display: inline-flex; gap: 6px; margin-left: auto; margin-right: 8px; }
@@ -1046,3 +1045,8 @@ button { -webkit-tap-highlight-color: transparent; }
 /* 话术内容 / 中文翻译: the box follows its text (JS sets the textarea height, three lines at least, nine at most) */
 .inline-editor .snippet-content .soft-textarea, .inline-editor .chinese-field .soft-textarea { height: auto; }
 .inline-editor .snippet-content .soft-textarea textarea, .inline-editor .chinese-field .soft-textarea textarea { display: block; height: auto; min-height: 0; overflow-y: auto; }
+.var-memory-option { display: inline-flex; align-items: center; padding: 0; }
+.var-memory-option .var-grip { flex: none; display: grid; place-items: center; width: 22px; height: 24px; padding: 0 0 0 5px; border: 0; background: transparent; color: inherit; cursor: grab; touch-action: none; }
+.var-memory-option .var-grip .grip-pill { width: 14px; height: 20px; background: transparent; }
+.var-memory-option .var-grip .grip-pill .icon { width: 14px; height: 20px; }
+.var-memory-pick { min-width: 0; padding: 3px 10px 3px 2px; border: 0; background: transparent; color: inherit; font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
