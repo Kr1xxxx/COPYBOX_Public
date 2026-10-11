@@ -5,6 +5,8 @@ import { ArcCollapsible } from "./arc/collapsible";
 import { CATEGORY_PALETTE } from "./category-colors";
 import type { ItemKind } from "./clipbox-core";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import { ReorderHandle } from "./reorder-handle";
+import { Icon } from "./ui-atoms";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 
@@ -79,7 +81,7 @@ export function SettingsFolders({ groups, onAdd, onRename, onDelete, onColor, on
                 <div className="settings-folder-row">
                   {folder.locked || !group.sortable || editing?.key === key
                     ? <span className="settings-folder-grip placeholder" aria-hidden="true" />
-                    : <button type="button" className="settings-folder-grip" aria-label={`拖动排序 ${folder.name}`} title="按住拖动排序" onPointerDown={(event) => reorder.beginPointerDrag(event, key)}><span aria-hidden="true">⠿</span></button>}
+                    : <ReorderHandle className="settings-folder-grip" label={`拖动排序 ${folder.name}`} title="按住拖动，点一下可上移下移" canMoveUp={Boolean(previous) && !previous.locked} canMoveDown={Boolean(next) && !next.locked} onBeginDrag={(event) => reorder.beginPointerDrag(event, key)} onMove={(delta) => onMove(group.kind, folder.name, delta)}><Icon name="grip" /></ReorderHandle>}
                   <button type="button" className="settings-folder-dot" style={{ background: folder.color }} aria-label={`修改颜色 ${folder.name}`} aria-expanded={colorKey === key} onClick={() => setColorKey(colorKey === key ? "" : key)} />
                   {editing?.key === key ? (
                     <form className="settings-folder-form" data-local-esc onSubmit={(event) => { event.preventDefault(); void finish(onRename(group.kind, folder.name, editing.value), () => setEditing(null)); }}>

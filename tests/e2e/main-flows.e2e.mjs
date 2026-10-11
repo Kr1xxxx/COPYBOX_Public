@@ -475,6 +475,8 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   await page.mouse.move(h.x + h.width / 2, target.y + target.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect.poll(async () => (await names()).indexOf("甲")).toBeGreaterThan(before.indexOf("甲"));
+  // A drag never opens the little menu.
+  await expect(page.getByRole("menu", { name: /拖动目录/ })).toHaveCount(0);
   const after = await names();
 
   // The same list lives in Settings.
@@ -483,6 +485,15 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   const group = page.locator(".settings-dialog .settings-folder-group").nth(0);
   await group.getByRole("button", { name: /话术目录/ }).click();
   expect(await group.locator(".settings-folder-name").allInnerTexts()).toEqual(after);
+
+  // Every drag handle is the same six-dot pill.
+  const look = (locator) => locator.evaluate((element) => { const c = getComputedStyle(element); return { w: c.width, h: c.height, r: c.borderRadius, dots: element.querySelector("path").getAttribute("d").split("M").length - 1 }; });
+  const settingsLook = await look(group.locator(".settings-folder-grip .icon").first());
+  expect(settingsLook).toEqual({ w: "16px", h: "22px", r: "999px", dots: 6 });
+  await page.keyboard.press("Escape");
+  const sidebarLook = await look(page.locator(".sidebar .folder-drag-handle .icon").first());
+  expect(sidebarLook.dots).toBe(6);
+  expect(sidebarLook.r).toBe("999px");
 });
 
 test("the 话术内容 and 中文翻译 boxes are about three lines when short, grow while typing and stop at a limit", async ({ page }) => {
@@ -505,4 +516,39 @@ test("the 话术内容 and 中文翻译 boxes are about three lines when short, 
   expect(await content.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
   await chinese.fill("一\n二\n三\n四\n五");
   expect((await heights())[1]).toBeGreaterThan(emptyChinese + 15);
+});
+
+test("a click on a drag handle opens 上移 / 下移, greyed at the ends, and a card moves too", async ({ page }) => {
+  const names = () => page.locator(".sidebar .directory-row .directory-main").evaluateAll((els) => els.map((el) => el.getAttribute("title")));
+  for (const name of ["甲", "乙", "丙"]) {
+    await page.getByRole("button", { name: "新建目录" }).first().click();
+    await page.locator(".directory-new input").fill(name);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".sidebar .directory-row", { hasText: name })).toBeVisible();
+  }
+  const row = (n) => page.locator(".sidebar .directory-row", { hasText: n });
+  await row("甲").hover();
+  await row("甲").locator(".folder-drag-handle").click();
+  const menu = page.getByRole("menu", { name: "拖动目录 甲" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText(["上移", "下移"]);
+  await expect(menu.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+  await menu.getByRole("menuitem", { name: "下移" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => { const n = await names(); return n.indexOf("乙") < n.indexOf("甲"); }).toBe(true);
+  await row("丙").hover();
+  await row("丙").locator(".folder-drag-handle").click();
+  await expect(page.getByRole("menu", { name: "拖动目录 丙" }).getByRole("menuitem", { name: "下移" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "拖动目录 丙" })).toHaveCount(0);
+
+  // Cards: the first one cannot go up; 下移 swaps it with the next.
+  await page.locator(".sidebar .nav-item", { hasText: "全部" }).first().click();
+  const titles = () => page.locator(".native-row .row-main").evaluateAll((els) => els.slice(0, 3).map((el) => el.getAttribute("aria-label")));
+  const first = await titles();
+  await page.locator(".native-row .drag-handle").first().click();
+  const cardMenu = page.getByRole("menu", { name: /拖动排序/ });
+  await expect(cardMenu.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+  await cardMenu.getByRole("menuitem", { name: "下移" }).click();
+  await expect.poll(async () => (await titles())[0]).not.toBe(first[0]);
 });

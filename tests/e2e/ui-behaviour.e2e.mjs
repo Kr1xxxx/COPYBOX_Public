@@ -77,10 +77,10 @@ test.describe("snippet list", () => {
     await expect.poll(async () => { const box = await primary.boundingBox(); return box ? [Math.round(box.width), Math.round(box.height)] : null; }).toEqual([Math.round(before.width), Math.round(before.height)]);
   });
 
-  test("the card marker is a small round drag handle that can be focused", async ({ page }) => {
-    const marker = page.locator(".native-row .drag-handle i").first();
-    const style = await marker.evaluate((element) => { const computed = getComputedStyle(element); return { width: computed.width, height: computed.height, radius: computed.borderRadius }; });
-    expect(style).toEqual({ width: "8px", height: "8px", radius: "50%" });
+  test("the card marker is a six-dot pill drag handle that can be focused", async ({ page }) => {
+    const marker = page.locator(".native-row .drag-handle .grip-pill").first();
+    const style = await marker.evaluate((element) => { const computed = getComputedStyle(element); return { width: computed.width, height: computed.height, radius: computed.borderRadius, dots: element.querySelectorAll("path")[0].getAttribute("d").split("M").length - 1 }; });
+    expect(style).toEqual({ width: "16px", height: "22px", radius: "999px", dots: 6 });
     const handle = page.locator(".native-row .drag-handle").first();
     await page.keyboard.press("Tab");
     await handle.focus();

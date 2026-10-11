@@ -30,13 +30,13 @@ test("card dots and sidebar folder markers use the same colours; uncategorized c
   expect(markerCount).toBeGreaterThan(0);
   const markerColours = new Set();
   for (let i = 0; i < markerCount; i += 1) markerColours.add(await colour(markers.nth(i)));
-  const dots = page.locator(".native-row .drag-handle i");
+  const dots = page.locator(".native-row .drag-handle .grip-pill");
   const dotCount = await dots.count();
   expect(dotCount).toBeGreaterThan(0);
   const GREY = "rgb(199, 199, 204)";
   let coloured = 0;
   for (let i = 0; i < dotCount; i += 1) {
-    const dot = await colour(dots.nth(i));
+    const dot = await dots.nth(i).evaluate((element) => getComputedStyle(element).color);
     if (dot !== GREY) { coloured += 1; expect(markerColours.has(dot)).toBe(true); }
   }
   expect(coloured).toBeGreaterThan(0);

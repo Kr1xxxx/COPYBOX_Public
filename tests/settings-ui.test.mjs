@@ -49,7 +49,7 @@ const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf
 
 test("settings folders can be dragged as well as moved with the arrow buttons", () => {
   assert.match(page, /scope: "settings-folder"/);
-  assert.match(page, /className="settings-folder-grip"[^>]*onPointerDown=\{\(event\) => reorder\.beginPointerDrag\(event, key\)\}/);
+  assert.match(page, /className="settings-folder-grip"[^>]*onBeginDrag=\{\(event\) => reorder\.beginPointerDrag\(event, key\)\}/);
   assert.match(page, /folder\.locked \|\| !group\.sortable \? \{\} : \{ "data-sort-scope": "settings-folder"/, "standard folders and image folders (no saved order) are neither draggable nor drop targets");
   assert.match(page, /onMove=\{onFolderMove\} onReorder=\{onFolderReorder\}/);
   assert.match(page, /document\.querySelector\("\.settings-folder\.dragging"\)/, "Esc cancels the drag, not the dialog");

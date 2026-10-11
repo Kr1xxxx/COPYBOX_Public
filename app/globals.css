@@ -117,7 +117,11 @@ button { -webkit-tap-highlight-color: transparent; }
 .directory-row .directory-main { flex: 1 1 auto; min-width: 0; }
 /* The handle sits on the far left, over the colour dot: on hover the dot gives way to three bars (press and drag). */
 .directory-row .folder-drag-handle { position: absolute; left: 4px; top: 4px; z-index: 1; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: grab; touch-action: none; opacity: 0; transition: opacity .14s; }
-.directory-row .folder-drag-handle .icon { width: 14px; height: 14px; }
+.directory-row .folder-drag-handle .icon { width: 16px; height: 20px; padding: 3px 0; box-sizing: border-box; border-radius: 999px; background: var(--hover); }
+/* One handle look everywhere: a rounded pill with two columns of three dots. */
+.grip-pill, .settings-folder-grip .icon { display: grid; place-items: center; border-radius: 999px; background: var(--hover); }
+.grip-pill { width: 16px; height: 22px; }
+.grip-pill .icon, .settings-folder-grip .icon { width: 16px; height: 22px; }
 .directory-row:hover .folder-drag-handle, .folder-drag-handle:focus-visible, .directory-row.dragging .folder-drag-handle { opacity: 1; }
 .directory-row:has(.folder-drag-handle):hover .directory-color-marker, .directory-row:has(.folder-drag-handle:focus-visible) .directory-color-marker, .directory-row.dragging .directory-color-marker { opacity: 0; }
 .directory-row .directory-color-marker { transition: opacity .14s; }
@@ -178,11 +182,11 @@ button { -webkit-tap-highlight-color: transparent; }
 .secret-row .row-line { height: 44px; }
 .native-row:not(.selected):hover { background: var(--hover); }
 .drag-handle { width: 26px; height: 100%; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: grab; touch-action: none; }
-.drag-handle i { width: 8px; height: 8px; border-radius: 50%; transition: transform .16s, box-shadow .16s; }
-.drag-handle:hover i, .drag-handle:focus-visible i { transform: scale(1.35); box-shadow: 0 0 0 3px rgba(31,30,28,.06); }
+.drag-handle .grip-pill { transition: transform .16s; }
+.drag-handle:hover .grip-pill, .drag-handle:focus-visible .grip-pill { transform: scale(1.08); }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle:disabled { cursor: default; }
-.drag-handle:disabled:hover i { transform: none; box-shadow: none; }
+.drag-handle:disabled:hover .grip-pill { transform: none; }
 .row-main { flex: 1 1 auto; min-width: 0; height: 100%; padding: 0 6px 0 4px; display: flex; align-items: center; border: 0; border-radius: 6px; background: none; color: inherit; text-align: left; cursor: pointer; }
 .row-copy { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
 .row-title { min-width: 0; display: flex; align-items: baseline; gap: 9px; }
@@ -548,6 +552,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .folder-more:hover { background: var(--fill); color: var(--ink); }
 .directory-row:hover .directory-main b { opacity: 0; }
 .directory-row.fixed:hover .directory-main b { opacity: 0; }
+.reorder-menu { position: fixed; right: auto; width: 168px; z-index: 40; }
+.reorder-menu .icon { width: 15px; height: 15px; color: var(--muted); }
 .menu-scrim { position: fixed; inset: 0; z-index: 38; background: transparent; }
 .folder-menu { position: fixed; z-index: 40; width: 196px; right: auto; }
 .folder-menu .swatches { margin: 2px 6px 6px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
@@ -683,7 +689,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-folder { position: relative; }
 .settings-folder.dragging { z-index: 5; border-radius: 8px; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .settings-folder.drag-over::after { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
-.settings-folder-grip { width: 16px; height: 24px; flex: none; margin-left: -4px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; cursor: grab; touch-action: none; opacity: .55; transition: opacity .14s, background .14s; }
+.settings-folder-grip { width: 16px; height: 24px; flex: none; margin-left: 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; cursor: grab; touch-action: none; opacity: .55; transition: opacity .14s, background .14s; }
 .settings-folder-grip:hover, .settings-folder-grip:focus-visible { opacity: 1; background: var(--hover); }
 .settings-folder-grip:active { cursor: grabbing; }
 .settings-folder-grip.placeholder { cursor: default; opacity: 0; pointer-events: none; }

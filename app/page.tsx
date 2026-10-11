@@ -7,6 +7,7 @@ import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./
 import {
   canReorderCards,
   moveName,
+  moveVisibleItem,
   reorderNames,
   reorderVisibleItems,
 } from "./clipbox-order";
@@ -79,6 +80,7 @@ import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, m
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
 import { ArcMenu } from "./arc/menu";
+import { ReorderHandle } from "./reorder-handle";
 import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
@@ -1596,6 +1598,17 @@ export default function Home() {
   const bulkCount = bulkIds.filter((id) => filtered.some((item) => item.id === id)).length;
   const isStandardFolder = (folder: string) => Boolean(folderEditBlocker(activeKind, folder));
 
+  // The sidebar list keeps the fixed standard folders in front; a sortable folder can only swap with another sortable one.
+  const canMoveFolder = (folder: string, delta: -1 | 1) => {
+    const movable = activeFolders.filter((name) => !isStandardFolder(name));
+    const neighbour = movable[movable.indexOf(folder) + delta];
+    return Boolean(neighbour);
+  };
+  // Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
+  const canMoveCard = (item: SecretItem, delta: -1 | 1) => {
+    const group = filtered.filter((entry) => Boolean(entry.pinned) === Boolean(item.pinned));
+    return Boolean(group[group.findIndex((entry) => entry.id === item.id) + delta]);
+  };
   const renderFolderRow = (folder: string) => {
     const standard = isStandardFolder(folder);
     const sortable = !standard;
@@ -1626,6 +1639,9 @@ export default function Home() {
           setFolderMenu((value) => value === folder ? "" : folder);
         }}
         onBeginDrag={(event) => folderReorder.beginPointerDrag(event, folder)}
+        canMoveUp={canMoveFolder(folder, -1)}
+        canMoveDown={canMoveFolder(folder, 1)}
+        onMove={(delta) => { void persistFolderOrder((latest) => moveName(latest, folder, delta), "目录顺序已更新", true); }}
       />
     );
   };
@@ -1800,7 +1816,7 @@ export default function Home() {
                     <div className="row-line">
                       {bulkMode
                         ? <button type="button" className={`row-check ${checked ? "on" : ""}`} role="checkbox" aria-checked={checked} aria-label={`选择 ${item.label}`} onClick={() => toggleBulk(item.id)}><Icon name="check" /></button>
-                        : <button type="button" className="drag-handle" disabled={!cardDragEnabled} aria-label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "拖动排序" : "清除搜索和筛选后可排序"} onPointerDown={(event) => cardReorder.beginPointerDrag(event, item.id)}><i style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} /></button>}
+                        : <ReorderHandle className="drag-handle" disabled={!cardDragEnabled} label={`拖动排序 ${item.label}`} title={cardDragEnabled ? "按住拖动，点一下可上移下移" : "清除搜索和筛选后可排序"} canMoveUp={canMoveCard(item, -1)} canMoveDown={canMoveCard(item, 1)} onBeginDrag={(event) => cardReorder.beginPointerDrag(event, item.id)} onMove={(delta) => { void persistCardOrder((latest) => moveVisibleItem(latest, filtered.map((entry) => entry.id), item.id, delta), "顺序已更新", true); }}><span className="grip-pill" style={{ color: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }}><Icon name="grip" /></span></ReorderHandle>}
                       <button type="button" className="row-main" onClick={() => { if (bulkMode) { toggleBulk(item.id); return; } selectRow(index); }} onDoubleClick={() => { if (!bulkMode) void copy(item); }} aria-expanded={bulkMode ? undefined : isSelected} aria-label={bulkMode ? `选择 ${item.label}` : `${isSelected ? "已展开" : "展开"} ${item.label}`}>
                         <span className="row-copy">
                           <span className="row-title">
