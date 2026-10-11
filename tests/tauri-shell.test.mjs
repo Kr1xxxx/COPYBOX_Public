@@ -42,3 +42,9 @@ test("every command the bridge calls is registered in Rust", () => {
 test("errors from Rust reach the page as Error objects", () => {
   assert.match(read("src-tauri/bridge.js"), /throw error instanceof Error \? error : new Error\(String\(error\)\)/);
 });
+
+test("sleep, lock and shutdown ask the page to save (Windows hook is wired in)", () => {
+  assert.match(read("src-tauri/src/main.rs"), /power::watch_window\(/);
+  assert.match(read("src-tauri/src/power.rs"), /WM_POWERBROADCAST[\s\S]*WM_WTSSESSION_CHANGE[\s\S]*WM_QUERYENDSESSION|WM_QUERYENDSESSION[\s\S]*WM_POWERBROADCAST/);
+  assert.match(read("src-tauri/Cargo.toml"), /^windows = /m);
+});
