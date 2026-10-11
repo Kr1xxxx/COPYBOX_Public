@@ -60,8 +60,8 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is LoginItem => entry.type === "login")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
-    openTotpStore(deviceKey).list().then((list) => { if (live) setTotps(list); }).catch(() => undefined);
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is LoginItem => entry.type === "login" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    openTotpStore(deviceKey).list().then((list) => { if (live) setTotps(list.filter((account) => !account.trashedAt)); }).catch(() => undefined);
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
@@ -108,13 +108,14 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
     const now = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: LoginItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "login", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, 40).join(""),
       url: draft.url.trim() ? normalizeUrl(draft.url) : "", username: draft.username.trim(), password: draft.password,
       ...(draft.totpId ? { totpId: draft.totpId } : {}), note: draft.note.trim(), createdAt: existing?.createdAt ?? now, updatedAt: now,
     };
     try {
       const list = await store.put(item);
-      setItems(list.filter((entry): entry is LoginItem => entry.type === "login"));
+      setItems(list.filter((entry): entry is LoginItem => entry.type === "login" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
       scanSiteIcons();
@@ -124,8 +125,10 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      setItems((await storeRef.current!.remove(id)).filter((entry): entry is LoginItem => entry.type === "login"));
+      setItems((await storeRef.current!.put({ ...found, trashedAt: Date.now() })).filter((entry): entry is LoginItem => entry.type === "login" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {

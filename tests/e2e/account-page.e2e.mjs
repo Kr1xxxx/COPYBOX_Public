@@ -42,7 +42,7 @@ test("账号 rows: one copy button per type, the rest in the 「…」 menu", as
   await expect.poll(copied).toMatch(/^\d{6}$/);
   // Everything else is in the menu.
   await dialog.getByRole("button", { name: "更多操作 【范例】接口密钥" }).click();
-  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["打开 / 修改", "改归类"]);
+  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["打开 / 修改", "收藏", "改归类"]);
   await page.getByRole("menuitem", { name: "打开 / 修改" }).click();
   await expect(dialog.getByRole("button", { name: "显示密钥" })).toBeVisible();
   await dialog.getByRole("button", { name: "返回列表" }).click();
@@ -73,4 +73,63 @@ test("账号 新增: 全部 asks for the type, a category creates that type at o
   await accountAddButton(page).click();
   await expect(dialog.getByPlaceholder("例如：Google 恢复码")).toBeVisible();
   await expect(page.getByRole("heading", { name: "恢复码" })).toBeVisible();
+});
+
+const shortcut = (page, name) => page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: new RegExp(`^${name}`) });
+
+test("账号 收藏 and 最近使用 list the new types too", async ({ page }) => {
+  const dialog = await open(page);
+  await expect(shortcut(page, "收藏")).toContainText("0");
+  await dialog.getByRole("button", { name: "更多操作 【范例】接口密钥" }).click();
+  await page.getByRole("menuitem", { name: "收藏" }).click();
+  await expect(shortcut(page, "收藏")).toContainText("1");
+  await shortcut(page, "收藏").click();
+  await expect(page.getByRole("heading", { name: "收藏" })).toBeVisible();
+  await expect(dialog.locator(".vault-entry")).toHaveText([/接口密钥/]);
+  // Still there after a restart; then un-pin from the same menu.
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  await shortcut(page, "收藏").click();
+  await dialog.getByRole("button", { name: "更多操作 【范例】接口密钥" }).click();
+  await page.getByRole("menuitem", { name: "取消收藏" }).click();
+  await expect(dialog).toContainText("还没有收藏内容");
+  // Copying puts an entry on 最近使用.
+  await shortcut(page, "全部").click();
+  await expect(shortcut(page, "最近使用")).toContainText("0");
+  await dialog.getByRole("button", { name: "复制密码 【范例】Example 后台" }).click();
+  await expect(shortcut(page, "最近使用")).toContainText("1");
+  await shortcut(page, "最近使用").click();
+  await expect(dialog.locator(".vault-entry")).toHaveText([/Example 后台/]);
+});
+
+test("账号 deleting a new type moves it to the 回收站, from where it can be restored or deleted for good", async ({ page }) => {
+  const dialog = await open(page);
+  await openAccountCategory(page, "API 密钥");
+  await dialog.locator(".vault-entry", { hasText: "接口密钥" }).click();
+  await dialog.getByRole("button", { name: "删除", exact: true }).click();
+  await dialog.getByRole("button", { name: "确认删除" }).click();
+  await dialog.getByRole("button", { name: "返回列表" }).click();
+  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button", { name: /^API 密钥/ })).toContainText("0");
+  await expect(page.getByRole("button", { name: /^回收站/ })).toContainText("1");
+  // The stored data is not removed: it is only marked, so it survives a restart.
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  await page.getByRole("button", { name: /^回收站/ }).click();
+  await expect(dialog.locator(".vault-entry")).toHaveText([/接口密钥/]);
+  await dialog.getByRole("button", { name: "恢复" }).click();
+  await expect(dialog).toContainText("回收站里没有新添加的类型");
+  await shortcut(page, "全部").click();
+  await expect(dialog.locator(".vault-entry", { hasText: "接口密钥" })).toBeVisible();
+  // A 验证码 goes the same way, then is deleted for good after a second confirmation.
+  await openAccountCategory(page, "验证码");
+  await dialog.locator(".vault-entry").first().click();
+  await dialog.getByRole("button", { name: /^删除/ }).click();
+  await dialog.getByRole("button", { name: "确认删除" }).click();
+  await page.getByRole("button", { name: /^回收站/ }).click();
+  await dialog.getByRole("button", { name: "永久删除" }).click();
+  await dialog.getByRole("button", { name: "确认永久删除" }).click();
+  await expect(dialog).toContainText("回收站里没有新添加的类型");
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.totp.v1"))).toBeTruthy();
 });

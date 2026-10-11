@@ -410,7 +410,7 @@ export default function Home() {
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
   const miniFavorites = useMemo(() => windowMode === "mini" && activeKind === "snippet" ? pickMiniFavorites(activeKindItems) : [], [windowMode, activeKind, activeKindItems]);
-  const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret }))), [items]);
+  const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
   const accountMode = !PLAIN_NOTES && activeKind === "secret" && !imageView;
   const account = useAccountEntries(deviceKey, legacySecrets, accountMode, vaultRev);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
@@ -1472,6 +1472,7 @@ export default function Home() {
 
   function openLegacyEntry(id: string) {
     pendingLegacyOpen.current = id;
+    selectFolder("all");
     setQuery("");
     setVaultCat("other");
   }
@@ -1479,6 +1480,7 @@ export default function Home() {
   // 新增 on the 账号 page: in 「全部」 it asks for the type first; inside a category it creates that type directly.
   function addAccount(tab: EntryKind) {
     setAddMenuOpen(false);
+    if (activeFolder !== "all") selectFolder("all");
     if (tab === "other") { setVaultCat("other"); openEditor(null); return; }
     setVaultAdd((current) => ({ tab, n: (current?.n ?? 0) + 1 }));
   }
@@ -1676,9 +1678,11 @@ export default function Home() {
       : activeFolder === "trash" ? "回收站"
         : activeFolder === "uncategorized" ? "未分类"
           : activeFolder.slice(7);
-  const searchPlaceholder = imageView ? "搜索图片标题" : accountMode && activeFolder === "all" ? "搜索名称、网站、用户名" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : englishSearch ? "搜索英文单词" : "搜索标题、编号或内容";
+  const searchPlaceholder = imageView ? "搜索图片标题" : accountMode && ["all", "pinned", "recent"].includes(activeFolder) ? "搜索名称、网站、用户名" : activeFolder === "trash" ? "搜索回收站" : activeKind === "secret" ? `搜索${SECRET_WORD}标题` : englishSearch ? "搜索英文单词" : "搜索标题、编号或内容";
   // Mac: the 秘密 section IS the 保险箱 (its folders such as 回收站 still show the old list).
-  const vaultPage = !PLAIN_NOTES && activeKind === "secret" && !imageView && activeFolder === "all";
+  // In 全部, 收藏 and 最近使用 the new entry's type is asked first; inside one category it is known.
+  const addAsksType = vaultCat === "all" || activeFolder !== "all";
+  const vaultPage = accountMode && ["all", "pinned", "recent", "trash"].includes(activeFolder);
   const kindSwitch = (
     <ArcSegmented
       className={`kind-switch ${isMini ? "compact" : ""}`}
@@ -1926,7 +1930,7 @@ export default function Home() {
               {directoryShortcuts.map((shortcut) => {
                 const accountAll = accountMode && shortcut.id === "all";
                 const active = activeFolder === shortcut.id && (!accountAll || vaultCat === "all");
-                return <button key={shortcut.id} type="button" className={`nav-item ${active ? "active" : ""}`} onClick={() => { selectFolder(shortcut.id); if (accountAll) setVaultCat("all"); }}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{accountAll && account.entries ? account.entries.length : shortcut.count}</b></button>;
+                return <button key={shortcut.id} type="button" className={`nav-item ${active ? "active" : ""}`} onClick={() => { selectFolder(shortcut.id); if (accountAll) setVaultCat("all"); }}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{accountMode && account.entries ? (shortcut.id === "all" ? account.entries.length : shortcut.id === "pinned" ? account.entries.filter((entry) => entry.pinned).length : shortcut.id === "recent" ? Math.min(20, account.entries.filter((entry) => entry.lastUsedAt).length) : shortcut.count) : shortcut.count}</b></button>;
               })}
             </nav>
             {accountMode && <>
@@ -1954,7 +1958,7 @@ export default function Home() {
               {activeKind === "secret" && <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>}
             </div></>}
             <div className="nav-footer">
-              {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length > 0 && <b>{trashedKindItems.length}</b>}</button>}
+              {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length + (accountMode ? account.trashed.length : 0) > 0 && <b>{trashedKindItems.length + (accountMode ? account.trashed.length : 0)}</b>}</button>}
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
@@ -1986,10 +1990,10 @@ export default function Home() {
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
                 : <>
                   {vaultPage
-                    ? <span className="add-menu-wrap">
-                      <button type="button" className="primary-button add-button" aria-label="新增条目" aria-haspopup={vaultCat === "all" ? "menu" : undefined} aria-expanded={vaultCat === "all" ? addMenuOpen : undefined}
-                        onClick={() => { if (vaultCat === "all") setAddMenuOpen((open) => !open); else addAccount(vaultCat); }}><Icon name="plus" />新增</button>
-                      {addMenuOpen && vaultCat === "all" && <>
+                    ? activeFolder !== "trash" && <span className="add-menu-wrap">
+                      <button type="button" className="primary-button add-button" aria-label="新增条目" aria-haspopup={addAsksType ? "menu" : undefined} aria-expanded={addAsksType ? addMenuOpen : undefined}
+                        onClick={() => { if (addAsksType) setAddMenuOpen((open) => !open); else addAccount(vaultCat as EntryKind); }}><Icon name="plus" />新增</button>
+                      {addMenuOpen && addAsksType && <>
                         <div className="menu-scrim" role="presentation" onMouseDown={() => setAddMenuOpen(false)} />
                         <div className="dropdown acct-menu" role="menu" aria-label="新增什么">
                           {CATEGORY_ORDER.map((id) => <button key={id} type="button" role="menuitem" onClick={() => addAccount(id)}>{CATEGORY_LABEL[id]}</button>)}
@@ -2002,7 +2006,7 @@ export default function Home() {
             </header>
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
-              <AccountPage deviceKey={deviceKey} entries={account.entries} marks={account.marks} error={account.error} category={vaultCat} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onToast={flashToast}
+              <AccountPage deviceKey={deviceKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 legacyView={legacyList} />
             </>}
             {!vaultPage && <div className="section-head">

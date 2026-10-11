@@ -7,6 +7,7 @@ export type AccountEntry = {
   id: string; tab: EntryKind; title: string; hint: string; site: Site;
   // An old 秘密 entry: it stays where it is; its type is only a guess (or Lock's choice).
   legacy?: boolean;
+  pinned?: boolean; lastUsedAt?: number; trashedAt?: number;
   // Where Lock's own sorting for this entry is kept, and what it was before that.
   target: string; autoTab: EntryKind; autoSite: Site;
   // The one most useful thing to copy from this entry (password, code, key, whole payment block); none for old entries.

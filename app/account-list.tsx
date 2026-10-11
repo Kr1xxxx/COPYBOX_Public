@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { type AccountEntry, type EntryKind, CATEGORY_LABEL, TYPE_LABEL, groupBySite, matchesQuery } from "./account-view";
+import { patchEntry, purgeEntry } from "./account-entries";
+import { type AccountEntry, type EntryKind, CATEGORY_LABEL, TYPE_LABEL, UNKNOWN_SITE, groupBySite, matchesQuery } from "./account-view";
 import { copyTextWithExpiry } from "./clipboard";
 import type { MarkItem } from "./payment-core";
 import { openSecretItemsStore } from "./secret-items-store";
@@ -13,9 +14,11 @@ const KIND_CHOICES: EntryKind[] = ["login", "payment", "apikey", "totp", "recove
 
 // The 账号 list: one row style for every type. The row opens its entry; one button copies the most useful thing;
 // everything else (打开, 改归类) is in the 「…」 menu.
-export function AccountList({ deviceKey, entries, marks, category, query, onOpen, onToast }: {
-  deviceKey: string; entries: AccountEntry[]; marks: Record<string, MarkItem>; category: EntryKind | "all"; query: string;
-  onOpen: (entry: AccountEntry) => void; onToast: (message: string) => void;
+export type AccountView = "all" | "pinned" | "recent" | "trash";
+
+export function AccountList({ deviceKey, entries, trashed, marks, category, view = "all", query, onOpen, onPinLegacy, onToast }: {
+  deviceKey: string; entries: AccountEntry[]; trashed: AccountEntry[]; marks: Record<string, MarkItem>; category: EntryKind | "all"; view?: AccountView; query: string;
+  onOpen: (entry: AccountEntry) => void; onPinLegacy: (id: string) => void; onToast: (message: string) => void;
 }) {
   const [menuId, setMenuId] = useState("");
   const [editing, setEditing] = useState("");
@@ -26,16 +29,22 @@ export function AccountList({ deviceKey, entries, marks, category, query, onOpen
   // null = not asking; otherwise the names that 删除范例 would remove, shown before anything is deleted.
   const [sampleNames, setSampleNames] = useState<string[] | null>(null);
 
-  const shown = useMemo(() => entries.filter((entry) => (category === "all" || entry.tab === category) && matchesQuery(entry, query)), [entries, category, query]);
-  const groups = useMemo(() => groupBySite(shown), [shown]);
+  const [purgeId, setPurgeId] = useState("");
+  const shown = useMemo(() => {
+    const base = view === "trash" ? trashed : view === "pinned" ? entries.filter((entry) => entry.pinned) : view === "recent" ? entries.filter((entry) => entry.lastUsedAt).sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0)).slice(0, 20) : entries;
+    return base.filter((entry) => (view !== "all" || category === "all" || entry.tab === category) && matchesQuery(entry, query));
+  }, [entries, trashed, category, view, query]);
+  // 最近使用 and 回收站 are plain lists (newest first); everything else is one card per website.
+  const groups = useMemo(() => (view === "recent" || view === "trash" ? (shown.length ? [{ key: "flat", title: view === "recent" ? "最近使用" : "回收站", site: UNKNOWN_SITE, entries: shown }] : []) : groupBySite(shown)), [shown, view]);
   const siteNames = useMemo(() => [...new Set(entries.map((entry) => entry.site).filter((site) => site.key !== "other" && site.key !== "payment").map((site) => site.name))], [entries]);
-  const hasSamples = category === "all" && !query.trim() && entries.some((entry) => !entry.legacy && isSampleId(entry.id));
+  const hasSamples = view === "all" && category === "all" && !query.trim() && entries.some((entry) => !entry.legacy && isSampleId(entry.id));
 
   async function copy(entry: AccountEntry) {
     if (!entry.copy) return;
     try {
       const text = await entry.copy.text();
       await copyTextWithExpiry(text);
+      if (!entry.legacy) void patchEntry(deviceKey, entry, { lastUsedAt: Date.now() }).catch(() => undefined);
       setCopiedId(entry.target);
       window.setTimeout(() => setCopiedId((current) => (current === entry.target ? "" : current)), 1600);
       onToast("已复制");
@@ -60,6 +69,10 @@ export function AccountList({ deviceKey, entries, marks, category, query, onOpen
     }
   }
 
+  async function change(task: Promise<void>) {
+    try { await task; } catch (reason) { setError(reason instanceof Error ? reason.message : "保存失败，请重试"); }
+  }
+
   async function removeSamples() {
     try {
       setSampleNames(null);
@@ -70,8 +83,8 @@ export function AccountList({ deviceKey, entries, marks, category, query, onOpen
   }
 
   if (error) return <p className="settings-note" role="alert">{error}</p>;
-  if (entries.length === 0) return <p className="totp-empty">还没有账号。点右上角「新增」，添加登录、收款信息或验证码。</p>;
-  if (shown.length === 0) return <p className="totp-empty">{query.trim() ? "没有找到匹配的内容。" : `「${category === "all" ? "全部" : CATEGORY_LABEL[category]}」里还没有内容。点右上角「新增」添加。`}</p>;
+  if (view === "all" && entries.length === 0) return <p className="totp-empty">还没有账号。点右上角「新增」，添加登录、收款信息或验证码。</p>;
+  if (shown.length === 0) return <p className="totp-empty">{query.trim() ? "没有找到匹配的内容。" : view === "pinned" ? "还没有收藏内容。点条目右边「…」里的「收藏」添加。" : view === "recent" ? "复制过的内容会出现在这里。" : view === "trash" ? "回收站里没有新添加的类型。" : `「${category === "all" ? "全部" : CATEGORY_LABEL[category]}」里还没有内容。点右上角「新增」添加。`}</p>;
   return (
     <>
       {hasSamples && (
@@ -86,14 +99,22 @@ export function AccountList({ deviceKey, entries, marks, category, query, onOpen
       <div className="vault-groups">
         {groups.map((group) => (
           <section key={group.key} className="vault-group" aria-label={group.title}>
-            <h3>{group.key !== "payment" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
+            <h3>{group.key !== "payment" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
             <ul className="totp-list">
               {group.entries.map((entry) => (
                 <li key={entry.target} className="vault-entry-row acct-row">
-                  <button type="button" className="vault-entry" onClick={() => onOpen(entry)}>
+                  <button type="button" className="vault-entry" disabled={view === "trash"} onClick={() => onOpen(entry)}>
                     <span className="vault-type-chip">{TYPE_LABEL[entry.tab]}</span>
                     <span className="totp-who"><strong>{entry.title}</strong><small>{entry.hint}</small></span>
                   </button>
+                  {view === "trash" ? (
+                    <span className="settings-inline-actions acct-trash-actions">
+                      <button type="button" className="secondary-button" onClick={() => void change(patchEntry(deviceKey, entry, { trashedAt: undefined }))}>恢复</button>
+                      {purgeId === entry.target
+                        ? <><button type="button" className="secondary-button" onClick={() => setPurgeId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => { setPurgeId(""); void change(purgeEntry(deviceKey, entry)); }}>确认永久删除</button></>
+                        : <button type="button" className="secondary-button" onClick={() => setPurgeId(entry.target)}>永久删除</button>}
+                    </span>
+                  ) : <>
                   {entry.copy && <button type="button" className={`icon-button acct-copy${copiedId === entry.target ? " copied" : ""}`} aria-label={`${entry.copy.label} ${entry.title}`} title={entry.copy.label} onClick={() => void copy(entry)}><Icon name={copiedId === entry.target ? "check" : "copy"} /></button>}
                   <span className="acct-menu-wrap">
                     <button type="button" className="icon-button" aria-label={`更多操作 ${entry.title}`} aria-haspopup="menu" aria-expanded={menuId === entry.target} onClick={() => setMenuId(menuId === entry.target ? "" : entry.target)}><Icon name="more" /></button>
@@ -101,10 +122,12 @@ export function AccountList({ deviceKey, entries, marks, category, query, onOpen
                       <div className="menu-scrim" role="presentation" onMouseDown={() => setMenuId("")} />
                       <div className="dropdown acct-menu" role="menu" aria-label={`${entry.title} 的操作`}>
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); onOpen(entry); }}>打开 / 修改</button>
+                        <button type="button" role="menuitem" onClick={() => { setMenuId(""); if (entry.legacy) onPinLegacy(entry.id); else void change(patchEntry(deviceKey, entry, { pinned: entry.pinned ? undefined : true })); }}>{entry.pinned ? "取消收藏" : "收藏"}</button>
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); setEditing(entry.target); setKindDraft(entry.tab); setSiteDraft(marks[entry.target]?.site ?? ""); }}>改归类</button>
                       </div>
                     </>}
                   </span>
+                  </>}
                   {editing === entry.target && (
                     <form className="vault-sort-form" onSubmit={(event) => { event.preventDefault(); void saveMark(entry); }}>
                       {entry.legacy && <label>类型<select value={kindDraft} onChange={(event) => setKindDraft(event.target.value as EntryKind)}>

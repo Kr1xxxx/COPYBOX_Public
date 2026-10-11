@@ -77,3 +77,10 @@
 - No storage format changed and no data moved (step 3 is not started): every store, key and backup is as before. Writes to the two encrypted stores now also fire a `clipbox:vault-changed` event so the sidebar counts and the list refresh.
 - Files: new `app/account-view.ts` (grouping, merging, search; unit tests in `tests/account-view.test.mjs`), `app/account-entries.ts` (reads the stores), `app/account-list.tsx`, `app/account-page.tsx`; `app/vault-dialog.tsx` and `app/vault-overview.tsx` removed. In `app/page.tsx`: sidebar 分类, toolbar 新增 menu, `vaultCat`/`vaultAdd` state.
 - User-visible change: Mac 账号 has a 分类 sidebar, one search, one 新增, website cards and the same row everywhere.
+
+## Patch 21: 账号 step 3: 回收站, 收藏 and 最近使用 for the new types
+
+- What changed: 登录, 收款信息, API 密钥, 恢复码 and 验证码 can now be 收藏 (「…」 menu), show up in 最近使用 after a copy, and 「删除」 moves them to the 回收站 instead of deleting for good. On the 账号 page the sidebar's 收藏, 最近使用 and 回收站 now list the new types together with the old entries (the 回收站 shows the new types first, with 恢复 and 永久删除 after a second confirm, and the old deleted entries under them). Counts in the sidebar include both.
+- Storage: no format change and no data moved. Each stored entry (and each 验证码 account) may carry three optional fields, `pinned`, `lastUsedAt` and `trashedAt`; older data simply has none, old backups restore as before and backups made now carry the fields inside the same encrypted block (an older app reads them as ignored extra fields). Edited examples still count as edited only when their content changed.
+- Decision, differing from the plan: the old 秘密 entries are **not** copied into the new storage. They already have 收藏, 回收站 and 最近使用 of their own, and moving them would lose folders, the masked/reference copy, the segments and the command-line references. The 账号 page shows both kinds as one list instead, so nothing needs migrating and nothing can be lost. If Lock still wants them physically moved, that is a separate, larger change.
+- User-visible change: 账号 has 收藏, 最近使用 and a 回收站 that cover everything; deleting a login or code is no longer permanent.

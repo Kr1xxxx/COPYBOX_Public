@@ -36,7 +36,7 @@ export function PaymentPanel({ deviceKey, onToast, focusId, startAdding }: { dev
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
@@ -82,12 +82,13 @@ export function PaymentPanel({ deviceKey, onToast, focusId, startAdding }: { dev
     const now = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: PaymentItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "payment", kind: draft.kind, name: clampPaymentName(draft.name),
       fields: normalizePaymentFields(draft.kind, draft.fields), createdAt: existing?.createdAt ?? now, updatedAt: now,
     };
     try {
       const list = await store.put(item);
-      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment"));
+      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
       setConfirmSave(false);
@@ -98,9 +99,11 @@ export function PaymentPanel({ deviceKey, onToast, focusId, startAdding }: { dev
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      const list = await storeRef.current!.remove(id);
-      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment"));
+      const list = await storeRef.current!.put({ ...found, trashedAt: Date.now() });
+      setItems(list.filter((entry): entry is PaymentItem => entry.type === "payment" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {

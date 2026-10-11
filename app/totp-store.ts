@@ -12,6 +12,8 @@ type Envelope = { version: 1; salt: string; iv: string; ciphertext: string; iter
 export type TotpStore = {
   list(): Promise<TotpAccount[]>;
   add(account: TotpAccount): Promise<TotpAccount[]>;
+  // Replaces the account with the same id (used for 收藏, 回收站 and last-copied marks).
+  put(account: TotpAccount): Promise<TotpAccount[]>;
   remove(id: string): Promise<TotpAccount[]>;
   // Used when restoring a backup: writes the whole list at once.
   replaceAll(accounts: TotpAccount[]): Promise<TotpAccount[]>;
@@ -75,6 +77,10 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
       if (accounts.length >= TOTP_MAX_ACCOUNTS) throw new Error(`最多保存 ${TOTP_MAX_ACCOUNTS} 个账号`);
       if (accounts.some((entry) => entry.secret === account.secret && entry.issuer === account.issuer && entry.name === account.name)) throw new Error("这个账号已经添加过了");
       return write([...accounts, account]);
+    }),
+    put: (account) => serial(async () => {
+      const accounts = await read();
+      return write(accounts.some((entry) => entry.id === account.id) ? accounts.map((entry) => (entry.id === account.id ? account : entry)) : [...accounts, account]);
     }),
     remove: (id) => serial(async () => write((await read()).filter((entry) => entry.id !== id))),
     replaceAll: (accounts) => serial(async () => write(accounts)),

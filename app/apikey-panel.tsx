@@ -39,7 +39,7 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is ApiKeyItem => entry.type === "apikey")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
@@ -84,12 +84,13 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
     const at = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: ApiKeyItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "apikey", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, 40).join(""),
       service: draft.service.trim() || siteFromApiKey(key)?.name || "", key, secret,
       endpoint: draft.endpoint.trim() ? normalizeUrl(draft.endpoint) : "", expires: draft.expires, createdAt: existing?.createdAt ?? at, updatedAt: at,
     };
     try {
-      setItems((await store.put(item)).filter((entry): entry is ApiKeyItem => entry.type === "apikey"));
+      setItems((await store.put(item)).filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
     } catch (error) {
@@ -98,8 +99,10 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      setItems((await storeRef.current!.remove(id)).filter((entry): entry is ApiKeyItem => entry.type === "apikey"));
+      setItems((await storeRef.current!.put({ ...found, trashedAt: Date.now() })).filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {

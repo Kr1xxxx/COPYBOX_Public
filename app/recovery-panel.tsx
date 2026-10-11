@@ -36,7 +36,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
     let live = true;
     const store = openSecretItemsStore(deviceKey);
     storeRef.current = store;
-    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is RecoveryItem => entry.type === "recovery")); }).catch((error: Error) => { if (live) setLoadError(error.message); });
+    store.list().then((list) => { if (live) setItems(list.filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
   useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
@@ -77,11 +77,12 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
     const at = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: RecoveryItem = {
+      ...existing,
       id: draft.id ?? crypto.randomUUID(), type: "recovery", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, 40).join(""),
       site: draft.site.trim().slice(0, 60), codes, note: draft.note.trim(), createdAt: existing?.createdAt ?? at, updatedAt: at,
     };
     try {
-      setItems((await store.put(item)).filter((entry): entry is RecoveryItem => entry.type === "recovery"));
+      setItems((await store.put(item)).filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt));
       setOpenId(item.id);
       setDraft(null);
     } catch (error) {
@@ -90,8 +91,10 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
   }
 
   async function remove(id: string) {
+    const found = items?.find((entry) => entry.id === id);
+    if (!found) return;
     try {
-      setItems((await storeRef.current!.remove(id)).filter((entry): entry is RecoveryItem => entry.type === "recovery"));
+      setItems((await storeRef.current!.put({ ...found, trashedAt: Date.now() })).filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt));
       setDeleteId("");
       setOpenId("");
     } catch {
