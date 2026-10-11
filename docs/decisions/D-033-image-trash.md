@@ -1,4 +1,4 @@
-### D-032 图片 have a 回收站 (2026-10-11)
+### D-033 图片 have a 回收站 (2026-10-11)
 - Context (owner, 2026-10-11, advisor idea 9: "做一下"): deleting a picture used to remove the encrypted record, the original and the
   thumbnail at once; a wrong click lost the picture. 话术 already has a 回收站 with 撤销 and automatic cleanup.
 - Decision: deleting a picture only sets `deletedAt` (a time) on its record; the original and the thumbnail stay. A 6-second
