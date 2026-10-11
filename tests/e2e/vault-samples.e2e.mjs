@@ -36,7 +36,7 @@ test("a new 保险箱 opens with clearly fake examples of each type, which one t
   await expect(page.getByRole("dialog", { name: "保险箱" })).toContainText("保险箱还是空的");
 });
 
-test("examples never mix into data that is already there", async ({ page }) => {
+test("examples are added beside data that is already there and leave it untouched", async ({ page }) => {
   await asDesktop(page, "darwin");
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v1"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
@@ -53,7 +53,8 @@ test("examples never mix into data that is already there", async ({ page }) => {
   for (let i = 0; i < 5; i += 1) await page.getByRole("dialog", { name: "设置" }).getByText(/^Clipbox v/).click();
   const dialog = page.getByRole("dialog", { name: "保险箱" });
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
-  await expect(dialog).not.toContainText("范例");
+  await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
+  await expect(dialog).toContainText("【范例】");
 });
 
 test("设置 → 清除范例 / 恢复范例 only touch the examples: own entries and edited examples stay", async ({ page }) => {
@@ -130,4 +131,24 @@ test("清除范例 and 恢复范例 are not offered on Windows", async ({ page }
   await s.getByRole("tab", { name: "数据" }).click();
   await expect(s).toContainText("导入备份");
   await expect(s).not.toContainText("范例");
+});
+
+test("the empty 秘密 page has 导入案例, which brings the examples in once, only on Mac", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await page.getByRole("button", { name: "秘密" }).first().click();
+  await expect(page.getByText("还没有秘密，先添加第一条")).toBeVisible();
+  await page.getByRole("button", { name: "导入案例" }).click();
+  const dialog = page.getByRole("dialog", { name: "保险箱" });
+  await expect(dialog).toContainText("【范例】");
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(/已导入 \d+ 条范例/)).toBeVisible();
+});
+
+test("导入案例 is not on Windows", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await expect(page.getByRole("button", { name: "导入案例" })).toHaveCount(0);
 });

@@ -7,9 +7,7 @@ import { LoginPanel } from "./login-panel";
 import { PaymentPanel } from "./payment-panel";
 import { SiteIconsProvider } from "./site-icons-context";
 import { TotpPanel } from "./totp-dialog";
-import { openSecretItemsStore } from "./secret-items-store";
-import { openTotpStore } from "./totp-store";
-import { SAMPLES_DONE_KEY, sampleVaultData } from "./vault-samples";
+import { SAMPLES_DONE_KEY, restoreSampleEntries } from "./vault-samples";
 import { RecoveryPanel } from "./recovery-panel";
 import { VaultOverview, type LegacySecret, type VaultTab } from "./vault-overview";
 
@@ -22,25 +20,19 @@ export function VaultDialog({ deviceKey, legacySecrets, onOpenLegacy, onClose, o
   // Opening an entry from 全部 switches to its tab with that entry expanded; the key makes the panel start fresh.
   const [focus, setFocus] = useState<{ id: string; n: number }>({ id: "", n: 0 });
   const [confirmHide, setConfirmHide] = useState(false);
-  // Examples go in once, and only into an empty 保险箱; the panels start after that check so they never miss them.
+  // Examples go in once, next to anything already there; the panels start after that check so they never miss them.
   const [ready, setReady] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const legacySecretsRef = useRef(legacySecrets);
   const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; legacySecretsRef.current = legacySecrets; });
+  useEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => { closeRef.current?.focus(); }, []);
   useEffect(() => {
     let live = true;
     (async () => {
       try {
         if (localStorage.getItem(SAMPLES_DONE_KEY) === "1") return;
-        const totpStore = openTotpStore(deviceKey);
-        const itemStore = openSecretItemsStore(deviceKey);
-        if ((await totpStore.list()).length === 0 && (await itemStore.list()).length === 0 && legacySecretsRef.current.length === 0) {
-          const samples = sampleVaultData(Date.now());
-          await totpStore.replaceAll(samples.totp);
-          await itemStore.replaceAll(samples.items);
-        }
+        // Added beside whatever is already there (old 秘密, earlier 验证码): only the missing 范例 go in, nothing is changed.
+        await restoreSampleEntries(deviceKey);
         localStorage.setItem(SAMPLES_DONE_KEY, "1");
       } catch {
         // Examples are a nicety: if anything is unreadable nothing is written and the 保险箱 opens as it is.

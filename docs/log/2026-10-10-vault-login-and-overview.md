@@ -45,3 +45,8 @@
 ## Patch 13: 全部 page's 删除范例 asks the same way
 - What changed: 全部 → 删除范例… shows how many and which examples will go and asks to confirm, with the same safe clear as in settings.
 - User-visible change: one confirmation listing the examples before they are removed.
+
+## Patch 14: 范例 also appear beside existing data
+
+- What changed: the 保险箱 now adds the 范例 the first time it opens even when old 秘密 or 验证码 already exist (before, it stayed bare, so nobody with test data ever saw them). Only missing 范例 are added; nothing existing is changed. 清除范例 / 恢复范例 work as before.
+- Also: the empty 秘密 page (Mac) has an 「导入案例」 button next to 「新增第一条」; it adds the missing 范例 (same logic as 恢复范例, no duplicates) and opens the 保险箱. Not shown on Windows (no 秘密 section there).

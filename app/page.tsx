@@ -1567,6 +1567,15 @@ export default function Home() {
       onAdd={() => openEditor(null)}
       onImportSheet={() => spreadsheetFileRef.current?.click()}
       onImportBackup={() => fileRef.current?.click()}
+      onImportSamples={PLAIN_NOTES ? undefined : async () => {
+        try {
+          const result = await restoreSampleEntries(deviceKey);
+          writeStoredChoice(TOTP_UNLOCK_KEY, "1");
+          setTotpUnlocked(true);
+          setTotpOpen(true);
+          flashToast(result.added === 0 ? "范例都在，没有缺的" : `已导入 ${result.added} 条范例`);
+        } catch { flashToast("导入失败，数据没有改动"); }
+      }}
     />
   );
   const showFolderChip = searching && (searchWholeVault || activeFolder === "pinned" || activeFolder === "recent");
