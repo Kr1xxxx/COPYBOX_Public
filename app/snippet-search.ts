@@ -1,5 +1,6 @@
 import { pinyin } from "pinyin-pro";
 import type { SecretItem } from "./clipbox-core";
+import { displaySnippetNumber } from "./clipbox-order.ts";
 
 // Search for 话术: every typed term must match somewhere. A term matches text directly,
 // by full pinyin ("tuikuan") or by pinyin initials ("tk"). Results are ranked by where
@@ -76,7 +77,7 @@ function snippetFields(item: SecretItem): Field[] {
     field(item.label, TITLE_WEIGHT, true),
     field([item.summary, item.note, meta?.usageNote].filter(Boolean).join(" "), HINT_WEIGHT, true),
     field([item.secret, meta?.chineseText].filter(Boolean).join(" "), BODY_WEIGHT, false),
-    field([item.snippetNumber, item.folder, meta?.stage, meta?.scene, meta?.action, meta?.rawProduct, meta?.productGroups?.join(" ")].filter(Boolean).join(" "), BODY_WEIGHT, true),
+    field([item.snippetNumber, displaySnippetNumber(item.snippetNumber), displaySnippetNumber(item.snippetNumber).replace(/^#0+(?=\d)/, "#"), item.folder, meta?.stage, meta?.scene, meta?.action, meta?.rawProduct, meta?.productGroups?.join(" ")].filter(Boolean).join(" "), BODY_WEIGHT, true),
   ];
 }
 

@@ -4,8 +4,8 @@
   var platform = "__PLATFORM__";
   var noop = function () {};
   // Rust commands reject with a plain string; the page (written for Electron) reads error.message.
-  var invoke = function (name, args) {
-    return tauri.core.invoke(name, args).catch(function (error) { throw error instanceof Error ? error : new Error(String(error)); });
+  var invoke = function (name, args, options) {
+    return tauri.core.invoke(name, args, options).catch(function (error) { throw error instanceof Error ? error : new Error(String(error)); });
   };
   var fireAndForget = function (name, args) { invoke(name, args).catch(noop); };
 
@@ -13,6 +13,12 @@
     platform: platform,
     copyText: function (text) { return tauri.clipboardManager.writeText(text); },
     copyImage: function (png) { return tauri.clipboardManager.writeImage(png); },
+    // TinyPNG compression (D-037): the bytes go as the raw body, the key as a header; a failure is a reason word.
+    compressImage: function (bytes, key) {
+      return invoke("compress_image", bytes, { headers: { "x-tinify-key": key } })
+        .then(function (buffer) { return { ok: true, bytes: new Uint8Array(buffer) }; })
+        .catch(function (error) { return { ok: false, reason: String(error && error.message ? error.message : error) }; });
+    },
     didCopy: function () { fireAndForget("did_copy"); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
     setMiniHidePolicy: function (policy) { fireAndForget("set_mini_hide_policy", { policy: policy }); },

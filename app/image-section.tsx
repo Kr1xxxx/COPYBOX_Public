@@ -23,6 +23,7 @@ import {
   pinnedFirst,
 } from "./image-folders-core";
 import { readableMessage, type ImageLibrary } from "./image-library";
+import { compressForUpload, formatBytes } from "./image-compress";
 import { detailScrollDelta, gridCardInsertIndex, type ImageView } from "./image-view-core";
 import {
   IMAGE_TITLE_MAX,
@@ -370,13 +371,21 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     const folder = folderOfImageFilter(filter);
     let added = 0;
     let rejected = 0;
+    let failedCompress = 0;
+    let saved = 0;
     let firstProblem = "";
+    let lastNotice = "";
     for (const file of files) {
       const problem = validateImageFile(file);
       if (problem) { rejected += 1; firstProblem ||= problem; continue; }
       try {
-        await library.addImage(file, titleForFile(file, pasted), folder);
+        // TinyPNG first (D-037); only the monthly cap stops an upload, any other trouble keeps the original.
+        const compressed = await compressForUpload(file);
+        await library.addImage(compressed.blob, titleForFile(file, pasted), folder);
         added += 1;
+        saved += compressed.saved;
+        if (compressed.failed) failedCompress += 1;
+        lastNotice = compressed.notice;
       } catch (error) {
         rejected += 1;
         firstProblem ||= readableMessage(error, "图片保存失败，请重试");
@@ -384,7 +393,8 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     }
     if (added === 0) onToast(firstProblem);
     else if (rejected > 0) onToast(`已添加 ${added} 张，有 ${rejected} 张没有添加：${firstProblem}`);
-    else onToast(added === 1 ? "图片已加密保存" : `已添加 ${added} 张图片`);
+    else if (added === 1) onToast(lastNotice ? `图片已加密保存（${lastNotice}）` : "图片已加密保存");
+    else onToast(`已添加 ${added} 张图片${saved > 0 ? `，压缩省了 ${formatBytes(saved)}` : ""}${failedCompress > 0 ? `，有 ${failedCompress} 张压缩没成功，已保存原图` : ""}`);
   }
 
   // Dropped and pasted images arrive through window-level listeners, which must see the latest state.

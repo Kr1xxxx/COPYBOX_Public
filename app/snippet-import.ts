@@ -252,18 +252,15 @@ export function matchesSnippetProduct(item: SecretItem | SnippetImportItem, prod
 export function snippetCopyReadiness(
   item: SecretItem | SnippetImportItem,
   values: Record<string, string>,
-  verificationConfirmed: boolean,
   language?: "en" | "zh",
 ) {
   const meta = item.snippetMeta;
-  if (!meta) return { ready: true, missingPlaceholders: [], needsVerification: false };
+  if (!meta) return { ready: true, missingPlaceholders: [] };
   // The English and Chinese texts can use different variable names; only the ones in the text being copied need a value.
   const needed = language ? extractPlaceholders(resolveSnippetCopySource(item, language)) : meta.placeholders;
   const missingPlaceholders = needed.filter((name) => !values[name]?.trim());
-  const needsVerification = meta.requiresVerification && !verificationConfirmed;
   return {
-    ready: missingPlaceholders.length === 0 && !needsVerification,
+    ready: missingPlaceholders.length === 0,
     missingPlaceholders,
-    needsVerification,
   };
 }

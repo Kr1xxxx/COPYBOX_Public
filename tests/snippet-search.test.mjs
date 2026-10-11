@@ -72,3 +72,10 @@ test("English search looks at the English message by word, whole word first", ()
 test("English search does not use pinyin", () => {
   assert.deepEqual(ids(searchSnippetsEnglish([item("a", "好看的包装", { secret: "Nice box" })], "haokan")), []);
 });
+
+test("a snippet is found by #014, #14 or CB-0014", async () => {
+  const { searchSnippets } = await import("../app/snippet-search.ts");
+  const make = (id, n) => ({ id, label: `条目${id}`, secret: "x", note: "", color: "#fff", kind: "snippet", createdAt: 1, updatedAt: 1, snippetNumber: n });
+  const items = [make("a", "CB-0014"), make("b", "CB-0015")];
+  for (const q of ["#014", "#14", "CB-0014"]) assert.deepEqual(searchSnippets(items, q).map((i) => i.id), ["a"], q);
+});

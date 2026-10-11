@@ -1,0 +1,7 @@
+# Compress added pictures with TinyPNG (D-037)
+
+- Date: 2026-10-11 · Thread/agent: 【圖片】宮格與動效
+- What changed: new `src-tauri/src/tinify.rs` (Rust command `compress_image`, calls the TinyPNG API, only that host; registered in `main.rs`, wired in `src-tauri/bridge.js`), `app/image-compress.ts` (monthly count of 100, key, outcome text), use in `app/image-section.tsx` `addFiles`, a 图片压缩 block in 设置 → 数据 (`app/image-compress-settings.tsx`), and a browser-only simulation in `tools/preview/build.mjs`. Tests: `tests/image-compress.test.mjs`, a bridge test in `tests/tauri-shell.test.mjs`, Rust unit tests in `tinify.rs`, three e2e tests in `tests/e2e/images.e2e.mjs`. Decision D-037. Touches `app/image-section.tsx` (addFiles only) and `app/settings.tsx` (one section).
+- User-visible change: adding a picture now says how much it was shrunk (for example "已压缩 1.2 MB → 380 KB"); 设置 → 数据 shows "本月已压缩 N / 100 张" and lets the key be replaced; at 100 a month a new picture is refused until next month; if the service cannot be reached the original is saved and the toast says so. In the web trial the compression is simulated.
+- Not done / risks: the Rust command could not be compiled or run in this environment (no GTK libraries), so only its pure parts were compiled and tested by themselves; CI's `cargo test` and `tauri build` are the first full build, and no real TinyPNG call has been made. The count is per computer and resets if the data is cleared. Files under `src-tauri/` make this a needs-owner PR.
+- Next step: have the owner try one real picture in the Windows app.

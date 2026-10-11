@@ -48,3 +48,24 @@ test("sleep, lock and shutdown ask the page to save (Windows hook is wired in)",
   assert.match(read("src-tauri/src/power.rs"), /WM_POWERBROADCAST[\s\S]*WM_WTSSESSION_CHANGE[\s\S]*WM_QUERYENDSESSION|WM_QUERYENDSESSION[\s\S]*WM_POWERBROADCAST/);
   assert.match(read("src-tauri/Cargo.toml"), /^windows = /m);
 });
+
+test("compressImage hands the bytes and the key to the shell and turns a failure into a reason word", async () => {
+  const vm = await import("node:vm");
+  const run = async (invokeImpl) => {
+    const calls = [];
+    const window = { addEventListener() {} };
+    const tauri = { core: { invoke: (name, args, options) => { calls.push({ name, args, options }); return invokeImpl(); } }, clipboardManager: {}, app: {}, event: {} };
+    window.__TAURI__ = tauri;
+    vm.runInNewContext(read("src-tauri/bridge.js").replace("__PLATFORM__", "win32"), { window, Uint8Array, Error, String, Boolean, setTimeout, clearTimeout, document: { documentElement: { classList: { add() {}, remove() {} } }, hidden: false, hasFocus: () => true, addEventListener() {} }, addEventListener() {} });
+    const result = await window.clipboxDesktop.compressImage(new Uint8Array([1, 2]), "KEY");
+    return { result, calls };
+  };
+  const ok = await run(async () => new Uint8Array([9]).buffer);
+  assert.equal(ok.calls[0].name, "compress_image");
+  assert.equal(ok.calls[0].options.headers["x-tinify-key"], "KEY");
+  assert.deepEqual(Array.from(ok.result.bytes), [9]);
+  assert.equal(ok.result.ok, true);
+  const failed = await run(async () => { throw "limit"; });
+  assert.equal(failed.result.ok, false);
+  assert.equal(failed.result.reason, "limit");
+});

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "./arc/motion-tokens";
 import { AiSettingsSection } from "./ai-settings";
+import { ImageCompressSettings } from "./image-compress-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, type SecretItem } from "./clipbox-core";
 import { UsageSection } from "./usage-section";
@@ -168,7 +169,7 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
             </div>
           </section>
           <section className="settings-card" aria-labelledby="set-security" hidden={hideSection("data", "set-security")}><h3 id="set-security">安全</h3>
-            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}</p>
+            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-usage" hidden={hideSection("usage", "set-usage")}><h3 id="set-usage">使用排行</h3>
             <UsageSection items={usageItems} now={openedAt} onShow={onShowItem} />
@@ -189,6 +190,9 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
                 options={[["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]].map(([value, label]) => ({ value, label }))} />
             </div>}
             <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
+          </section>
+          <section className="settings-card" aria-labelledby="set-compress" hidden={hideSection("data", "set-compress")}><h3 id="set-compress">图片压缩</h3>
+            <ImageCompressSettings />
           </section>
           <section className="settings-card" aria-labelledby="set-shared" hidden={hideSection("data", "set-shared")}><h3 id="set-shared">共享话术</h3>
             {sharedLibrary}

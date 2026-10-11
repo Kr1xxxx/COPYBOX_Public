@@ -518,9 +518,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .snippet-fill .copy-language { height: 28px; background: var(--fill); }
 .snippet-fill .copy-language button { color: var(--muted); font-size: 12px; }
 .snippet-fill .copy-language button.active { background: var(--card); color: var(--ink); }
-.snippet-fill .copy-warning { color: var(--ink-3); font-size: 12px; }
-.snippet-fill .copy-warning { background: var(--warn-bg); color: var(--warn); }
-.snippet-fill .copy-warning strong { color: inherit; }
 /* Variable blocks: no brackets; the name is the placeholder, and a click types right there. */
 .var-chip { position: relative; display: inline-grid; max-width: 100%; vertical-align: baseline; margin: 0 1px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: 0 0 0 0 var(--ring); transition: background-color .16s cubic-bezier(.22,1,.36,1), box-shadow .16s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
 .var-chip:active { scale: .96; }

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
 import {
   canReorderCards,
+  displaySnippetNumber,
   moveName,
   moveVisibleItem,
   reorderNames,
@@ -894,17 +895,16 @@ export default function Home() {
     const state = pickedValues ? { ...fillFor(item), values: pickedValues } : fillFor(item);
     const source = resolveSnippetCopySource(item, state.language);
     if (!source) return;
-    const readiness = snippetCopyReadiness(item, state.values, state.verificationConfirmed, state.language);
+    const readiness = snippetCopyReadiness(item, state.values, state.language);
     if (!readiness.ready) {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== safeSelected) selectRow(index);
       const missing = readiness.missingPlaceholders;
-      setToast(missing.length > 0 ? `先填写：${missing.join("、")}` : "先勾选“发送前核实”");
+      setToast(`先填写：${missing.join("、")}`);
       window.setTimeout(() => setToast(""), 2200);
       window.setTimeout(() => {
         const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
-        if (missing.length > 0) Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
-        else row?.querySelector<HTMLInputElement>(".copy-warning input:not(:checked)")?.focus();
+        Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
       }, 60);
       return;
     }
@@ -1803,7 +1803,7 @@ export default function Home() {
                         <span className="row-copy">
                           <span className="row-title">
                             <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
-                            {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{item.snippetNumber}</b>}
+                            {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{displaySnippetNumber(item.snippetNumber)}</b>}
                             {showFolderChip && item.folder && <small className="row-folder">{item.folder}</small>}
                             {isSnippet && sharedMark(item) && <small className="row-shared-mark" data-mark={sharedMark(item)}>{sharedMark(item) === "update" ? "公司版有更新" : "公司已停用"}</small>}
                           </span>

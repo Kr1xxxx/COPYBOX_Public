@@ -10,6 +10,12 @@ export function formatSnippetNumber(sequence: number) {
   return `CB-${Math.max(1, Math.trunc(sequence)).toString().padStart(4, "0")}`;
 }
 
+// How a number is shown to people: "CB-0014" is "#014" (three digits, more when it needs them). Stored values stay "CB-0014".
+export function displaySnippetNumber(value: string | undefined) {
+  const sequence = snippetSequence(value);
+  return sequence > 0 ? `#${sequence.toString().padStart(3, "0")}` : value || "";
+}
+
 function snippetSequence(value: unknown) {
   if (typeof value !== "string") return 0;
   const match = SNIPPET_NUMBER_PATTERN.exec(value);
