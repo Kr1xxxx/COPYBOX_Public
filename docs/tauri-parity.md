@@ -23,6 +23,8 @@ that every command it calls is registered.
 | Update reminder | yes | step 4 | unit tests |
 | Restart | yes | step 4 | not checked |
 | Company 话术 library fetch (plain GET, 5 MB, 15 s) | yes | step 7 (was missing) | unit test of the address rules |
+| Website icon for 保险箱 entries (own site only, public addresses, https) | yes | step 7 (added after main moved) | unit tests of the address and image rules; network part not run |
+| Build time shown in 设置→关于 | yes | step 7 (added after main moved) | unit test of the date |
 | Mac command line (socket + `clipbox`) | yes | step 5 | Linux (status, add, list, get) |
 | Old data move (export in Electron, import in Tauri) | – | step 6 | Chromium only |
 | Content security policy | none | step 7: page may load only its own files | Linux (page loads and answers commands) |

@@ -3,6 +3,7 @@
 mod ai;
 mod automation;
 mod shared_library;
+mod site_icon;
 mod shell;
 mod update;
 mod window_mode;
@@ -58,6 +59,8 @@ fn main() {
             ai::ai_clear,
             ai::ai_request,
             shared_library::fetch_shared_library,
+            site_icon::fetch_site_icon,
+            site_icon::get_build_time,
             update::check_update,
             update::open_update,
             automation::automation_ready,

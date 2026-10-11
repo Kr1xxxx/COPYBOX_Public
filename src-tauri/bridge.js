@@ -28,6 +28,8 @@
     aiSave: function (settings) { return invoke("ai_save", { settings: settings }); },
     aiClear: function () { return invoke("ai_clear"); },
     aiRequest: function (payload) { return invoke("ai_request", { payload: payload }); },
+    getBuildTime: function () { return invoke("get_build_time"); },
+    fetchSiteIcon: function (host) { return invoke("fetch_site_icon", { host: host }); },
     fetchSharedLibrary: function (url) { return invoke("fetch_shared_library", { url: url }); },
     onFocusSearch: function (callback) {
       var stopped = false;
