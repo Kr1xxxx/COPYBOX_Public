@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { makePng } from "../helpers/png.mjs";
-import { asDesktop } from "./helpers.mjs";
+import { asDesktop, changesSeen, recordChanges } from "./helpers.mjs";
 
 // The 图片 nine-grid (docs/specs/image-grid.md). Every picture is generated here, so no binary fixtures are needed.
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -64,6 +64,7 @@ test("the default view is a grid of square tiles, four to a row (16 tiles = 4 fu
 });
 
 test("the copy button on a tile puts a PNG on the clipboard", async ({ page }) => {
+  await recordChanges(page, ".image-tile");
   await openImages(page);
   await addSix(page);
   const first = tile(page, "图一");
@@ -79,9 +80,11 @@ test("the copy button on a tile puts a PNG on the clipboard", async ({ page }) =
   expect(corner.y).toBeLessThan(box.y + 14);
   await copy.click();
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual(PNG_SIGNATURE);
-  await expect(first).toHaveClass(/copied/);
-  await expect(first.locator("[role=status]")).toHaveText("已复制");
-  await expect(first.getByRole("button", { name: "已复制 图一" })).toBeVisible();
+  // The "copied" look lasts about a second, so check what the tile showed rather than whether it still shows it.
+  const seen = async () => (await changesSeen(page)).join("\n");
+  await expect.poll(seen).toMatch(/^class=.*\bcopied\b/m);
+  await expect.poll(seen).toMatch(/^text=已复制$/m);
+  await expect.poll(seen).toMatch(/^aria-label=已复制 图一$/m);
   // Copying does not open the card.
   await expect(card(page)).toHaveCount(0);
 });
