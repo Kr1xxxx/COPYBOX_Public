@@ -244,8 +244,9 @@ export default function Home() {
   const [activeKind, setActiveKind] = useState<ItemKind>(DEFAULT_ITEM_KIND);
   // The 图片 section is not an ItemKind: its data lives in its own store, never in the vault.
   const [imageView, setImageView] = useState(false);
-  const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
+  const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0, open: false });
   const imageSectionRef = useRef<ImageSectionHandle>(null);
+  const [imageSelectKey, setImageSelectKey] = useState("\u0000");
   const [imageViewMode, setImageViewMode] = useImageView();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
@@ -259,6 +260,9 @@ export default function Home() {
   const pendingLegacyOpen = useRef("");
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
+  // 选择 belongs to the folder it was started in: moving to another folder (or the 回收站) ends it.
+  const imageSelecting = imageView && imageSelectKey === imageLibrary.filter && imageLibrary.filter !== IMAGE_FILTER_TRASH;
+  const setImageSelecting = (next: boolean | ((value: boolean) => boolean)) => setImageSelectKey((key) => (typeof next === "function" ? next(key === imageLibrary.filter) : next) ? imageLibrary.filter : "\u0000");
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -426,13 +430,16 @@ export default function Home() {
   // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
   const [lockSet, setLockSet] = useState(() => typeof window !== "undefined" && isAccountLockSet());
   const [accountUnlocked, setAccountUnlocked] = useState(false);
+  // 账号 header: 选择 (tick entries, 删除) and 收起 (fold every website card to its title).
+  const [acctSelecting, setAcctSelecting] = useState(false);
+  const [acctFolded, setAcctFolded] = useState(false);
   const accountLocked = lockSet && !(accountMode && accountUnlocked);
   const lockedHere = accountMode && lockSet && !accountUnlocked;
   // Leaving the 账号 section locks it again (state adjusted while rendering, not in an effect).
   const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
   if (seenAccountMode !== accountMode) {
     setSeenAccountMode(accountMode);
-    if (!accountMode) setAccountUnlocked(false);
+    if (!accountMode) { setAccountUnlocked(false); setAcctSelecting(false); }
   }
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
@@ -1941,7 +1948,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mini-folders">{miniFolderTabs.length > 0 && <MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} />}</div>
-          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
+          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} selecting={false} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
@@ -2053,8 +2060,12 @@ export default function Home() {
             </header>
             {lockedHere ? <AccountLockScreen onUnlock={() => setAccountUnlocked(true)} /> : <>
             {vaultPage && <>
-              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
+              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
+                {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
+                {activeFolder !== "trash" && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
+                <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
               <AccountPage deviceKey={deviceKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
+                selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} />
             </>}
             {!vaultPage && <div className="section-head">
@@ -2084,9 +2095,11 @@ export default function Home() {
                 </ArcMenu>}</AnimatePresence>
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
+              {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && !imageSelecting && imageCounts.open && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的图片" onClick={() => imageSectionRef.current?.collapse()}>收起</button>}
+              {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && imageCounts.shown > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${imageSelecting ? "active" : ""}`} aria-pressed={imageSelecting} onClick={() => setImageSelecting((value) => !value)}>{imageSelecting ? "取消选择" : "选择"}</button>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>}
-            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
+            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} selecting={imageSelecting} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
             {!imageView && !vaultPage && legacyList}
             {bulkMode && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
               <strong>已选 {bulkCount} 条</strong>

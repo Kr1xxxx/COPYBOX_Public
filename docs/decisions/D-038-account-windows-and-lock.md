@@ -16,3 +16,6 @@
   A reset never clears the account data. This replaces "There is no reset" above.
 - Update (owner, 2026-10-12: "windows 账号,去掉 API +恢复码这个类别"): on Windows the sidebar 分类 and the 新增 menu offer only 登录, 收款信息 and
   验证码. Existing API 密钥 / 恢复码 entries are not deleted and still show under 全部. macOS is unchanged.
+- Update (owner, 2026-10-12: "账号也加上这个功能, 账号单独的也加上删除功能"): the 账号 page header has 收起 (folds every website card to its title; 展开 undoes it)
+  left of 选择 (tick entries, 全选, 删除, 完成), and every entry has 删除 in its 「…」 menu. 删除 moves to the 回收站 without asking
+  (the 回收站 can 恢复; 永久删除 there still asks). Both platforms; hidden while the page is locked.

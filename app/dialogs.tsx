@@ -57,7 +57,7 @@ export function SnippetImportDialog({ preview, fileName, secretWord, onClose, on
     <div className="snippet-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section ref={dialogRef} className="snippet-import-dialog" role="dialog" aria-modal="true" aria-labelledby="snippet-import-title">
         <header className="snippet-dialog-head">
-          <div><p>LOCAL SPREADSHEET</p><h2 id="snippet-import-title">导入话术表格</h2><small title={fileName}>{fileName}</small></div>
+          <div><h2 id="snippet-import-title">导入话术表格</h2><small title={fileName}>{fileName}</small></div>
           <button ref={closeRef} type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
         </header>
         <div className="snippet-import-body">
@@ -183,7 +183,7 @@ export function DeleteConfirmDialog({ request, onClose, onConfirm }: {
   return (
     <div className="delete-confirm-backdrop">
       <section ref={dialogRef} className={`delete-confirm-dialog ${request.permanent ? "permanent" : ""}`} role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description">
-        <header><span>{request.permanent ? "PERMANENT DELETE" : "MOVE TO TRASH"}</span><h2 id="delete-confirm-title">{request.permanent ? "永久删除这条内容？" : "移入回收站？"}</h2><p id="delete-confirm-description">{request.permanent ? "删除后无法恢复，请确认你不再需要它。" : "内容将从普通目录隐藏，之后可以在回收站恢复。"}</p></header>
+        <header><h2 id="delete-confirm-title">{request.permanent ? "永久删除这条内容？" : "移入回收站？"}</h2><p id="delete-confirm-description">{request.permanent ? "删除后无法恢复，请确认你不再需要它。" : "内容将从普通目录隐藏，之后可以在回收站恢复。"}</p></header>
         <form onSubmit={(event) => void submit(event)}>
           <div className="delete-confirm-item"><strong>{request.item.label}</strong><small>{request.item.folder || "未分类"}</small></div>
           {error && <p className="delete-confirm-error" role="alert">{error}</p>}
