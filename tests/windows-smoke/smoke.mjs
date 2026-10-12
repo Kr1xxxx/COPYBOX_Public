@@ -66,7 +66,7 @@ function findInstalledExe() {
 function launch(tag) {
   const outFile = fs.openSync(path.join(OUT, `app-${tag}.log`), "a");
   child = spawn(exe, [], {
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` },
+    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT} --remote-allow-origins=*` },
     stdio: ["ignore", outFile, outFile],
     windowsHide: false,
   });
@@ -92,7 +92,21 @@ async function connect(timeoutMs = 90000) {
     } catch (error) { lastError = String(error && error.message || error); }
     await sleep(1000);
   }
+  diagnose();
   throw new Error(`the app page never answered on port ${PORT}: ${lastError}`);
+}
+
+// Printed into the job log when the page cannot be reached, so the cause is visible without opening the artifact.
+function diagnose() {
+  const lines = [
+    `app process alive: ${child ? child.exitCode === null : "not started"}`,
+    powershell("Get-Process | Where-Object { $_.ProcessName -match 'clipbox|msedgewebview2' } | Select-Object ProcessName,Id,MainWindowTitle | Format-Table -AutoSize | Out-String -Width 200").out,
+    powershell("Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | Select-Object -First 2 -ExpandProperty CommandLine | Out-String -Width 4000").out,
+    powershell("netstat -ano | Select-String 'LISTENING' | Select-String '9222|127.0.0.1' | Out-String -Width 200").out,
+    powershell("Get-ChildItem \"$env:LOCALAPPDATA\\com.clipbox.tauri\" -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 30 -ExpandProperty FullName | Out-String -Width 300").out,
+  ];
+  for (const line of lines) log(`DIAG ${line}`);
+  desktopShot("diag-desktop");
 }
 
 async function stopApp() {
