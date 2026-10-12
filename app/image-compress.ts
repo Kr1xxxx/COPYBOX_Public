@@ -2,8 +2,11 @@
 // The desktop shell does the network call; here we keep the monthly count and decide what to tell the user.
 import type { ClipboxDesktop } from "./desktop-bridge";
 
-// A shared key built in on purpose (the owner's decision); a different key can be set in 设置.
-export const TINIFY_DEFAULT_KEY = "NMqwhKbFJBCGnHHPj1FXLNHfbLsN8mjt";
+// Shared keys built in on purpose (the owner's decision); a different key can be set in 设置.
+// The built-in keys take turns so one of them is not used up first.
+export const TINIFY_DEFAULT_KEYS = ["NMqwhKbFJBCGnHHPj1FXLNHfbLsN8mjt", "Ycp4Hxb1XgStc5VZjlZrVB1Rt2p0Nhrz"];
+export const TINIFY_DEFAULT_KEY = TINIFY_DEFAULT_KEYS[0];
+export const TINIFY_ROTATION_STORAGE = "clipbox.tinify.rotation.v1";
 export const TINIFY_KEY_STORAGE = "clipbox.tinify.key.v1";
 export const TINIFY_USAGE_STORAGE = "clipbox.tinify.usage.v1";
 export const COMPRESS_MONTHLY_LIMIT = 100;
@@ -30,8 +33,47 @@ export function addCompressUsage(storage: KeyValueStorage | undefined, now: Date
   return count;
 }
 
+function readCustomKey(storage: KeyValueStorage | undefined): string {
+  try { return (storage?.getItem(TINIFY_KEY_STORAGE) || "").trim(); } catch { return ""; }
+}
+
 export function readTinifyKey(storage: KeyValueStorage | undefined): string {
-  try { return (storage?.getItem(TINIFY_KEY_STORAGE) || "").trim() || TINIFY_DEFAULT_KEY; } catch { return TINIFY_DEFAULT_KEY; }
+  return readCustomKey(storage) || TINIFY_DEFAULT_KEY;
+}
+
+type Rotation = { month: string; next: number; bad: number[] };
+
+function readRotation(storage: KeyValueStorage | undefined, now: Date): Rotation {
+  try {
+    const stored = JSON.parse(storage?.getItem(TINIFY_ROTATION_STORAGE) || "null");
+    if (stored && stored.month === monthKey(now) && Number.isInteger(stored.next) && Array.isArray(stored.bad)) {
+      return { month: stored.month, next: stored.next, bad: stored.bad.filter((i: unknown) => Number.isInteger(i)) };
+    }
+  } catch { /* unreadable: start fresh */ }
+  return { month: monthKey(now), next: 0, bad: [] };
+}
+
+function writeRotation(storage: KeyValueStorage | undefined, rotation: Rotation) {
+  try { storage?.setItem(TINIFY_ROTATION_STORAGE, JSON.stringify(rotation)); } catch { /* optional */ }
+}
+
+// The built-in keys to try for the next picture, in order: the one whose turn it is first, then the others.
+// A key that was refused this month (wrong key or quota used up) is left out until the month changes.
+export function builtInKeyOrder(storage: KeyValueStorage | undefined, now: Date): number[] {
+  const { next, bad } = readRotation(storage, now);
+  const order = TINIFY_DEFAULT_KEYS.map((_, i) => (next + i) % TINIFY_DEFAULT_KEYS.length);
+  const usable = order.filter((i) => !bad.includes(i));
+  return usable.length ? usable : order;
+}
+
+function advanceRotation(storage: KeyValueStorage | undefined, now: Date, used: number) {
+  const rotation = readRotation(storage, now);
+  writeRotation(storage, { ...rotation, next: (used + 1) % TINIFY_DEFAULT_KEYS.length });
+}
+
+function markKeyBad(storage: KeyValueStorage | undefined, now: Date, index: number) {
+  const rotation = readRotation(storage, now);
+  if (!rotation.bad.includes(index)) writeRotation(storage, { ...rotation, bad: [...rotation.bad, index] });
 }
 
 export function formatBytes(size: number): string {
@@ -60,11 +102,24 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
   const same: CompressResult = { blob: file, saved: 0, failed: false, notice: "" };
   if (!bridge?.compressImage || !COMPRESSIBLE_TYPES.includes(file.type)) return same;
   if (readCompressUsage(storage, now) >= COMPRESS_MONTHLY_LIMIT) throw new Error(COMPRESS_LIMIT_MESSAGE);
-  let result: Awaited<ReturnType<NonNullable<ClipboxDesktop["compressImage"]>>>;
-  try {
-    result = await bridge.compressImage(new Uint8Array(await file.arrayBuffer()), readTinifyKey(storage));
-  } catch {
+  type Outcome = Awaited<ReturnType<NonNullable<ClipboxDesktop["compressImage"]>>>;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const send = async (key: string): Promise<Outcome> => {
+    try { return await bridge.compressImage!(bytes, key); } catch { return { ok: false, reason: "service" }; }
+  };
+  let result: Outcome;
+  const custom = readCustomKey(storage);
+  if (custom) {
+    result = await send(custom);
+  } else {
+    // Built-in keys take turns. A key that is refused (key or limit) is retried once on the other key and skipped for the month.
     result = { ok: false, reason: "service" };
+    for (const index of builtInKeyOrder(storage, now)) {
+      result = await send(TINIFY_DEFAULT_KEYS[index]);
+      if (result.ok) { advanceRotation(storage, now, index); break; }
+      if (result.reason !== "key" && result.reason !== "limit") break;
+      markKeyBad(storage, now, index);
+    }
   }
   if (!result.ok) return { ...same, failed: true, notice: `${FAILURE_TEXT[result.reason] || "压缩服务暂时不可用"}，已保存原图` };
   addCompressUsage(storage, now);
