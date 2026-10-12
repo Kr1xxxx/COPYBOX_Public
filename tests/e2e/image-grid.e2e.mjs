@@ -477,3 +477,60 @@ test("收藏: star a picture, see it in the 收藏 list with the right count, fa
   for (const title of ["图三", "图五"]) await star(title).click();
   await expect(page.getByText("还没有收藏图片")).toBeVisible();
 });
+
+// 收起 and 选择 in the 图片 header, and 选择 → 删除 (D-033: everything goes to the 回收站).
+for (const platform of ["win32", "darwin"]) {
+  test(`${platform}: 收起 folds the opened picture, and 选择 → 删除 moves several pictures to the 回收站 at once`, async ({ page }) => {
+    await openImages(page, platform);
+    await addImages(page, [png("甲"), png("乙", 64, 64, [200, 90, 90]), png("丙", 64, 64, [90, 200, 90])]);
+    await expect(tiles(page)).toHaveCount(3);
+    const collapse = page.getByRole("button", { name: "收起展开的图片" });
+    const select = page.getByRole("button", { name: "选择", exact: true });
+    await expect(collapse).toHaveCount(0);
+    await expect(select).toBeVisible();
+
+    // 收起 appears only while a picture is open, and folds it.
+    await tile(page, "甲").locator(".image-tile-main").click();
+    await expect(card(page)).toBeVisible();
+    await expect(collapse).toBeVisible();
+    await collapse.click();
+    await expect(card(page)).toHaveCount(0);
+    await expect(collapse).toHaveCount(0);
+
+    // 选择: nothing is expanded, tick two, delete.
+    await tile(page, "乙").locator(".image-tile-main").click();
+    await select.click();
+    await expect(card(page)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "取消选择" })).toBeVisible();
+    await expect(page.getByText("已选 0 张")).toBeVisible();
+    await expect(page.getByRole("button", { name: "删除", exact: true })).toBeDisabled();
+    await page.getByRole("checkbox", { name: "选择 甲" }).click();
+    await page.getByRole("checkbox", { name: "选择 丙" }).click();
+    await expect(page.getByText("已选 2 张")).toBeVisible();
+    await page.getByRole("button", { name: "删除", exact: true }).click();
+    await expect(page.locator(".toast")).toContainText("已把 2 张图片移到回收站");
+    await expect(tiles(page)).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "取消选择" })).toHaveCount(0);
+
+    // They are in the 回收站 and can be restored from there.
+    await sidebar(page).getByRole("button", { name: /回收站/ }).click();
+    await expect(page.locator(".trash-row")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "选择", exact: true })).toHaveCount(0);
+  });
+}
+
+test("选择 can be left with 取消选择 and 完成, and 全选 ticks every picture", async ({ page }) => {
+  await openImages(page);
+  await addImages(page, [png("甲"), png("乙")]);
+  await expect(tiles(page)).toHaveCount(2);
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+  await page.getByRole("button", { name: "全选" }).click();
+  await expect(page.getByText("已选 2 张")).toBeVisible();
+  await page.getByRole("button", { name: "全不选" }).click();
+  await expect(page.getByText("已选 0 张")).toBeVisible();
+  await page.getByRole("button", { name: "完成" }).click();
+  await expect(page.getByText(/已选 \d 张/)).toHaveCount(0);
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+  await page.getByRole("button", { name: "取消选择" }).click();
+  await expect(tiles(page)).toHaveCount(2);
+});

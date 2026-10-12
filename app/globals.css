@@ -1150,3 +1150,11 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .account-lock-link { border: 0; background: none; color: var(--muted, #6b665e); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px; }
 .account-lock-forgot { display: grid; gap: 8px; justify-items: center; max-width: 280px; text-align: center; }
+/* 图片 选择: a tick on the picture, like the check box on a 话术 row. */
+.image-tile.picking .image-tile-main { cursor: pointer; }
+.image-tile .image-tile-thumb { position: relative; }
+.image-tile .tile-check { z-index: 3; position: absolute; left: 6px; top: 6px; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid var(--border); border-radius: 6px; background: var(--card); }
+.image-tile .tile-check .icon { width: 12px; height: 12px; padding: 0; color: transparent; }
+.image-tile.ticked .tile-check { border-color: var(--accent); background: var(--accent); }
+.image-tile.ticked .tile-check .icon { color: #fff; }
+.image-tile.ticked .image-tile-thumb { outline: 2px solid var(--accent); outline-offset: -2px; }

@@ -244,8 +244,9 @@ export default function Home() {
   const [activeKind, setActiveKind] = useState<ItemKind>(DEFAULT_ITEM_KIND);
   // The 图片 section is not an ItemKind: its data lives in its own store, never in the vault.
   const [imageView, setImageView] = useState(false);
-  const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0 });
+  const [imageCounts, setImageCounts] = useState<ImageCounts>({ total: 0, shown: 0, open: false });
   const imageSectionRef = useRef<ImageSectionHandle>(null);
+  const [imageSelectKey, setImageSelectKey] = useState("\u0000");
   const [imageViewMode, setImageViewMode] = useImageView();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
@@ -259,6 +260,9 @@ export default function Home() {
   const pendingLegacyOpen = useRef("");
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
+  // 选择 belongs to the folder it was started in: moving to another folder (or the 回收站) ends it.
+  const imageSelecting = imageView && imageSelectKey === imageLibrary.filter && imageLibrary.filter !== IMAGE_FILTER_TRASH;
+  const setImageSelecting = (next: boolean | ((value: boolean) => boolean)) => setImageSelectKey((key) => (typeof next === "function" ? next(key === imageLibrary.filter) : next) ? imageLibrary.filter : "\u0000");
   const [activeFolder, setActiveFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -1941,7 +1945,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mini-folders">{miniFolderTabs.length > 0 && <MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} />}</div>
-          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
+          {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} selecting={false} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
@@ -2084,9 +2088,11 @@ export default function Home() {
                 </ArcMenu>}</AnimatePresence>
               </div>}
               {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
+              {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && !imageSelecting && imageCounts.open && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的图片" onClick={() => imageSectionRef.current?.collapse()}>收起</button>}
+              {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && imageCounts.shown > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${imageSelecting ? "active" : ""}`} aria-pressed={imageSelecting} onClick={() => setImageSelecting((value) => !value)}>{imageSelecting ? "取消选择" : "选择"}</button>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>}
-            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
+            {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} selecting={imageSelecting} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
             {!imageView && !vaultPage && legacyList}
             {bulkMode && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
               <strong>已选 {bulkCount} 条</strong>

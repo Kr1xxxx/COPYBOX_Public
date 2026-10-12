@@ -457,3 +457,19 @@ test("after 100 compressed pictures in a month, adding another is refused with a
   await expect(rows(page)).toHaveCount(0);
   expect(await page.evaluate(() => window.__compressCalls)).toBe(0);
 });
+
+test("in the list view 选择 shows a tick box on each row and 删除 moves the ticked pictures to the 回收站", async ({ page }) => {
+  await openImages(page);
+  await addImages(page, [PNG_FILE, JPG_FILE]);
+  await expect(rows(page)).toHaveCount(2);
+  await rows(page).first().locator(".row-main").click();
+  await expect(page.getByRole("button", { name: "收起展开的图片" })).toBeVisible();
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+  await expect(page.locator(".image-row.selected")).toHaveCount(0);
+  await expect(page.locator(".row-check")).toHaveCount(2);
+  await page.locator(".row-check").first().click();
+  await expect(page.getByText("已选 1 张")).toBeVisible();
+  await page.getByRole("button", { name: "删除", exact: true }).click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator(".toast")).toContainText("图片已移入回收站");
+});

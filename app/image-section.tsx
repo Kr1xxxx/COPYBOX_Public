@@ -35,8 +35,9 @@ import {
   type ImageMeta,
 } from "./image-store";
 
-export type ImageSectionHandle = { openPicker: () => void };
-export type ImageCounts = { total: number; shown: number };
+export type ImageSectionHandle = { openPicker: () => void; collapse: () => void };
+// `open`: a picture is expanded, so the header offers 收起.
+export type ImageCounts = { total: number; shown: number; open: boolean };
 
 function pastedTitle(now = new Date()) {
   const two = (value: number) => String(value).padStart(2, "0");
@@ -199,7 +200,7 @@ function ImageDetail({ meta, src, copied, currentFolder, folders, colors, moveMe
   );
 }
 
-export function ImageSection({ library, query, compact, view, paused, onToast, onTrashed, onCounts, ref }: {
+export function ImageSection({ library, query, compact, view, paused, selecting, onSelectingChange, onToast, onTrashed, onCounts, ref }: {
   // Images and folders are owned by the page (image-library.ts), so the sidebar and this list never disagree.
   library: ImageLibrary;
   query: string;
@@ -212,6 +213,9 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   // An image went to the 回收站: the page offers the 6-second 撤销 for it.
   onTrashed: (meta: ImageMeta) => void;
   onCounts: (counts: ImageCounts) => void;
+  // 选择 mode (the button is in the page header): tick pictures, then 删除 moves them all to the 回收站.
+  selecting: boolean;
+  onSelectingChange: (selecting: boolean) => void;
   ref?: Ref<ImageSectionHandle>;
 }) {
   const { images, trashed, folders, filter: chosenFilter, ready, loadError, getBlob, getThumb, markUsed } = library;
@@ -222,6 +226,7 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   // The opened picture's full-size copy; until it has loaded the detail shows the thumbnail.
   const [fulls, setFulls] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState("");
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [copiedId, setCopiedId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ImageMeta | null>(null);
@@ -282,9 +287,17 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
   }, [inFolder, query, trashView]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
   const total = images?.length ?? 0;
-  useEffect(() => { onCounts({ total, shown: shown.length }); }, [onCounts, total, shown.length]);
-
   const openId = shown.some((meta) => meta.id === selectedId) ? selectedId : "";
+  useEffect(() => { onCounts({ total, shown: shown.length, open: openId !== "" }); }, [onCounts, total, shown.length, openId]);
+  // Starting 选择 folds the opened picture; leaving it forgets the ticks. Pictures that are gone or filtered out are unticked.
+  const selectingNow = selecting && !compact && !trashView;
+  const [wasSelecting, setWasSelecting] = useState(selectingNow);
+  if (wasSelecting !== selectingNow) {
+    setWasSelecting(selectingNow);
+    setCheckedIds([]);
+    if (selectingNow) setSelectedId("");
+  }
+  const checked = checkedIds.filter((id) => shown.some((meta) => meta.id === id));
   useEffect(() => {
     if (!ready || !openId || fullUrls.current.has(openId) || fullPending.current.has(openId)) return;
     fullPending.current.add(openId);
@@ -436,6 +449,12 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     openPicker() {
       fileInputRef.current?.click();
     },
+    // 收起: fold the opened picture without changing anything else.
+    collapse() {
+      setRenaming(null);
+      setMoveMenu(null);
+      setSelectedId("");
+    },
   }), []);
 
   async function copyImage(meta: ImageMeta) {
@@ -491,6 +510,23 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     setDeleteTarget(null);
     setSelectedId("");
     onToast("已永久删除");
+  }
+
+  function toggleChecked(id: string) {
+    setCheckedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
+  }
+
+  // 选择 → 删除: every ticked picture goes to the 回收站 (restorable there), so there is no extra question.
+  async function trashChecked() {
+    const targets = shown.filter((meta) => checked.includes(meta.id));
+    if (targets.length === 0) return;
+    let moved = 0;
+    for (const meta of targets) if (await library.trash(meta.id)) moved += 1;
+    setCheckedIds([]);
+    onSelectingChange(false);
+    if (moved === 0) onToast("删除失败，图片没有改动");
+    else if (moved === 1 && targets.length === 1) onTrashed(targets[0]);
+    else onToast(moved === targets.length ? `已把 ${moved} 张图片移到回收站，可在回收站恢复` : `已移到回收站 ${moved} 张，有 ${targets.length - moved} 张没有成功`);
   }
 
   function toggleRow(id: string) {
@@ -605,6 +641,15 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
     const tiles = shown.map((meta) => {
       const open = openId === meta.id;
       const copied = copiedId === meta.id;
+      const ticked = checked.includes(meta.id);
+      if (selectingNow) return (
+        <div key={meta.id} data-tile-id={meta.id} className={`image-tile picking ${ticked ? "ticked" : ""}`}>
+          <button type="button" className="image-tile-main" role="checkbox" aria-checked={ticked} onClick={() => toggleChecked(meta.id)} aria-label={`选择 ${meta.title}`}>
+            <span className="image-tile-thumb">{tileImage(meta)}<i className="tile-check" aria-hidden="true"><Icon name="check" /></i></span>
+            <strong className="image-tile-title">{meta.title}</strong>
+          </button>
+        </div>
+      );
       return (
         <div key={meta.id} data-tile-id={meta.id} className={`image-tile ${open ? "selected" : ""} ${copied ? "copied" : ""}`}>
           <button type="button" className="image-tile-main" onClick={() => toggleRow(meta.id)} aria-expanded={open} aria-label={`${open ? "已展开" : "展开"} ${meta.title}`}>
@@ -640,6 +685,20 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
       const open = openId === meta.id;
       const copied = copiedId === meta.id;
       const editing = open && renaming?.id === meta.id ? renaming : null;
+      if (selectingNow) {
+        const ticked = checked.includes(meta.id);
+        return (
+          <article key={meta.id} data-image-id={meta.id} className="native-row image-row picking">
+            <div className="row-line">
+              <button type="button" className={`row-check ${ticked ? "on" : ""}`} role="checkbox" aria-checked={ticked} aria-label={`选择 ${meta.title}`} onClick={() => toggleChecked(meta.id)}><Icon name="check" /></button>
+              <button type="button" className="row-main" onClick={() => toggleChecked(meta.id)} aria-label={`选择 ${meta.title}`}>
+                {thumb(meta)}
+                <span className="row-copy"><span className="row-title"><strong>{meta.title}</strong></span><small>{sizeLabel(meta)}</small></span>
+              </button>
+            </div>
+          </article>
+        );
+      }
       return (
         <article key={meta.id} data-image-id={meta.id} className={`native-row image-row ${open ? "selected" : ""} ${copied ? "copied" : ""} ${meta.pinned ? "pinned" : ""}`}>
           <div className="row-line">
@@ -694,6 +753,13 @@ export function ImageSection({ library, query, compact, view, paused, onToast, o
         onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void addFiles(files); }}
       />
       <div ref={listRef} className={`native-list list-switch image-list ${compact ? "mini-list" : ""} ${gridShown ? "image-grid" : ""}`}>{body}</div>
+      {selectingNow && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
+        <strong>已选 {checked.length} 张</strong>
+        <button type="button" className="ghost-button" onClick={() => setCheckedIds(checked.length === shown.length ? [] : shown.map((meta) => meta.id))}>{checked.length === shown.length ? "全不选" : "全选"}</button>
+        <span className="spacer" />
+        <button type="button" className="secondary-button danger-text" disabled={checked.length === 0} onClick={() => void trashChecked()}>删除</button>
+        <button type="button" className="primary-button" onClick={() => onSelectingChange(false)}>完成</button>
+      </div>}
       <AnimatePresence>{dragging && <ArcDropHint className="image-drop-hint">松开即可添加图片</ArcDropHint>}</AnimatePresence>
       {deleteTarget && createPortal(<ImageDeleteDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />, document.body)}
     </div>
