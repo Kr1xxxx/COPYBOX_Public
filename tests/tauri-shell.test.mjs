@@ -69,3 +69,10 @@ test("compressImage hands the bytes and the key to the shell and turns a failure
   assert.equal(failed.result.ok, false);
   assert.equal(failed.result.reason, "limit");
 });
+
+test("the top band moves the window: the bridge starts a drag and the capability allows it", () => {
+  const bridge = read("src-tauri/bridge.js");
+  assert.match(bridge, /plugin:window\|start_dragging/);
+  assert.match(bridge, /closest\("\.drag-region"\)/);
+  assert.match(read("src-tauri/capabilities/main.json"), /core:window:allow-start-dragging/);
+});
