@@ -1,4 +1,4 @@
 标题,沟通阶段,具体场景,核心动作,产品/业务,英文即时消息,中文对照,使用备注,可替换变量
 测试｜第一条,询盘接待,首次问候,自我介绍,通用,"Smoke test one: hello from the made-up sample data.",测试第一条,,
 测试｜第二条,询盘接待,询问需求,需求确认,通用,"Smoke test two: second made-up sample message.",测试第二条,,
-测试｜第三条,售后处理,物流跟进,催件回复,通用,"Smoke test three: third made-up sample message.",测试第三条,,
+测试｜第三条,询盘接待,物流跟进,催件回复,通用,"Smoke test three: third made-up sample message.",测试第三条,,

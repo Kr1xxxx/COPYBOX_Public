@@ -223,7 +223,10 @@ async function main() {
     await sleep(2500);
     const count = await rowCount(page);
     await page.screenshot({ path: path.join(OUT, "02-imported.png") });
-    if (count !== EXPECT_ROWS) throw new Error(`expected ${EXPECT_ROWS} snippets, found ${count}`);
+    if (count !== EXPECT_ROWS) {
+      const rows = await page.locator(".native-row").evaluateAll((nodes) => nodes.map((node) => node.textContent.slice(0, 40)));
+      throw new Error(`expected ${EXPECT_ROWS} snippets, found ${count}: ${JSON.stringify(rows)}`);
+    }
     return `${count} snippets`;
   });
 
