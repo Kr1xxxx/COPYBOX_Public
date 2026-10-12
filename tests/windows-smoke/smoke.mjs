@@ -1,7 +1,7 @@
 // Windows smoke test (run by .github/workflows/windows-smoke.yml on a GitHub Windows runner, or by hand on Windows).
 // Installs the NSIS installer, starts the real app, drives its page through the WebView2 debugging port with
 // Playwright, and checks: install, launch, import (made-up data), copy to the real clipboard, restart keeps the
-// data, and a hard kill keeps the data. Nothing here changes the app. Results, screenshots and logs go to SMOKE_OUT.
+// data, and a hard kill keeps the data. By default only shell-level checks run (install, window, restart after a kill, uninstall entry); the page steps need SMOKE_UI=1. Results, screenshots and logs go to SMOKE_OUT.
 //
 //   node tests/windows-smoke/smoke.mjs <path to Setup.exe>
 import { chromium } from "@playwright/test";
@@ -18,6 +18,8 @@ const PORT = 9222;
 const EXPECT_ROWS = 3;
 const FIRST_TEXT = "Smoke test one: hello from the made-up sample data.";
 const installer = process.argv[2];
+// SMOKE_UI=1 also drives the page; it needs a build with the test-hooks feature (see docs/log note). Default: shell-level checks only.
+const UI = process.env.SMOKE_UI === "1";
 
 fs.mkdirSync(OUT, { recursive: true });
 const results = [];
@@ -65,8 +67,10 @@ function findInstalledExe() {
 
 function launch(tag) {
   const outFile = fs.openSync(path.join(OUT, `app-${tag}.log`), "a");
+  const env = { ...process.env };
+  if (UI) env.CLIPBOX_TEST_DEBUG_PORT = String(PORT);
   child = spawn(exe, [], {
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT} --remote-allow-origins=*` },
+    env,
     stdio: ["ignore", outFile, outFile],
     windowsHide: false,
   });
@@ -135,6 +139,28 @@ function dataDirListing() {
 
 async function rowCount(page) { return page.locator(".native-row").count(); }
 
+async function waitForWindow(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const out = powershell("(Get-Process clipbox -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | Select-Object -First 1 -ExpandProperty MainWindowTitle)").out;
+    if (out) return out;
+    if (child && child.exitCode !== null) throw new Error(`the app exited early with ${child.exitCode}`);
+    await sleep(1000);
+  }
+  diagnose();
+  throw new Error("no app window appeared");
+}
+
+async function finish() {
+  const files = dataDirListing();
+  const uninstall = powershell("Get-ChildItem 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like '*Clipbox*' } | Select-Object DisplayName,DisplayVersion | Out-String");
+  fs.writeFileSync(path.join(OUT, "uninstall-entry.txt"), uninstall.out);
+  await step("uninstall entry exists", async () => {
+    if (!/Clipbox/.test(uninstall.out)) throw new Error("no Clipbox entry in the installed-programs list");
+    return `${files} files in the data folder; ${uninstall.out.replace(/\s+/g, " ")}`;
+  });
+}
+
 async function main() {
   if (!installer || !fs.existsSync(installer)) throw new Error(`installer not found: ${installer}`);
   let page;
@@ -148,6 +174,34 @@ async function main() {
     return exe;
   });
   if (!exe) return;
+
+
+  await step("the app starts and its window appears", async () => {
+    launch("first");
+    const title = await waitForWindow(90000);
+    desktopShot("01-first-start-desktop");
+    return `window title "${title}"`;
+  });
+
+  await step("the app wrote its data folder", async () => {
+    await sleep(4000);
+    const files = dataDirListing();
+    if (!files) throw new Error("no data folder was created");
+    return `${files} entries in the data folder`;
+  });
+
+  await step("a hard kill, then starting again, shows the window again", async () => {
+    await stopApp();
+    const before = dataDirListing();
+    launch("after-kill");
+    const title = await waitForWindow(90000);
+    desktopShot("02-after-kill-desktop");
+    const after = dataDirListing();
+    if (after < before) throw new Error(`the data folder shrank from ${before} to ${after} entries`);
+    return `window "${title}"; data folder ${before} -> ${after} entries`;
+  });
+  if (!UI) { await finish(); return; }
+  await stopApp();
 
   await step("starts and shows the main page", async () => {
     launch("first");
@@ -216,13 +270,7 @@ async function main() {
     return `${count} snippets still there`;
   });
 
-  await step("collect data folder and uninstall entry", async () => {
-    const files = dataDirListing();
-    const uninstall = powershell("Get-ChildItem 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like '*Clipbox*' } | Select-Object DisplayName,DisplayVersion | Out-String");
-    fs.writeFileSync(path.join(OUT, "uninstall-entry.txt"), uninstall.out);
-    if (!/Clipbox/.test(uninstall.out)) throw new Error("no Clipbox entry in the installed-programs list");
-    return `${files} files in the data folder; ${uninstall.out.replace(/\s+/g, " ")}`;
-  });
+  await finish();
 }
 
 try {
