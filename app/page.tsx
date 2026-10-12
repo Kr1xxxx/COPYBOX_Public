@@ -100,6 +100,7 @@ import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseShar
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
+import { useDropdownDismiss, useRowMenuPlacement } from "./dropdown-menus";
 import { useValueOptionDrag } from "./value-option-drag";
 import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
@@ -677,41 +678,12 @@ export default function Home() {
 
   // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu close on a click or touch anywhere outside them, and on Esc.
   const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || Boolean(folderMenu);
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const closeAll = () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setFolderMenu(""); setFolderDeleteArm(""); };
-    const outside = (event: PointerEvent) => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest(".folder-menu, .folder-more")) return; // the folder menu has its own scrim and toggle
-      if (target?.closest(".product-filter-wrap")) { setRowMenuId(""); setBulkMoveOpen(false); return; }
-      if (target?.closest(".menu-wrap")) { setProductMenuOpen(false); return; }
-      closeAll();
-    };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") closeAll(); };
-    document.addEventListener("pointerdown", outside, true);
-    document.addEventListener("keydown", escape);
-    return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
-  }, [dropdownOpen]);
-
-  // A row's ⋯ menu opens downward, but flips above the button when it would run past the bottom of the window.
-  useEffect(() => {
-    if (!rowMenuId) return;
-    const frame = requestAnimationFrame(() => {
-      const menu = document.querySelector<HTMLElement>(".row-menu");
-      const anchor = menu?.parentElement?.querySelector<HTMLElement>(".icon-button");
-      if (!menu || !anchor) return;
-      const height = menu.offsetHeight;
-      const room = window.innerHeight - anchor.getBoundingClientRect().bottom - 12;
-      const above = anchor.getBoundingClientRect().top - 12;
-      const up = height > room && above > room;
-      menu.style.top = up ? "auto" : "";
-      menu.style.bottom = up ? "34px" : "";
-      menu.style.transformOrigin = up ? "bottom right" : "";
-      menu.style.maxHeight = `${Math.max(120, Math.floor(up ? above : room))}px`;
-      menu.style.overflowY = "auto";
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [rowMenuId]);
+  useDropdownDismiss(dropdownOpen, {
+    all: () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
+    rowAndBulk: () => { setRowMenuId(""); setBulkMoveOpen(false); },
+    product: () => setProductMenuOpen(false),
+  });
+  useRowMenuPlacement(rowMenuId);
 
   useEffect(() => {
     if (loading) return;
