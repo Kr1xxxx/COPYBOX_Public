@@ -8,6 +8,10 @@ rust-version = "1.77"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# Test-only: lets the Windows smoke test reach the page. Never enabled in normal or release builds.
+test-hooks = []
+
 [dependencies]
 tauri = { version = "2", features = ["image-png", "tray-icon"] }
 tauri-plugin-clipboard-manager = "2"
