@@ -34,3 +34,22 @@ test("a short password is refused and a damaged record never opens the page", as
   assert.equal(isAccountLockSet(storage), true);
   assert.equal(await verifyAccountLock("anything", storage), false);
 });
+
+test("a recovery email is optional, checked, kept when the password changes, and masked for display", async () => {
+  const { checkRecoveryEmail, getRecoveryEmail, maskEmail, requestPasswordReset, setRecoveryEmail } = await import("../app/account-lock.ts");
+  const storage = memory();
+  assert.equal(checkRecoveryEmail(""), "");
+  assert.equal(checkRecoveryEmail("nope"), "邮箱格式不对");
+  await setAccountLock("open-sesame", storage, " me@example.com ");
+  assert.equal(getRecoveryEmail(storage), "me@example.com");
+  await setAccountLock("another-one", storage);
+  assert.equal(getRecoveryEmail(storage), "me@example.com");
+  assert.equal(await verifyAccountLock("another-one", storage), true);
+  await assert.rejects(() => setAccountLock("another-one", storage, "bad"), /邮箱格式不对/);
+  assert.equal(maskEmail("me@example.com"), "m***@example.com");
+  assert.deepEqual(await requestPasswordReset(storage), { ok: false, reason: "no-server" });
+  setRecoveryEmail("", storage);
+  assert.equal(getRecoveryEmail(storage), "");
+  assert.deepEqual(await requestPasswordReset(storage), { ok: false, reason: "no-email" });
+  assert.equal(await verifyAccountLock("another-one", storage), true);
+});

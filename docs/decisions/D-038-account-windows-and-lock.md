@@ -9,3 +9,8 @@
     `clipbox.account-lock.v1` (one new storage key; nothing existing changes). It is not part of backups.
   - There is no reset: a forgotten password cannot be recovered in the app. Clearing site data removes it (and all data).
 - Consequences: a password stops someone using the open app, not someone reading the browser/app storage files directly.
+- Update (owner, 2026-10-12: "加一个「忘记密码」按钮，需要邮箱重置密码,后期我们用服务器"): the lock screen has 「忘记密码」, and setting or
+  changing the password can include an optional 找回邮箱 (stored inside the same `clipbox.account-lock.v1` record, as plain text).
+  The reset mail needs the owner's server, which is not deployed: `RESET_SERVER_URL` in `app/account-lock.ts` is empty, so the
+  button says "找回功能需要服务器，部署后开通". When the address is set, the app POSTs `{email}` to `<server>/account-reset`.
+  A reset never clears the account data. This replaces "There is no reset" above.

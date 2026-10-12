@@ -1145,3 +1145,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .account-lock-form>div:first-child{display:grid;gap:6px;min-width:0}
 .account-lock-error{color:var(--danger)!important}
 @media (prefers-reduced-motion: reduce){.account-lock-screen{animation:none}}
+
+.account-lock-link { border: 0; background: none; color: var(--muted, #6b665e); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px; }
+.account-lock-forgot { display: grid; gap: 8px; justify-items: center; max-width: 280px; text-align: center; }

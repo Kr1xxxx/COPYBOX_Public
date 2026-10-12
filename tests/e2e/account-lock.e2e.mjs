@@ -88,3 +88,35 @@ test("a short password is refused, and the account backup cannot be exported whi
   await expect(settings).toContainText("先打开账号页、输入密码，才能导出");
   await expect(settings.locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button")).toBeDisabled();
 });
+
+test("忘记密码: with a recovery email it offers a reset mail (needs the server, says so); without one it says it cannot reset", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  const settings = await openSettings(page);
+  await settings.getByRole("button", { name: "设置…" }).click();
+  await settings.getByLabel("新密码", { exact: true }).fill("abcd1234");
+  await settings.getByLabel("再输入一次新密码").fill("abcd1234");
+  await settings.getByLabel("找回邮箱").fill("bad");
+  await settings.getByRole("button", { name: "保存" }).click();
+  await expect(settings.getByRole("alert")).toContainText("邮箱格式不对");
+  await settings.getByLabel("找回邮箱").fill("lock@example.com");
+  await settings.getByRole("button", { name: "保存" }).click();
+  await expect(settings).toContainText("已设置");
+  await settings.getByRole("button", { name: "关闭" }).first().click();
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  await page.getByRole("button", { name: "忘记密码" }).click();
+  await expect(page.locator(".account-lock-forgot")).toContainText("l***@example.com");
+  await expect(page.locator(".account-lock-forgot")).toContainText("不会被清空");
+  await page.getByRole("button", { name: "发送重置邮件" }).click();
+  await expect(page.getByRole("status")).toContainText("找回功能需要服务器，部署后开通");
+});
+
+test("忘记密码 without a recovery email says reset is not possible", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await seedSnippets(page);
+  await setPassword(page, "abcd1234");
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  await page.getByRole("button", { name: "忘记密码" }).click();
+  await expect(page.locator(".account-lock-forgot")).toContainText("没有设置找回邮箱");
+  await expect(page.getByRole("button", { name: "发送重置邮件" })).toHaveCount(0);
+});
