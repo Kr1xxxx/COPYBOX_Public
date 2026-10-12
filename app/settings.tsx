@@ -8,6 +8,7 @@ import { ImageCompressSettings } from "./image-compress-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, type SecretItem } from "./clipbox-core";
 import { UsageSection } from "./usage-section";
+import { AutoBackupRows } from "./auto-backup-ui";
 import { testPreviewText, type TestContentPreview } from "./sample-snippets";
 import { DataMoveDialog } from "./data-move";
 import { AccountLockSettings } from "./account-lock-ui";
@@ -138,7 +139,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
             <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">数据</h3>
-            {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
+            {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密，不含图片" : `用独立密码加密，不含${SECRET_WORD}和图片`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {row(`导出${SECRET_WORD}备份`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…", accountLocked)}
             {onImportTest && row("导入测试内容", `放入一批带「范例」标记的假内容（话术${PLAIN_NOTES ? "" : `、${SECRET_WORD}`}），重复导入不会重复`, () => void onImportTest(), "导入")}
             {onClearTest && (
@@ -150,10 +151,11 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
                   : <button type="button" className="secondary-button" onClick={() => void (onPreviewTest?.() ?? Promise.resolve({ snippets: 0, accounts: null, keptEdited: 0 })).then(setConfirmClearTest)}>清除…</button>}
               </div>
             )}
-            {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
+            {row("导入备份", "读取话术备份或账号备份文件，可选择合并或覆盖", onImport, "选择文件…")}
             {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
-            {isDesktop && row("导出到新版", "话术、图片和设置打包成一个加密文件，换到新版 Clipbox 时用", () => setDataMove("export"), "导出…")}
-            {isDesktop && row("从旧版导入", "读取旧版导出的文件，替换这里现有的全部内容", () => setDataMove("import"), "选择文件…")}
+            {row("完整备份", "话术、账号、图片和设置，全部打包成一个带密码的文件", () => setDataMove("export"), "导出…")}
+            {row("从完整备份恢复", "读取完整备份文件，替换这里现有的全部内容，替换前会再问你一次", () => setDataMove("import"), "选择文件…")}
+            <AutoBackupRows itemCount={itemCount} />
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
             {isDesktop
               ? row("数据位置", "在文件夹中打开 Clipbox 的本机数据", onOpenDataFolder, "打开文件夹")
@@ -172,7 +174,9 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           </section>
           <section className="settings-card" aria-labelledby="set-security" hidden={hideSection("data", "set-security")}><h3 id="set-security">安全</h3>
             <AccountLockSettings isSet={accountLock.isSet} onChanged={accountLock.onChanged} />
-            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
+            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。</p>
+            <p className="settings-note">密钥也放在这台电脑里，请不要把整个数据文件夹拷给别人。自动备份和数据放在一起，保护程度一样；要带走备份，请用带密码的「完整备份」。{PLAIN_NOTES ? "" : `复制${SECRET_WORD}默认只给出引用。`}</p>
+            <p className="settings-note">只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-usage" hidden={hideSection("usage", "set-usage")}><h3 id="set-usage">使用排行</h3>
             <UsageSection items={usageItems} now={openedAt} onShow={onShowItem} />

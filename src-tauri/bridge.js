@@ -19,6 +19,10 @@
         .then(function (buffer) { return { ok: true, bytes: new Uint8Array(buffer) }; })
         .catch(function (error) { return { ok: false, reason: String(error && error.message ? error.message : error) }; });
     },
+    // Automatic daily backup: the file bytes go as the raw body, the file name as a header (backup.rs keeps the newest seven).
+    backupSave: function (name, bytes) { return invoke("backup_save", bytes, { headers: { "x-backup-name": name } }).then(noop); },
+    backupList: function () { return invoke("backup_list"); },
+    backupRead: function (name) { return invoke("backup_read", { name: name }).then(function (buffer) { return new Uint8Array(buffer); }); },
     didCopy: function () { fireAndForget("did_copy"); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
     setMiniHidePolicy: function (policy) { fireAndForget("set_mini_hide_policy", { policy: policy }); },
