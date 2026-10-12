@@ -60,33 +60,51 @@ export async function previewClearSamples(deviceKey: string, storage: Storage2 =
 
 // Removes the examples, and nothing else. There is no "remove all" path: each list is rewritten with only the planned ids
 // taken out, and the write is refused unless exactly those entries are gone and every other one is left as it was.
+// Each list is read and rewritten in one step (store.update), so an entry saved at the same moment is never lost.
 export async function clearSampleEntries(deviceKey: string, storage: Storage2 = localStorage) {
   const totpStore = openTotpStore(deviceKey, storage);
   const itemStore = openSecretItemsStore(deviceKey, storage);
-  const [totp, items] = [await totpStore.list(), await itemStore.list()];
-  const plan = planClearSamples(totp, items);
-  const goneItems = new Set(plan.removeItems);
-  const goneTotp = new Set(plan.removeTotp);
-  const keptItems = items.filter((item) => !goneItems.has(item.id));
-  const keptTotp = totp.filter((entry) => !goneTotp.has(entry.id));
-  // Marks (改归类) that only point at a removed example go with it.
-  const finalItems = keptItems.filter((item) => !(item.type === "mark" && (goneItems.has(item.target.slice(item.target.indexOf(":") + 1)) || goneTotp.has(item.target.slice(item.target.indexOf(":") + 1)))));
-  const safe = items.length - finalItems.length >= goneItems.size && finalItems.every((item) => items.includes(item) && !(isSampleId(item.id) && untouched(item) && item.type !== "mark"))
-    && keptTotp.length === totp.length - goneTotp.size && goneItems.size + goneTotp.size <= 20;
-  if (!safe) throw new Error("清除范例的检查没通过，数据没有改动");
-  if (finalItems.length !== items.length) await itemStore.replaceAll(finalItems);
-  if (keptTotp.length !== totp.length) await totpStore.replaceAll(keptTotp);
+  let removedTotp: string[] = [];
+  await totpStore.update((totp) => {
+    removedTotp = planClearSamples(totp, []).removeTotp;
+    const gone = new Set(removedTotp);
+    const kept = totp.filter((entry) => !gone.has(entry.id));
+    if (kept.length !== totp.length - gone.size || gone.size > 20) throw new Error("清除范例的检查没通过，数据没有改动");
+    return kept;
+  });
+  let removedItems = 0;
+  let keptEdited = 0;
+  await itemStore.update((items) => {
+    const plan = planClearSamples([], items);
+    const goneItems = new Set(plan.removeItems);
+    const goneTotp = new Set(removedTotp);
+    // Marks (改归类) that only point at a removed example go with it.
+    const finalItems = items.filter((item) => !goneItems.has(item.id) && !(item.type === "mark" && (goneItems.has(item.target.slice(item.target.indexOf(":") + 1)) || goneTotp.has(item.target.slice(item.target.indexOf(":") + 1)))));
+    const safe = items.length - finalItems.length >= goneItems.size && finalItems.every((item) => items.includes(item) && !(isSampleId(item.id) && untouched(item) && item.type !== "mark")) && goneItems.size <= 20;
+    if (!safe) throw new Error("清除范例的检查没通过，数据没有改动");
+    removedItems = goneItems.size;
+    keptEdited = plan.keptEdited;
+    return finalItems;
+  });
   storage.setItem(SAMPLES_DONE_KEY, "1");
-  return { removed: goneItems.size + goneTotp.size, keptEdited: plan.keptEdited };
+  return { removed: removedItems + removedTotp.length, keptEdited };
 }
 
 export async function restoreSampleEntries(deviceKey: string, storage: Storage2 = localStorage) {
   const totpStore = openTotpStore(deviceKey, storage);
   const itemStore = openSecretItemsStore(deviceKey, storage);
-  const [totp, items] = [await totpStore.list(), await itemStore.list()];
-  const plan = planRestoreSamples(totp, items, Date.now());
-  if (plan.addItems.length > 0) await itemStore.replaceAll([...items, ...plan.addItems]);
-  if (plan.addTotp.length > 0) await totpStore.replaceAll([...totp, ...plan.addTotp]);
+  const now = Date.now();
+  let added = 0;
+  await itemStore.update((items) => {
+    const { addItems } = planRestoreSamples([], items, now);
+    added += addItems.length;
+    return addItems.length > 0 ? [...items, ...addItems] : items;
+  });
+  await totpStore.update((totp) => {
+    const { addTotp } = planRestoreSamples(totp, [], now);
+    added += addTotp.length;
+    return addTotp.length > 0 ? [...totp, ...addTotp] : totp;
+  });
   storage.setItem(SAMPLES_DONE_KEY, "1");
-  return { added: plan.addItems.length + plan.addTotp.length };
+  return { added };
 }
