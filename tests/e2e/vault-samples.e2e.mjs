@@ -58,7 +58,7 @@ test("examples are added beside data that is already there and leave it untouche
   await expect(dialog).toContainText("【范例】");
 });
 
-test("设置 → 清除范例 / 恢复范例 only touch the examples: own entries and edited examples stay", async ({ page }) => {
+test("设置 → 清除测试内容 / 导入测试内容 only touch the examples: own entries and edited examples stay", async ({ page }) => {
   const dialog = await open(page);
   // The user's own entries: a 验证码 and a 账号密码.
   await openAccountCategory(dialog.page(), "验证码");
@@ -89,11 +89,11 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await s.getByRole("button", { name: "清除…" }).click();
   // Before anything is deleted the box says how many and which; own entries and the edited example are not on the list.
   const list = s.getByRole("status");
-  await expect(list).toContainText("将删除 4 条");
+  await expect(list).toContainText("账号 4 条");
   await expect(list).toContainText("【范例】接口密钥");
   for (const kept of ["我的邮箱", "我的店铺", "美元电汇"]) await expect(list).not.toContainText(kept);
   await s.getByRole("button", { name: "确认清除" }).click();
-  await expect(page.getByText("已清除 4 条范例，1 条你改过的已保留")).toBeVisible();
+  await expect(page.getByText("已清除 4 条测试内容，1 条你改过的已保留")).toBeVisible();
   await page.keyboard.press("Escape");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const after = page.getByRole("region", { name: "保险箱" });
@@ -106,11 +106,11 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await expect(after).not.toContainText("【范例】Example 后台");
   await page.keyboard.press("Escape");
 
-  // 恢复: the missing examples come back once, nothing is duplicated, the edited one is left alone.
+  // 导入: the missing examples come back once, nothing is duplicated, the edited one is left alone.
   for (let round = 0; round < 2; round += 1) {
     s = await settings();
-    await s.getByRole("button", { name: "恢复", exact: true }).click();
-    await expect(page.getByText(round === 0 ? "已补回 4 条范例" : "范例都在，没有缺的")).toBeVisible();
+    await s.getByRole("button", { name: "导入", exact: true }).click();
+    await expect(page.getByText(round === 0 ? /已放入测试内容：话术 \d+ 条，账号 4 条/ : "测试内容都在，没有缺的")).toBeVisible();
     await page.keyboard.press("Escape");
   }
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
@@ -123,7 +123,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await expect(restored).toContainText("我的店铺");
 });
 
-test("清除范例 and 恢复范例 are offered on Windows too", async ({ page }) => {
+test("导入测试内容 and 清除测试内容 are offered on Windows too", async ({ page }) => {
   await asDesktop(page, "win32");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
