@@ -90,7 +90,7 @@ fn main() {
                 .traffic_light_position(tauri::LogicalPosition::new(14.0, 19.0));
             #[cfg(all(feature = "test-hooks", target_os = "windows"))]
             let builder = match std::env::var("CLIPBOX_TEST_DEBUG_PORT") {
-                Ok(port) if port.chars().all(|c| c.is_ascii_digit()) && !port.is_empty() => builder.additional_browser_args(format!(
+                Ok(port) if port.chars().all(|c| c.is_ascii_digit()) && !port.is_empty() => builder.additional_browser_args(&format!(
                     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port} --remote-allow-origins=*"
                 )),
                 _ => builder,
