@@ -76,3 +76,27 @@ test("the top band moves the window: the bridge starts a drag and the capability
   assert.match(bridge, /closest\("\.drag-region"\)/);
   assert.match(read("src-tauri/capabilities/main.json"), /core:window:allow-start-dragging/);
 });
+
+test("the browser's page menu and its keys are blocked, but text fields keep their menu", async () => {
+  const vm = await import("node:vm");
+  const listeners = {};
+  const window = { addEventListener(name, fn) { if (name === "DOMContentLoaded") fn(); } };
+  window.__TAURI__ = { core: { invoke: async () => {} }, clipboardManager: {}, app: {}, event: {} };
+  const document = {
+    documentElement: { classList: { add() {}, remove() {} } },
+    hidden: false,
+    hasFocus: () => true,
+    addEventListener(name, fn) { (listeners[name] ||= []).push(fn); if (name === "DOMContentLoaded") fn(); },
+  };
+  vm.runInNewContext(read("src-tauri/bridge.js").replace("__PLATFORM__", "win32"), { window, Uint8Array, Error, String, Boolean, setTimeout, clearTimeout, document, addEventListener() {} });
+  const fire = (name, event) => { let prevented = false; for (const fn of listeners[name] || []) fn({ ...event, preventDefault() { prevented = true; } }); return prevented; };
+  const onPage = { closest: () => null };
+  const onField = { closest: (selector) => (/input/.test(selector) ? {} : null) };
+  assert.equal(fire("contextmenu", { target: onPage }), true);
+  assert.equal(fire("contextmenu", { target: onField }), false);
+  assert.equal(fire("keydown", { key: "r", ctrlKey: true }), true);
+  assert.equal(fire("keydown", { key: "p", ctrlKey: true }), true);
+  assert.equal(fire("keydown", { key: "F5" }), true);
+  assert.equal(fire("keydown", { key: "v", ctrlKey: true }), false);
+  assert.equal(fire("keydown", { key: "c", ctrlKey: true }), false);
+});
