@@ -109,10 +109,32 @@
     });
   }
 
+  // The browser's own page menu (refresh, print, ... with their key hints) and its keys have no place in the app (D-005).
+  // Text fields keep the system menu, which is how people paste with the mouse.
+  var browserKeys = ["f5", "f7", "f12"];
+  var browserCtrlKeys = ["r", "p", "s", "u", "g", "j"];
+  function blocksBrowserKey(event) {
+    var key = String(event.key || "").toLowerCase();
+    if (browserKeys.indexOf(key) >= 0) return true;
+    if (event.ctrlKey && event.shiftKey && (key === "i" || key === "j" || key === "c" || key === "r")) return true;
+    return (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && browserCtrlKeys.indexOf(key) >= 0 && platform !== "darwin";
+  }
+  function quietBrowserChrome() {
+    document.addEventListener("contextmenu", function (event) {
+      var target = event.target;
+      var field = target && target.closest && target.closest("input, textarea, [contenteditable='true']");
+      if (!field) event.preventDefault();
+    }, true);
+    document.addEventListener("keydown", function (event) {
+      if (blocksBrowserKey(event)) event.preventDefault();
+    }, true);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.documentElement.classList.add("desktop-app", "platform-" + platform);
     watchIdle();
     watchTitleDrag();
+    quietBrowserChrome();
   }, { once: true });
 
   // Show the window once the page has painted, so it never opens as a white flash.
