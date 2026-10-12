@@ -274,11 +274,15 @@ button { -webkit-tap-highlight-color: transparent; }
 .status-bar > span.spacer { display: block; }
 
 /* Mini window */
-.mini-top { height: 42px; flex: 0 0 auto; padding: 0 8px 0 10px; display: flex; align-items: center; gap: 8px; background: var(--sidebar); }
-.mini-top .icon-button { flex: 0 0 auto; width: 28px; height: 28px; color: var(--ink-2); }
+.mini-top { height: 42px; flex: 0 0 auto; padding: 0 8px 0 10px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 8px; background: var(--sidebar); }
+.mini-top .traffic-lights { justify-self: start; }
+.desktop-app:not(.platform-darwin) .mini-top .traffic-lights { width: 0; }
+/* The switch and 全部/收藏/最近 sit together in the middle; a long row scrolls inside its own space. */
+.mini-top-center { min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.mini-top .icon-button { justify-self: end; width: 28px; height: 28px; color: var(--ink-2); }
 .mini-top .kind-switch { flex: 0 0 auto; }
 /* Folder tabs: one row that scrolls sideways (drag, wheel, trackpad); the 话术/图片 switch beside it stays put. */
-.mini-tabs { position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x; cursor: grab; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); }
+.mini-tabs { position: relative; flex: 0 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x; cursor: grab; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); }
 .mini-tabs::-webkit-scrollbar { display: none; }
 .mini-tabs.dragging { cursor: grabbing; }
 .mini-tabs.dragging .mini-tab { pointer-events: none; }
@@ -290,16 +294,13 @@ button { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) { .mini-tab { transition: none; } .mini-tab:active { transform: none; } }
 .mini-search { flex: 0 0 auto; padding: 4px 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
 .mini-search .native-search { height: 34px; padding-right: 0; border-radius: 8px; }
-.mini-folder { position: relative; height: 26px; max-width: 110px; display: flex; align-items: center; border-left: 1px solid var(--line-soft); color: var(--ink-2); }
-.mini-folder select { height: 100%; max-width: 110px; padding: 0 22px 0 9px; border: 0; outline: 0; background: transparent; color: inherit; font-size: 12px; font-weight: 500; appearance: none; cursor: pointer; }
-.mini-folder .icon { position: absolute; right: 7px; width: 11px; height: 11px; pointer-events: none; }
-.mini-favorites { flex: 0 0 auto; display: flex; gap: 4px; padding: 0 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
-.mini-search:has(+ .mini-favorites) { border-bottom: 0; }
-.mini-chip { flex: 1 1 0; min-width: 0; height: 28px; padding: 0 4px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: transform .12s ease, background-color .12s ease; }
-.mini-chip:hover { background: var(--hover); }
-.mini-chip:active { transform: scale(.97); }
-.mini-chip.pinned { border-color: var(--accent); color: var(--accent-ink); }
-.mini-chip.copied { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); }
+/* Folder row under the search box (takes the place of the old 最常用 chips): the same tabs, drawn as bordered chips. */
+.mini-folders { flex: 0 0 auto; height: 36px; padding: 0 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
+.mini-search:has(+ .mini-folders) { border-bottom: 0; }
+.mini-tabs.chips { height: 28px; padding-inline: 8px; margin-inline: -8px; }
+.mini-tabs.chips .mini-tab { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--ink-2); }
+.mini-tabs.chips .mini-tab:hover { background: var(--hover); }
+.mini-tabs.chips .mini-tab.active { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); }
 .mini-list { padding: 6px 6px 8px; gap: 1px; }
 .mini-row .row-main { min-height: 46px; padding: 0 10px 0 12px; gap: 10px; border-radius: 9px; }
 .mini-row .row-copy small { font-size: 12px; }
