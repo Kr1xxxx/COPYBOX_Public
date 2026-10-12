@@ -445,7 +445,7 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
   }
 });
 
-test("the mini window has a folder select next to the search box", async ({ browser }) => {
+test("the mini window has folder tabs in the top row", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 680, height: 620 }, locale: "zh-CN" });
   const page = await context.newPage();
   await openImages(page);
@@ -461,23 +461,23 @@ test("the mini window has a folder select next to the search box", async ({ brow
 
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
-  const select = page.locator(".mini-folder select");
-  await expect(select).toBeVisible();
-  await expect(select.locator("option")).toHaveText(["全部", "收藏", "收款码", "价目表", "未分类"]);
+  const tabs = page.locator(".mini-top .mini-tab");
+  const tab = (name) => page.locator(".mini-top .mini-tab", { hasText: name });
+  await expect(tabs).toHaveText(["全部", "收藏", "收款码", "价目表", "未分类"]);
   await expect(page.locator(".mini-row")).toHaveCount(4);
   await expect(page.locator(".status-bar")).toContainText("4 张");
 
-  await select.selectOption({ label: "收款码" });
+  await tab("收款码").click();
   await expect(page.locator(".mini-row")).toHaveCount(2);
   await expect(page.locator(".status-bar")).toContainText("2 张");
-  await select.selectOption({ label: "未分类" });
+  await tab("未分类").click();
   await expect(page.locator(".mini-row")).toHaveCount(1);
   await expect(page.locator(".mini-row").first()).toContainText("散图");
-  await select.selectOption({ label: "价目表" });
+  await tab("价目表").click();
   await page.getByPlaceholder("搜索图片").fill("码一");
   await expect(page.locator(".mini-row")).toHaveCount(0);
   await page.getByPlaceholder("搜索图片").fill("");
-  await select.selectOption({ label: "全部" });
+  await tab("全部").click();
   await expect(page.locator(".mini-row")).toHaveCount(4);
 
   // Copying still works with one click, and an empty folder says so.
@@ -486,15 +486,16 @@ test("the mini window has a folder select next to the search box", async ({ brow
   await context.close();
 });
 
-test("the 话术 mini window keeps its own folder select", async ({ page }) => {
+test("the 话术 mini window keeps its own folder tabs", async ({ page }) => {
   await asDesktop(page, "win32");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
-  await expect(page.locator(".mini-folder select option")).toContainText(["全部", "收藏", "最近使用"]);
+  await expect(page.locator(".mini-top .mini-tab").first()).toBeVisible();
+  await expect(page.locator(".mini-top .mini-tab")).toContainText(["全部", "收藏", "最近"]);
   await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
-  await expect(page.locator(".mini-folder select option")).toHaveText(["全部", "收藏", "未分类"]);
+  await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "未分类"]);
 });
 
 test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs", async ({ page }) => {
