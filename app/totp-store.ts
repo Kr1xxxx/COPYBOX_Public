@@ -1,5 +1,6 @@
 // Encrypted store for the hidden 验证码 accounts (Mac). One AES-GCM envelope in its own localStorage key, keyed from the
 // device key by PBKDF2 like the vault, but kept apart from it: never in the vault. It goes into a 秘密 backup only as its own password-encrypted block (vault-backup.ts).
+import { serialFor } from "./store-queue.ts";
 import { VAULT_CHANGED_EVENT } from "./secret-items-store.ts";
 import { TOTP_MAX_ACCOUNTS, type TotpAccount } from "./totp-core.ts";
 
@@ -16,6 +17,8 @@ export type TotpStore = {
   put(account: TotpAccount): Promise<TotpAccount[]>;
   remove(id: string): Promise<TotpAccount[]>;
   // Used when restoring a backup: writes the whole list at once.
+  // Reads, changes and writes in one step, so nothing written in between is lost. Throw to write nothing.
+  update(change: (current: TotpAccount[]) => TotpAccount[]): Promise<TotpAccount[]>;
   replaceAll(accounts: TotpAccount[]): Promise<TotpAccount[]>;
 };
 
@@ -62,13 +65,8 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
     return accounts;
   }
 
-  // Changes are applied one after another so two quick adds cannot overwrite each other.
-  let queue: Promise<unknown> = Promise.resolve();
-  function serial<T>(task: () => Promise<T>): Promise<T> {
-    const next = queue.then(task, task);
-    queue = next.catch(() => undefined);
-    return next;
-  }
+  // Changes wait in one line per storage key, shared with every other store object on it.
+  const serial = serialFor(storage, TOTP_STORAGE_KEY);
 
   return {
     list: () => serial(read),
@@ -83,6 +81,7 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
       return write(accounts.some((entry) => entry.id === account.id) ? accounts.map((entry) => (entry.id === account.id ? account : entry)) : [...accounts, account]);
     }),
     remove: (id) => serial(async () => write((await read()).filter((entry) => entry.id !== id))),
+    update: (change) => serial(async () => { const current = await read(); const next = change(current); return next === current ? current : write(next); }),
     replaceAll: (accounts) => serial(async () => write(accounts)),
   };
 }

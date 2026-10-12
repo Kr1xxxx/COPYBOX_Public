@@ -3,7 +3,20 @@ import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs"
 
 const openAll = (page) => page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ }).click();
 
+// A toast is on screen for about two seconds, which a busy machine can let a poll miss. This notes every piece of text the
+// page adds, so the check looks at what was shown, not at whether it happens to be visible right now.
+async function recordShown(page) {
+  await page.addInitScript(() => {
+    window.__shown = [];
+    new MutationObserver((records) => {
+      for (const record of records) for (const node of record.addedNodes) window.__shown.push(node.textContent ?? "");
+    }).observe(document, { childList: true, subtree: true, characterData: false });
+  });
+}
+const expectShown = (page, text) => expect.poll(() => page.evaluate(() => window.__shown.join("\n"))).toMatch(text);
+
 async function open(page) {
+  await recordShown(page);
   await asDesktop(page, "darwin");
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
@@ -11,6 +24,8 @@ async function open(page) {
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
+  // The examples are written once, right as the box first opens (slow key derivation, slower still on a busy machine); work only starts after they are in.
+  await expect(dialog).toContainText("范例", { timeout: 20_000 });
   return dialog;
 }
 
@@ -93,7 +108,7 @@ test("设置 → 清除测试内容 / 导入测试内容 only touch the examples
   await expect(list).toContainText("【范例】接口密钥");
   for (const kept of ["我的邮箱", "我的店铺", "美元电汇"]) await expect(list).not.toContainText(kept);
   await s.getByRole("button", { name: "确认清除" }).click();
-  await expect(page.getByText("已清除 4 条测试内容，1 条你改过的已保留")).toBeVisible();
+  await expectShown(page, /已清除 4 条测试内容，1 条你改过的已保留/);
   await page.keyboard.press("Escape");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   const after = page.getByRole("region", { name: "保险箱" });
@@ -110,7 +125,7 @@ test("设置 → 清除测试内容 / 导入测试内容 only touch the examples
   for (let round = 0; round < 2; round += 1) {
     s = await settings();
     await s.getByRole("button", { name: "导入", exact: true }).click();
-    await expect(page.getByText(round === 0 ? /已放入测试内容：话术 \d+ 条，账号 4 条/ : "测试内容都在，没有缺的")).toBeVisible();
+    await expectShown(page, round === 0 ? /已放入测试内容：话术 \d+ 条，账号 4 条/ : /测试内容都在，没有缺的$/m);
     await page.keyboard.press("Escape");
   }
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();

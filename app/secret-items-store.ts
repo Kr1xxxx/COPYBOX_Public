@@ -1,6 +1,7 @@
 // Encrypted store for the typed items of the hidden 保险箱 (Mac only): 收款信息 now, 账号密码 and API 密钥 later.
 // A separate AES-GCM envelope in its own localStorage key. The 验证码 accounts keep their own key (`clipbox.totp.v1`,
 // totp-store.ts) and are not touched, so older data stays readable without any migration.
+import { serialFor } from "./store-queue.ts";
 import type { ApiKeyItem, LoginItem, MarkItem, PaymentItem, RecoveryItem } from "./payment-core.ts";
 
 // Fired after every write, so the sidebar counts of the 账号 page stay right.
@@ -19,6 +20,8 @@ export type SecretItemsStore = {
   put(item: VaultItem): Promise<VaultItem[]>;
   remove(id: string): Promise<VaultItem[]>;
   // Used when restoring a backup: writes the whole list at once.
+  // Reads, changes and writes in one step, so nothing written in between is lost. Throw to write nothing.
+  update(change: (current: VaultItem[]) => VaultItem[]): Promise<VaultItem[]>;
   replaceAll(items: VaultItem[]): Promise<VaultItem[]>;
 };
 
@@ -64,13 +67,8 @@ export function openSecretItemsStore(deviceKey: string, storage: SecretItemsStor
     return items;
   }
 
-  // One change after another, so two quick saves cannot overwrite each other.
-  let queue: Promise<unknown> = Promise.resolve();
-  function serial<T>(task: () => Promise<T>): Promise<T> {
-    const next = queue.then(task, task);
-    queue = next.catch(() => undefined);
-    return next;
-  }
+  // Changes wait in one line per storage key, shared with every other store object on it.
+  const serial = serialFor(storage, SECRET_ITEMS_KEY);
 
   return {
     list: () => serial(read),
@@ -81,6 +79,7 @@ export function openSecretItemsStore(deviceKey: string, storage: SecretItemsStor
       return write(index < 0 ? [...items, item] : items.map((entry) => (entry.id === item.id ? item : entry)));
     }),
     remove: (id) => serial(async () => write((await read()).filter((entry) => entry.id !== id))),
+    update: (change) => serial(async () => { const current = await read(); const next = change(current); return next === current ? current : write(next); }),
     replaceAll: (items) => serial(async () => write(items)),
   };
 }

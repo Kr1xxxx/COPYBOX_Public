@@ -57,3 +57,25 @@ test("restoring adds only the missing examples and leaves user entries alone", a
   assert.deepEqual(items.filter((item) => !item.id.startsWith("sample-")), mine.items);
   assert.equal(items.length, mine.items.length + 4);
 });
+
+test("an entry saved while the examples are being put in is not lost (stores opened separately share one line)", async () => {
+  const storage = memory();
+  const mine = userData();
+  const restoring = restoreSampleEntries(KEY, storage);
+  // A second store object, as the 验证码 and 账号 panels open their own.
+  const saving = [openTotpStore(KEY, storage).add(mine.totp[0]), openSecretItemsStore(KEY, storage).put(mine.items[0])];
+  await Promise.all([restoring, ...saving]);
+  assert.deepEqual((await openTotpStore(KEY, storage).list()).map((entry) => entry.id).sort(), ["sample-totp", "u-totp"]);
+  assert.deepEqual((await openSecretItemsStore(KEY, storage).list()).map((item) => item.id).sort(), ["sample-apikey", "sample-login", "sample-payment", "sample-recovery", "u-login"]);
+});
+
+test("a clear running at the same moment as a save keeps the saved entry", async () => {
+  const storage = memory();
+  const mine = userData();
+  const samples = sampleVaultData(5);
+  await openSecretItemsStore(KEY, storage).replaceAll(samples.items);
+  await openTotpStore(KEY, storage).replaceAll(samples.totp);
+  await Promise.all([clearSampleEntries(KEY, storage), openTotpStore(KEY, storage).add(mine.totp[0]), openSecretItemsStore(KEY, storage).put(mine.items[0])]);
+  assert.deepEqual((await openTotpStore(KEY, storage).list()).map((entry) => entry.id), ["u-totp"]);
+  assert.deepEqual((await openSecretItemsStore(KEY, storage).list()).map((item) => item.id), ["u-login"]);
+});
