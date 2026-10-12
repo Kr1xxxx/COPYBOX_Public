@@ -1,4 +1,4 @@
-### D-039 The 账号页密码 now really encrypts the 账号 data (2026-10-12)
+### D-040 The 账号页密码 now really encrypts the 账号 data (2026-10-12)
 - Context: D-038 made the password only a door; the data stayed encrypted with the device key kept on the same computer, so
   someone with the data folder could read it (advisor review 2026-10-12, item 2). The owner chose to fix it ("124568 安排").
 - Decision (owner): setting a password encrypts the three 账号 stores (`clipbox.vault-items.v1`, `clipbox.totp.v1`,
@@ -19,3 +19,9 @@
   - Not covered: on Mac the old 秘密 list (「其他」) lives in the main vault under the device key; the 找回邮箱 is stored in plain text.
   - The key K exists in memory only while the 账号 section is open; leaving the section locks again.
 - Supersedes: the "password is only a door" lines of D-038. Backups (账号备份) are unchanged: they have their own password.
+- 完整备份 (PR #98) copies every `clipbox.*` key as it is, so it carries the lock record (K wrapped twice) and the encrypted stores: a
+  restored backup still needs the password or the recovery code. The recovery code is deliberately NOT written into any backup:
+  with it in the file, the backup password would become a second way in. Keep the code on paper or in a password manager.
+- Trade-off the owner accepted by choosing real encryption: security against someone holding the data folder, paid for with "password
+  and recovery code both lost = unreadable data". The planned email reset (server never sees the password) can prove identity but
+  cannot recover encrypted data, so the recovery code is the only way back.
