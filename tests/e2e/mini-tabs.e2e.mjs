@@ -67,3 +67,20 @@ test("mini folder row: a click on a folder shows it and marks it", async ({ page
   await page.locator(".mini-top .mini-tab", { hasText: "全部" }).click();
   await expect(page.locator(".mini-folders .mini-tab.active")).toHaveCount(0);
 });
+
+test("mini top: switching 话术 ↔ 图片 does not move anything", async ({ page }) => {
+  await openMini(page);
+  const spots = async () => page.evaluate(() => {
+    const r = (s) => { const b = document.querySelector(s)?.getBoundingClientRect(); return b ? [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)] : null; };
+    return { sw: r(".mini-top .kind-switch"), all: r(".mini-top .mini-tab"), search: r(".mini-search"), folders: r(".mini-folders"), restore: r(".mini-top .icon-button") };
+  });
+  await page.waitForTimeout(1500);
+  const before = await spots();
+  await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
+  await expect(page.locator(".mini-top .mini-tab:not(.placeholder)")).toHaveText(["全部", "收藏"]);
+  await page.waitForTimeout(400);
+  expect(await spots()).toEqual(before);
+  await page.locator(".kind-switch.compact").getByRole("button", { name: "话术" }).click();
+  await page.waitForTimeout(400);
+  expect(await spots()).toEqual(before);
+});

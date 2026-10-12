@@ -5,7 +5,8 @@
 // stays outside the top row, pinned at the left.
 import { useEffect, useRef } from "react";
 
-export type MiniTab = { id: string; label: string };
+// `placeholder`: keeps the tab's space but shows nothing, so rows do not change width when a section lacks that tab.
+export type MiniTab = { id: string; label: string; placeholder?: boolean };
 
 const DRAG_START_PX = 4;
 
@@ -82,7 +83,9 @@ export function MiniTabs({ tabs, active, onSelect, label, className = "" }: { ta
       onPointerCancel={endDrag}
       onClickCapture={(event) => { if (justDragged.current) { event.stopPropagation(); event.preventDefault(); } }}
     >
-      {tabs.map((tab) => (
+      {tabs.map((tab) => tab.placeholder ? (
+        <button key={tab.id} type="button" className="mini-tab placeholder" disabled tabIndex={-1} aria-hidden="true">{tab.label}</button>
+      ) : (
         <button key={tab.id} type="button" className={`mini-tab ${tab.id === active ? "active" : ""}`} aria-pressed={tab.id === active} onClick={() => onSelect(tab.id)}>{tab.label}</button>
       ))}
     </div>

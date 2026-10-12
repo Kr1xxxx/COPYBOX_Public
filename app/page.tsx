@@ -1711,7 +1711,7 @@ export default function Home() {
   );
   // Top row: 全部 / 收藏 / 最近. Row under the search box: the folders.
   const miniTopTabs: MiniTab[] = imageView
-    ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }]
+    ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, { id: "recent-placeholder", label: "最近", placeholder: true }]
     : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }];
   const miniFolderTabs: MiniTab[] = imageView
     ? [...imageLibrary.folders.map((folder) => ({ id: imageFolderFilter(folder.name), label: folder.name })), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
@@ -1908,7 +1908,7 @@ export default function Home() {
               {searchInput}
             </div>
           </div>
-          {miniFolderTabs.length > 0 && <div className="mini-folders"><MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} /></div>}
+          <div className="mini-folders">{miniFolderTabs.length > 0 && <MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} />}</div>
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
