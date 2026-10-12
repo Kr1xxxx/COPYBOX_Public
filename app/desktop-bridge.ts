@@ -10,6 +10,10 @@ export type ClipboxDesktop = {
   copyImage?: (png: Uint8Array) => Promise<void>;
   // TinyPNG compression done by the desktop shell; resolves with the smaller picture or the reason it failed.
   compressImage?: (bytes: Uint8Array, key: string) => Promise<{ ok: true; bytes: Uint8Array } | { ok: false; reason: string }>;
+  // Automatic daily backup files kept in the data folder (newest seven); the page decides what goes in a file.
+  backupSave?: (name: string, bytes: Uint8Array) => Promise<void>;
+  backupList?: () => Promise<{ name: string; size: number }[]>;
+  backupRead?: (name: string) => Promise<Uint8Array>;
   didCopy: () => void;
   setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;

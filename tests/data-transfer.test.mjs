@@ -96,8 +96,8 @@ test("the file is sealed with the password and nothing readable leaks", async ()
 });
 
 test("bad files get plain Chinese errors", () => {
-  assert.throws(() => parseTransferFile("not json"), /不是搬家文件/);
-  assert.throws(() => parseTransferFile(JSON.stringify({ format: "clipbox-secure-backup" })), /不是搬家文件/);
+  assert.throws(() => parseTransferFile("not json"), /不是完整备份文件/);
+  assert.throws(() => parseTransferFile(JSON.stringify({ format: "clipbox-secure-backup" })), /不是完整备份文件/);
   assert.throws(() => parseTransferFile(JSON.stringify({ format: "clipbox-data-move", version: 9, salt: "", iv: "", ciphertext: "", iterations: 1 })), /版本太新/);
   assert.throws(() => parseTransferFile(JSON.stringify({ format: "clipbox-data-move", version: 1 })), /已损坏/);
 });

@@ -60,7 +60,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
     } catch (problem) {
       setFile(null);
       setFileName("");
-      setError(problem instanceof Error ? problem.message : "这不是搬家文件");
+      setError(problem instanceof Error ? problem.message : "这不是完整备份文件");
     }
   }
 
@@ -69,7 +69,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
     setError("");
     if (exporting && password.length < 8) return setError("密码至少需要 8 个字符");
     if (exporting && password !== confirmation) return setError("两次输入的密码不一致");
-    if (!exporting && !file) return setError("请先选择搬家文件");
+    if (!exporting && !file) return setError("请先选择完整备份文件");
     if (!exporting && !password) return setError("请输入密码");
     setBusy(true);
     try {
@@ -83,7 +83,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
         anchor.click();
         URL.revokeObjectURL(url);
         const counts = countPayload(payload);
-        setSaved(`已导出：${counts.settings} 项设置，${counts.records} 条加密记录（话术、图片等）。请把文件拷到新版 Clipbox 里导入。`);
+        setSaved(`已导出：${counts.settings} 项设置，${counts.records} 条加密记录（话术、图片等）。请把文件放在安全的地方，需要时用「从完整备份恢复」读回来。`);
       } else {
         if (pending) {
           await applyPayload(pending.payload);
@@ -94,7 +94,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
         }
       }
     } catch (problem) {
-      setError(problem instanceof TransferError ? problem.message : exporting ? "导出没有成功，请再试一次" : "导入没有成功，现有内容没有改动，请再试一次");
+      setError(problem instanceof TransferError ? problem.message : exporting ? "导出没有成功，请再试一次" : "恢复没有成功，现有内容没有改动，请再试一次");
     } finally {
       setBusy(false);
     }
@@ -104,7 +104,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
     <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section ref={dialogRef} tabIndex={-1} data-local-esc className="backup-dialog data-move" role="dialog" aria-modal="true" aria-labelledby="move-title">
         <header className="backup-head">
-          <div><p>换新版时用</p><h2 id="move-title">{exporting ? "导出到新版" : "从旧版导入"}</h2></div>
+          <div><p>全部内容</p><h2 id="move-title">{exporting ? "完整备份" : "从完整备份恢复"}</h2></div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
         </header>
         {saved ? (
@@ -114,12 +114,12 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
           </div>
         ) : (
           <form className="backup-form" onSubmit={submit}>
-            <p className="backup-intro">{exporting ? "把话术、图片和设置一次性打包，用密码加密。换到新版 Clipbox 时用。" : "选择旧版导出的文件。导入会用文件里的内容替换这里现有的全部内容。"}</p>
+            <p className="backup-intro">{exporting ? "把话术、账号、图片和设置一次性打包，用密码加密。" : "选择完整备份文件。恢复会用文件里的内容替换这里现有的全部内容。"}</p>
             {!exporting && (
               <div className="backup-field">
-                <span>搬家文件</span>
+                <span>备份文件</span>
                 <button type="button" className="secondary-button" onClick={() => fileRef.current?.click()}>{fileName || "选择文件…"}</button>
-                <input ref={fileRef} className="hidden-input" type="file" accept="application/json" aria-label="搬家文件" onChange={(event) => { void pick(event.target.files?.[0]); event.target.value = ""; }} />
+                <input ref={fileRef} className="hidden-input" type="file" accept="application/json" aria-label="备份文件" onChange={(event) => { void pick(event.target.files?.[0]); event.target.value = ""; }} />
               </div>
             )}
             <label className="backup-field"><span>密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={exporting ? "至少 8 个字符，建议更长" : "输入导出时设置的密码"} autoComplete="off" /></label>
@@ -127,7 +127,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
             {leftover && !pending && <p className="backup-warning" role="status">上一次导入没有完成。<button type="button" className="secondary-button" onClick={() => void restoreLeftover()} disabled={busy}>恢复导入前的内容</button></p>}
             {pending && <p className="backup-warning" role="alert">密码正确。继续会用文件里的内容（含 {countImages(pending.payload)} 张图片）替换现有的 {itemCount} 条内容、{pending.currentImages} 张图片，替换后不能撤销。</p>}
             {error && <p className="backup-error">{error}</p>}
-            <p className="backup-note">{exporting ? "密码越长越安全，建议用 12 个字符以上。请妥善保存，Clipbox 无法找回。AI 的密钥不会带走，到新版里重新填一次。" : "导入成功后会自动重新打开。"}</p>
+            <p className="backup-note">{exporting ? "密码越长越安全，建议用 12 个字符以上。请妥善保存，Clipbox 无法找回。AI 的密钥不在备份里，换电脑后需要重新填一次。" : "导入成功后会自动重新打开。"}</p>
             <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={exporting ? "primary" : "danger"} disabled={busy}>{busy ? (exporting ? "正在加密…" : "正在导入…") : exporting ? "加密并导出" : pending ? "确认替换" : "验证并替换"}</button></div>
           </form>
         )}

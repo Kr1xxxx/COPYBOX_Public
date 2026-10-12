@@ -15,7 +15,8 @@ export const TRANSFER_VERSION = 1;
 const ITERATIONS = 600_000;
 const KEY_PREFIX = "clipbox.";
 // The browser build keeps its AI key in plain text in localStorage; it never travels. Desktop builds keep it in the OS store.
-const SKIPPED_KEYS = new Set(["clipbox.ai-key.web.v1"]);
+// The browser build's own list of automatic backups never goes inside a backup.
+const SKIPPED_KEYS = new Set(["clipbox.ai-key.web.v1", "clipbox.web-backups.v1"]);
 const DATABASES = ["clipbox-images", "clipbox-image-thumbs"];
 
 type Wire = null | boolean | number | string | { $b64: string } | Wire[] | { [key: string]: Wire };
@@ -54,7 +55,7 @@ export function encodeValue(value: unknown): Wire {
   if (Array.isArray(value)) return value.map(encodeValue);
   if (typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, encodeValue(inner)]));
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
-  throw new TransferError("遇到无法搬家的数据");
+  throw new TransferError("遇到无法备份的数据");
 }
 
 export function decodeValue(wire: Wire): unknown {
@@ -191,6 +192,14 @@ export async function restoreStashedBackup(storage: Storage = localStorage, fact
   return true;
 }
 
+// An automatic backup file (not password-sealed): checks it is one of ours and its contents are well-formed before anything is restored.
+export function parseBackupText(text: string, format: string): TransferPayload {
+  let file: { format?: unknown; version?: unknown; payload?: unknown };
+  try { file = JSON.parse(text); } catch { throw new TransferError("这不是 Clipbox 的备份文件"); }
+  if (file?.format !== format || file.version !== 1) throw new TransferError("这不是 Clipbox 的备份文件");
+  return validatePayload(file.payload);
+}
+
 // What the person sees in the confirmation: pictures only (the two bookkeeping rows are not pictures).
 export function countImages(payload: TransferPayload): number {
   const rows = payload.indexedDB["clipbox-images"]?.meta ?? [];
@@ -272,11 +281,11 @@ export async function sealTransfer(payload: TransferPayload, password: string, n
 
 export function parseTransferFile(text: string): TransferFile {
   let file: TransferFile;
-  try { file = JSON.parse(text) as TransferFile; } catch { throw new TransferError("这不是搬家文件"); }
-  if (file?.format !== TRANSFER_FORMAT) throw new TransferError("这不是搬家文件");
-  if (file.version !== TRANSFER_VERSION) throw new TransferError("搬家文件的版本太新，请先更新 Clipbox");
+  try { file = JSON.parse(text) as TransferFile; } catch { throw new TransferError("这不是完整备份文件"); }
+  if (file?.format !== TRANSFER_FORMAT) throw new TransferError("这不是完整备份文件");
+  if (file.version !== TRANSFER_VERSION) throw new TransferError("这份备份的版本太新，请先更新 Clipbox");
   if (typeof file.salt !== "string" || typeof file.iv !== "string" || typeof file.ciphertext !== "string" || !Number.isInteger(file.iterations) || file.iterations < 1) {
-    throw new TransferError("搬家文件已损坏");
+    throw new TransferError("备份文件已损坏");
   }
   return file;
 }
@@ -293,5 +302,5 @@ export async function openTransfer(file: TransferFile, password: string): Promis
 }
 
 export function transferFileName(date = new Date()) {
-  return `clipbox-data-move-${date.toISOString().slice(0, 10)}.json`;
+  return `clipbox-full-backup-${date.toISOString().slice(0, 10)}.json`;
 }

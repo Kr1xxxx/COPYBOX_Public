@@ -2,6 +2,7 @@
 
 mod ai;
 mod automation;
+mod backup;
 mod flush;
 mod power;
 mod shared_library;
@@ -59,6 +60,9 @@ fn main() {
             shell::open_data_folder,
             shell::relaunch,
             flush::flush_done,
+            backup::backup_save,
+            backup::backup_list,
+            backup::backup_read,
             ai::ai_status,
             ai::ai_save,
             ai::ai_clear,
