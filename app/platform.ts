@@ -1,4 +1,4 @@
-// Windows shows this section as 备注; darwin calls it 账号 (it was 秘密).
-// Windows has no password-style masking or reference links: 备注 is a plain notes list.
+// Both platforms have the 账号 page. Only the Mac also has the old 秘密 list inside it (其他, folders, masked copy, references);
+// PLAIN_NOTES = no old list, so Windows shows the new account types only.
 export const PLAIN_NOTES = typeof window === "undefined" || window.clipboxDesktop?.platform !== "darwin";
-export const SECRET_WORD = typeof window !== "undefined" && window.clipboxDesktop?.platform === "darwin" ? "账号" : "备注";
+export const SECRET_WORD = "账号";

@@ -49,10 +49,11 @@ test("Mac: only three sections; the 保险箱 sits inside 账号, no hidden unlo
   await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
 });
 
-test("Windows: no 账号 page, so no 保险箱", async ({ page }) => {
+test("Windows: has the 账号 page too, with 保险箱 inside", async ({ page }) => {
   await open(page, "win32");
-  await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
 });
 
 test("关于 shows the version and when it was updated; tapping the version opens nothing", async ({ page }) => {

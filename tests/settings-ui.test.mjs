@@ -6,6 +6,7 @@ import { readUiSource } from "./helpers/ui-source.mjs";
 const page = readUiSource();
 // The AI settings panel and the AI request code live in their own files (split out of page.tsx).
 const aiSettings = fs.readFileSync(new URL("../app/ai-settings.tsx", import.meta.url), "utf8");
+const platformSource = fs.readFileSync(new URL("../app/platform.ts", import.meta.url), "utf8");
 const aiClient = fs.readFileSync(new URL("../app/ai-client.ts", import.meta.url), "utf8");
 
 test("settings is a full panel covering data, security, trash, window, AI and about (no shortcut list)", () => {
@@ -28,8 +29,8 @@ test("settings shows the version and the editor calls the snippet note 小提示
   assert.doesNotMatch(page, /<label htmlFor="summary-input">\{structured \? "核心动作" : "总结"/);
 });
 
-test("the secrets section is called 备注 on Windows and 账号 on macOS", () => {
-  assert.match(page, /const SECRET_WORD = .*platform === "darwin" \? "账号" : "备注"/);
+test("the secrets section is called 账号 on both platforms", () => {
+  assert.match(platformSource, /export const SECRET_WORD = "账号"/);
   assert.match(page, /label: kind === "snippet" \? "话术" : SECRET_WORD/);
 });
 

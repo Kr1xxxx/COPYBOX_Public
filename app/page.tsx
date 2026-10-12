@@ -78,6 +78,8 @@ import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
+import { isAccountLockSet } from "./account-lock";
+import { AccountLockScreen } from "./account-lock-ui";
 import { AccountPage, type AddRequest } from "./account-page";
 import { countByKind, useAccountEntries } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
@@ -246,7 +248,6 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Hidden 验证码 (Mac only): the entry appears after the secret gesture in Settings → 关于, and can be hidden again.
   // 保险箱 is the 秘密 section now (Mac): no hidden unlock any more.
-  const totpUnlocked = !PLAIN_NOTES;
   // Bumped after 清除/恢复范例 so the 秘密 page reads the vault again.
   const [vaultRev, setVaultRev] = useState(0);
   // The 账号 page (Mac): which category the sidebar shows, a 新增 request for the page, and the type menu next to 新增.
@@ -350,7 +351,7 @@ export default function Home() {
       setFolderColors(data.folderColors);
       if (refreshContext) {
         // Windows has no second text section any more: an old context that points at it opens 话术.
-        const restoredKind: ItemKind = PLAIN_NOTES && refreshContext.activeKind === "secret" ? "snippet" : refreshContext.activeKind;
+        const restoredKind: ItemKind = refreshContext.activeKind;
         setActiveKind(restoredKind);
         setActiveFolder(resolveRefreshedActiveFolder(restoredKind, data.folders[restoredKind], restoredKind === refreshContext.activeKind ? refreshContext.activeFolder : "all"));
         setProductFilter(refreshContext.productFilter);
@@ -413,7 +414,20 @@ export default function Home() {
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
   const miniFavorites = useMemo(() => windowMode === "mini" && activeKind === "snippet" ? pickMiniFavorites(activeKindItems) : [], [windowMode, activeKind, activeKindItems]);
   const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
-  const accountMode = !PLAIN_NOTES && activeKind === "secret" && !imageView;
+  const accountMode = activeKind === "secret" && !imageView;
+  // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
+  const [lockSet, setLockSet] = useState(() => typeof window !== "undefined" && isAccountLockSet());
+  const [accountUnlocked, setAccountUnlocked] = useState(false);
+  const accountLocked = lockSet && !(accountMode && accountUnlocked);
+  const lockedHere = accountMode && lockSet && !accountUnlocked;
+  // Leaving the 账号 section locks it again (state adjusted while rendering, not in an effect).
+  const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
+  if (seenAccountMode !== accountMode) {
+    setSeenAccountMode(accountMode);
+    if (!accountMode) setAccountUnlocked(false);
+  }
+  // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
+  const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
   const account = useAccountEntries(deviceKey, legacySecrets, accountMode, vaultRev);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
@@ -1052,6 +1066,7 @@ export default function Home() {
       if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
       return;
     }
+    if (lockedHere) return;
     if (event.key === "ArrowDown") { event.preventDefault(); moveSelection((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
     if (event.key === "ArrowUp") { event.preventDefault(); moveSelection((value) => Math.max(0, value - 1)); }
     if (event.key === "Enter" && activeFolder !== "trash" && !(accountMode && activeFolder === "all" && vaultCat !== "other") && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
@@ -1547,7 +1562,7 @@ export default function Home() {
     const scopedData = vaultDataForBackupScope(currentData, scope);
     const envelope = await encryptVault(scopedData, password);
     let vaultBox: VaultBoxEnvelope | undefined;
-    if (scope === "secret" && !PLAIN_NOTES) {
+    if (scope === "secret") {
       try {
         const payload: VaultBoxPayload = { totp: await openTotpStore(deviceKey).list(), items: await openSecretItemsStore(deviceKey).list() };
         if (!isVaultBoxEmpty(payload)) vaultBox = await encryptVaultBox(payload, password);
@@ -1561,7 +1576,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    const fileWord = scope === "snippet" ? "snippets" : PLAIN_NOTES ? "notes" : "secrets";
+    const fileWord = scope === "snippet" ? "snippets" : "secrets";
     anchor.download = `clipbox-${fileWord}-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
@@ -1610,7 +1625,7 @@ export default function Home() {
     if (!pendingImport) return;
     const importedData = pendingImport.legacyData || await decryptVault(pendingImport.envelope as VaultEnvelope, password);
     // Opened before anything is written, so a bad block cannot leave a half-restored backup.
-    const importedBox = pendingImport.vaultBox && !PLAIN_NOTES ? await decryptVaultBox(pendingImport.vaultBox, password) : null;
+    const importedBox = pendingImport.vaultBox ? await decryptVaultBox(pendingImport.vaultBox, password) : null;
     const result = await enqueueVaultTask(async () => {
       const result = mergeImportedVaultData(
         readVault(),
@@ -1673,7 +1688,7 @@ export default function Home() {
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
-    ? (activeKind === "snippet" ? "全部话术" : !PLAIN_NOTES && vaultCat !== "all" ? CATEGORY_LABEL[vaultCat] : `全部${SECRET_WORD}`)
+    ? (activeKind === "snippet" ? "全部话术" : vaultCat !== "all" ? CATEGORY_LABEL[vaultCat] : `全部${SECRET_WORD}`)
     : activeFolder === "pinned" ? "收藏"
       : activeFolder === "recent" ? "最近使用"
       : activeFolder === "trash" ? "回收站"
@@ -1691,7 +1706,7 @@ export default function Home() {
       value={imageView ? "image" : activeKind}
       onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
       options={[
-        ...(PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
+        ...(["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
         { value: "image", label: "图片" },
       ]}
     />
@@ -1701,7 +1716,7 @@ export default function Home() {
     : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }, ...activeFolders.map((folder) => ({ id: `folder:${folder}`, label: folder })), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
-  const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
+  const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = (
     <ListEmptyState
@@ -1893,7 +1908,8 @@ export default function Home() {
             {miniFavorites.map((item) => <button key={item.id} type="button" className={`mini-chip ${item.pinned ? "pinned" : ""} ${copiedId === item.id ? "copied" : ""}`} title={item.label} onClick={() => void copyRaw(item)}>{copiedId === item.id ? "已复制" : item.label}</button>)}
           </div>}
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
-          {!imageView && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
+          {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
+          {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
               return (
@@ -1931,9 +1947,10 @@ export default function Home() {
             {accountMode && <>
               <div className="nav-heading"><span>分类</span></div>
               <nav className="nav-list account-categories" aria-label="分类">
-                {CATEGORY_ORDER.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
+                {categoryList.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
               </nav>
             </>}
+            {!(accountMode && PLAIN_NOTES) && <>
             <div className="nav-heading">
               <span>目录</span>
               <button ref={folderCreateButtonRef} type="button" onClick={startNewFolder} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
@@ -1952,6 +1969,7 @@ export default function Home() {
               )}
               {activeKind === "secret" && <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>}
             </div></>}
+            </>}
             <div className="nav-footer">
               {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length + (accountMode ? account.trashed.length : 0) > 0 && <b>{trashedKindItems.length + (accountMode ? account.trashed.length : 0)}</b>}</button>}
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
@@ -1985,13 +2003,13 @@ export default function Home() {
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
                 : <>
                   {vaultPage
-                    ? activeFolder !== "trash" && <span className="add-menu-wrap">
+                    ? activeFolder !== "trash" && !lockedHere && <span className="add-menu-wrap">
                       <button type="button" className="primary-button add-button" aria-label="新增条目" aria-haspopup={addAsksType ? "menu" : undefined} aria-expanded={addAsksType ? addMenuOpen : undefined}
                         onClick={() => { if (addAsksType) setAddMenuOpen((open) => !open); else addAccount(vaultCat as EntryKind); }}><Icon name="plus" />新增</button>
                       {addMenuOpen && addAsksType && <>
                         <div className="menu-scrim" role="presentation" onMouseDown={() => setAddMenuOpen(false)} />
                         <div className="dropdown acct-menu" role="menu" aria-label="新增什么">
-                          {CATEGORY_ORDER.map((id) => <button key={id} type="button" role="menuitem" onClick={() => addAccount(id)}>{CATEGORY_LABEL[id]}</button>)}
+                          {categoryList.map((id) => <button key={id} type="button" role="menuitem" onClick={() => addAccount(id)}>{CATEGORY_LABEL[id]}</button>)}
                         </div>
                       </>}
                     </span>
@@ -1999,6 +2017,7 @@ export default function Home() {
                 </>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
+            {lockedHere ? <AccountLockScreen onUnlock={() => setAccountUnlocked(true)} /> : <>
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
               <AccountPage deviceKey={deviceKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
@@ -2047,19 +2066,20 @@ export default function Home() {
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>
             </div>}
+            </>}
           </section>
         </>}
       </section>
       {settingsOpen && <SettingsDialog
-        onPreviewSamples={PLAIN_NOTES || !totpUnlocked ? undefined : () => previewClearSamples(deviceKey)}
-        onClearSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
+        onPreviewSamples={accountLocked ? undefined : () => previewClearSamples(deviceKey)}
+        onClearSamples={accountLocked ? undefined : async () => {
           try {
             const result = await clearSampleEntries(deviceKey);
             setVaultRev((n) => n + 1);
             flashToast(result.removed === 0 ? "没有可清除的范例" : result.keptEdited > 0 ? `已清除 ${result.removed} 条范例，${result.keptEdited} 条你改过的已保留` : `已清除 ${result.removed} 条范例`);
           } catch { flashToast("清除失败，数据没有改动"); }
         }}
-        onRestoreSamples={PLAIN_NOTES || !totpUnlocked ? undefined : async () => {
+        onRestoreSamples={accountLocked ? undefined : async () => {
           try {
             const result = await restoreSampleEntries(deviceKey);
             setVaultRev((n) => n + 1);
@@ -2093,6 +2113,8 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
+        accountLock={{ isSet: lockSet, onChanged: (isSet) => { setLockSet(isSet); setAccountUnlocked(isSet && accountMode); } }}
+        accountLocked={accountLocked}
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
         onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
