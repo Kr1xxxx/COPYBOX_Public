@@ -1896,8 +1896,10 @@ export default function Home() {
         {isMini ? <>
           <header className="mini-top drag-region">
             <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
-            {kindSwitch}
-            <MiniTabs label="范围" tabs={miniTopTabs} active={miniTabActive} onSelect={selectMiniTab} />
+            <div className="mini-top-center">
+              {kindSwitch}
+              <MiniTabs label="范围" tabs={miniTopTabs} active={miniTabActive} onSelect={selectMiniTab} />
+            </div>
             <button type="button" className="icon-button" onClick={() => requestWindowMode("full")} aria-label="恢复完整窗口" title="恢复完整窗口"><Icon name="restore" /></button>
           </header>
           <div className="mini-search">
