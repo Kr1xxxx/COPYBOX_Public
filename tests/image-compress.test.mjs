@@ -4,6 +4,7 @@ import {
   COMPRESS_LIMIT_MESSAGE,
   COMPRESS_MONTHLY_LIMIT,
   TINIFY_DEFAULT_KEY,
+  TINIFY_DEFAULT_KEYS,
   TINIFY_KEY_STORAGE,
   TINIFY_USAGE_STORAGE,
   compressForUpload,
@@ -80,4 +81,58 @@ test("a result that is not smaller keeps the original but still counts", async (
   const result = await compressForUpload(original, { bridge: { compressImage: async (bytes) => ({ ok: true, bytes: new Uint8Array(bytes.length + 5) }) }, storage, now: october });
   assert.equal(result.blob, original);
   assert.equal(readCompressUsage(storage, october), 1);
+});
+
+const okBridge = (sent, fail = {}) => ({
+  compressImage: async (bytes, key) => { sent.push(key); return fail[key] ? { ok: false, reason: fail[key] } : { ok: true, bytes: bytes.slice(0, 10) }; },
+});
+
+test("the built-in keys take turns", async () => {
+  const storage = memoryStorage();
+  const sent = [];
+  for (let i = 0; i < 4; i++) await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: october });
+  const [a, b] = TINIFY_DEFAULT_KEYS;
+  assert.deepEqual(sent, [a, b, a, b]);
+});
+
+test("a refused key is retried once on the other key and skipped for the rest of the month", async () => {
+  const storage = memoryStorage();
+  const [a, b] = TINIFY_DEFAULT_KEYS;
+  const sent = [];
+  const result = await compressForUpload(png(100), { bridge: okBridge(sent, { [a]: "limit" }), storage, now: october });
+  assert.equal(result.failed, false);
+  assert.deepEqual(sent, [a, b]);
+  sent.length = 0;
+  await compressForUpload(png(100), { bridge: okBridge(sent, { [a]: "limit" }), storage, now: october });
+  await compressForUpload(png(100), { bridge: okBridge(sent, { [a]: "limit" }), storage, now: october });
+  assert.deepEqual(sent, [b, b]);
+  sent.length = 0;
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: new Date(2026, 10, 2) });
+  assert.equal(sent.length, 1);
+});
+
+test("a network or service error does not burn a key and is not retried", async () => {
+  const storage = memoryStorage();
+  const sent = [];
+  const result = await compressForUpload(png(100), { bridge: okBridge(sent, { [TINIFY_DEFAULT_KEYS[0]]: "network" }), storage, now: october });
+  assert.equal(result.failed, true);
+  assert.equal(sent.length, 1);
+  sent.length = 0;
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: october });
+  assert.equal(sent[0], TINIFY_DEFAULT_KEYS[0]);
+});
+
+test("both keys refused keeps the original and says why", async () => {
+  const [a, b] = TINIFY_DEFAULT_KEYS;
+  const original = png(100);
+  const result = await compressForUpload(original, { bridge: okBridge([], { [a]: "limit", [b]: "key" }), storage: memoryStorage(), now: october });
+  assert.equal(result.blob, original);
+  assert.equal(result.failed, true);
+});
+
+test("a key set in 设置 is the only key used", async () => {
+  const storage = memoryStorage({ [TINIFY_KEY_STORAGE]: "mine" });
+  const sent = [];
+  await compressForUpload(png(100), { bridge: okBridge(sent, { mine: "limit" }), storage, now: october });
+  assert.deepEqual(sent, ["mine"]);
 });

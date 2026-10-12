@@ -13,6 +13,10 @@
     is dropped and the original kept.
   - Pictures already stored are not changed. The browser trial has no TinyPNG access, so there compression is simulated by
     re-encoding.
+  - Two built-in keys take turns, one per compression (2026-10-12, owner). If a key is refused (key error or monthly limit) the
+    same picture is retried once on the other key and the refused key is skipped until next month (`clipbox.tinify.rotation.v1`,
+    one new storage key; nothing existing changes). Network and service errors do not retry or mark a key. A key set in 设置 is
+    the only key used. The 100-a-month cap per installation is unchanged.
 - Consequences: picture bytes (not names or any text) go to TinyPNG when a picture is added; nothing else is sent. Because the
   count is local, a reinstall or cleared data resets it; the real limit is TinyPNG's own monthly allowance on the key.
   Rollback = revert the PR; stored pictures are ordinary pictures.
