@@ -143,6 +143,15 @@ test("a card opened on the last, short row scrolls into view and the copy button
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual(PNG_SIGNATURE);
 });
 
+test("a card that opens slowly (slow machine) is still scrolled fully into view once it has grown", async ({ page }) => {
+  await openImages(page);
+  await addSix(page, ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一"]);
+  // Stretch every opening animation far past the first scroll pass, as a slow machine would.
+  await page.addStyleTag({ content: ".image-card, .image-card *, .row-detail, .row-detail-inner { animation-duration: 1400ms !important; }" });
+  await mainButton(tiles(page).last()).click();
+  await expect(card(page).getByRole("button", { name: "删除", exact: true })).toBeInViewport({ ratio: 1, timeout: 8000 });
+});
+
 test("rename, move to a folder and delete all work from the card", async ({ page }) => {
   await openImages(page);
   await page.getByRole("button", { name: "新建目录" }).click();
