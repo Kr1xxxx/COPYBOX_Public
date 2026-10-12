@@ -14,3 +14,5 @@
   The reset mail needs the owner's server, which is not deployed: `RESET_SERVER_URL` in `app/account-lock.ts` is empty, so the
   button says "找回功能需要服务器，部署后开通". When the address is set, the app POSTs `{email}` to `<server>/account-reset`.
   A reset never clears the account data. This replaces "There is no reset" above.
+- Update (owner, 2026-10-12: "windows 账号,去掉 API +恢复码这个类别"): on Windows the sidebar 分类 and the 新增 menu offer only 登录, 收款信息 and
+  验证码. Existing API 密钥 / 恢复码 entries are not deleted and still show under 全部. macOS is unchanged.

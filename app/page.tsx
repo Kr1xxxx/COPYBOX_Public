@@ -427,7 +427,7 @@ export default function Home() {
     if (!accountMode) setAccountUnlocked(false);
   }
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
-  const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other") : CATEGORY_ORDER), []);
+  const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
   const account = useAccountEntries(deviceKey, legacySecrets, accountMode, vaultRev);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
