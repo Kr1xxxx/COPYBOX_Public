@@ -68,7 +68,6 @@ import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { pickMiniFavorites } from "./mini-favorites";
 import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
@@ -412,7 +411,6 @@ export default function Home() {
   const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
-  const miniFavorites = useMemo(() => windowMode === "mini" && activeKind === "snippet" ? pickMiniFavorites(activeKindItems) : [], [windowMode, activeKind, activeKindItems]);
   const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
   const accountMode = activeKind === "secret" && !imageView;
   // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
@@ -1711,9 +1709,13 @@ export default function Home() {
       ]}
     />
   );
-  const miniTabs: MiniTab[] = imageView
-    ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, ...imageLibrary.folders.map((folder) => ({ id: imageFolderFilter(folder.name), label: folder.name })), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
-    : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }, ...activeFolders.map((folder) => ({ id: `folder:${folder}`, label: folder })), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
+  // Top row: 全部 / 收藏 / 最近. Row under the search box: the folders.
+  const miniTopTabs: MiniTab[] = imageView
+    ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }]
+    : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }];
+  const miniFolderTabs: MiniTab[] = imageView
+    ? [...imageLibrary.folders.map((folder) => ({ id: imageFolderFilter(folder.name), label: folder.name })), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
+    : [...activeFolders.map((folder) => ({ id: `folder:${folder}`, label: folder })), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
@@ -1895,7 +1897,7 @@ export default function Home() {
           <header className="mini-top drag-region">
             <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
             {kindSwitch}
-            <MiniTabs label="目录" tabs={miniTabs} active={miniTabActive} onSelect={selectMiniTab} />
+            <MiniTabs label="范围" tabs={miniTopTabs} active={miniTabActive} onSelect={selectMiniTab} />
             <button type="button" className="icon-button" onClick={() => requestWindowMode("full")} aria-label="恢复完整窗口" title="恢复完整窗口"><Icon name="restore" /></button>
           </header>
           <div className="mini-search">
@@ -1904,9 +1906,7 @@ export default function Home() {
               {searchInput}
             </div>
           </div>
-          {!imageView && activeKind === "snippet" && !query.trim() && miniFavorites.length > 0 && <div className="mini-favorites" role="group" aria-label="最常用">
-            {miniFavorites.map((item) => <button key={item.id} type="button" className={`mini-chip ${item.pinned ? "pinned" : ""} ${copiedId === item.id ? "copied" : ""}`} title={item.label} onClick={() => void copyRaw(item)}>{copiedId === item.id ? "已复制" : item.label}</button>)}
-          </div>}
+          {miniFolderTabs.length > 0 && <div className="mini-folders"><MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} /></div>}
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">

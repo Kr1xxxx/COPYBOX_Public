@@ -1,15 +1,15 @@
 "use client";
 
-// The mini window's folder tabs (全部 / 收藏 / 最近 / folders): one row that scrolls sideways. Press and drag
+// The mini window's tab rows (top: 全部 / 收藏 / 最近; under the search box: the folders): each one scrolls sideways. Press and drag
 // moves it (mouse), the wheel and the trackpad work too, and the active tab slides into view. The 话术/图片 switch
-// stays outside this row, pinned at the left.
+// stays outside the top row, pinned at the left.
 import { useEffect, useRef } from "react";
 
 export type MiniTab = { id: string; label: string };
 
 const DRAG_START_PX = 4;
 
-export function MiniTabs({ tabs, active, onSelect, label }: { tabs: MiniTab[]; active: string; onSelect: (id: string) => void; label: string }) {
+export function MiniTabs({ tabs, active, onSelect, label, className = "" }: { tabs: MiniTab[]; active: string; onSelect: (id: string) => void; label: string; className?: string }) {
   const scroller = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; left: number; moved: boolean; id: number } | null>(null);
   const justDragged = useRef(false);
@@ -72,7 +72,7 @@ export function MiniTabs({ tabs, active, onSelect, label }: { tabs: MiniTab[]; a
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       ref={scroller}
-      className="mini-tabs"
+      className={`mini-tabs ${className}`}
       role="group"
       aria-label={label}
       onMouseDown={keepWindowStill}

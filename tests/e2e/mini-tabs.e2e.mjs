@@ -9,27 +9,31 @@ async function openMini(page) {
   await expect(page.locator(".mini-top .mini-tab").first()).toBeVisible();
 }
 
-test("mini top: one row, 话术/图片 switch first, then 全部 收藏 最近 and the folders", async ({ page }) => {
+test("mini top: 话术/图片 switch first, then 全部 收藏 最近; the folders sit under the search box", async ({ page }) => {
   await openMini(page);
   const top = page.locator(".mini-top");
   const switchBox = await top.locator(".kind-switch").boundingBox();
   const tabsBox = await top.locator(".mini-tabs").boundingBox();
   expect(tabsBox.x).toBeGreaterThanOrEqual(switchBox.x + switchBox.width - 1);
   expect(Math.abs(tabsBox.y + tabsBox.height / 2 - (switchBox.y + switchBox.height / 2))).toBeLessThan(6);
-  const labels = await top.locator(".mini-tab").allTextContents();
-  expect(labels.slice(0, 3)).toEqual(["全部", "收藏", "最近"]);
-  expect(labels.length).toBeGreaterThan(3);
+  await expect(top.locator(".mini-tab")).toHaveText(["全部", "收藏", "最近"]);
   await page.waitForTimeout(500);
-  expect(await page.locator(".mini-tabs").evaluate((el) => el.scrollLeft)).toBe(0);
+  expect(await page.locator(".mini-top .mini-tabs").evaluate((el) => el.scrollLeft)).toBe(0);
   const first = await top.locator(".mini-tab").first().boundingBox();
   expect(first.x).toBeGreaterThanOrEqual(tabsBox.x - 1);
   await expect(page.locator(".mini-search select")).toHaveCount(0);
+  await expect(page.locator(".mini-favorites")).toHaveCount(0);
   await expect(top.getByRole("button", { name: "恢复完整窗口" })).toBeVisible();
+  const folders = page.locator(".mini-folders .mini-tab");
+  expect(await folders.count()).toBeGreaterThan(0);
+  const searchBox = await page.locator(".mini-search").boundingBox();
+  const rowBox = await page.locator(".mini-folders").boundingBox();
+  expect(rowBox.y).toBeGreaterThanOrEqual(searchBox.y + searchBox.height - 1);
 });
 
 test("mini top: dragging the tab row scrolls it, keeps the switch in place, and does not pick a tab", async ({ page }) => {
   await openMini(page);
-  const tabs = page.locator(".mini-tabs");
+  const tabs = page.locator(".mini-folders .mini-tabs");
   const overflow = await tabs.evaluate((el) => el.scrollWidth - el.clientWidth);
   test.skip(overflow <= 0, "the sample folders fit in one row");
   await page.waitForTimeout(300);
@@ -51,4 +55,15 @@ test("mini top: a click on a tab switches the list", async ({ page }) => {
   await openMini(page);
   await page.locator(".mini-tab", { hasText: "收藏" }).click();
   await expect(page.locator(".mini-tab.active")).toHaveText("收藏");
+});
+
+test("mini folder row: a click on a folder shows it and marks it", async ({ page }) => {
+  await openMini(page);
+  const folder = page.locator(".mini-folders .mini-tab").first();
+  const name = (await folder.textContent()).trim();
+  await folder.click();
+  await expect(page.locator(".mini-folders .mini-tab.active")).toHaveText(name);
+  await expect(page.locator(".mini-top .mini-tab.active")).toHaveCount(0);
+  await page.locator(".mini-top .mini-tab", { hasText: "全部" }).click();
+  await expect(page.locator(".mini-folders .mini-tab.active")).toHaveCount(0);
 });
