@@ -77,7 +77,7 @@ test("mini top: switching 话术 ↔ 图片 does not move anything", async ({ pa
   await page.waitForTimeout(1500);
   const before = await spots();
   await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
-  await expect(page.locator(".mini-top .mini-tab:not(.placeholder)")).toHaveText(["全部", "收藏"]);
+  await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
   await page.waitForTimeout(400);
   expect(await spots()).toEqual(before);
   await page.locator(".kind-switch.compact").getByRole("button", { name: "话术" }).click();

@@ -462,7 +462,7 @@ test("the mini window has folder tabs in the top row", async ({ browser }) => {
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
   const tab = (name) => page.locator(".mini-top .mini-tab, .mini-folders .mini-tab", { hasText: name });
-  await expect(page.locator(".mini-top .mini-tab:not(.placeholder)")).toHaveText(["全部", "收藏"]);
+  await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
   await expect(page.locator(".mini-folders .mini-tab")).toHaveText(["收款码", "价目表", "未分类"]);
   await expect(page.locator(".mini-row")).toHaveCount(4);
   await expect(page.locator(".status-bar")).toContainText("4 张");
@@ -483,6 +483,17 @@ test("the mini window has folder tabs in the top row", async ({ browser }) => {
   // Copying still works with one click, and an empty folder says so.
   await page.getByRole("button", { name: "复制 散图" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+
+  // 最近 lists the copied images, newest first; before any copy it says so.
+  await tab("最近").click();
+  await expect(page.locator(".mini-row")).toHaveCount(1);
+  await expect(page.locator(".mini-row").first()).toContainText("散图");
+  await page.getByRole("button", { name: "复制 散图" }).waitFor();
+  await tab("全部").click();
+  await page.getByRole("button", { name: "复制 码二" }).click();
+  await tab("最近").click();
+  await expect(page.locator(".mini-row")).toHaveCount(2);
+  await expect(page.locator(".mini-row").first()).toContainText("码二");
   await context.close();
 });
 
@@ -496,7 +507,7 @@ test("the 话术 mini window keeps its own folder tabs", async ({ page }) => {
   await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
   await expect(page.locator(".mini-folders .mini-tab").first()).toBeVisible();
   await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
-  await expect(page.locator(".mini-top .mini-tab:not(.placeholder)")).toHaveText(["全部", "收藏"]);
+  await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
 });
 
 test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs", async ({ page }) => {

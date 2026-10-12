@@ -11,6 +11,8 @@ export const IMAGE_FILTER_ALL: ImageFilter = "all";
 export const IMAGE_FILTER_UNCATEGORIZED: ImageFilter = "uncategorized";
 export const IMAGE_FILTER_PINNED: ImageFilter = "pinned";
 export const IMAGE_FILTER_TRASH: ImageFilter = "trash";
+export const IMAGE_FILTER_RECENT: ImageFilter = "recent";
+export const RECENT_IMAGE_LIMIT = 50;
 const FOLDER_PREFIX = "folder:";
 
 export function imageFolderFilter(name: string): ImageFilter {
@@ -25,7 +27,7 @@ export function folderOfImageFilter(filter: ImageFilter): string | null {
 // A folder that no longer exists (renamed or deleted elsewhere) falls back to 全部图片.
 export function resolveImageFilter(filter: ImageFilter, folders: readonly ImageFolder[]): ImageFilter {
   const name = folderOfImageFilter(filter);
-  if (name === null) return filter === IMAGE_FILTER_UNCATEGORIZED || filter === IMAGE_FILTER_PINNED || filter === IMAGE_FILTER_TRASH ? filter : IMAGE_FILTER_ALL;
+  if (name === null) return filter === IMAGE_FILTER_UNCATEGORIZED || filter === IMAGE_FILTER_PINNED || filter === IMAGE_FILTER_TRASH || filter === IMAGE_FILTER_RECENT ? filter : IMAGE_FILTER_ALL;
   return folders.some((folder) => folder.name === name) ? filter : IMAGE_FILTER_ALL;
 }
 
@@ -37,6 +39,7 @@ function folderOf(meta: ImageMeta, names: ReadonlySet<string>): string | null {
 export function filterImagesByFolder(images: readonly ImageMeta[], filter: ImageFilter, folders: readonly ImageFolder[]): ImageMeta[] {
   if (filter === IMAGE_FILTER_ALL) return [...images];
   if (filter === IMAGE_FILTER_PINNED) return images.filter((meta) => meta.pinned);
+  if (filter === IMAGE_FILTER_RECENT) return images.filter((meta) => meta.lastUsedAt).toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, RECENT_IMAGE_LIMIT);
   const names = new Set(folders.map((folder) => folder.name));
   const wanted = folderOfImageFilter(filter);
   return images.filter((meta) => folderOf(meta, names) === wanted);
@@ -69,6 +72,7 @@ export function imageFilterTitle(filter: ImageFilter): string {
   if (filter === IMAGE_FILTER_ALL) return "全部图片";
   if (filter === IMAGE_FILTER_PINNED) return "收藏";
   if (filter === IMAGE_FILTER_TRASH) return "回收站";
+  if (filter === IMAGE_FILTER_RECENT) return "最近使用";
   return folderOfImageFilter(filter) ?? "未分类";
 }
 

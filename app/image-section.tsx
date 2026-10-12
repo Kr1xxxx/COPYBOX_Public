@@ -16,6 +16,7 @@ import { ImageMoveMenu, MoreGlyph, ChevronGlyph } from "./image-folders";
 import {
   IMAGE_FILTER_ALL,
   IMAGE_FILTER_PINNED,
+  IMAGE_FILTER_RECENT,
   IMAGE_FILTER_TRASH,
   filterImagesByFolder,
   folderOfImageFilter,
@@ -283,8 +284,8 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     // Like the 话术 list: favourites first, except while searching.
     if (trashView) return terms.length === 0 ? inFolder : inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
-    return terms.length === 0 ? pinnedFirst(inFolder) : inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
-  }, [inFolder, query, trashView]);
+    return terms.length === 0 ? (filter === IMAGE_FILTER_RECENT ? inFolder : pinnedFirst(inFolder)) : inFolder.filter((meta) => terms.every((term) => meta.title.toLowerCase().includes(term)));
+  }, [inFolder, query, trashView, filter]);
   const colors = useMemo(() => imageFolderColors(folders), [folders]);
   const total = images?.length ?? 0;
   const openId = shown.some((meta) => meta.id === selectedId) ? selectedId : "";
@@ -613,8 +614,8 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
       : trashView
       ? <div className="native-empty"><strong>回收站是空的</strong><span>删除的图片会先放在这里，可以恢复</span></div>
       : <div className="native-empty">
-        <strong>{filter === IMAGE_FILTER_PINNED ? "还没有收藏图片" : folderName ? "这个目录还是空的" : "没有未分类的图片"}</strong>
-        <span>{filter === IMAGE_FILTER_PINNED ? "点图片上的星标添加收藏" : compact ? "回到完整窗口添加图片" : folderName ? "点右上角的「新增图片」，会放进这个目录" : "新增的图片会先放在这里"}</span>
+        <strong>{filter === IMAGE_FILTER_RECENT ? "还没有复制过图片" : filter === IMAGE_FILTER_PINNED ? "还没有收藏图片" : folderName ? "这个目录还是空的" : "没有未分类的图片"}</strong>
+        <span>{filter === IMAGE_FILTER_RECENT ? "复制过的图片会出现在这里" : filter === IMAGE_FILTER_PINNED ? "点图片上的星标添加收藏" : compact ? "回到完整窗口添加图片" : folderName ? "点右上角的「新增图片」，会放进这个目录" : "新增的图片会先放在这里"}</span>
       </div>;
   } else if (trashView) {
     body = shown.map((meta) => (
