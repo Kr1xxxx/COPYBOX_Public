@@ -60,21 +60,6 @@ export function ImageMoveMenu({ folders, colors, current, up, onMove }: {
 }
 
 // Mini window: a select next to the search box, like the 话术 mini window.
-export function ImageFolderSelect({ library }: { library: ImageLibrary }) {
-  return (
-    <label className="mini-folder">
-      <span className="sr-only">目录</span>
-      <select value={library.filter} onChange={(event) => library.setFilter(event.target.value)}>
-        <option value={IMAGE_FILTER_ALL}>全部</option>
-        <option value={IMAGE_FILTER_PINNED}>收藏</option>
-        {library.folders.map((folder) => <option key={folder.name} value={imageFolderFilter(folder.name)}>{folder.name}</option>)}
-        <option value={IMAGE_FILTER_UNCATEGORIZED}>未分类</option>
-      </select>
-      <ChevronGlyph />
-    </label>
-  );
-}
-
 // Sidebar in the 图片 view: 全部图片, the folders, 未分类. 设置 stays in the page's footer.
 export function ImageFolderNav({ library }: { library: ImageLibrary }) {
   const { folders, filter, setFilter } = library;

@@ -71,8 +71,9 @@ import type { WindowMode } from "./desktop-bridge";
 import { pickMiniFavorites } from "./mini-favorites";
 import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
-import { ImageFolderNav, ImageFolderSelect } from "./image-folders";
-import { countImagesByFolder, IMAGE_FILTER_TRASH, imageFilterTitle, imageFolderColors } from "./image-folders-core";
+import { ImageFolderNav } from "./image-folders";
+import { MiniTabs, type MiniTab } from "./mini-tabs";
+import { countImagesByFolder, IMAGE_FILTER_ALL, IMAGE_FILTER_PINNED, IMAGE_FILTER_TRASH, IMAGE_FILTER_UNCATEGORIZED, imageFilterTitle, imageFolderColors, imageFolderFilter } from "./image-folders-core";
 import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
@@ -1695,6 +1696,11 @@ export default function Home() {
       ]}
     />
   );
+  const miniTabs: MiniTab[] = imageView
+    ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, ...imageLibrary.folders.map((folder) => ({ id: imageFolderFilter(folder.name), label: folder.name })), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
+    : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }, ...activeFolders.map((folder) => ({ id: `folder:${folder}`, label: folder })), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
+  const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
+  const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   const searchInput = <input ref={searchRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = (
@@ -1874,24 +1880,13 @@ export default function Home() {
           <header className="mini-top drag-region">
             <div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div>
             {kindSwitch}
+            <MiniTabs label="目录" tabs={miniTabs} active={miniTabActive} onSelect={selectMiniTab} />
             <button type="button" className="icon-button" onClick={() => requestWindowMode("full")} aria-label="恢复完整窗口" title="恢复完整窗口"><Icon name="restore" /></button>
           </header>
           <div className="mini-search">
             <div className="native-search">
               <Icon name="search" className="search-glyph" />
               {searchInput}
-              {imageView && <ImageFolderSelect library={imageLibrary} />}
-              {!imageView && <label className="mini-folder">
-                <span className="sr-only">目录</span>
-                <select value={activeFolder} onChange={(event) => selectFolder(event.target.value)}>
-                  <option value="all">全部</option>
-                  <option value="pinned">收藏</option>
-                  <option value="recent">最近使用</option>
-                  {activeFolders.map((folder) => <option key={folder} value={`folder:${folder}`}>{folder}</option>)}
-                  {activeKind === "secret" && <option value="uncategorized">未分类</option>}
-                </select>
-                <Icon name="chevron" />
-              </label>}
             </div>
           </div>
           {!imageView && activeKind === "snippet" && !query.trim() && miniFavorites.length > 0 && <div className="mini-favorites" role="group" aria-label="最常用">
