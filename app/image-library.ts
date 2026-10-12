@@ -100,7 +100,11 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
 
   const getBlob = useCallback(async (id: string) => (await loadStore(deviceKey)).getBlob(id), [deviceKey]);
   const getThumb = useCallback(async (id: string) => (await loadStore(deviceKey)).getThumb(id), [deviceKey]);
-  const markUsed = useCallback(async (id: string) => (await loadStore(deviceKey)).markUsed(id), [deviceKey]);
+  const markUsed = useCallback(async (id: string) => {
+    await (await loadStore(deviceKey)).markUsed(id);
+    const usedAt = Date.now();
+    setImages((current) => current && current.map((meta) => meta.id === id ? { ...meta, lastUsedAt: usedAt } : meta));
+  }, [deviceKey]);
 
   async function addImage(file: Blob, title: string, folder: string | null) {
     let target: ImageStore;
