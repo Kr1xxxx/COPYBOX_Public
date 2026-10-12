@@ -99,6 +99,8 @@ import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
 import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
+import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
+import { useValueOptionDrag } from "./value-option-drag";
 import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
@@ -138,31 +140,10 @@ const VALUES_COLLAPSED_KEY = "clipbox.values-collapsed";
 // The 话术 card that was open last (only its id), so the list comes back the way it was; empty = all folded.
 const OPEN_CARD_KEY = "clipbox.open-card";
 
-function readStoredChoice<T extends string | number>(key: string, allowed: readonly T[], fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    const match = allowed.find((value) => String(value) === raw);
-    if (match !== undefined) return match;
-  } catch {
-    // Storage can be unavailable; use the default.
-  }
-  return fallback;
-}
-
-function writeStoredChoice(key: string, value: string | number) {
-  try { localStorage.setItem(key, String(value)); } catch { /* keep the in-memory choice for this session */ }
-}
-
-
 const STORAGE_KEY = "clipbox.vault.v1";
 const DEVICE_KEY = "clipbox.device-key.v1";
 const REFRESH_CONTEXT_KEY = "clipbox:refresh-context";
 const ITERATIONS = 310_000;
-
-// parseRefreshContext only knows the text sections; the 图片 flag rides along in the same stored object.
-function readRefreshedImageView(stored: string | null) {
-  try { return JSON.parse(stored || "null")?.imageView === true; } catch { return false; }
-}
 
 function timestampNow() {
   return Date.now();
@@ -312,7 +293,6 @@ export default function Home() {
   function toggleValuesCollapsed() { setValuesCollapsed((current) => { writeStoredChoice(VALUES_COLLAPSED_KEY, current ? "0" : "1"); return !current; }); }
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
-  const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; grab: number; element: HTMLElement } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
   const [undoImage, setUndoImage] = useState<ImageMeta | null>(null);
@@ -978,51 +958,7 @@ export default function Home() {
     setToast(`已删除「${value}」`);
     window.setTimeout(() => setToast(""), 2000);
   }
-  // Holding a listed value and moving it drags it to another place in the list.
-  // The other values slide to their new places while one is dragged (first, last, invert, play).
-  const optionLefts = useRef<Map<string, number>>(new Map());
-  useLayoutEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const next = new Map<string, number>();
-    document.querySelectorAll<HTMLElement>(".var-memory-option").forEach((element) => {
-      const key = `${element.closest(".var-memory-group")?.getAttribute("aria-label")}|${element.dataset.optionValue}`;
-      next.set(key, element.offsetLeft);
-      const before = optionLefts.current.get(key);
-      if (reduce || before === undefined || before === element.offsetLeft || "dragging" in element.dataset) return;
-      element.animate([{ transform: `translateX(${before - element.offsetLeft}px)` }, { transform: "none" }], { duration: 180, easing: "cubic-bezier(.22,1,.36,1)" });
-    });
-    optionLefts.current = next;
-  });
-
-  function startOptionDrag(event: React.PointerEvent<HTMLButtonElement>, name: string, value: string) {
-    const element = event.currentTarget.closest<HTMLElement>(".var-memory-option");
-    if (event.button !== 0 || !element) return;
-    dragOption.current = { name, value, startX: event.clientX, startLeft: element.offsetLeft, moved: false, grab: event.clientX - element.getBoundingClientRect().left, element };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    // Reordering moves the value in the page, which can drop the pointer capture; the window still hears the move and the release.
-    const move = (pointerEvent: PointerEvent) => moveOptionDrag(pointerEvent.clientX);
-    const release = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); endOptionDrag(); };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", release);
-    window.addEventListener("pointercancel", release);
-  }
-  function moveOptionDrag(clientX: number) {
-    const drag = dragOption.current;
-    if (!drag) return;
-    if (!drag.moved && Math.abs(clientX - drag.startX) < 6) return;
-    if (!drag.moved) { drag.element.dataset.dragging = ""; drag.element.style.transition = "none"; }
-    drag.moved = true;
-    // Hit-test where the pointer is, on layout positions (not painted ones), so values that are still sliding do not confuse the swap.
-    const shift = clientX - drag.startX - (drag.element.offsetLeft - drag.startLeft);
-    const centre = drag.element.offsetLeft + shift + drag.grab;
-    const over = Array.from(drag.element.parentElement?.querySelectorAll<HTMLElement>(".var-memory-option") || []).find((element) => element !== drag.element && centre >= element.offsetLeft && centre <= element.offsetLeft + element.offsetWidth);
-    if (over) {
-    const outcome = moveOption(valueMemory, pinnedValues, drag.name, drag.value, over.dataset.optionValue || "");
-    if (outcome.memory !== valueMemory || outcome.pins !== pinnedValues) { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); }
-    }
-    // the held value follows the pointer, even after the others have slid into new places
-    drag.element.style.transform = `translateX(${shift}px)`;
-  }
+  const { startOptionDrag } = useValueOptionDrag(valueMemory, pinnedValues, setValueMemory, setPinnedValues);
   // The menu on a value's handle moves it one place; pinned values only change places among themselves.
   function stepOption(name: string, value: string, step: -1 | 1) {
     const options = memoryOptions(valueMemory, pinnedValues, name);
@@ -1036,18 +972,6 @@ export default function Home() {
     const target = options[options.indexOf(value) + step];
     return target !== undefined && isPinned(pinnedValues, name, value) === isPinned(pinnedValues, name, target);
   }
-  function endOptionDrag() {
-    const held = dragOption.current;
-    if (held?.moved) {
-      const element = held.element;
-      delete element.dataset.dragging;
-      element.style.transition = "transform .18s cubic-bezier(.22,1,.36,1)";
-      element.style.transform = "";
-      window.setTimeout(() => { element.style.transition = ""; }, 200);
-    }
-    dragOption.current = null;
-  }
-
   // Variable blocks, checks, or a 中文翻译 all mean the card offers the 英文/中文 switch and prepares the copy.
   function hasPreparedCopy(item: SecretItem) {
     return hasOptionalSnippetPreparation(item) || Boolean(item.snippetMeta?.chineseText?.trim());
