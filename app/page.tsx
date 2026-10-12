@@ -83,6 +83,7 @@ import { AccountPage, type AddRequest } from "./account-page";
 import { countByKind, useAccountEntries } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
+import { applyImportSampleSnippets, planClearSampleSnippets, planImportSampleSnippets } from "./sample-snippets";
 import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
@@ -2091,20 +2092,37 @@ export default function Home() {
         </>}
       </section>
       {settingsOpen && <SettingsDialog
-        onPreviewSamples={accountLocked ? undefined : () => previewClearSamples(deviceKey)}
-        onClearSamples={accountLocked ? undefined : async () => {
-          try {
-            const result = await clearSampleEntries(deviceKey);
-            setVaultRev((n) => n + 1);
-            flashToast(result.removed === 0 ? "没有可清除的范例" : result.keptEdited > 0 ? `已清除 ${result.removed} 条范例，${result.keptEdited} 条你改过的已保留` : `已清除 ${result.removed} 条范例`);
-          } catch { flashToast("清除失败，数据没有改动"); }
+        onPreviewTest={async () => {
+          const snippets = planClearSampleSnippets(itemsRef.current);
+          const accountPart = accountLocked || PLAIN_NOTES ? null : await previewClearSamples(deviceKey);
+          return { snippets: snippets.ids.length, accounts: accountPart === null ? null : accountPart.length, accountNames: accountPart ?? [], keptEdited: snippets.keptEdited };
         }}
-        onRestoreSamples={accountLocked ? undefined : async () => {
+        onImportTest={async () => {
           try {
-            const result = await restoreSampleEntries(deviceKey);
-            setVaultRev((n) => n + 1);
-            flashToast(result.added === 0 ? "范例都在，没有缺的" : `已补回 ${result.added} 条范例`);
-          } catch { flashToast("恢复失败，数据没有改动"); }
+            const plan = planImportSampleSnippets(itemsRef.current, timestampNow());
+            if (plan.add.length > 0 || plan.revive.length > 0) {
+              await persist((current) => ({
+                ...current,
+                items: applyImportSampleSnippets(current.items, plan),
+                folders: { secret: current.folders.secret, snippet: Array.from(new Set([...current.folders.snippet, ...plan.folders])) },
+              }));
+            }
+            const accounts = accountLocked || PLAIN_NOTES ? { added: 0 } : await restoreSampleEntries(deviceKey);
+            if (accounts.added > 0) setVaultRev((n) => n + 1);
+            const total = plan.add.length + plan.revive.length + accounts.added;
+            flashToast(total === 0 ? "测试内容都在，没有缺的" : `已放入测试内容：话术 ${plan.add.length + plan.revive.length} 条${PLAIN_NOTES ? "" : `，${SECRET_WORD} ${accounts.added} 条${accountLocked ? "（账号已锁，没有处理）" : ""}`}`);
+          } catch { flashToast("导入失败，数据没有改动"); }
+        }}
+        onClearTest={async () => {
+          try {
+            const plan = planClearSampleSnippets(itemsRef.current);
+            if (plan.ids.length > 0) await persist((current) => ({ ...current, items: moveItemsToTrash(current.items, plan.ids, timestampNow()) }));
+            const accounts = accountLocked || PLAIN_NOTES ? { removed: 0, keptEdited: 0 } : await clearSampleEntries(deviceKey);
+            if (accounts.removed > 0) setVaultRev((n) => n + 1);
+            const total = plan.ids.length + accounts.removed;
+            const kept = plan.keptEdited + accounts.keptEdited;
+            flashToast(total === 0 ? "没有可清除的测试内容" : `已清除 ${total} 条测试内容${kept > 0 ? `，${kept} 条你改过的已保留` : ""}`);
+          } catch { flashToast("清除失败，数据没有改动"); }
         }}
         version={appVersion}
         buildTime={buildTime}

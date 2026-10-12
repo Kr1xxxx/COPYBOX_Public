@@ -1,0 +1,8 @@
+# 设置 → 数据：导入测试内容 / 清除测试内容
+
+- Date: 2026-10-12 · Thread/agent: 【設置】设置页
+- What changed: Two rows on 设置 → 数据 (Windows and Mac). 导入测试内容 adds the sample 话术 (the 34 rows of `docs/samples/clipbox-test-snippets.csv`, ids `sample-snippet-N`) and, on a Mac with the 账号 page unlocked, the 账号 examples. Importing again adds nothing; a test 话术 that was cleared comes back from the trash; a 话术 the user already has with the same text is not added twice. 清除测试内容 shows "话术 N 条、账号 M 条（names）" and asks to confirm; it moves only untouched test 话术 to the trash (so 回收站 keeps them for the usual days) and removes only untouched 账号 examples; anything the user edited stays and is counted as "你改过的 N 条会保留". New: `app/sample-snippets.ts`, `app/sample-snippet-rows.ts`. The old 账号 rows 清除范例 / 恢复范例 are folded into this pair (same functions in `app/vault-samples.ts`, no data format or storage change). The two 账号 buttons inside the 账号 page ("删除范例…") are unchanged.
+- User-visible change (plain Chinese, for the preview changelog): 设置 → 数据 新增「导入测试内容」和「清除测试内容」：一键放入带「范例」标记的假话术（Mac 还有假账号），重复导入不会重复；清除时先告诉你会清多少条，只清没改过的范例，话术先进回收站，你自己的内容不动。原来的「清除范例」「恢复范例」合并到这两个按钮里。
+- Tests: `tests/sample-snippets.test.mjs`, `tests/e2e/test-content.e2e.mjs` (Windows and Mac); `tests/e2e/vault-samples.e2e.mjs` only changed button names and message text for the folded buttons (all earlier assertions kept).
+- Not done / risks: No sample images exist in the repo, so 图片 is not part of the test set. Folders created by the test 话术 stay after a clear (empty folders are the user's structure). Not walked through on a real Windows or Mac machine.
+- Next step: the preview publisher adds it to the next web trial.

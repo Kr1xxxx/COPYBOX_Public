@@ -8,6 +8,7 @@ import { ImageCompressSettings } from "./image-compress-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, type SecretItem } from "./clipbox-core";
 import { UsageSection } from "./usage-section";
+import { testPreviewText, type TestContentPreview } from "./sample-snippets";
 import { DataMoveDialog } from "./data-move";
 import { AccountLockSettings } from "./account-lock-ui";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
@@ -25,9 +26,9 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
-  // Only given on a Mac whose 保险箱 is unlocked: remove / put back the 【范例】 entries.
-  onPreviewSamples?: () => Promise<string[]>; onClearSamples?: () => Promise<void>; onRestoreSamples?: () => Promise<void>;
+export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
+  // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
+  onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
@@ -83,7 +84,7 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
   };
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   // null = not asking; otherwise the names a clear would remove, shown before anything is deleted.
-  const [confirmClearSamples, setConfirmClearSamples] = useState<string[] | null>(null);
+  const [confirmClearTest, setConfirmClearTest] = useState<TestContentPreview | null>(null);
   const [versionCopied, setVersionCopied] = useState(false);
   const [dataMove, setDataMove] = useState<"export" | "import" | null>(null);
   const [openedAt] = useState(() => Date.now());
@@ -139,16 +140,16 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
           <section className="settings-card" data-solo="" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {row(`导出${SECRET_WORD}备份`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…", accountLocked)}
-            {onClearSamples && (
-              <div className="settings-row"><div><strong>清除范例</strong><small>只删保险箱里带「范例」标记、你没改过的条目，其他内容不动</small>
-                {confirmClearSamples && <small className="settings-sample-list" role="status">{confirmClearSamples.length === 0 ? "现在没有可清除的范例" : `将删除 ${confirmClearSamples.length} 条：${confirmClearSamples.join("、")}`}</small>}</div>
-                {confirmClearSamples
-                  ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmClearSamples(null)}>取消</button>
-                    {confirmClearSamples.length > 0 && <button type="button" className="secondary-button danger" onClick={() => { setConfirmClearSamples(null); void onClearSamples(); }}>确认清除</button>}</div>
-                  : <button type="button" className="secondary-button" onClick={() => void (onPreviewSamples?.() ?? Promise.resolve([])).then(setConfirmClearSamples)}>清除…</button>}
+            {onImportTest && row("导入测试内容", `放入一批带「范例」标记的假内容（话术${PLAIN_NOTES ? "" : `、${SECRET_WORD}`}），重复导入不会重复`, () => void onImportTest(), "导入")}
+            {onClearTest && (
+              <div className="settings-row"><div><strong>清除测试内容</strong><small>只清带「范例」标记、你没改过的内容，其他内容不动；话术会先进回收站</small>
+                {confirmClearTest && <small className="settings-sample-list" role="status">{testPreviewText(confirmClearTest)}</small>}</div>
+                {confirmClearTest
+                  ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmClearTest(null)}>取消</button>
+                    {confirmClearTest.snippets + (confirmClearTest.accounts ?? 0) > 0 && <button type="button" className="secondary-button danger" onClick={() => { setConfirmClearTest(null); void onClearTest(); }}>确认清除</button>}</div>
+                  : <button type="button" className="secondary-button" onClick={() => void (onPreviewTest?.() ?? Promise.resolve({ snippets: 0, accounts: null, keptEdited: 0 })).then(setConfirmClearTest)}>清除…</button>}
               </div>
             )}
-            {onRestoreSamples && row("恢复范例", "把缺少的范例补回来，已有的内容不会重复或改动", () => void onRestoreSamples(), "恢复")}
             {row("导入备份", "支持新旧版备份，可选择合并或覆盖", onImport, "选择文件…")}
             {row("导入话术表格", "读取 .xlsx / .csv，只在本机解析", onImportSheet, "选择表格…")}
             {isDesktop && row("导出到新版", "话术、图片和设置打包成一个加密文件，换到新版 Clipbox 时用", () => setDataMove("export"), "导出…")}
