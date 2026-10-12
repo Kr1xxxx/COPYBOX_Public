@@ -83,6 +83,7 @@ import { AccountPage, type AddRequest } from "./account-page";
 import { countByKind, useAccountEntries } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
+import { useAutoBackup } from "./auto-backup-ui";
 import { applyImportSampleSnippets, planClearSampleSnippets, planImportSampleSnippets } from "./sample-snippets";
 import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
@@ -1358,6 +1359,7 @@ export default function Home() {
 
   const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
   const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
+  useAutoBackup(!loading && !startupError);
   useEffect(() => {
     window.clipboxDesktop?.setMiniHidePolicy?.(miniHidePolicy);
     // Only tell the desktop shell about the stored choice once on start; later changes go through chooseMiniHidePolicy.
