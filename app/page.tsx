@@ -261,6 +261,8 @@ export default function Home() {
   const [selected, setSelected] = useState(0);
   // Cards that just lost the selection keep their detail mounted while it folds away.
   const [closingIds, setClosingIds] = useState<string[]>([]);
+  // The 收起 button in the list header folds the open card without moving the selection.
+  const [collapsedAt, setCollapsedAt] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
   const [toast, setToast] = useState("");
@@ -460,7 +462,9 @@ export default function Home() {
   });
 
   const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
-  const selectedCardId = filtered[safeSelected]?.id || "";
+  // Folded only while the selection, folder, kind and search stay as they were when the button was pressed.
+  const cardsCollapsed = collapsedAt === `${selected}|${activeFolder}|${activeKind}|${query}`;
+  const selectedCardId = cardsCollapsed ? "" : filtered[safeSelected]?.id || "";
   const closingAnimationsRef = useRef(new Map<string, Animation[]>());
 
   // A card that just lost the selection folds its card chrome and title row back
@@ -1512,7 +1516,7 @@ export default function Home() {
 
   // Rows slide to their new places when a different entry opens.
   function moveSelection(update: (value: number) => number) {
-    const leaving = bulkMode ? undefined : filtered[safeSelected]?.id;
+    const leaving = bulkMode || cardsCollapsed ? undefined : filtered[safeSelected]?.id;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (leaving && !reduceMotion && update(safeSelected) !== safeSelected) {
       setClosingIds((ids) => ids.includes(leaving) ? ids : [...ids, leaving]);
@@ -1524,6 +1528,19 @@ export default function Home() {
   function selectRow(index: number) {
     if (fill && filtered[index]?.id !== fill.itemId) setFill(null);
     if (index !== safeSelected) moveSelection(() => index);
+    setCollapsedAt("");
+    setRowMenuId("");
+    setRevealedId("");
+  }
+
+  function collapseCards() {
+    const leaving = selectedCardId;
+    if (!leaving || bulkMode) return;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setClosingIds((ids) => ids.includes(leaving) ? ids : [...ids, leaving]);
+      window.setTimeout(() => setClosingIds((ids) => ids.filter((id) => id !== leaving)), DETAIL_CLOSE_MS + 40);
+    }
+    setCollapsedAt(`${selected}|${activeFolder}|${activeKind}|${query}`);
     setRowMenuId("");
     setRevealedId("");
   }
@@ -1811,7 +1828,7 @@ export default function Home() {
                 if (modalOpen && editing?.id === item.id) {
                   return <article key={item.id} data-row-index={index} className={`native-row selected editing ${isSnippet ? "snippet-row" : "secret-row"}`}>{editorNode}</article>;
                 }
-                const isSelected = safeSelected === index && !bulkMode;
+                const isSelected = safeSelected === index && !bulkMode && !cardsCollapsed;
                 const checked = bulkIds.includes(item.id);
                 const revealed = revealedId === item.id;
                 const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
@@ -2043,6 +2060,7 @@ export default function Home() {
                 onSelect={(next) => { setSearchAllFolders(next === "all"); setSelected(0); }}
                 options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
               />}
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
