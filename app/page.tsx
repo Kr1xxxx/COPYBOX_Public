@@ -134,6 +134,8 @@ const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
 const VALUES_COLLAPSED_KEY = "clipbox.values-collapsed";
+// The 话术 card that was open last (only its id), so the list comes back the way it was; empty = all folded.
+const OPEN_CARD_KEY = "clipbox.open-card";
 
 function readStoredChoice<T extends string | number>(key: string, allowed: readonly T[], fallback: T): T {
   try {
@@ -264,6 +266,11 @@ export default function Home() {
   const [closingIds, setClosingIds] = useState<string[]>([]);
   // The 收起 button in the list header folds the open card without moving the selection.
   const [collapsedAt, setCollapsedAt] = useState("");
+  const [openId, setOpenIdState] = useState(() => { try { return localStorage.getItem(OPEN_CARD_KEY) || ""; } catch { return ""; } });
+  function setOpenId(id: string) {
+    setOpenIdState(id);
+    try { if (id) localStorage.setItem(OPEN_CARD_KEY, id); else localStorage.removeItem(OPEN_CARD_KEY); } catch { /* the open card is only remembered for this session */ }
+  }
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
   const [toast, setToast] = useState("");
@@ -462,10 +469,13 @@ export default function Home() {
     selectRow(index);
   });
 
-  const safeSelected = Math.min(selected, Math.max(0, filtered.length - 1));
-  // Folded only while the selection, folder, kind and search stay as they were when the button was pressed.
+  // The list starts folded. The card opened last stays open when the person comes back (openId); while searching,
+  // the top result opens by itself so Enter still copies what is shown, until 收起 is pressed.
+  const openIndex = openId ? filtered.findIndex((item) => item.id === openId) : -1;
+  const safeSelected = openIndex >= 0 ? openIndex : Math.min(selected, Math.max(0, filtered.length - 1));
   const cardsCollapsed = collapsedAt === `${selected}|${activeFolder}|${activeKind}|${query}`;
-  const selectedCardId = cardsCollapsed ? "" : filtered[safeSelected]?.id || "";
+  const expandedIndex = openIndex >= 0 ? openIndex : query.trim() !== "" && !cardsCollapsed && filtered.length > 0 ? safeSelected : -1;
+  const selectedCardId = filtered[expandedIndex]?.id || "";
   const closingAnimationsRef = useRef(new Map<string, Animation[]>());
 
   // A card that just lost the selection folds its card chrome and title row back
@@ -916,7 +926,7 @@ export default function Home() {
     const readiness = snippetCopyReadiness(item, state.values, state.language);
     if (!readiness.ready) {
       const index = filtered.findIndex((value) => value.id === item.id);
-      if (index >= 0 && index !== safeSelected) selectRow(index);
+      if (index >= 0 && index !== expandedIndex) selectRow(index);
       const missing = readiness.missingPlaceholders;
       setToast(`先填写：${missing.join("、")}`);
       window.setTimeout(() => setToast(""), 2200);
@@ -930,7 +940,7 @@ export default function Home() {
     const unseen = state.remembered.filter((name) => name !== pickedName && extractPlaceholders(source).includes(name));
     if (unseen.length > 0) {
       const index = filtered.findIndex((value) => value.id === item.id);
-      if (index >= 0 && index !== safeSelected) selectRow(index);
+      if (index >= 0 && index !== expandedIndex) selectRow(index);
       setFill({ ...state, values: state.values, remembered: [] });
       setToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`);
       window.setTimeout(() => setToast(""), 3600);
@@ -1517,19 +1527,22 @@ export default function Home() {
 
   // Rows slide to their new places when a different entry opens.
   function moveSelection(update: (value: number) => number) {
-    const leaving = bulkMode || cardsCollapsed ? undefined : filtered[safeSelected]?.id;
+    const next = update(safeSelected);
+    const nextId = filtered[next]?.id || "";
+    const leaving = bulkMode ? undefined : selectedCardId;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (leaving && !reduceMotion && update(safeSelected) !== safeSelected) {
+    if (leaving && !reduceMotion && nextId !== leaving) {
       setClosingIds((ids) => ids.includes(leaving) ? ids : [...ids, leaving]);
       window.setTimeout(() => setClosingIds((ids) => ids.filter((id) => id !== leaving)), DETAIL_CLOSE_MS + 40);
     }
-    setSelected(update);
+    setSelected(next);
+    setCollapsedAt("");
+    if (nextId && !bulkMode) setOpenId(nextId);
   }
 
   function selectRow(index: number) {
     if (fill && filtered[index]?.id !== fill.itemId) setFill(null);
-    if (index !== safeSelected) moveSelection(() => index);
-    setCollapsedAt("");
+    moveSelection(() => index);
     setRowMenuId("");
     setRevealedId("");
   }
@@ -1542,6 +1555,7 @@ export default function Home() {
       window.setTimeout(() => setClosingIds((ids) => ids.filter((id) => id !== leaving)), DETAIL_CLOSE_MS + 40);
     }
     setCollapsedAt(`${selected}|${activeFolder}|${activeKind}|${query}`);
+    setOpenId("");
     setRowMenuId("");
     setRevealedId("");
   }
@@ -1829,7 +1843,7 @@ export default function Home() {
                 if (modalOpen && editing?.id === item.id) {
                   return <article key={item.id} data-row-index={index} className={`native-row selected editing ${isSnippet ? "snippet-row" : "secret-row"}`}>{editorNode}</article>;
                 }
-                const isSelected = safeSelected === index && !bulkMode && !cardsCollapsed;
+                const isSelected = expandedIndex === index && !bulkMode;
                 const checked = bulkIds.includes(item.id);
                 const revealed = revealedId === item.id;
                 const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
