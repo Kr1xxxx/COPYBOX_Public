@@ -232,9 +232,8 @@ async function main() {
 
   await step("copy puts the text on the real Windows clipboard", async () => {
     powershell("Set-Clipboard -Value 'cleared-before-copy'");
-    await page.locator(".native-row", { hasText: "测试｜第一条" }).locator(".row-main").click();
-    const row = page.locator(".native-row.selected");
-    await row.getByRole("button", { name: "复制", exact: true }).click();
+    const row = page.locator(".native-row", { hasText: "Smoke test one" }).first();
+    await row.locator(".native-copy").click();
     let clip = "";
     for (let i = 0; i < 20; i += 1) {
       clip = powershell("Get-Clipboard -Raw").out;
