@@ -1158,3 +1158,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-tile.ticked .tile-check { border-color: var(--accent); background: var(--accent); }
 .image-tile.ticked .tile-check .icon { color: #fff; }
 .image-tile.ticked .image-tile-thumb { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+
+.acct-row.selecting { grid-template-columns: auto minmax(0, 1fr); }
+.vault-inline + .bulk-bar, .vault-panel .bulk-bar { margin: 8px 0 0; }

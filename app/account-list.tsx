@@ -16,9 +16,10 @@ const KIND_CHOICES: EntryKind[] = ["login", "payment", "apikey", "totp", "recove
 // everything else (打开, 改归类) is in the 「…」 menu.
 export type AccountView = "all" | "pinned" | "recent" | "trash";
 
-export function AccountList({ deviceKey, entries, trashed, marks, category, view = "all", query, onOpen, onPinLegacy, onToast }: {
+export function AccountList({ deviceKey, entries, trashed, marks, category, view = "all", query, selecting = false, folded = false, onSelectingChange, onOpen, onPinLegacy, onTrashLegacy, onToast }: {
   deviceKey: string; entries: AccountEntry[]; trashed: AccountEntry[]; marks: Record<string, MarkItem>; category: EntryKind | "all"; view?: AccountView; query: string;
-  onOpen: (entry: AccountEntry) => void; onPinLegacy: (id: string) => void; onToast: (message: string) => void;
+  selecting?: boolean; folded?: boolean; onSelectingChange?: (selecting: boolean) => void;
+  onOpen: (entry: AccountEntry) => void; onPinLegacy: (id: string) => void; onTrashLegacy: (ids: string[]) => Promise<void>; onToast: (message: string) => void;
 }) {
   const [menuId, setMenuId] = useState("");
   const [editing, setEditing] = useState("");
@@ -30,6 +31,10 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
   const [sampleNames, setSampleNames] = useState<string[] | null>(null);
 
   const [purgeId, setPurgeId] = useState("");
+  // 选择: the targets ticked in the list; leaving the mode forgets them (set while rendering, no effect needed).
+  const [picked, setPicked] = useState<string[]>([]);
+  const [seenSelecting, setSeenSelecting] = useState(selecting);
+  if (seenSelecting !== selecting) { setSeenSelecting(selecting); if (!selecting) setPicked([]); }
   const shown = useMemo(() => {
     const base = view === "trash" ? trashed : view === "pinned" ? entries.filter((entry) => entry.pinned) : view === "recent" ? entries.filter((entry) => entry.lastUsedAt).sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0)).slice(0, 20) : entries;
     return base.filter((entry) => (view !== "all" || category === "all" || entry.tab === category) && matchesQuery(entry, query));
@@ -73,6 +78,29 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
     try { await task; } catch (reason) { setError(reason instanceof Error ? reason.message : "保存失败，请重试"); }
   }
 
+  // 删除 = move to the 回收站 (new types by a mark, old 秘密 through the page's own trash); nothing is lost, 恢复 brings it back.
+  async function trashEntries(list: AccountEntry[]) {
+    if (list.length === 0) return;
+    try {
+      const stamp = Date.now();
+      for (const entry of list) if (!entry.legacy) await patchEntry(deviceKey, entry, { trashedAt: stamp });
+      const old = list.filter((entry) => entry.legacy).map((entry) => entry.id);
+      if (old.length > 0) await onTrashLegacy(old);
+      onToast(list.length === 1 ? "已移到回收站，可以恢复" : `已把 ${list.length} 条移到回收站，可以恢复`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除失败，请重试");
+    }
+  }
+
+  const pickedEntries = shown.filter((entry) => picked.includes(entry.target));
+  const togglePicked = (target: string) => setPicked((current) => (current.includes(target) ? current.filter((value) => value !== target) : [...current, target]));
+  async function trashPicked() {
+    const list = pickedEntries;
+    setPicked([]);
+    onSelectingChange?.(false);
+    await trashEntries(list);
+  }
+
   async function removeSamples() {
     try {
       setSampleNames(null);
@@ -100,10 +128,11 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
         {groups.map((group) => (
           <section key={group.key} className="vault-group" aria-label={group.title}>
             <h3>{group.key !== "payment" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
-            <ul className="totp-list">
+            {(!folded || selecting || group.key === "flat") && <ul className="totp-list">
               {group.entries.map((entry) => (
-                <li key={entry.target} className="vault-entry-row acct-row">
-                  <button type="button" className="vault-entry" disabled={view === "trash"} onClick={() => onOpen(entry)}>
+                <li key={entry.target} className={`vault-entry-row acct-row${selecting ? " selecting" : ""}`}>
+                  {selecting && <button type="button" className={`row-check ${picked.includes(entry.target) ? "on" : ""}`} role="checkbox" aria-checked={picked.includes(entry.target)} aria-label={`选择 ${entry.title}`} onClick={() => togglePicked(entry.target)}><Icon name="check" /></button>}
+                  <button type="button" className="vault-entry" disabled={view === "trash"} onClick={() => (selecting ? togglePicked(entry.target) : onOpen(entry))}>
                     <span className="vault-type-chip">{TYPE_LABEL[entry.tab]}</span>
                     <span className="totp-who"><strong>{entry.title}</strong><small>{entry.hint}</small></span>
                   </button>
@@ -114,7 +143,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
                         ? <><button type="button" className="secondary-button" onClick={() => setPurgeId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => { setPurgeId(""); void change(purgeEntry(deviceKey, entry)); }}>确认永久删除</button></>
                         : <button type="button" className="secondary-button" onClick={() => setPurgeId(entry.target)}>永久删除</button>}
                     </span>
-                  ) : <>
+                  ) : selecting ? null : <>
                   {entry.copy && <button type="button" className={`icon-button acct-copy${copiedId === entry.target ? " copied" : ""}`} aria-label={`${entry.copy.label} ${entry.title}`} title={entry.copy.label} onClick={() => void copy(entry)}><Icon name={copiedId === entry.target ? "check" : "copy"} /></button>}
                   <span className="acct-menu-wrap">
                     <button type="button" className="icon-button" aria-label={`更多操作 ${entry.title}`} aria-haspopup="menu" aria-expanded={menuId === entry.target} onClick={() => setMenuId(menuId === entry.target ? "" : entry.target)}><Icon name="more" /></button>
@@ -124,6 +153,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); onOpen(entry); }}>打开 / 修改</button>
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); if (entry.legacy) onPinLegacy(entry.id); else void change(patchEntry(deviceKey, entry, { pinned: entry.pinned ? undefined : true })); }}>{entry.pinned ? "取消收藏" : "收藏"}</button>
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); setEditing(entry.target); setKindDraft(entry.tab); setSiteDraft(marks[entry.target]?.site ?? ""); }}>改归类</button>
+                        <button type="button" role="menuitem" className="danger-text" onClick={() => { setMenuId(""); void trashEntries([entry]); }}>删除</button>
                       </div>
                     </>}
                   </span>
@@ -141,10 +171,17 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
                   )}
                 </li>
               ))}
-            </ul>
+            </ul>}
           </section>
         ))}
       </div>
+      {selecting && view !== "trash" && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
+        <strong>已选 {pickedEntries.length} 条</strong>
+        <button type="button" className="ghost-button" onClick={() => setPicked(pickedEntries.length === shown.length ? [] : shown.map((entry) => entry.target))}>{pickedEntries.length === shown.length ? "全不选" : "全选"}</button>
+        <span className="spacer" />
+        <button type="button" className="secondary-button danger-text" disabled={pickedEntries.length === 0} onClick={() => void trashPicked()}>删除</button>
+        <button type="button" className="primary-button" onClick={() => onSelectingChange?.(false)}>完成</button>
+      </div>}
       <datalist id="vault-site-names">{siteNames.map((name) => <option key={name} value={name} />)}</datalist>
     </>
   );

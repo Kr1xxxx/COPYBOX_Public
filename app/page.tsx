@@ -430,13 +430,16 @@ export default function Home() {
   // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
   const [lockSet, setLockSet] = useState(() => typeof window !== "undefined" && isAccountLockSet());
   const [accountUnlocked, setAccountUnlocked] = useState(false);
+  // 账号 header: 选择 (tick entries, 删除) and 收起 (fold every website card to its title).
+  const [acctSelecting, setAcctSelecting] = useState(false);
+  const [acctFolded, setAcctFolded] = useState(false);
   const accountLocked = lockSet && !(accountMode && accountUnlocked);
   const lockedHere = accountMode && lockSet && !accountUnlocked;
   // Leaving the 账号 section locks it again (state adjusted while rendering, not in an effect).
   const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
   if (seenAccountMode !== accountMode) {
     setSeenAccountMode(accountMode);
-    if (!accountMode) setAccountUnlocked(false);
+    if (!accountMode) { setAccountUnlocked(false); setAcctSelecting(false); }
   }
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
@@ -2057,8 +2060,12 @@ export default function Home() {
             </header>
             {lockedHere ? <AccountLockScreen onUnlock={() => setAccountUnlocked(true)} /> : <>
             {vaultPage && <>
-              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" /><span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
+              <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
+                {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
+                {activeFolder !== "trash" && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
+                <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
               <AccountPage deviceKey={deviceKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
+                selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} />
             </>}
             {!vaultPage && <div className="section-head">
