@@ -574,7 +574,7 @@ test("图片 folders can be dragged by the three-bar handle in the sidebar, and 
   const group = page.locator(".settings-dialog .settings-folder-group", { hasText: "图片目录" });
   await group.getByRole("button", { name: /图片目录/ }).click();
   const settingsNames = () => group.locator(".settings-folder-name").allInnerTexts();
-  expect(await settingsNames()).toEqual(["乙", "丙", "甲"]);
+  await expect.poll(settingsNames).toEqual(["乙", "丙", "甲"]);
   await group.locator(".settings-folder", { hasText: "甲" }).getByRole("button", { name: /上移/ }).click();
   await expect.poll(settingsNames).toEqual(["乙", "甲", "丙"]);
   await page.keyboard.press("Escape");
