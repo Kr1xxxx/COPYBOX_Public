@@ -32,6 +32,7 @@ test("mini top: dragging the tab row scrolls it, keeps the switch in place, and 
   const tabs = page.locator(".mini-tabs");
   const overflow = await tabs.evaluate((el) => el.scrollWidth - el.clientWidth);
   test.skip(overflow <= 0, "the sample folders fit in one row");
+  await page.waitForTimeout(300);
   const switchBefore = await page.locator(".kind-switch").boundingBox();
   const box = await tabs.boundingBox();
   const y = box.y + box.height / 2;
@@ -39,7 +40,7 @@ test("mini top: dragging the tab row scrolls it, keeps the switch in place, and 
   await page.mouse.down();
   await page.mouse.move(box.x + 40, y, { steps: 8 });
   await page.mouse.up();
-  expect(await tabs.evaluate((el) => el.scrollLeft)).toBeGreaterThan(20);
+  await expect.poll(() => tabs.evaluate((el) => el.scrollLeft)).toBeGreaterThan(20);
   await expect(page.locator(".mini-tab.active")).toHaveText("全部");
   const switchAfter = await page.locator(".kind-switch").boundingBox();
   expect(Math.abs(switchAfter.x - switchBefore.x)).toBeLessThanOrEqual(1);
