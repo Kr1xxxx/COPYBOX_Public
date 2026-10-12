@@ -317,7 +317,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!openId) return;
-    const timer = setTimeout(() => {
+    const align = () => {
       const list = listRef.current;
       const id = CSS.escape(openId);
       const card = list?.querySelector(`[data-image-id="${id}"]`);
@@ -329,8 +329,16 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
       const view = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
       const delta = detailScrollDelta(view.top, view.bottom, (tile ?? card).getBoundingClientRect().top, card.getBoundingClientRect().bottom);
       if (Math.abs(delta) > 1) (scroller ?? window).scrollBy({ top: delta, behavior: "smooth" });
-    }, 280);
-    return () => clearTimeout(timer);
+    };
+    // On a slow machine the card is still growing at the first pass: align again each time it changes size (once it
+    // has been quiet for a moment), until it has settled or two seconds have passed.
+    const first = setTimeout(align, 280);
+    let quiet: ReturnType<typeof setTimeout> | undefined;
+    const card = listRef.current?.querySelector(`[data-image-id="${CSS.escape(openId)}"]`);
+    const observer = card && typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => { clearTimeout(quiet); quiet = setTimeout(align, 120); }) : null;
+    if (card) observer?.observe(card);
+    const stop = setTimeout(() => observer?.disconnect(), 2000);
+    return () => { clearTimeout(first); clearTimeout(quiet); clearTimeout(stop); observer?.disconnect(); };
   }, [openId]);
   const renamingId = renaming?.id;
   useEffect(() => {
