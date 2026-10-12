@@ -9,6 +9,7 @@ import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, type SecretItem } from "./clipbox-core";
 import { UsageSection } from "./usage-section";
 import { DataMoveDialog } from "./data-move";
+import { AccountLockSettings } from "./account-lock-ui";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
@@ -24,7 +25,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamples, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
   // Only given on a Mac whose 保险箱 is unlocked: remove / put back the 【范例】 entries.
   onPreviewSamples?: () => Promise<string[]>; onClearSamples?: () => Promise<void>; onRestoreSamples?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
@@ -40,7 +41,7 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
-  onClose: () => void; onExport: () => void; onExportSecret: () => void; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
+  onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { isSet: boolean; onChanged: (isSet: boolean) => void }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
   sharedLibrary: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -137,7 +138,7 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密" : `用独立密码加密，不包含${SECRET_WORD}`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
-            {!PLAIN_NOTES && row(`导出${SECRET_WORD}备份`, `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…")}
+            {row(`导出${SECRET_WORD}备份`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…", accountLocked)}
             {onClearSamples && (
               <div className="settings-row"><div><strong>清除范例</strong><small>只删保险箱里带「范例」标记、你没改过的条目，其他内容不动</small>
                 {confirmClearSamples && <small className="settings-sample-list" role="status">{confirmClearSamples.length === 0 ? "现在没有可清除的范例" : `将删除 ${confirmClearSamples.length} 条：${confirmClearSamples.join("、")}`}</small>}</div>
@@ -169,6 +170,7 @@ export function SettingsDialog({ onPreviewSamples, onClearSamples, onRestoreSamp
             </div>
           </section>
           <section className="settings-card" aria-labelledby="set-security" hidden={hideSection("data", "set-security")}><h3 id="set-security">安全</h3>
+            <AccountLockSettings isSet={accountLock.isSet} onChanged={accountLock.onChanged} />
             <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。密钥也放在这台电脑里，所以请不要把整个数据文件夹拷给别人。{PLAIN_NOTES ? "图片同样加密保存，不会进入话术备份。" : `${SECRET_WORD}不会进入话术备份，复制${SECRET_WORD}默认只给出引用。`}只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-usage" hidden={hideSection("usage", "set-usage")}><h3 id="set-usage">使用排行</h3>

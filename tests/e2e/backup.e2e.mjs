@@ -108,11 +108,11 @@ test("macOS: the snippet backup still leaves 账号 out", async ({ page }) => {
   expect(JSON.parse(readFileSync(await download.path(), "utf8")).scope).toBe("snippet");
 });
 
-test("Windows: the snippet backup says nothing about 备注, which no longer exists", async ({ page }) => {
+test("Windows: the snippet backup says nothing about 备注, and 账号备份 is its own row", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);
   const settings = await openSettings(page);
-  await expect(settings.locator(".settings-row", { hasText: /导出.*备份/ })).toHaveCount(1);
+  await expect(settings.locator(".settings-row", { hasText: /导出.*备份/ })).toHaveCount(2);
   await settings.locator(".settings-row", { hasText: "导出话术备份" }).getByRole("button", { name: "导出…" }).click();
   const dialog = page.getByRole("dialog", { name: "导出话术备份" });
   await expect(dialog).toContainText("只备份话术");

@@ -123,7 +123,7 @@ test("设置 → 清除范例 / 恢复范例 only touch the examples: own entrie
   await expect(restored).toContainText("我的店铺");
 });
 
-test("清除范例 and 恢复范例 are not offered on Windows", async ({ page }) => {
+test("清除范例 and 恢复范例 are offered on Windows too", async ({ page }) => {
   await asDesktop(page, "win32");
   await page.goto("/");
   await page.waitForSelector(".app-shell");
@@ -131,7 +131,7 @@ test("清除范例 and 恢复范例 are not offered on Windows", async ({ page }
   const s = page.getByRole("dialog", { name: "设置" });
   await s.getByRole("tab", { name: "数据" }).click();
   await expect(s).toContainText("导入备份");
-  await expect(s).not.toContainText("范例");
+  await expect(s).toContainText("范例");
 });
 
 test("someone who opened an earlier 保险箱 (old flag set, own data present) still gets the examples on 账号", async ({ page }) => {

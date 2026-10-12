@@ -29,15 +29,14 @@ async function addImages(page, files) {
 
 const rows = (page) => page.locator(".image-row");
 
-test("Windows: the sections are 话术 and 图片, and 备注 is gone", async ({ page }) => {
+test("Windows: the sections are 话术, 账号 and 图片, and 备注 is gone", async ({ page }) => {
   await openApp(page, "win32");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
   await expect(page.locator("body")).not.toContainText("备注");
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
   await expect(settings).toContainText("导出话术备份");
   await expect(settings).not.toContainText("备注");
-  await expect(settings).not.toContainText("账号");
 });
 
 test("macOS: the sections are 话术, 账号 and 图片, and 账号 still opens", async ({ page }) => {
@@ -379,7 +378,7 @@ test("the mini window lists images and copies with one click", async ({ browser 
   await expect(rows(page)).toHaveCount(2);
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
-  await expect(page.locator(".kind-switch.compact button")).toHaveText(["话术", "图片"]);
+  await expect(page.locator(".kind-switch.compact button")).toHaveText(["话术", "账号", "图片"]);
   await expect(page.locator(".kind-switch.compact button.active")).toHaveText("图片");
   await expect(page.locator(".mini-row")).toHaveCount(2);
   await page.getByPlaceholder("搜索图片").fill("photo");
