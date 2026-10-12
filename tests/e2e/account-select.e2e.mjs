@@ -24,19 +24,19 @@ for (const platform of ["win32", "darwin"]) {
     await expect(region.locator(".vault-entry")).toHaveCount(5);
   });
 
-  test(`${platform}: 选择 ticks entries and 删除 moves them to the 回收站 without asking, where 恢复 brings them back`, async ({ page }) => {
+  test(`${platform}: 选择 ticks entries and 移到回收站 moves them to the 回收站 without asking, where 恢复 brings them back`, async ({ page }) => {
     const region = await open(page, platform);
     await page.locator(".section-head").getByRole("button", { name: "选择" }).click();
     await expect(page.locator(".section-head").getByRole("button", { name: "收起账号" })).toHaveCount(0);
     const bar = page.getByRole("toolbar", { name: "批量操作" });
     await expect(bar).toContainText("已选 0 条");
-    await expect(bar.getByRole("button", { name: "删除" })).toBeDisabled();
+    await expect(bar.getByRole("button", { name: "移到回收站" })).toBeDisabled();
     const boxes = region.getByRole("checkbox");
     await expect(boxes).toHaveCount(5);
     await boxes.nth(0).click();
     await region.locator(".vault-entry").nth(1).click();
     await expect(bar).toContainText("已选 2 条");
-    await bar.getByRole("button", { name: "删除" }).click();
+    await bar.getByRole("button", { name: "移到回收站" }).click();
     await expect(region.locator(".vault-entry")).toHaveCount(3);
     await expect(page.getByRole("toolbar", { name: "批量操作" })).toHaveCount(0);
     await page.getByRole("button", { name: /^回收站/ }).click();
@@ -45,10 +45,10 @@ for (const platform of ["win32", "darwin"]) {
     await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(1);
   });
 
-  test(`${platform}: each entry has 删除 in its 「…」 menu (to the 回收站), and 全选 selects all`, async ({ page }) => {
+  test(`${platform}: each entry has 移到回收站 in its 「…」 menu (to the 回收站), and 全选 selects all`, async ({ page }) => {
     const region = await open(page, platform);
     await region.getByRole("button", { name: /^更多操作/ }).first().click();
-    await region.getByRole("menuitem", { name: "删除" }).click();
+    await region.getByRole("menuitem", { name: "移到回收站" }).click();
     await expect(region.locator(".vault-entry")).toHaveCount(4);
     await expect(page.getByText("已移到回收站，可以恢复")).toBeVisible();
     await page.locator(".section-head").getByRole("button", { name: "选择" }).click();

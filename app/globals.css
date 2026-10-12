@@ -130,7 +130,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .folder-drag-handle:active { cursor: grabbing; }
 .directory-row.dragging { z-index: 5; opacity: .8; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .directory-row.drag-over::after { content: ""; position: absolute; left: 5px; right: 5px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
-.nav-footer { flex: 0 0 auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
+.nav-footer { flex: 0 0 auto; margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
 .menu-wrap { position: relative; }
 .dropdown { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 168px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 16px 40px rgba(31,30,28,.16); }
 .dropdown.folder-menu { animation: menu-in .14s ease-out both; }

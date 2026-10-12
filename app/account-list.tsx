@@ -153,7 +153,8 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); onOpen(entry); }}>打开 / 修改</button>
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); if (entry.legacy) onPinLegacy(entry.id); else void change(patchEntry(deviceKey, entry, { pinned: entry.pinned ? undefined : true })); }}>{entry.pinned ? "取消收藏" : "收藏"}</button>
                         <button type="button" role="menuitem" onClick={() => { setMenuId(""); setEditing(entry.target); setKindDraft(entry.tab); setSiteDraft(marks[entry.target]?.site ?? ""); }}>改归类</button>
-                        <button type="button" role="menuitem" className="danger-text" onClick={() => { setMenuId(""); void trashEntries([entry]); }}>删除</button>
+                        <div className="menu-divider" />
+                        <button type="button" role="menuitem" className="danger" onClick={() => { setMenuId(""); void trashEntries([entry]); }}>移到回收站</button>
                       </div>
                     </>}
                   </span>
@@ -179,7 +180,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
         <strong>已选 {pickedEntries.length} 条</strong>
         <button type="button" className="ghost-button" onClick={() => setPicked(pickedEntries.length === shown.length ? [] : shown.map((entry) => entry.target))}>{pickedEntries.length === shown.length ? "全不选" : "全选"}</button>
         <span className="spacer" />
-        <button type="button" className="secondary-button danger-text" disabled={pickedEntries.length === 0} onClick={() => void trashPicked()}>删除</button>
+        <button type="button" className="secondary-button danger-text" disabled={pickedEntries.length === 0} onClick={() => void trashPicked()}>移到回收站</button>
         <button type="button" className="primary-button" onClick={() => onSelectingChange?.(false)}>完成</button>
       </div>}
       <datalist id="vault-site-names">{siteNames.map((name) => <option key={name} value={name} />)}</datalist>

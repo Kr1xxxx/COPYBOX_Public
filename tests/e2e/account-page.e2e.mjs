@@ -42,7 +42,7 @@ test("账号 rows: one copy button per type, the rest in the 「…」 menu", as
   await expect.poll(copied).toMatch(/^\d{6}$/);
   // Everything else is in the menu.
   await dialog.getByRole("button", { name: "更多操作 【范例】接口密钥" }).click();
-  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["打开 / 修改", "收藏", "改归类"]);
+  await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["打开 / 修改", "收藏", "改归类", "移到回收站"]);
   await page.getByRole("menuitem", { name: "打开 / 修改" }).click();
   await expect(dialog.getByRole("button", { name: "显示密钥" })).toBeVisible();
   await dialog.getByRole("button", { name: "返回列表" }).click();
