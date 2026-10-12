@@ -45,3 +45,24 @@ export async function openAccountCategory(page, name) {
   await page.getByRole("navigation", { name: "分类" }).getByRole("button", { name: new RegExp(`^${name}`) }).click();
 }
 export const accountAddButton = (page) => page.getByRole("button", { name: "新增条目" });
+
+// Notes what changes inside `scope` from the moment the page loads: text that appears and the class / aria-label values
+// an element gets. A short-lived state (a "已复制" that is gone after a second) can then be checked from what was shown,
+// instead of by catching it on screen, which a busy machine can make a poll miss. Call before page.goto.
+export async function recordChanges(page, scope) {
+  await page.addInitScript((selector) => {
+    window.__changes = [];
+    const inScope = (node) => (node instanceof Element ? node : node.parentElement)?.closest(selector);
+    new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type === "attributes") { if (inScope(record.target)) window.__changes.push(`${record.attributeName}=${record.target.getAttribute(record.attributeName)}`); continue; }
+        for (const node of record.addedNodes) {
+          if (!inScope(node)) continue;
+          window.__changes.push(`text=${node.textContent ?? ""}`);
+          if (node instanceof Element) for (const element of [node, ...node.querySelectorAll("[class],[aria-label]")]) for (const name of ["class", "aria-label"]) if (element.hasAttribute(name)) window.__changes.push(`${name}=${element.getAttribute(name)}`);
+        }
+      }
+    }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-label"] });
+  }, scope);
+}
+export const changesSeen = (page) => page.evaluate(() => window.__changes);
