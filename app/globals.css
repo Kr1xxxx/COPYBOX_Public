@@ -1162,3 +1162,8 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .acct-row.selecting { grid-template-columns: auto minmax(0, 1fr); }
 .vault-inline + .bulk-bar, .vault-panel .bulk-bar { margin: 8px 0 0; }
+
+.account-lock-recover { display: grid; gap: 6px; justify-items: center; }
+.account-lock-recover input { width: 100%; }
+.recovery-code-text { display: block; margin: 8px 0; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--card); font-size: 15px; letter-spacing: .06em; user-select: all; }
+.recovery-saved { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; }

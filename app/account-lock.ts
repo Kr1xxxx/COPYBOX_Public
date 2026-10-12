@@ -3,9 +3,15 @@
 // What is stored is a salted PBKDF2 hash, never the password.
 export const ACCOUNT_LOCK_KEY = "clipbox.account-lock.v1";
 export const ACCOUNT_LOCK_MIN = 4;
+// A password that encrypts the data must be harder to guess than one that only guards the door.
+export const ENCRYPTED_LOCK_MIN = 8;
 const ITERATIONS = 210_000;
 
 type LockRecord = { version: 1; salt: string; hash: string; iterations: number; email?: string };
+// Version 2: the password really protects the data. The account stores are encrypted with a random key K; the record only
+// holds K wrapped by the password and, separately, by a recovery code (so a forgotten password never loses the data).
+export type Wrapped = { salt: string; iv: string; ct: string; iterations: number };
+export type EncryptedLockRecord = { version: 2; wrapPw: Wrapped; wrapRecovery: Wrapped; email?: string; phase: "migrating" | "ready"; at: number };
 export type LockStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 function toBase64(bytes: Uint8Array) {
@@ -31,6 +37,21 @@ function read(storage: LockStorage): LockRecord | null {
   return null;
 }
 
+function readEncrypted(storage: LockStorage): EncryptedLockRecord | null {
+  try {
+    const parsed = JSON.parse(storage.getItem(ACCOUNT_LOCK_KEY) || "null") as Partial<EncryptedLockRecord> | null;
+    if (parsed && parsed.version === 2 && parsed.wrapPw && parsed.wrapRecovery) return parsed as EncryptedLockRecord;
+  } catch { /* not a version 2 record */ }
+  return null;
+}
+
+// none = no password; door = the old password that only guards opening; encrypted = the password also encrypts the data.
+export type LockMode = "none" | "door" | "encrypted";
+export function lockMode(storage: LockStorage = localStorage): LockMode {
+  if (!isAccountLockSet(storage)) return "none";
+  return readEncrypted(storage) ? "encrypted" : "door";
+}
+
 // A damaged record still counts as "set", so a corrupt value can never open the page without a password.
 export function isAccountLockSet(storage: LockStorage = localStorage): boolean {
   try { return Boolean(storage.getItem(ACCOUNT_LOCK_KEY)); } catch { return false; }
@@ -50,7 +71,7 @@ export function checkRecoveryEmail(email: string): string {
 }
 
 export function getRecoveryEmail(storage: LockStorage = localStorage): string {
-  return read(storage)?.email ?? "";
+  return readEncrypted(storage)?.email ?? read(storage)?.email ?? "";
 }
 
 // 「a***@x.com」: enough to recognise the address without showing it whole.
@@ -104,6 +125,15 @@ export function removeAccountLock(storage: LockStorage = localStorage): void {
 
 // Changes only the recovery email; the password check is untouched.
 export function setRecoveryEmail(email: string, storage: LockStorage = localStorage): void {
+  const encrypted = readEncrypted(storage);
+  if (encrypted) {
+    const value = email.trim();
+    if (checkRecoveryEmail(email)) throw new Error(checkRecoveryEmail(email));
+    const { email: _gone, ...rest } = encrypted;
+    void _gone;
+    storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value ? { ...rest, email: value } : rest));
+    return;
+  }
   const record = read(storage);
   if (!record) return;
   const problem = checkRecoveryEmail(email);
@@ -112,4 +142,102 @@ export function setRecoveryEmail(email: string, storage: LockStorage = localStor
   void _old;
   const value = email.trim();
   storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value ? { ...rest, email: value } : rest));
+}
+
+// ---- version 2: key wrapping --------------------------------------------------------------------------------------------
+
+const WRAP_LABEL = new TextEncoder().encode("clipbox-account-lock:wrap");
+const RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+async function wrapKey(secret: string, passphrase: string): Promise<Wrapped> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: ITERATIONS, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: WRAP_LABEL }, key, new TextEncoder().encode(secret)));
+  return { salt: toBase64(salt), iv: toBase64(iv), ct: toBase64(ct), iterations: ITERATIONS };
+}
+
+// null = wrong passphrase (AES-GCM refuses to open it).
+async function unwrapKey(wrapped: Wrapped, passphrase: string): Promise<string | null> {
+  try {
+    const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: fromBase64(wrapped.salt) as Uint8Array<ArrayBuffer>, iterations: wrapped.iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(wrapped.iv) as Uint8Array<ArrayBuffer>, additionalData: WRAP_LABEL }, key, fromBase64(wrapped.ct) as Uint8Array<ArrayBuffer>);
+    return new TextDecoder().decode(plain);
+  } catch {
+    return null;
+  }
+}
+
+export function newDataKey(): string {
+  return toBase64(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+// 20 characters from an alphabet without look-alikes, shown as XXXX-XXXX-XXXX-XXXX-XXXX (100 bits).
+export function newRecoveryCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(20));
+  const chars = Array.from(bytes, (byte) => RECOVERY_ALPHABET[byte % RECOVERY_ALPHABET.length]);
+  return [0, 4, 8, 12, 16].map((start) => chars.slice(start, start + 4).join("")).join("-");
+}
+
+export function normalizeRecoveryCode(code: string): string {
+  return code.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+export async function writeEncryptedLock(record: { dataKey: string; password: string; recoveryCode: string; email?: string; phase: "migrating" | "ready" }, storage: LockStorage = localStorage): Promise<void> {
+  const value: EncryptedLockRecord = {
+    version: 2, phase: record.phase, at: Date.now(),
+    wrapPw: await wrapKey(record.dataKey, record.password),
+    wrapRecovery: await wrapKey(record.dataKey, normalizeRecoveryCode(record.recoveryCode)),
+    ...(record.email?.trim() ? { email: record.email.trim() } : {}),
+  };
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value));
+}
+
+export function encryptedPhase(storage: LockStorage = localStorage): "migrating" | "ready" | null {
+  return readEncrypted(storage)?.phase ?? null;
+}
+
+export async function markEncryptedReady(storage: LockStorage = localStorage): Promise<void> {
+  const record = readEncrypted(storage);
+  if (record && record.phase !== "ready") storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, phase: "ready" }));
+}
+
+// The data key if the password is right, otherwise null.
+export async function unlockEncrypted(password: string, storage: LockStorage = localStorage): Promise<string | null> {
+  const record = readEncrypted(storage);
+  return record ? unwrapKey(record.wrapPw, password) : null;
+}
+
+// Forgot the password: the recovery code opens the data and sets a new password at once.
+export async function resetPasswordWithRecovery(code: string, newPassword: string, storage: LockStorage = localStorage): Promise<string | null> {
+  const record = readEncrypted(storage);
+  if (!record) return null;
+  const dataKey = await unwrapKey(record.wrapRecovery, normalizeRecoveryCode(code));
+  if (dataKey === null) return null;
+  if (Array.from(newPassword).length < ENCRYPTED_LOCK_MIN) throw new Error(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`);
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapPw: await wrapKey(dataKey, newPassword) }));
+  return dataKey;
+}
+
+export async function changeEncryptedPassword(oldPassword: string, newPassword: string, storage: LockStorage = localStorage): Promise<string | null> {
+  const record = readEncrypted(storage);
+  if (!record) return null;
+  const dataKey = await unwrapKey(record.wrapPw, oldPassword);
+  if (dataKey === null) return null;
+  if (Array.from(newPassword).length < ENCRYPTED_LOCK_MIN) throw new Error(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`);
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapPw: await wrapKey(dataKey, newPassword) }));
+  return dataKey;
+}
+
+// A new recovery code (the old one stops working). null = wrong password.
+export async function renewRecoveryCode(password: string, storage: LockStorage = localStorage): Promise<string | null> {
+  const record = readEncrypted(storage);
+  if (!record) return null;
+  const dataKey = await unwrapKey(record.wrapPw, password);
+  if (dataKey === null) return null;
+  const code = newRecoveryCode();
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapRecovery: await wrapKey(dataKey, normalizeRecoveryCode(code)) }));
+  return code;
 }

@@ -69,7 +69,9 @@ test("a locked 账号 page shows no 收起 or 选择", async ({ page }) => {
   await settings.getByLabel("新密码", { exact: true }).fill("abcd1234");
   await settings.getByLabel("再输入一次新密码").fill("abcd1234");
   await settings.getByRole("button", { name: "保存" }).click();
-  await settings.getByRole("button", { name: "关闭" }).first().click();
+  await settings.getByLabel("我已经把恢复码保存好了").check();
+  await settings.getByRole("button", { name: "完成" }).click();
+  await settings.getByRole("button", { name: "关闭设置" }).click();
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("form", { name: "账号页已上锁" })).toBeVisible();
   await expect(page.getByRole("button", { name: "选择", exact: true })).toHaveCount(0);

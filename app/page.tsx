@@ -77,7 +77,7 @@ import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
-import { isAccountLockSet } from "./account-lock";
+import { type LockMode, isAccountLockSet, lockMode } from "./account-lock";
 import { AccountLockScreen } from "./account-lock-ui";
 import { AccountPage, type AddRequest } from "./account-page";
 import { countByKind, useAccountEntries } from "./account-entries";
@@ -431,6 +431,10 @@ export default function Home() {
   // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
   const [lockSet, setLockSet] = useState(() => typeof window !== "undefined" && isAccountLockSet());
   const [accountUnlocked, setAccountUnlocked] = useState(false);
+  const [lockModeNow, setLockModeNow] = useState<LockMode>(() => (typeof window === "undefined" ? "none" : lockMode()));
+  // The key the 账号 stores are encrypted with: the device key without a password, otherwise the key the password opened (kept only in memory).
+  const [accountSecret, setAccountSecret] = useState("");
+  const accountKey = !lockSet ? deviceKey : accountUnlocked ? accountSecret : "";
   // 账号 header: 选择 (tick entries, 删除) and 收起 (fold every website card to its title).
   const [acctSelecting, setAcctSelecting] = useState(false);
   const [acctFolded, setAcctFolded] = useState(false);
@@ -440,11 +444,11 @@ export default function Home() {
   const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
   if (seenAccountMode !== accountMode) {
     setSeenAccountMode(accountMode);
-    if (!accountMode) { setAccountUnlocked(false); setAcctSelecting(false); }
+    if (!accountMode) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); }
   }
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
-  const account = useAccountEntries(deviceKey, legacySecrets, accountMode, vaultRev);
+  const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
   const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
@@ -1603,7 +1607,7 @@ export default function Home() {
     let vaultBox: VaultBoxEnvelope | undefined;
     if (scope === "secret") {
       try {
-        const payload: VaultBoxPayload = { totp: await openTotpStore(deviceKey).list(), items: await openSecretItemsStore(deviceKey).list() };
+        const payload: VaultBoxPayload = { totp: await openTotpStore(accountKey).list(), items: await openSecretItemsStore(accountKey).list() };
         if (!isVaultBoxEmpty(payload)) vaultBox = await encryptVaultBox(payload, password);
       } catch {
         window.alert("保险箱里的内容读不出来，备份没有生成，数据没有改动。");
@@ -1676,9 +1680,11 @@ export default function Home() {
       await writeVault(result.data);
       return result;
     });
-    if (importedBox) {
-      const totpStore = openTotpStore(deviceKey);
-      const itemStore = openSecretItemsStore(deviceKey);
+    if (importedBox && !accountKey) {
+      window.alert("账号页已上锁，备份里的账号内容没有导入。先打开账号页、输入密码，再导入一次。");
+    } else if (importedBox) {
+      const totpStore = openTotpStore(accountKey);
+      const itemStore = openSecretItemsStore(accountKey);
       const merged = mergeVaultBox({ totp: await totpStore.list(), items: await itemStore.list() }, importedBox, strategy);
       await totpStore.replaceAll(merged.totp);
       await itemStore.replaceAll(merged.items);
@@ -2060,13 +2066,13 @@ export default function Home() {
                 </>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
-            {lockedHere ? <AccountLockScreen onUnlock={() => setAccountUnlocked(true)} /> : <>
+            {lockedHere ? <AccountLockScreen deviceKey={deviceKey} onUnlock={(key) => { setAccountSecret(key ?? deviceKey); setAccountUnlocked(true); }} /> : <>
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
                 {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
                 {activeFolder !== "trash" && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
                 <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
-              <AccountPage deviceKey={deviceKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
+              <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} />
             </>}
@@ -2123,7 +2129,7 @@ export default function Home() {
       {settingsOpen && <SettingsDialog
         onPreviewTest={async () => {
           const snippets = planClearSampleSnippets(itemsRef.current);
-          const accountPart = accountLocked || PLAIN_NOTES ? null : await previewClearSamples(deviceKey);
+          const accountPart = accountLocked || PLAIN_NOTES ? null : await previewClearSamples(accountKey);
           return { snippets: snippets.ids.length, accounts: accountPart === null ? null : accountPart.length, accountNames: accountPart ?? [], keptEdited: snippets.keptEdited };
         }}
         onImportTest={async () => {
@@ -2136,7 +2142,7 @@ export default function Home() {
                 folders: { secret: current.folders.secret, snippet: Array.from(new Set([...current.folders.snippet, ...plan.folders])) },
               }));
             }
-            const accounts = accountLocked || PLAIN_NOTES ? { added: 0 } : await restoreSampleEntries(deviceKey);
+            const accounts = accountLocked || PLAIN_NOTES ? { added: 0 } : await restoreSampleEntries(accountKey);
             if (accounts.added > 0) setVaultRev((n) => n + 1);
             const total = plan.add.length + plan.revive.length + accounts.added;
             flashToast(total === 0 ? "测试内容都在，没有缺的" : `已放入测试内容：话术 ${plan.add.length + plan.revive.length} 条${PLAIN_NOTES ? "" : `，${SECRET_WORD} ${accounts.added} 条${accountLocked ? "（账号已锁，没有处理）" : ""}`}`);
@@ -2146,7 +2152,7 @@ export default function Home() {
           try {
             const plan = planClearSampleSnippets(itemsRef.current);
             if (plan.ids.length > 0) await persist((current) => ({ ...current, items: moveItemsToTrash(current.items, plan.ids, timestampNow()) }));
-            const accounts = accountLocked || PLAIN_NOTES ? { removed: 0, keptEdited: 0 } : await clearSampleEntries(deviceKey);
+            const accounts = accountLocked || PLAIN_NOTES ? { removed: 0, keptEdited: 0 } : await clearSampleEntries(accountKey);
             if (accounts.removed > 0) setVaultRev((n) => n + 1);
             const total = plan.ids.length + accounts.removed;
             const kept = plan.keptEdited + accounts.keptEdited;
@@ -2180,7 +2186,7 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
-        accountLock={{ isSet: lockSet, onChanged: (isSet) => { setLockSet(isSet); setAccountUnlocked(isSet && accountMode); } }}
+        accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}
         accountLocked={accountLocked}
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
         onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}
