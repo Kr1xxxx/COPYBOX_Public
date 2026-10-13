@@ -49,6 +49,20 @@ test("sleep, lock and shutdown ask the page to save (Windows hook is wired in)",
   assert.match(read("src-tauri/Cargo.toml"), /^windows = /m);
 });
 
+test("「关闭即退出」 keeps the window until the page has saved: it hides it and quits like the tray's 退出", () => {
+  const shell = read("src-tauri/src/shell.rs");
+  const arm = shell.slice(shell.indexOf("pub fn on_close_requested")).match(/CloseAction::Quit => \{([\s\S]*?)\n {12}\}/)[1];
+  // Letting the close go ahead destroys the window, and flush.rs cannot ask a page that is gone to save.
+  assert.doesNotMatch(arm, /\btrue\s*$/);
+  assert.match(arm, /window\.hide\(\)/);
+  assert.match(arm, /self\.quit\(/);
+  assert.match(arm, /\bfalse\s*$/);
+  // quit() ends in app.exit, whose exit request is held back until the page answered (or 1.5 s passed).
+  assert.match(shell.slice(shell.indexOf("pub fn quit"), shell.indexOf("pub fn on_close_requested")), /app\.exit\(0\)/);
+  assert.match(read("src-tauri/src/main.rs"), /RunEvent::ExitRequested[\s\S]*?api\.prevent_exit\(\);\s*flush::then_after_flush\(app, \|app\| app\.exit\(0\)\)/);
+  assert.match(read("src-tauri/src/flush.rs"), /const TIMEOUT: Duration = Duration::from_millis\(1500\);/);
+});
+
 test("compressImage hands the bytes and the key to the shell and turns a failure into a reason word", async () => {
   const vm = await import("node:vm");
   const run = async (invokeImpl) => {
