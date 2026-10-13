@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Clipboxx",
+  "productName": "Copyboxx",
   "version": "../package.json",
   "identifier": "com.clipbox.tauri",
   "build": {
@@ -17,6 +17,8 @@
   },
   "bundle": {
     "active": true,
+    "publisher": "Copyboxx",
+    "copyright": "Copyboxx 复制盒",
     "targets": [
       "nsis",
       "app"
@@ -28,7 +30,12 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["SimpChinese"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "sidebarImage": "icons/installer-sidebar.bmp"
       }
     }
   }
