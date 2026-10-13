@@ -385,6 +385,39 @@ button { -webkit-tap-highlight-color: transparent; }
 .mini-row.selected .row-dot { margin-top: 6px; }
 .mini-row.selected .row-copy small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; color: #4a3f38; line-height: 1.5; }
 .mini-copied { flex: 0 0 auto; color: #1c6f43; font-size: 12px; font-weight: 600; }
+/* Mini 话术 rows: a click opens the row in place (one at a time, the full window's fold animation); a floating
+   复制 button shows on hover or keyboard focus and copies without opening. After a copy it turns into ✓ 已复制
+   with a short pop, and the row glows softly until the feedback ends (~1.2 s). */
+.mini-row.snippet-row .row-main { width: 100%; height: auto; }
+.mini-row.snippet-row.open { background: var(--accent-tint); }
+/* The open row's title stops before the 复制 button instead of running under it. */
+.mini-row.snippet-row.open .row-main { align-items: center; min-height: 46px; padding-top: 0; padding-bottom: 0; padding-right: 88px; }
+.mini-row.snippet-row.open .row-dot { margin-top: 0; }
+.mini-row.snippet-row.copied { background: color-mix(in oklab, var(--ok-bg) 80%, transparent); transition: background .3s ease-out; }
+.mini-detail .row-detail-inner { padding: 0 10px 10px 30px; gap: 6px; }
+.mini-detail .row-content { max-height: 150px; padding: 8px 10px; font-size: 13px; line-height: 1.6; background: var(--card); }
+.mini-actions { display: flex; }
+.mini-actions .ghost-button { height: 28px; margin-left: -8px; color: var(--accent-ink); font-weight: 600; }
+.mini-actions .ghost-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mini-copy { position: absolute; top: 9px; right: 8px; z-index: 1; height: 28px; padding: 0 10px 0 8px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 999px; background: var(--card); color: var(--ink-2); font-size: 12px; font-weight: 500; box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(31,30,28,.12); cursor: pointer; opacity: 0; transition: opacity .14s ease-out, background-color .14s ease-out, color .14s ease-out, transform .12s ease-out; }
+.mini-row:hover .mini-copy, .mini-row:has(:focus-visible) .mini-copy, .mini-copy[data-copied] { opacity: 1; }
+/* While the button shows, the text fades out just before it instead of running into its edge. */
+.mini-row.snippet-row:not(.open):is(:hover, :has(:focus-visible), .copied) .row-copy { mask-image: linear-gradient(to left, transparent 0 74px, #000 104px); }
+.mini-copy:hover { color: var(--ink); }
+.mini-copy:active { transform: scale(.96); }
+.mini-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mini-copy-icon, .mini-copy-label { display: grid; }
+.mini-copy-icon > *, .mini-copy-label > * { grid-area: 1 / 1; }
+.mini-copy-label > span { text-align: center; transition: opacity .14s cubic-bezier(.2,0,0,1); }
+.mini-copy-icon .icon { width: 13px; height: 13px; transition: opacity .14s cubic-bezier(.2,0,0,1), scale .14s cubic-bezier(.2,0,0,1); }
+.mini-copy .copy-tick, .mini-copy[data-copied] .icon:not(.copy-tick) { opacity: 0; scale: .25; }
+.mini-copy[data-copied] .copy-tick { opacity: 1; scale: 1; }
+.mini-copy-label > span:last-child, .mini-copy[data-copied] .mini-copy-label > span:first-child { opacity: 0; }
+.mini-copy[data-copied] .mini-copy-label > span:last-child { opacity: 1; }
+.mini-copy[data-copied] { background: var(--ok-bg); color: var(--ok); font-weight: 600; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok) 32%, transparent), 0 1px 3px rgba(31,30,28,.12); animation: mini-copy-pop .22s ease-out; }
+@keyframes mini-copy-pop { from { transform: scale(.9); } to { transform: none; } }
+@media (hover: none) { .mini-copy { opacity: .85; } }
+@media (prefers-reduced-motion: reduce) { .mini-copy, .mini-copy-icon .icon, .mini-copy-label > span, .mini-row.snippet-row.copied { transition: none; } .mini-copy[data-copied] { animation: none; } .mini-copy:active { transform: none; } }
 .app-shell.mini .status-bar { height: 30px; padding: 0 12px; }
 
 /* Toast (app/arc/arc-toast.tsx, arc-library motion): the host only positions; the toast itself is moved by motion. */
