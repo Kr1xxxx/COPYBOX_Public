@@ -496,6 +496,37 @@ export function restoreTrashedItems(items: SecretItem[], ids: readonly string[])
   });
 }
 
+// 撤销 after a save in the editor. `before` is the entry as it was (null: the save created it), `after` is what the save
+// wrote. Copying an entry only counts its use (lastUsedAt, useCount), which does not count as a change; anything else
+// changed since the save (edited again, pinned, moved, sent to the 回收站, removed) makes undo refuse with null, so a newer
+// change is never overwritten. A created entry is removed outright (not sent to the 回收站) and, when nothing was numbered
+// after it, its 话术 number is handed out again.
+export type ItemSaveRecord = { before: SecretItem | null; after: SecretItem; nextBefore: number; nextAfter: number };
+const USAGE_FIELDS = new Set(["lastUsedAt", "useCount"]);
+function withoutUsage(item: SecretItem) {
+  return Object.fromEntries(Object.entries(item).filter(([key, value]) => !USAGE_FIELDS.has(key) && value !== undefined).sort(([a], [b]) => a.localeCompare(b)));
+}
+export function unchangedSinceSave(current: SecretItem | undefined, after: SecretItem) {
+  return Boolean(current) && JSON.stringify(withoutUsage(current!)) === JSON.stringify(withoutUsage(after));
+}
+export function undoItemSave(data: VaultData, record: ItemSaveRecord): VaultData | null {
+  const id = record.after.id;
+  const current = data.items.find((item) => item.id === id);
+  if (!unchangedSinceSave(current, record.after)) return null;
+  if (!record.before) {
+    const nextSnippetNumber = data.nextSnippetNumber === record.nextAfter ? record.nextBefore : data.nextSnippetNumber;
+    return { ...data, items: data.items.filter((item) => item.id !== id), nextSnippetNumber };
+  }
+  // The entry goes back to its earlier fields; how often it was copied stays as it is now.
+  const restored: Record<string, unknown> = { ...record.before };
+  for (const key of USAGE_FIELDS) {
+    const value = (current as Record<string, unknown>)[key];
+    if (value === undefined) delete restored[key];
+    else restored[key] = value;
+  }
+  return { ...data, items: data.items.map((item) => item.id === id ? restored as SecretItem : item) };
+}
+
 // Splits text into plain and matching pieces for search highlighting; every whitespace-separated term counts.
 export function splitSearchHighlight(text: string, query: string): { text: string; hit: boolean }[] {
   const terms = Array.from(new Set(query.trim().toLowerCase().split(/\s+/).filter(Boolean)));

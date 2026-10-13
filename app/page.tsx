@@ -2,7 +2,7 @@
 
 import { ArcToast } from "./arc/arc-toast";
 import { useToast } from "./use-toast";
-import { buildCardMoveMap, countItemsByFolder } from "./clipbox-core";
+import { buildCardMoveMap, countItemsByFolder, undoItemSave, type ItemSaveRecord } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
@@ -260,7 +260,7 @@ export default function Home() {
   }
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
-  const { toast, toastTone, showToast } = useToast();
+  const { toastState, showToast, clearToast, pauseToast, resumeToast } = useToast();
   const [copiedId, setCopiedId] = useState("");
   const [copiedReferenceId, setCopiedReferenceId] = useState("");
   const [, setMenuOpen] = useState(false);
@@ -295,9 +295,8 @@ export default function Home() {
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
-  const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
-  const [undoImage, setUndoImage] = useState<ImageMeta | null>(null);
-  const undoTimerRef = useRef<number | null>(null);
+  // 编辑 in the toast after a save: the entry to open once it is in the list shown.
+  const pendingSavedEdit = useRef("");
   const [productFilter, setProductFilter] = useState("全部产品");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -644,8 +643,6 @@ export default function Home() {
 
   // For the image section and the 账号 panels, which pass only text: the tone follows the words (use-toast.ts).
   function flashToast(message: string, ms = 2200) {
-    // The newest message wins over a pending 撤销 for a picture.
-    setUndoImage(null);
     showToast(message, { ms });
   }
 
@@ -1012,17 +1009,74 @@ export default function Home() {
     if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
   }
 
+  // The toast after a save offers 编辑 (open this entry again) and 撤销 (put it back as it was before this save).
   async function saveItem(data: Omit<SecretItem, "id" | "createdAt" | "updatedAt">) {
     const now = timestampNow();
     const wasEditing = Boolean(editing);
-    if (editing) {
-      await persist((current) => ({ ...current, items: current.items.map((item) => item.id === editing.id ? { ...item, ...data, updatedAt: now } : item) }));
-    } else {
-      await persist((current) => ({ ...current, items: [{ ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now }, ...current.items] }));
-    }
+    const id = editing ? editing.id : crypto.randomUUID();
+    let before = null as SecretItem | null;
+    let nextBefore = 0;
+    await persist((current) => {
+      nextBefore = current.nextSnippetNumber;
+      before = editing ? current.items.find((item) => item.id === id) ?? null : null;
+      return editing
+        ? { ...current, items: current.items.map((item) => item.id === id ? { ...item, ...data, updatedAt: now } : item) }
+        : { ...current, items: [{ ...data, id, createdAt: now, updatedAt: now }, ...current.items] };
+    });
     closeEditor();
-    showToast(wasEditing ? "条目已更新" : "条目已加密保存");
+    const after = itemsRef.current.find((item) => item.id === id);
+    const record: ItemSaveRecord | null = after && (before || !wasEditing) ? { before, after, nextBefore, nextAfter: nextSnippetNumberRef.current } : null;
+    showToast(wasEditing ? "条目已更新" : "条目已加密保存", record ? {
+      ms: 5000,
+      actions: [
+        { label: "编辑", variant: "primary", onClick: () => editSavedItem(id) },
+        { label: "撤销", variant: "secondary", onClick: () => void undoSave(record) },
+      ],
+    } : undefined);
   }
+
+  // 撤销 in the save toast. It refuses when the entry changed again after the save, so nothing newer is lost.
+  async function undoSave(record: ItemSaveRecord) {
+    clearToast();
+    let refused = false as boolean;
+    try {
+      await persist((current) => {
+        const undone = undoItemSave(current, record);
+        if (!undone) { refused = true; return current; }
+        return undone;
+      });
+    } catch {
+      showToast("撤销失败，内容保持现在的样子", { tone: "error", ms: 2800 });
+      return;
+    }
+    if (refused) { showToast("这条保存后又改过，没有撤销", { tone: "error", ms: 2800 }); return; }
+    if (modalOpen && editing?.id === record.after.id) closeEditor();
+    showToast("已撤销", { ms: 1800 });
+  }
+
+  // 编辑 in the save toast: the same inline editor as a card's 编辑 button. When the entry is not in the list shown
+  // (another section, folder or search), the list switches to where it is first.
+  function editSavedItem(id: string) {
+    clearToast();
+    const item = itemsRef.current.find((entry) => entry.id === id);
+    if (!item || isTrashedItem(item)) { showToast("这条已经不在了", { tone: "error" }); return; }
+    const kind = item.kind || "secret";
+    if (imageView || kind !== activeKind) switchKind(kind);
+    else if (!filtered.some((entry) => entry.id === id)) { selectFolder("all"); setQuery(""); }
+    if (kind === "secret" && accountMode) setVaultCat("other");
+    pendingSavedEdit.current = id;
+  }
+
+  useEffect(() => {
+    const id = pendingSavedEdit.current;
+    if (!id) return;
+    const index = filtered.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    pendingSavedEdit.current = "";
+    selectRow(index);
+    openEditor(filtered[index]);
+    window.requestAnimationFrame(() => document.querySelector(".native-row.editing")?.scrollIntoView({ block: "nearest" }));
+  });
 
   function startNewFolder() {
     setNewFolder({ name: "", error: "" });
@@ -1190,17 +1244,11 @@ export default function Home() {
     }
     setSelected(0);
     setRevealedId("");
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoImage(null);
-    setUndoTrash(list);
-    undoTimerRef.current = window.setTimeout(() => setUndoTrash(null), 6000);
+    showToast(list.length > 1 ? `已移入回收站 ${list.length} 条` : "已移入回收站", { tone: "ok", ms: 6000, actions: [{ label: "撤销", onClick: () => void undoTrashNow(list) }] });
   }
 
-  async function undoTrashNow() {
-    const list = undoTrash;
-    if (!list) return;
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoTrash(null);
+  async function undoTrashNow(list: SecretItem[]) {
+    clearToast();
     try {
       await persist((current) => ({ ...current, items: restoreTrashedItems(current.items, list.map((item) => item.id)) }));
       setSelected(0);
@@ -1212,17 +1260,11 @@ export default function Home() {
 
   // A picture went to the 回收站: the same 6-second 撤销 as for 话术.
   function offerImageUndo(meta: ImageMeta) {
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoTrash(null);
-    setUndoImage(meta);
-    undoTimerRef.current = window.setTimeout(() => setUndoImage(null), 6000);
+    showToast("图片已移入回收站", { tone: "ok", ms: 6000, actions: [{ label: "撤销", onClick: () => void undoImageTrash(meta) }] });
   }
 
-  async function undoImageTrash() {
-    const meta = undoImage;
-    if (!meta) return;
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoImage(null);
+  async function undoImageTrash(meta: ImageMeta) {
+    clearToast();
     if (await imageLibrary.restore(meta.id)) flashToast("已恢复");
   }
 
@@ -1349,8 +1391,7 @@ export default function Home() {
 
   async function emptyTrash() {
     const count = items.filter((item) => isTrashedItem(item)).length;
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoTrash(null);
+    clearToast();
     try {
       // Nothing is changed in memory until the encrypted save succeeded (writeVault), so a failure leaves the trash as it was.
       await persist((current) => ({ ...current, items: current.items.filter((item) => !isTrashedItem(item)) }));
@@ -2122,10 +2163,13 @@ export default function Home() {
       />}
       {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={PLAIN_NOTES ? "" : SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
       <ArcToast
-        message={undoImage ? "图片已移入回收站" : undoTrash ? (undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站") : toast}
-        className={undoTrash || undoImage ? "undo-toast" : undefined}
-        tone={undoTrash || undoImage ? "ok" : toastTone}
-        action={undoImage ? { label: "撤销", onClick: () => void undoImageTrash() } : undoTrash ? { label: "撤销", onClick: () => void undoTrashNow() } : undefined}
+        message={toastState.message}
+        className={toastState.actions?.length === 1 ? "undo-toast" : undefined}
+        tone={toastState.tone}
+        actions={toastState.actions}
+        fading={toastState.fading}
+        fadeMs={toastState.fadeMs}
+        onHold={(held) => { if (held) pauseToast(); else resumeToast(); }}
       />
     </main>
   );
