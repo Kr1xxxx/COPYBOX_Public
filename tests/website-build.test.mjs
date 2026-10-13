@@ -138,7 +138,7 @@ test("website deploy: keys no longer in the build are removed, the key list is r
     "preview/assets/static/old.js",
   ]);
   assert.deepEqual(staleKeys(["index.html"], ["index.html"]), []);
-  assert.deepEqual(parseKeyList('warning: proxy\n[{"name":"index.html"},{"name":"404.html","metadata":{}}]'), ["index.html", "404.html"]);
+  assert.deepEqual(parseKeyList('▲ [WARNING] Proxy environment variables detected.\nResource location: remote\n[{"name":"index.html"},{"name":"404.html","metadata":{}}]\n'), ["index.html", "404.html"]);
   assert.throws(() => parseKeyList("nothing"), /key list/);
 });
 

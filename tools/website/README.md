@@ -19,7 +19,8 @@ Why KV and not Workers static assets: wrangler uploads static assets with a shor
 so the upload fails with 401. KV writes and the script upload use the normal token.
 
 The Worker answers GET and HEAD only, sends an `ETag` (the file's sha256, 304 on a match), `no-cache` for `.html` and
-`.json`, a one-year immutable cache for `preview/assets/` (hashed names), one hour for everything else, and the
+`.json` and for the other files under `preview/` (no hash in their names), a one-year immutable cache for
+`preview/assets/` (hashed names), one hour for the installer, and the
 installer as a download named `Clipboxx-Setup.exe`.
 
 ## Build and deploy

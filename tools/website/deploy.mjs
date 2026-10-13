@@ -21,11 +21,18 @@ export function staleKeys(existingKeys, manifestKeys) {
   return [...new Set(existingKeys)].filter((key) => !keep.has(key)).sort();
 }
 
-// `wrangler kv key list` prints a JSON array of { name, … }; anything before it (warnings) is skipped.
+// `wrangler kv key list` prints a JSON array of { name, … }; anything before it is skipped, including warning
+// lines such as "[WARNING] Proxy environment variables detected", so the first "[" is not always the array.
 export function parseKeyList(stdout) {
-  const start = stdout.indexOf("[");
-  if (start < 0) throw new Error("wrangler kv key list did not print a key list.");
-  return JSON.parse(stdout.slice(start)).map((entry) => entry.name);
+  for (let start = stdout.indexOf("["); start >= 0; start = stdout.indexOf("[", start + 1)) {
+    try {
+      const parsed = JSON.parse(stdout.slice(start));
+      if (Array.isArray(parsed)) return parsed.map((entry) => entry.name);
+    } catch {
+      // not the array yet
+    }
+  }
+  throw new Error("wrangler kv key list did not print a key list.");
 }
 
 function show(args) {

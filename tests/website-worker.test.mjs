@@ -54,7 +54,9 @@ test("worker: lookup keys, content types and cache rules", () => {
   assert.equal(cacheControlFor("preview/index.html"), "no-cache");
   assert.equal(cacheControlFor("download/latest.json"), "no-cache");
   assert.equal(cacheControlFor("preview/assets/static/x.js"), "public, max-age=31536000, immutable");
-  assert.equal(cacheControlFor("preview/seed.js"), "public, max-age=3600");
+  assert.equal(cacheControlFor("preview/seed.js"), "no-cache");
+  assert.equal(cacheControlFor("preview/samples/1-inquiry-quote.csv"), "no-cache");
+  assert.equal(cacheControlFor("download/Clipboxx-Setup.exe"), "public, max-age=3600");
 });
 
 test("worker: pages are served, a folder without slash redirects, html files keep their path", async () => {

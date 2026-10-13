@@ -29,6 +29,8 @@ export function cacheControlFor(key) {
   const ext = extensionOf(key);
   if (ext === "html" || ext === "json") return "no-cache";
   if (key.startsWith("preview/assets/")) return "public, max-age=31536000, immutable";
+  // seed.js, image-store.js and the sample sheets have no hash in their names: a new preview must not run with old ones.
+  if (key.startsWith("preview/")) return "no-cache";
   return "public, max-age=3600";
 }
 
