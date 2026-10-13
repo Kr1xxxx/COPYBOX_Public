@@ -54,7 +54,7 @@ npm run tauri:build      # installer: NSIS on Windows, .app on a Mac → src-tau
 
 ## Platform differences
 
-- Sections are 话术 | 账号 | 图片 on both platforms. Only macOS (`window.clipboxDesktop.platform === "darwin"`) still has the old
+- Sections are 话术 | 图片 | 账号 on both platforms (order set by the owner, 2026-10-13). Only macOS (`window.clipboxDesktop.platform === "darwin"`) still has the old
   秘密 list (masked content, copy reference, split segments) inside 账号; elsewhere `PLAIN_NOTES` hides it (no 其他, no 目录).
 - 账号 can have a password that also encrypts its data with a random key, with a recovery code (`app/account-lock.ts`,
   `app/account-encryption.ts`, keys `clipbox.account-lock.v1` / `clipbox.account-premigration.v1`, D-038, D-040).

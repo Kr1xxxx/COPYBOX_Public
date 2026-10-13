@@ -31,7 +31,7 @@ const rows = (page) => page.locator(".image-row");
 
 test("Windows: the sections are 话术, 账号 and 图片, and 备注 is gone", async ({ page }) => {
   await openApp(page, "win32");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await expect(page.locator("body")).not.toContainText("备注");
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
@@ -41,7 +41,7 @@ test("Windows: the sections are 话术, 账号 and 图片, and 备注 is gone", 
 
 test("macOS: the sections are 话术, 账号 and 图片, and 账号 still opens", async ({ page }) => {
   await openApp(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await openAccountCategory(page, "其他");
   await expect(page.locator("body")).toContainText("默认只复制引用");
@@ -378,7 +378,7 @@ test("the mini window lists images and copies with one click", async ({ browser 
   await expect(rows(page)).toHaveCount(2);
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
-  await expect(page.locator(".kind-switch.compact button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch.compact button")).toHaveText(["话术", "图片", "账号"]);
   await expect(page.locator(".kind-switch.compact button.active")).toHaveText("图片");
   await expect(page.locator(".mini-row")).toHaveCount(2);
   await page.getByPlaceholder("搜索图片").fill("photo");
