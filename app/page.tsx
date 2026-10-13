@@ -108,6 +108,7 @@ import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { onRowAnimationEnd } from "./row-entrance";
+import { ListScrollFrame } from "./list-scroll-rail";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
 
 type VaultEnvelope = {
@@ -2011,7 +2012,7 @@ export default function Home() {
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>}
             {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} selecting={imageSelecting} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
-            {!imageView && !vaultPage && legacyList}
+            {!imageView && !vaultPage && <ListScrollFrame>{legacyList}</ListScrollFrame>}
             {bulkMode && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
               <strong>已选 {bulkCount} 条</strong>
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>

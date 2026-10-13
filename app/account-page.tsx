@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { AccountList, type AccountView } from "./account-list";
 import type { AccountEntry, EntryKind } from "./account-view";
 import { ApiKeyPanel } from "./apikey-panel";
+import { ListScrollFrame } from "./list-scroll-rail";
 import { LoginPanel } from "./login-panel";
 import type { MarkItem } from "./payment-core";
 import { PaymentPanel } from "./payment-panel";
@@ -61,7 +62,7 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
 
   return (
     <SiteIconsProvider deviceKey={deviceKey}>
-      <section className="vault-inline" aria-label="保险箱">{body}</section>
+      <ListScrollFrame className="vault-frame"><section className="vault-inline" aria-label="保险箱">{body}</section></ListScrollFrame>
     </SiteIconsProvider>
   );
 }
