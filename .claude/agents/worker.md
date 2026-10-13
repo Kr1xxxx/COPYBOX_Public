@@ -1,7 +1,7 @@
 ---
 name: worker
 description: Implementation worker for one bounded Clipbox task (a fix, a feature slice, tests, a refactor or a code review) described in a detailed prompt from the coordinator. Works in its own git worktree, commits locally, never pushes.
-model: sonnet
+model: opus
 effort: medium
 ---
 

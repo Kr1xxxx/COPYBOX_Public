@@ -38,7 +38,7 @@ npm run tauri:build      # installer: NSIS on Windows, .app on a Mac → src-tau
 
 | Path | What it is |
 | --- | --- |
-| `app/page.tsx` | Main UI: state, list, mini window; ~1580 lines, search before editing. Parts live next to it: `item-editor.tsx`, `fill-panel.tsx`, `settings.tsx`, `settings-folders.tsx`, `ai-settings.tsx`, `dialogs.tsx` |
+| `app/page.tsx` | Main UI: state, list, mini window; ~2120 lines, search before editing. Parts live next to it: `item-editor.tsx`, `fill-panel.tsx`, `settings.tsx`, `settings-folders.tsx`, `ai-settings.tsx`, `dialogs.tsx` |
 | `app/clipbox-core.ts` | Pure functions (folders, search, bulk actions, `tidyText`); put new logic here, with unit tests |
 | `app/ai-config.ts` | User-configured AI endpoint: presets, validation, request/response parsing |
 | `app/globals.css` | All styles; platform differences via `.platform-darwin` / `.desktop-app:not(.platform-darwin)` |
@@ -79,7 +79,7 @@ npm run tauri:build      # installer: NSIS on Windows, .app on a Mac → src-tau
 - Releasing a version.
 
 **Never**
-- Push to `main`, or merge a PR labelled `needs-owner` before the owner says so (see "Merging").
+- Push to `main`, or merge a high-risk PR before the owner writes 合并 (see "Merging").
 - Commit real customer data, API keys or `.env` files — use `docs/samples/`.
 - Delete or loosen a test just to make it pass — find out whether the code or the test is wrong, and say so in the PR.
 - Rename `saveItem`, `submit`, `openVault` and similar — `tests/helpers/page-harness.mjs` extracts them by name.
@@ -100,7 +100,7 @@ npm run tauri:build      # installer: NSIS on Windows, .app on a Mac → src-tau
 
 Files that every PR used to edit made parallel PRs conflict. The rule now: **a PR only adds new files for its notes.**
 
-- `tools/preview/VERSION` and `tools/preview/changelog.json` belong to the preview publisher (the 【話術】 thread)
+- `tools/preview/VERSION` and `tools/preview/changelog.json` belong to the preview publisher (the main Claude session)
   alone. Feature PRs never bump the version or edit the changelog; write the "User-visible change" line in your
   `docs/log/` note and the publisher turns it into a changelog entry. CI fails a PR that edits these files unless it
   carries the label `preview-publisher` (only the publisher adds it; GitHub cannot stop another agent from adding it, so this is an agreed rule, not a lock).
@@ -110,20 +110,19 @@ Files that every PR used to edit made parallel PRs conflict. The rule now: **a P
 - Before opening a PR run `git fetch origin main && git rebase origin/main`; if you touch `app/page.tsx`, say which
   part in the PR so others can avoid it.
 
-## Merging (D-011)
+## Merging (D-041, replaces the waiting rule of D-011)
 
-The owner never uses the GitHub website; all work goes through agents. CI decides how each PR merges:
+The owner never uses the GitHub website; all work goes through agents.
 
-- **Small** — merges by itself once every check is green: wording, styling, bug fixes, tests and docs, with at most
-  350 changed lines in `app/` (tests and docs do not count there) and under 500 changed lines in total.
-- **Big** — CI labels it `needs-owner` and stops: anything under `src-tauri/`, dependencies, CI and scripts, the
-  rulebook (`AGENTS.md`, `CONTRIBUTING.md`, `docs/DECISIONS.md`), data storage or encryption, deleted app files,
-  weakened tests, more than 350 lines of app code, or 500+ changed lines in total (any file type).
-- New or removed features and layout changes cannot be detected from files: **add the `major` label yourself** when
-  you open such a PR (`gh pr edit <n> --add-label major`), right away, before CI finishes.
-- A `needs-owner` PR is merged only after the owner writes 合并 (merge) in the conversation about that PR. Then merge
-  it with `gh api -X PUT repos/Kr1xxxx/Clipbox/pulls/<n>/merge -f merge_method=merge -f sha=<head sha>` (the commit
-  whose checks are green) and log it.
-- Tell the owner in Chinese which PRs merged by themselves and which are waiting.
+- Open PRs without asking. When every check on the latest commit is green and there is no conflict, merge it yourself
+  (`gh api -X PUT repos/Kr1xxxx/Clipbox/pulls/<n>/merge -f merge_method=merge -f sha=<head sha>`), whatever its size
+  or files (`src-tauri/`, `package.json`, CI and this file included). The `needs-owner` label from CI is not a stop.
+- Wait for the owner to write 合并 only for **high-risk** PRs: anything that could lose, corrupt or lock user data
+  (storage or encryption format, storage keys, migrations, the save / restore / key path, deleting user data),
+  releasing to staff, or anything irreversible. Ask in plain Chinese and say what the risk is.
+- If permissions block a merge, say it is a permission block and ask the owner to reply 「合并 N」; never work around it.
+- Never skip, disable or loosen a test, or change the CI gates, to get green.
+- New or removed features and layout changes: add the `major` label yourself when you open the PR.
+- Tell the owner in Chinese which PRs merged and which wait for him.
 
 Keep this file under 150 lines. Add a rule only after an agent repeats the same mistake; delete stale rules.
