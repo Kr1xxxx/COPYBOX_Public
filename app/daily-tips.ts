@@ -24,9 +24,9 @@ export const BUILT_IN_TIPS: Tip[] = [
   { id: "T-017", title: "收起展开的话术", text: "选中的话术会展开显示全文，点上面的「收起」就折回标题，列表更清爽。" },
   { id: "T-018", title: "迷你窗口", text: "点工具栏上的「迷你模式」，换成一个小窗口并一直显示在最前面，适合边聊边复制。" },
   { id: "T-019", title: "复制后收起小窗", text: "在 设置 → 窗口 里可以选迷你窗口复制后是否自动收起，免得挡住聊天窗口。" },
-  { id: "T-020", title: "从托盘快速搜索", text: "Clipboxx 会一直待在托盘里，点托盘图标或「快速搜索」就能呼出迷你窗口。" },
+  { id: "T-020", title: "从托盘快速搜索", text: "Copyboxx 会一直待在托盘里，点托盘图标或「快速搜索」就能呼出迷你窗口。" },
   { id: "T-021", title: "关闭按钮怎么做", text: "在 设置 → 窗口 里可以选点关闭按钮时做什么：收到托盘、缩到任务栏，或直接退出。" },
-  { id: "T-022", title: "开机自动启动", text: "打开「开机自动启动」后，登录电脑时 Clipboxx 会自己启动，并安静地收在托盘里。" },
+  { id: "T-022", title: "开机自动启动", text: "打开「开机自动启动」后，登录电脑时 Copyboxx 会自己启动，并安静地收在托盘里。" },
   { id: "T-023", title: "看看哪条最常用", text: "设置 → 使用排行 会列出复制次数最多的话术，看看哪些最常用，把它们收藏起来更顺手。" },
   { id: "T-024", title: "换成深色主题", text: "在 设置 → 外观 里可以选浅色、深色，或者跟随系统自动切换。" },
   { id: "T-025", title: "每天自动备份", text: "打开「每天自动备份」，每天会自动存一份完整备份，保留最近 7 份，需要时可以选一天恢复。" },
@@ -90,7 +90,7 @@ export function parseTipsFile(text: string): Tip[] {
   if (!data || typeof data !== "object") throw new Error("这不是有效的 tips 文件");
   const file = data as Record<string, unknown>;
   if (file.format !== TIPS_FORMAT || !Array.isArray(file.items)) throw new Error("这不是有效的 tips 文件");
-  if (file.version !== TIPS_VERSION) throw new Error("这个 tips 文件的版本太新，请先更新 Clipboxx");
+  if (file.version !== TIPS_VERSION) throw new Error("这个 tips 文件的版本太新，请先更新 Copyboxx");
   return cleanList(file.items);
 }
 
