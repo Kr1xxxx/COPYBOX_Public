@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { makePng } from "../helpers/png.mjs";
-import { asDesktop } from "./helpers.mjs";
+import { asDesktop, settle } from "./helpers.mjs";
 
 // The 图片 folders (docs/specs/image-folders.md). Every picture is generated here, so no binary fixtures are needed.
 const png = (name, width = 40, height = 40, color = [90, 140, 220]) => ({ name: `${name}.png`, mimeType: "image/png", buffer: makePng(width, height, color) });
@@ -418,7 +418,7 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
     await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth), { message: name }).toBe(width);
     await expect.poll(() => image.evaluate((element) => element.naturalHeight)).toBe(height);
     await expect(image).toHaveCSS("object-fit", "contain");
-    await page.waitForTimeout(350); // Let the row finish opening.
+    await settle(page); // Let the row finish opening.
 
     const panel = await page.locator(".content-panel").boundingBox();
     const box = await preview.boundingBox();
@@ -557,6 +557,7 @@ test("图片 folders can be dragged by the three-bar handle in the sidebar, and 
   await row("甲").hover();
   const handle = row("甲").locator(".folder-drag-handle");
   await expect(handle).toHaveCSS("opacity", "1");
+  await settle(page); // measure the handle and the target once the new rows have stopped moving
   const h = await handle.boundingBox();
   const target = await row("丙").boundingBox();
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);

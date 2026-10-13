@@ -5,7 +5,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { accountAddButton, asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory, seedSnippets, settle } from "./helpers.mjs";
 
 const DETECT = readFileSync(new URL("./layout-detect.js", import.meta.url), "utf8");
 const PNG = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
@@ -49,7 +49,7 @@ for (const { platform, theme, size } of cases) {
     const found = []; // { state, type, el, detail }
     const skipped = [];
     const search = () => page.getByPlaceholder(/搜索/).first();
-    const press2 = async () => { for (let i = 0; i < 2; i++) { await page.keyboard.press("Escape"); await page.waitForTimeout(120); } };
+    const press2 = async () => { for (let i = 0; i < 2; i++) { await page.keyboard.press("Escape"); await settle(page); } };
     const settingsBtn = () => page.getByRole("button", { name: /^设置$/ });
     const tabs = () => page.locator("[role=dialog] [role=tab]");
 
@@ -58,8 +58,10 @@ for (const { platform, theme, size } of cases) {
       for (let i = 0; i < 3; i++) {
         const open = page.locator("[role=dialog]:visible").last();
         if (!(await open.count())) return;
+        const before = await page.locator("[role=dialog]:visible").count();
         await open.getByRole("button", { name: /^(关闭|取消|关闭设置|稍后)$|关闭/ }).first().click({ timeout: 1500 }).catch(() => {});
-        await page.waitForTimeout(200);
+        // Wait for that dialog to go; one that cannot be closed this way is reloaded away below.
+        await expect.poll(() => page.locator("[role=dialog]:visible").count(), { timeout: 1500 }).toBeLessThan(before).catch(() => {});
       }
       if (await page.locator("[role=dialog]:visible").count()) await page.reload().then(() => page.waitForSelector(".app-shell"));
     };
@@ -69,7 +71,7 @@ for (const { platform, theme, size } of cases) {
         found.push({ state: name, type: "步骤失败", el: "-", detail: e.message.split("\n")[0].slice(0, 120) });
         await press2(); return;
       }
-      await page.waitForTimeout(450);
+      await settle(page);
       const issues = await page.evaluate(DETECT);
       for (const i of issues) found.push({ state: name, ...i });
       await press2(); await closeLeftovers();
@@ -77,7 +79,10 @@ for (const { platform, theme, size } of cases) {
 
     const addImages = async () => {
       const [ch] = await Promise.all([page.waitForEvent("filechooser", { timeout: 4000 }), page.getByRole("button", { name: /新增图片|添加/ }).first().click()]);
-      await ch.setFiles([PNG, JPG]); await page.waitForTimeout(1500);
+      const tilesBefore = await page.locator(".image-tile-main, .image-row").count();
+      await ch.setFiles([PNG, JPG]);
+      await expect.poll(() => page.locator(".image-tile-main, .image-row").count()).toBeGreaterThanOrEqual(tilesBefore + 2);
+      await settle(page);
     };
     if (size === "mini") {
       // The mini window cannot add images ("回到完整窗口添加图片"), so add them in the full window first.
@@ -85,9 +90,10 @@ for (const { platform, theme, size } of cases) {
       await addImages();
       await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
       await page.getByRole("button", { name: "迷你模式" }).click();
-      await page.waitForTimeout(400);
+      await expect(page.locator(".app-shell.mini")).toBeVisible();
+      await settle(page);
       await page.setViewportSize(SIZES.mini);
-      await page.waitForTimeout(800);
+      await settle(page);
     }
     const mini = size === "mini";
 
@@ -95,7 +101,7 @@ for (const { platform, theme, size } of cases) {
     await state("row-open", async () => { await page.locator(".row-main").nth(2).click(); });
     // The mini window copies on click and shows variable chips only: there is no popup to open there.
     if (!mini) await state("variable-popup", async () => {
-      await page.locator(".native-row .row-main").first().click(); await page.waitForTimeout(400);
+      await page.locator(".native-row .row-main").first().click(); await settle(page);
       await page.locator(".native-row.selected input[data-var]").first().click();
     });
     await search().fill("");
@@ -108,17 +114,17 @@ for (const { platform, theme, size } of cases) {
       await state("new-folder", async () => { await page.getByRole("button", { name: "新建目录" }).first().click(); await page.keyboard.type("一个比较长的目录名称测试一下"); });
       await state("folder-menu", async () => { await page.locator(".nav-item").nth(3).hover(); await page.locator(".folder-more").first().click(); });
       await state("product-filter", async () => { await page.locator(".product-filter").first().click(); }, { optional: true });
-      await state("select-mode", async () => { await page.getByRole("button", { name: "选择" }).first().click(); await page.waitForTimeout(300); });
+      await state("select-mode", async () => { await page.getByRole("button", { name: "选择" }).first().click(); await settle(page); });
       await page.keyboard.press("Escape");
       await state("new-item", async () => { await page.getByRole("button", { name: "新增条目" }).first().click(); });
-      await state("edit-inline", async () => { await page.locator(".row-main").nth(1).click(); await page.waitForTimeout(300); await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).first().click(); });
-      await state("more-menu", async () => { await page.locator(".row-main").nth(1).click(); await page.waitForTimeout(300); await page.getByRole("button", { name: /更多操作/ }).first().click(); });
+      await state("edit-inline", async () => { await page.locator(".row-main").nth(1).click(); await settle(page); await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).first().click(); });
+      await state("more-menu", async () => { await page.locator(".row-main").nth(1).click(); await settle(page); await page.getByRole("button", { name: /更多操作/ }).first().click(); });
       await state("trash", async () => { await page.getByRole("button", { name: "回收站" }).first().click(); });
       await page.locator(".nav-item").first().click().catch(() => {});
 
       // Settings is one scrolling page today; when it becomes tabs (#52) every tab is opened too.
       const dialog = () => page.locator(".settings-dialog");
-      const openSettings = async () => { await settingsBtn().click(); await dialog().waitFor(); await page.waitForTimeout(400); };
+      const openSettings = async () => { await settingsBtn().click(); await dialog().waitFor(); await settle(page); };
       await openSettings();
       const tabNames = [...new Set((await tabs().allTextContents()).map((x) => x.trim()).filter(Boolean))];
       await press2();

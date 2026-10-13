@@ -13,7 +13,23 @@ export async function seedSnippets(page) {
   await chooser.setFiles(SAMPLE_CSV);
   await page.locator("[role=dialog]").getByRole("button", { name: /导入 \d+ 条/ }).click();
   await page.waitForSelector(".native-row");
-  await page.waitForTimeout(2500); // list entrance animation
+  // Wait for the list entrance animation (rows slide in one after another) instead of a fixed pause.
+  // Endless animations (a spinner) never finish, so they are left out.
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  // The "已导入 … 条话术" toast may still show; a newer toast replaces it together with its timer (app/use-toast.ts).
+}
+
+// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
+// checks 50 ms apart (this also covers spring motion and scrolling, which document.getAnimations() does not list).
+export async function settle(page) {
+  await page.evaluate(() => { window.__settleShot = undefined; });
+  await page.waitForFunction(() => {
+    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
+    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
+    const same = shot === window.__settleShot;
+    window.__settleShot = shot;
+    return same;
+  }, null, { polling: 50 });
 }
 
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").
