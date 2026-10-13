@@ -733,8 +733,11 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
     if (!storageWarnedRef.current && isStorageNearlyFull(localStorage)) {
       storageWarnedRef.current = true;
-      setToast(STORAGE_NEARLY_FULL_MESSAGE);
-      window.setTimeout(() => setToast(""), 3600);
+      // After the save's own message (such as 条目已更新), so that one does not replace it at once.
+      window.setTimeout(() => {
+        setToast(STORAGE_NEARLY_FULL_MESSAGE);
+        window.setTimeout(() => setToast(""), 3600);
+      }, 0);
     }
   }, [deviceKey]);
 

@@ -47,6 +47,14 @@ test("a delayed save (copy count) that hits full storage says so too", async ({ 
 test("when storage is nearly full, a save warns once", async ({ page }) => {
   // Other data fills about 87% of the ~5 million characters a page may keep.
   await page.evaluate(() => localStorage.setItem("clipbox.test-filler", "x".repeat(4_350_000)));
+  // A new entry: its own 「条目已加密保存」 must not hide the warning.
+  await page.getByRole("button", { name: "新增条目", exact: true }).click();
+  await page.getByLabel("标题", { exact: true }).fill("快满提醒");
+  await page.getByLabel("话术内容", { exact: true }).fill("Synthetic nearly-full check.");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.getByText(NEARLY_FULL)).toBeVisible();
+  await expect(page.getByText(NEARLY_FULL)).toHaveCount(0, { timeout: 6000 });
+  // Further saves in the same session do not repeat it.
   for (const n of [1, 2]) {
     await page.locator(".native-row .row-main").nth(n).click();
     await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
@@ -54,10 +62,6 @@ test("when storage is nearly full, a save warns once", async ({ page }) => {
     await editor.locator("textarea").first().fill(`改过的内容 nearly-full-${n}`);
     await editor.getByRole("button", { name: /保存/ }).click();
     await expect(editor).toHaveCount(0);
-    if (n === 1) {
-      await expect(page.getByText(NEARLY_FULL)).toBeVisible();
-      await expect(page.getByText(NEARLY_FULL)).toHaveCount(0, { timeout: 6000 });
-    }
   }
   await page.waitForTimeout(500);
   await expect(page.getByText(NEARLY_FULL)).toHaveCount(0);
