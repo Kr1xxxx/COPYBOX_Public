@@ -396,9 +396,27 @@ button { -webkit-tap-highlight-color: transparent; }
 /* Errors: a red circle with an exclamation mark, and the whole message shows (it wraps instead of being cut off). */
 .toast.error .toast-icon { border-color: color-mix(in oklab, var(--danger) 30%, var(--line)); background: var(--danger-bg); color: var(--danger); }
 .toast.error .toast-line { white-space: normal; overflow-wrap: anywhere; }
-.undo-toast button { margin-left: 2px; padding: 3px 10px; border: 0; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, transform .15s; }
-.undo-toast button:hover { background: var(--accent-soft); }
-.undo-toast button:active { transform: scale(.96); }
+/* The slow fade at the end of a toast's time (data-fading, length in --toast-fade) eases in, so the words stay readable
+   at first. Pointer or keyboard focus on it brings it back to full strength within 150 ms (use-toast.ts pause). Only
+   opacity changes, so it also suits reduced motion. */
+.toast-motion { max-width: 100%; display: flex; justify-content: center; }
+.toast { transition: opacity .15s cubic-bezier(.2, 0, 0, 1); }
+.toast[data-fading] { opacity: 0; transition: opacity var(--toast-fade, 900ms) cubic-bezier(.55, 0, 1, .45); }
+.toast-body { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.toast.has-actions { padding-right: 8px; }
+/* 编辑 is filled with the accent like a primary button; 撤销 is a quiet text button next to it. The single 撤销 after
+   moving to the 回收站 keeps its tinted look (undo-toast). */
+.toast-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; }
+.toast-action { position: relative; height: 26px; padding: 0 11px; border: 0; border-radius: 10px; font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; transition-property: background-color, color, scale; transition-duration: .15s; transition-timing-function: cubic-bezier(.2, 0, 0, 1); }
+.toast-action::after { content: ""; position: absolute; inset: -7px -2px; }
+.toast-action:active { scale: .96; }
+.toast-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toast-action.primary { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgba(31,30,28,.15); }
+.toast-action.primary:hover { background: var(--accent-hover); }
+.toast-action.secondary { background: transparent; color: var(--ink-3); font-weight: 500; }
+.toast-action.secondary:hover { background: var(--hover); color: var(--ink); }
+.undo-toast .toast-action.secondary { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.undo-toast .toast-action.secondary:hover { background: var(--accent-soft); }
 
 /* Editor and dialogs */
 /* Editor */

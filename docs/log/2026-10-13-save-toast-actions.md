@@ -1,0 +1,7 @@
+# Save toast with 编辑 and 撤销; toasts fade and pause on hover
+
+- Date: 2026-10-13 · Thread/agent: W10 (worker for the coordinator)
+- What changed: Every toast now stays fully visible, then fades out over the last part of its time (about 40 %, 0.6 to 1.2 s); while the pointer or keyboard focus is on it the time stops and it is fully visible again, and after leaving it gets at least 1.5 s more (pause and resume live in the pure toast controller in app/use-toast.ts, the fade is CSS). ArcToast takes a list of buttons (primary or secondary) instead of one action, and the 回收站 and picture 撤销 toasts now go through the same controller. After saving in the editor the toast shows 编辑 (filled accent) and 撤销 (quiet) for 5 s: 编辑 opens the same inline editor on that entry, switching section, folder or search if needed; 撤销 puts the earlier version back (or removes a new entry outright, not to the 回收站) through the normal encrypted save, and refuses with an error toast if the entry was changed again after the save (copying does not count). The pure rule is undoItemSave in app/clipbox-core.ts.
+- User-visible change: 保存后的提示会慢慢淡出，鼠标放上去就停住并变清楚；提示里多了「编辑」和「撤销」两个按钮，编辑更醒目
+- Not done / risks: Only the latest save can be undone (a newer toast replaces the buttons). A newer toast now replaces a pending 回收站 撤销 toast (before, the 撤销 toast stayed on top of newer messages for 6 s). Storage format and keys are unchanged.
+- Next step: 无
