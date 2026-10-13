@@ -9,10 +9,11 @@
     branch it was built from, data only in the visitor's browser); `/download/Clipboxx-Setup.exe` is the Windows
     installer (file name after the product name Clipboxx, D-044). `/download/latest.json` carries `{"version","notes","url"}` (the D-023 update-check shape) plus size and
     SHA-256; the desktop update check is **not** pointed at it yet (the owner's call, D-023 stays).
-  - **Hosting: Cloudflare Workers static assets**, config `tools/website/wrangler.jsonc`, Worker name `copyboxx-site`,
-    custom domains `copyboxx.com` and `www.copyboxx.com` (Cloudflare creates the DNS records itself). No server code,
-    no database, nothing collected from visitors. Cloudflare R2 is not used (not enabled on the account); the installer
-    is published as a static file (about 2.3 MB).
+  - **Hosting: one Cloudflare Worker (`copyboxx-site`, `tools/website/worker.mjs`) that serves the files from the KV
+    namespace `copyboxx-site-files`**, config `tools/website/wrangler.jsonc`, custom domains `copyboxx.com` and
+    `www.copyboxx.com` (Cloudflare creates the DNS records itself). Workers static assets were tried first and dropped:
+    their upload uses a short-lived token that the agent environment's proxy overwrites. Nothing is collected from
+    visitors. Cloudflare R2 is not used (not enabled on the account); the installer (about 2.3 MB) is one KV value.
   - **Which installer.** The newest `tauri-test-N` pre-release built from `main` (today: `tauri-test-92`, app version
     1.65.0, built before the rename in D-044, so the installed app still says Clipbox until the next test build is
     published to the site). The page shows the preview version (`tools/preview/VERSION`), the file size and the update date. The
