@@ -167,7 +167,7 @@ function sendRequest(socketPath, request) {
       try {
         resolve(JSON.parse(source.trim()));
       } catch {
-        const error = new Error("Clipbox 返回了无效响应");
+        const error = new Error("Clipboxx 返回了无效响应");
         error.code = "INVALID_RESPONSE";
         reject(error);
       }
@@ -193,7 +193,7 @@ function readStdin() {
 }
 
 function humanOutput(response) {
-  if (response.action === "status") return `Clipbox 已连接，${response.snippetCount} 条话术`;
+  if (response.action === "status") return `Clipboxx 已连接，${response.snippetCount} 条话术`;
   if (response.action === "list") {
     if (!response.items?.length) return "没有话术";
     return response.items.map((item) => `${item.number}\t${item.folder ? `[${item.folder}] ` : ""}${item.title}`).join("\n");
@@ -208,9 +208,9 @@ function humanOutput(response) {
       profile.appSecretFormat ? "符合 App Secret 格式" : "不符合 App Secret 格式",
     ].join("、");
     return [
-      response.match ? "匹配：剪贴板与 Clipbox 内容完全一致" : "不匹配：剪贴板与 Clipbox 内容不同",
+      response.match ? "匹配：剪贴板与 Clipboxx 内容完全一致" : "不匹配：剪贴板与 Clipboxx 内容不同",
       `剪贴板：${describe(response.clipboard)}`,
-      `Clipbox：${describe(response.stored)}`,
+      `Clipboxx：${describe(response.stored)}`,
     ].join("\n");
   }
   if (response.action === "secret-export") return `已将 ${response.secretCount} 条秘密加密导出到 ${response.path}`;
@@ -240,7 +240,7 @@ function writeSecretBackup(outputPath, response) {
     || typeof backup.envelope?.salt !== "string"
     || typeof backup.envelope?.iv !== "string"
   ) {
-    throw new Error("Clipbox 返回了无效的秘密备份");
+    throw new Error("Clipboxx 返回了无效的秘密备份");
   }
   const target = path.resolve(outputPath);
   fs.writeFileSync(target, JSON.stringify(backup), { encoding: "utf8", flag: "wx", mode: 0o600 });
@@ -266,7 +266,7 @@ async function run(argv = process.argv.slice(2)) {
     process.stdout.write(`${parsed.json ? JSON.stringify(printable) : humanOutput(printable)}\n`);
   } catch (error) {
     if (["ENOENT", "ECONNREFUSED"].includes(error?.code)) {
-      process.stderr.write("Clipbox 未打开，请先打开应用。\n");
+      process.stderr.write("Clipboxx 未打开，请先打开应用。\n");
       process.exitCode = 2;
       return;
     }
