@@ -65,7 +65,18 @@ test("starring a snippet moves it to the top without the other rows fading in ag
   await seedSnippets(page);
   const LIST = ".native-list.list-switch:not(.mini-list) > .native-row";
   const rows = page.locator(LIST);
-  await page.evaluate((selector) => { window.__rowsAbove = [...document.querySelectorAll(selector)].slice(0, 7); }, LIST);
+  await page.evaluate((selector) => {
+    window.__rowsAbove = [...document.querySelectorAll(selector)].slice(0, 7);
+    // Records every Web Animation a row starts (target id + first keyframe), so the FLIP slide is seen even when a busy
+    // machine finishes the 220 ms animation before the check below runs.
+    window.__started = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (keyframes, options) {
+      const first = Array.isArray(keyframes) ? keyframes[0] : undefined;
+      window.__started.push({ element: this, id: this.dataset?.sortId || "", from: first?.transform || "" });
+      return animate.call(this, keyframes, options);
+    };
+  }, LIST);
   const target = rows.nth(6);
   const pin = target.locator(".native-pin");
   const name = (await pin.getAttribute("aria-label")).replace(/^收藏 /, "");
@@ -79,7 +90,8 @@ test("starring a snippet moves it to the top without the other rows fading in ag
       connected: above.every((el) => el.isConnected),
       replaying: above.filter((el) => el.getAnimations().some((a) => a.animationName === "row-in")).length,
       starredFirst: document.querySelector(selector) === above[6],
-      slidesUp: above[6].getAnimations().some((a) => !a.animationName), // the FLIP move, not a CSS entrance
+      // The FLIP move (a Web Animation, not a CSS entrance): it starts where the row was, i.e. shifted down, and slides up.
+      slidesUp: window.__started.some((entry) => entry.element === above[6] && Number(/^translate3d\(-?[\d.]+px, (-?[\d.]+)px/.exec(entry.from)?.[1]) > 0),
     };
   }, LIST);
   expect(after).toEqual({ connected: true, replaying: 0, starredFirst: true, slidesUp: true });
