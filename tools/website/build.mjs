@@ -3,12 +3,14 @@
 // Defaults: --preview dist-preview, --out dist-website (relative to the repo root). Without --installer the newest
 // tauri-test-N Windows installer is downloaded from GitHub Releases (GITHUB_TOKEN or GH_TOKEN is sent when set; the
 // repo is private). In the Claude cloud environment Node's fetch only goes through the proxy with NODE_USE_ENV_PROXY=1.
+// Besides the site files it writes kv-bulk.json and manifest.json, which deploy.mjs uploads to KV for worker.mjs.
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { previewBuildInfo } from "../preview/build.mjs";
 import { appVersionFrom } from "../../scripts/sync-version.mjs";
+import { contentTypeFor } from "./worker.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "../..");
@@ -56,6 +58,29 @@ export function latestJson(info) {
     sha256: info.sha256,
     updatedAt: info.updatedAt,
   };
+}
+
+// kv-bulk.json for `wrangler kv bulk put`: one entry per file ({ key, bytes }), sorted by key, with the metadata
+// { type, sha256, size } that worker.mjs uses for Content-Type, ETag and Content-Length.
+export function bulkEntries(files) {
+  return [...files]
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map(({ key, bytes }) => {
+      const buffer = Buffer.from(bytes);
+      return {
+        key,
+        value: buffer.toString("base64"),
+        base64: true,
+        metadata: { type: contentTypeFor(key), sha256: createHash("sha256").update(buffer).digest("hex"), size: buffer.length },
+      };
+    });
+}
+
+function walk(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? walk(path) : [path];
+  });
 }
 
 function option(argv, name, fallback) {
@@ -109,10 +134,17 @@ export async function main(argv = process.argv.slice(2)) {
   writeFileSync(join(out, installerPath), installer);
   writeFileSync(join(out, "download/latest.json"), JSON.stringify(latest, null, 2) + "\n");
 
+  // The Worker serves these files from KV (see worker.mjs and deploy.mjs).
+  const files = walk(out).map((path) => ({ key: relative(out, path).replaceAll("\\", "/"), bytes: readFileSync(path) }));
+  const entries = bulkEntries(files);
+  writeFileSync(join(out, "kv-bulk.json"), JSON.stringify(entries));
+  writeFileSync(join(out, "manifest.json"), JSON.stringify({ keys: entries.map((entry) => entry.key) }, null, 2) + "\n");
+
   console.log("out", out);
   console.log("version", latest.version);
   console.log("size", `${size} bytes (${formatSize(size)})`);
   console.log("sha256", sha256);
+  console.log("kv keys", entries.length);
   return { out, latest };
 }
 
