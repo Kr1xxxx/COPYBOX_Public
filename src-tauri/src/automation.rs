@@ -99,28 +99,57 @@ pub async fn prepare_socket(path: &Path) -> Result<(), String> {
     use std::os::unix::fs::{FileTypeExt, PermissionsExt};
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        // Never tighten a folder reached through a link: the link could point anywhere.
+        let meta = std::fs::symlink_metadata(parent).map_err(|e| e.to_string())?;
+        if !meta.file_type().is_dir() {
+            return Err("Clipbox automation socket folder is not a plain folder".into());
+        }
         std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
     }
     if let Ok(meta) = std::fs::symlink_metadata(path) {
-        if meta.file_type().is_socket() {
-            let probe = tokio::time::timeout(Duration::from_millis(120), UnixStream::connect(path)).await;
-            if matches!(probe, Ok(Ok(_))) {
-                return Err("Clipbox automation socket is already active".into());
-            }
+        // Only a stale socket is removed; any other file in the way is left alone.
+        if !meta.file_type().is_socket() {
+            return Err("something other than a socket is in the way of the automation socket".into());
+        }
+        let probe = tokio::time::timeout(Duration::from_millis(120), UnixStream::connect(path)).await;
+        if matches!(probe, Ok(Ok(_))) {
+            return Err("Clipbox automation socket is already active".into());
         }
         std::fs::remove_file(path).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
+/// `CLIPBOX_AUTOMATION_SOCKET_PATH` (for testing) is only honoured for a `*.sock` file in a folder of its own inside
+/// the temporary folder (e.g. one made with `mktemp -d`) or inside the app's own folder, because the app makes that
+/// folder private and replaces a stale socket there.
+#[cfg(unix)]
+pub fn allowed_socket_override(value: &str, temp: &Path, app_dir: &Path) -> Option<PathBuf> {
+    use std::path::Component;
+    let path = PathBuf::from(value);
+    if !path.is_absolute() || path.components().any(|part| matches!(part, Component::ParentDir | Component::CurDir)) {
+        return None;
+    }
+    if path.extension().and_then(|ext| ext.to_str()) != Some("sock") {
+        return None;
+    }
+    let parent = path.parent()?;
+    let inside_temp = parent.starts_with(temp) && parent != temp;
+    (inside_temp || parent.starts_with(app_dir)).then_some(path)
+}
+
 #[cfg(unix)]
 pub fn default_socket_path(app: &AppHandle) -> PathBuf {
-    if let Ok(custom) = std::env::var("CLIPBOX_AUTOMATION_SOCKET_PATH") {
-        return PathBuf::from(custom);
-    }
     // The same place the command line looks first (it was the Electron app's data folder).
     let home = app.path().home_dir().unwrap_or_else(|_| PathBuf::from("."));
-    home.join("Library").join("Application Support").join("Clipbox").join("automation.sock")
+    let app_dir = home.join("Library").join("Application Support").join("Clipbox");
+    if let Ok(custom) = std::env::var("CLIPBOX_AUTOMATION_SOCKET_PATH") {
+        match allowed_socket_override(&custom, &std::env::temp_dir(), &app_dir) {
+            Some(path) => return path,
+            None => eprintln!("clipbox: CLIPBOX_AUTOMATION_SOCKET_PATH ignored (must be a .sock file in its own temporary folder)"),
+        }
+    }
+    app_dir.join("automation.sock")
 }
 
 /// Waiting commands and whether the page is listening yet.
@@ -131,26 +160,48 @@ pub struct Bridge {
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>>,
 }
 
+/// A waiting command's place in `pending`. It is given up however the wait ends, also when the socket side stops
+/// waiting first (it has its own timeout and simply drops the waiting future).
+struct PendingEntry {
+    pending: Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>>,
+    id: String,
+}
+
+impl Drop for PendingEntry {
+    fn drop(&mut self) {
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.remove(&self.id);
+        }
+    }
+}
+
 impl Bridge {
+    fn register(&self) -> (PendingEntry, oneshot::Receiver<Value>) {
+        let id = format!("{}-{}", std::process::id(), self.next_id.fetch_add(1, Ordering::SeqCst));
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().unwrap().insert(id.clone(), tx);
+        (PendingEntry { pending: self.pending.clone(), id }, rx)
+    }
+
+    async fn wait_for(entry: PendingEntry, rx: oneshot::Receiver<Value>) -> Result<Value, Failure> {
+        let answer = tokio::time::timeout(TIMEOUT, rx).await;
+        drop(entry);
+        match answer {
+            Ok(Ok(value)) => Ok(value),
+            _ => Err(("RENDERER_TIMEOUT".into(), "Clipbox 窗口响应超时".into())),
+        }
+    }
+
     pub async fn forward(&self, app: &AppHandle, command: Value) -> Result<Value, Failure> {
         let window = app.get_webview_window("main");
         let Some(window) = window.filter(|_| self.ready.load(Ordering::SeqCst)) else {
             return Err(("WINDOW_UNAVAILABLE".into(), "Clipbox 窗口尚未就绪".into()));
         };
-        let id = format!("{}-{}", std::process::id(), self.next_id.fetch_add(1, Ordering::SeqCst));
-        let (tx, rx) = oneshot::channel();
-        self.pending.lock().unwrap().insert(id.clone(), tx);
-        if window.emit("clipbox:automation-command", json!({ "requestId": id, "command": command })).is_err() {
-            self.pending.lock().unwrap().remove(&id);
+        let (entry, rx) = self.register();
+        if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command })).is_err() {
             return Err(("COMMAND_FAILED".into(), "命令执行失败".into()));
         }
-        match tokio::time::timeout(TIMEOUT, rx).await {
-            Ok(Ok(value)) => Ok(value),
-            _ => {
-                self.pending.lock().unwrap().remove(&id);
-                Err(("RENDERER_TIMEOUT".into(), "Clipbox 窗口响应超时".into()))
-            }
-        }
+        Self::wait_for(entry, rx).await
     }
 
     pub fn respond(&self, request_id: &str, response: Value) -> bool {
@@ -175,16 +226,52 @@ pub fn automation_response(bridge: tauri::State<Bridge>, request_id: String, res
     bridge.respond(&request_id, response);
 }
 
-/// Keeps `~/.local/bin/clipbox` the same as the script that ships with the app.
+/// Whether an existing file is a copy of our command line (any version): every version reads this variable.
+#[cfg(unix)]
+fn is_our_cli(content: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(content);
+    text.starts_with("#!/usr/bin/env node") && text.contains("CLIPBOX_AUTOMATION_SOCKET_PATH")
+}
+
+/// Keeps `~/.local/bin/clipbox` the same as the script that ships with the app. A link, a folder or someone else's
+/// `clipbox` there is left alone; the file is only written when its content differs, and the new copy replaces the
+/// old one by rename, so nothing is ever written through a link.
 #[cfg(unix)]
 fn install_cli(home: &Path) -> std::io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let target = home.join(".local").join("bin").join("clipbox");
-    std::fs::create_dir_all(target.parent().unwrap())?;
-    if std::fs::read_to_string(&target).ok().as_deref() != Some(CLI_SCRIPT) {
-        std::fs::write(&target, CLI_SCRIPT)?;
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    let dir = home.join(".local").join("bin");
+    let target = dir.join("clipbox");
+    std::fs::create_dir_all(&dir)?;
+    match std::fs::symlink_metadata(&target) {
+        Ok(meta) if !meta.file_type().is_file() => return Ok(()),
+        Ok(meta) => {
+            let current = std::fs::read(&target)?;
+            if current == CLI_SCRIPT.as_bytes() {
+                if meta.permissions().mode() & 0o777 != 0o755 {
+                    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))?;
+                }
+                return Ok(());
+            }
+            if !is_our_cli(&current) {
+                return Ok(());
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
     }
-    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))
+    let temp = dir.join(format!(".clipbox-{}.tmp", std::process::id()));
+    let _ = std::fs::remove_file(&temp);
+    let written = (|| {
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o755).open(&temp)?;
+        file.write_all(CLI_SCRIPT.as_bytes())?;
+        file.set_permissions(std::fs::Permissions::from_mode(0o755))?;
+        std::fs::rename(&temp, &target)
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    written
 }
 
 /// Starts the socket server and installs the command line. Problems are only logged: the app works without it.
@@ -239,8 +326,9 @@ pub fn cleanup(_app: &AppHandle) {}
 mod tests {
     use super::*;
 
+    // Each test socket sits in a folder of its own: the server makes that folder private.
     fn temp_socket(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("clipbox-auto-{}-{name}.sock", std::process::id()))
+        std::env::temp_dir().join(format!("clipbox-auto-{}-{name}", std::process::id())).join("automation.sock")
     }
 
     async fn ask(path: &Path, text: &str) -> Value {
@@ -325,9 +413,109 @@ mod tests {
         install_cli(&home).unwrap();
         assert_eq!(std::fs::read_to_string(&target).unwrap(), CLI_SCRIPT);
         assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o755);
-        std::fs::write(&target, "old").unwrap();
+        // An older copy of our command line is brought up to date.
+        std::fs::write(&target, "#!/usr/bin/env node\nconst p = process.env.CLIPBOX_AUTOMATION_SOCKET_PATH; // old").unwrap();
         install_cli(&home).unwrap();
         assert_eq!(std::fs::read_to_string(&target).unwrap(), CLI_SCRIPT);
+        assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o755);
         let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn the_launcher_never_writes_through_a_link_or_over_someone_elses_file() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let home = std::env::temp_dir().join(format!("clipbox-cli-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        let bin = home.join(".local").join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let target = bin.join("clipbox");
+        // A link to another file: neither the link nor the file it points to changes.
+        let victim = home.join("victim.txt");
+        std::fs::write(&victim, "keep me").unwrap();
+        std::fs::set_permissions(&victim, std::fs::Permissions::from_mode(0o600)).unwrap();
+        std::os::unix::fs::symlink(&victim, &target).unwrap();
+        install_cli(&home).unwrap();
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep me");
+        assert_eq!(std::fs::metadata(&victim).unwrap().permissions().mode() & 0o777, 0o600);
+        assert!(std::fs::symlink_metadata(&target).unwrap().file_type().is_symlink());
+        // A dangling link is not followed to create a file either.
+        std::fs::remove_file(&target).unwrap();
+        let elsewhere = home.join("created-through-link");
+        std::os::unix::fs::symlink(&elsewhere, &target).unwrap();
+        install_cli(&home).unwrap();
+        assert!(!elsewhere.exists());
+        // Someone else's program called clipbox stays as it is.
+        std::fs::remove_file(&target).unwrap();
+        std::fs::write(&target, "#!/bin/sh\necho other tool").unwrap();
+        install_cli(&home).unwrap();
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "#!/bin/sh\necho other tool");
+        // A file that is already up to date is not rewritten (same inode), only made executable again.
+        std::fs::remove_file(&target).unwrap();
+        install_cli(&home).unwrap();
+        let before = std::fs::metadata(&target).unwrap().ino();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o644)).unwrap();
+        install_cli(&home).unwrap();
+        let after = std::fs::metadata(&target).unwrap();
+        assert_eq!(after.ino(), before);
+        assert_eq!(after.permissions().mode() & 0o777, 0o755);
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn the_socket_override_must_stay_in_its_own_temporary_or_app_folder() {
+        let temp = Path::new("/tmp");
+        let app = Path::new("/Users/a/Library/Application Support/Clipbox");
+        let ok = "/tmp/tmp.X1/automation.sock";
+        assert_eq!(allowed_socket_override(ok, temp, app), Some(PathBuf::from(ok)));
+        assert!(allowed_socket_override("/Users/a/Library/Application Support/Clipbox/test.sock", temp, app).is_some());
+        for bad in [
+            "",
+            "automation.sock",
+            "/tmp/automation.sock", // the shared temporary folder itself would be made private
+            "/tmp/x/../../etc/automation.sock",
+            "/tmp/x/notes.txt",
+            "/Users/a/Documents/automation.sock",
+            "/etc/automation.sock",
+            "/tmpfoo/x/automation.sock",
+        ] {
+            assert_eq!(allowed_socket_override(bad, temp, app), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn preparing_the_socket_never_removes_a_plain_file_or_follows_a_linked_folder() {
+        tauri::async_runtime::block_on(async {
+            let dir = std::env::temp_dir().join(format!("clipbox-auto-guard-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let file = dir.join("automation.sock");
+            std::fs::write(&file, "not a socket").unwrap();
+            assert!(prepare_socket(&file).await.is_err());
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), "not a socket");
+            let real = dir.join("real");
+            std::fs::create_dir_all(&real).unwrap();
+            let link = dir.join("link");
+            std::os::unix::fs::symlink(&real, &link).unwrap();
+            assert!(prepare_socket(&link.join("automation.sock")).await.is_err());
+            let _ = std::fs::remove_dir_all(&dir);
+        });
+    }
+
+    #[test]
+    fn a_command_nobody_answers_leaves_no_waiting_entry_behind() {
+        tauri::async_runtime::block_on(async {
+            let bridge = Bridge::default();
+            // The socket side stops waiting first and drops the wait.
+            let (entry, rx) = bridge.register();
+            assert_eq!(bridge.pending.lock().unwrap().len(), 1);
+            assert!(tokio::time::timeout(Duration::from_millis(20), Bridge::wait_for(entry, rx)).await.is_err());
+            assert!(bridge.pending.lock().unwrap().is_empty());
+            // An answered command is gone as well.
+            let (entry, rx) = bridge.register();
+            let id = entry.id.clone();
+            assert!(bridge.respond(&id, json!({ "ok": true })));
+            assert_eq!(Bridge::wait_for(entry, rx).await.unwrap()["ok"], true);
+            assert!(bridge.pending.lock().unwrap().is_empty());
+        });
     }
 }
