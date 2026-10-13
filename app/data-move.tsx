@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { applyPayload, collectPayload, countImages, countPayload, hasStashedBackup, openTransfer, restoreStashedBackup, TransferError, type TransferPayload, parseTransferFile, sealTransfer, transferFileName, type TransferFile } from "./data-transfer";
+import { applyPayload, collectPayload, countImages, countPayload, countStoredImages, hasStashedBackup, openTransfer, restoreStashedBackup, TransferError, type TransferPayload, parseTransferFile, sealTransfer, transferFileName, transferFileParts, type TransferFile } from "./data-transfer";
 
 // One-time move of all local data between the old (Electron) and new (Tauri) desktop app. Reuses the backup dialog's look.
 export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | "import"; itemCount: number; onClose: () => void }) {
@@ -76,7 +76,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
       if (exporting) {
         const payload = await collectPayload();
         const sealed = await sealTransfer(payload, password);
-        const url = URL.createObjectURL(new Blob([JSON.stringify(sealed)], { type: "application/json" }));
+        const url = URL.createObjectURL(new Blob(transferFileParts(sealed), { type: "application/json" }));
         const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = transferFileName();
@@ -90,7 +90,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
           window.location.reload();
         } else {
           const payload = await openTransfer(file as TransferFile, password);
-          setPending({ payload, currentImages: countImages(await collectPayload()) });
+          setPending({ payload, currentImages: await countStoredImages() });
         }
       }
     } catch (problem) {
