@@ -56,8 +56,8 @@ let child = null;
 let browser = null;
 
 function findInstalledExe() {
-  // The install folder is named after productName (Clipboxx, D-044); the exe keeps the Cargo name clipbox.exe.
-  const roots = [path.join(localAppData, "Clipboxx"), path.join(localAppData, "Programs", "Clipboxx"), path.join(process.env.ProgramFiles || "C:\\Program Files", "Clipboxx")];
+  // The install folder is named after productName (Copyboxx, D-046); the exe keeps the Cargo name clipbox.exe.
+  const roots = [path.join(localAppData, "Copyboxx"), path.join(localAppData, "Programs", "Copyboxx"), path.join(process.env.ProgramFiles || "C:\\Program Files", "Copyboxx")];
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
     const found = fs.readdirSync(root).filter((name) => name.toLowerCase().endsWith(".exe") && !/^unins|^uninstall/i.test(name));
@@ -154,10 +154,10 @@ async function waitForWindow(timeoutMs) {
 
 async function finish() {
   const files = dataDirListing();
-  const uninstall = powershell("Get-ChildItem 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like '*Clipboxx*' } | Select-Object DisplayName,DisplayVersion | Out-String");
+  const uninstall = powershell("Get-ChildItem 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like '*Copyboxx*' } | Select-Object DisplayName,DisplayVersion | Out-String");
   fs.writeFileSync(path.join(OUT, "uninstall-entry.txt"), uninstall.out);
   await step("uninstall entry exists", async () => {
-    if (!/Clipboxx/.test(uninstall.out)) throw new Error("no Clipboxx entry in the installed-programs list");
+    if (!/Copyboxx/.test(uninstall.out)) throw new Error("no Copyboxx entry in the installed-programs list");
     return `${files} files in the data folder; ${uninstall.out.replace(/\s+/g, " ")}`;
   });
 }

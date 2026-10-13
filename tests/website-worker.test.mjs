@@ -14,16 +14,16 @@ import worker, {
 const files = {
   "index.html": "<title>home</title>",
   "404.html": "<title>找不到这个页面</title>",
-  "preview-gate.html": '<title>网页测试版 · Clipboxx</title><h1>输入口令</h1><form method="post" action="/preview/"></form><p class="msg">__MESSAGE__</p>',
+  "preview-gate.html": '<title>网页测试版 · Copyboxx</title><h1>输入口令</h1><form method="post" action="/preview/"></form><p class="msg">__MESSAGE__</p>',
   "preview/index.html": "<title>preview</title>",
   "preview/app-win.html": "<title>app</title>",
   "preview/assets/static/x.js": "console.log(1);",
-  "download/Clipboxx-Setup.exe": "MZ fake installer",
+  "download/Copyboxx-Setup.exe": "MZ fake installer",
   "download/latest.json": '{"version":"1.65.0"}',
   "favicon.ico": "fake icon",
   "images/app-win-light.png": "fake screenshot",
   "assets/site.0123abcd.css": "body{}",
-  "site.webmanifest": '{"name":"Clipboxx"}',
+  "site.webmanifest": '{"name":"Copyboxx"}',
   "robots.txt": "User-agent: *",
   "sitemap.xml": "<urlset/>",
 };
@@ -86,7 +86,7 @@ test("worker: lookup keys, content types and cache rules", () => {
   assert.equal(cacheControlFor("preview/assets/static/x.js"), "public, max-age=31536000, immutable");
   assert.equal(cacheControlFor("preview/seed.js"), "no-cache");
   assert.equal(cacheControlFor("preview/samples/1-inquiry-quote.csv"), "no-cache");
-  assert.equal(cacheControlFor("download/Clipboxx-Setup.exe"), "public, max-age=3600");
+  assert.equal(cacheControlFor("download/Copyboxx-Setup.exe"), "public, max-age=3600");
 });
 
 test("worker: content types for the site's icons, screenshots and search-engine files", () => {
@@ -172,12 +172,12 @@ test("worker: hashed assets are cached for good, the installer downloads, latest
   assert.equal(chunk.headers.get("cache-control"), "public, max-age=31536000, immutable");
   assert.match(chunk.headers.get("content-type"), /^text\/javascript/);
 
-  const exe = await get("/download/Clipboxx-Setup.exe");
+  const exe = await get("/download/Copyboxx-Setup.exe");
   assert.equal(exe.status, 200);
   assert.equal(exe.headers.get("content-type"), "application/x-msdownload");
-  assert.equal(exe.headers.get("content-disposition"), 'attachment; filename="Clipboxx-Setup.exe"');
-  assert.equal(exe.headers.get("content-length"), String(Buffer.byteLength(files["download/Clipboxx-Setup.exe"])));
-  assert.equal(await exe.text(), files["download/Clipboxx-Setup.exe"]);
+  assert.equal(exe.headers.get("content-disposition"), 'attachment; filename="Copyboxx-Setup.exe"');
+  assert.equal(exe.headers.get("content-length"), String(Buffer.byteLength(files["download/Copyboxx-Setup.exe"])));
+  assert.equal(await exe.text(), files["download/Copyboxx-Setup.exe"]);
 
   const latest = await get("/download/latest.json");
   assert.equal(latest.headers.get("cache-control"), "no-cache");
@@ -213,7 +213,7 @@ test("worker: matching ETag gives 304, HEAD has no body, other methods are refus
   assert.equal(await again.text(), "");
   assert.equal((await get("/", { headers: { "If-None-Match": '"other"' } })).status, 200);
 
-  const head = await get("/download/Clipboxx-Setup.exe", { method: "HEAD" });
+  const head = await get("/download/Copyboxx-Setup.exe", { method: "HEAD" });
   assert.equal(head.status, 200);
   assert.equal(head.headers.get("content-type"), "application/x-msdownload");
   assert.equal(await head.text(), "");
@@ -328,7 +328,7 @@ test("worker: the right passphrase sets the cookie, a wrong one shows the page a
 
 test("worker: the rest of the site does not ask for the passphrase", async () => {
   assert.equal((await get("/")).status, 200);
-  assert.equal((await get("/download/Clipboxx-Setup.exe")).status, 200);
+  assert.equal((await get("/download/Copyboxx-Setup.exe")).status, 200);
   assert.equal((await get("/download/latest.json")).status, 200);
   const missing = await get("/nothing");
   assert.equal(missing.status, 404);

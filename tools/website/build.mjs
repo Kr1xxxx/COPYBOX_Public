@@ -20,7 +20,7 @@ const repo = resolve(here, "../..");
 const previewDir = join(repo, "tools/preview");
 
 export const siteUrl = "https://copyboxx.com";
-export const installerPath = "download/Clipboxx-Setup.exe";
+export const installerPath = "download/Copyboxx-Setup.exe";
 const releasesApi = "https://api.github.com/repos/Kr1xxxx/Clipbox/releases?per_page=20";
 
 const placeholder = /__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/g;
@@ -59,18 +59,18 @@ export function escapeHtml(value) {
 // Every page of the site: body source (relative to tools/website/), published key, canonical path, nav item, head
 // text. 404.html and preview-gate.html are left out of the sitemap and carry noindex.
 export const sitePages = [
-  { source: "pages/index.html", key: "index.html", path: "/", nav: "HOME", title: "Clipboxx · 复制盒",
-    description: "Clipboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，不用联网，内容加密保存。" },
-  { source: "pages/download.html", key: "download/index.html", path: "/download/", nav: "DOWNLOAD", title: "下载 · Clipboxx",
-    description: "下载 Clipboxx（复制盒）Windows 版，附安装步骤、安装时的提示和从旧版搬数据的方法。" },
-  { source: "pages/help.html", key: "help/index.html", path: "/help/", nav: "HELP", title: "使用说明 · Clipboxx",
-    description: "Clipboxx（复制盒）怎么用：话术、账号、图片、托盘小窗、备份与恢复、公司共享话术、AI 润色和整理。" },
-  { source: "pages/privacy.html", key: "privacy/index.html", path: "/privacy/", nav: "", title: "隐私说明 · Clipboxx",
-    description: "Clipboxx（复制盒）不收集你的内容：没有账号，没有服务器，数据加密后只保存在你的电脑上。" },
-  { source: "404.html", key: "404.html", path: "/", nav: "", title: "找不到这个页面 · Clipboxx",
+  { source: "pages/index.html", key: "index.html", path: "/", nav: "HOME", title: "Copyboxx · 复制盒",
+    description: "Copyboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，不用联网，内容加密保存。" },
+  { source: "pages/download.html", key: "download/index.html", path: "/download/", nav: "DOWNLOAD", title: "下载 · Copyboxx",
+    description: "下载 Copyboxx（复制盒）Windows 版，附安装步骤、安装时的提示和从旧版搬数据的方法。" },
+  { source: "pages/help.html", key: "help/index.html", path: "/help/", nav: "HELP", title: "使用说明 · Copyboxx",
+    description: "Copyboxx（复制盒）怎么用：话术、账号、图片、托盘小窗、备份与恢复、公司共享话术、AI 润色和整理。" },
+  { source: "pages/privacy.html", key: "privacy/index.html", path: "/privacy/", nav: "", title: "隐私说明 · Copyboxx",
+    description: "Copyboxx（复制盒）不收集你的内容：没有账号，没有服务器，数据加密后只保存在你的电脑上。" },
+  { source: "404.html", key: "404.html", path: "/", nav: "", title: "找不到这个页面 · Copyboxx",
     description: "找不到这个页面。", noindex: true },
-  { source: "preview-gate.html", key: "preview-gate.html", path: "/preview/", nav: "", title: "网页测试版 · Clipboxx",
-    description: "Clipboxx 网页测试版，需要口令。", noindex: true, keep: ["MESSAGE"] },
+  { source: "preview-gate.html", key: "preview-gate.html", path: "/preview/", nav: "", title: "网页测试版 · Copyboxx",
+    description: "Copyboxx 网页测试版，需要口令。", noindex: true, keep: ["MESSAGE"] },
 ];
 const navItems = ["HOME", "DOWNLOAD", "HELP"];
 
@@ -101,8 +101,8 @@ export const imageFiles = ["app-win-light.png", "app-win-dark.png"];
 
 export function webManifest() {
   return {
-    name: "Clipboxx 复制盒",
-    short_name: "Clipboxx",
+    name: "Copyboxx 复制盒",
+    short_name: "Copyboxx",
     lang: "zh-CN",
     start_url: "/",
     display: "browser",

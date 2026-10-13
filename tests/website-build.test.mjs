@@ -87,7 +87,7 @@ test("website pages: head, header, body and footer are joined and the current na
   const help = sitePages.find((page) => page.key === "help/index.html");
   assert.equal(
     assemblePage(help, parts, info, { CSS: "/assets/site.x.css" }),
-    '<title>使用说明 · Clipboxx</title><a href="/">首页</a><a href="/help/" aria-current="page">使用说明</a><p>/assets/site.x.css</p><i>https://copyboxx.com/help/</i>',
+    '<title>使用说明 · Copyboxx</title><a href="/">首页</a><a href="/help/" aria-current="page">使用说明</a><p>/assets/site.x.css</p><i>https://copyboxx.com/help/</i>',
   );
   const notFound = sitePages.find((page) => page.key === "404.html");
   assert.match(assemblePage(notFound, parts, info, { CSS: "" }), /<meta name="robots" content="noindex">/);
@@ -100,16 +100,16 @@ test("website build writes every page, the stylesheet, icons, images, preview, i
   const { out, installer, read, warnings } = site;
   assert.deepEqual(warnings, []);
   const home = read("index.html");
-  assert.match(home, /href="\/download\/Clipboxx-Setup\.exe"/);
+  assert.match(home, /href="\/download\/Copyboxx-Setup\.exe"/);
   assert.match(home, /href="\/preview\/"/);
   assert.equal(read("preview/assets/static/x.js"), "console.log(1);");
   assert.equal(read("preview/app-win.html"), "<title>app</title>");
-  assert.deepEqual(readFileSync(join(out, "download/Clipboxx-Setup.exe")), installer);
+  assert.deepEqual(readFileSync(join(out, "download/Copyboxx-Setup.exe")), installer);
   for (const name of iconFiles) assert.equal(read(name), `icon ${name}`);
   for (const name of imageFiles) assert.equal(read(`images/${name}`), `image ${name}`);
   const latest = JSON.parse(read("download/latest.json"));
   assert.match(latest.version, /^\d+\.\d+\.0$/);
-  assert.equal(latest.url, "https://copyboxx.com/download/Clipboxx-Setup.exe");
+  assert.equal(latest.url, "https://copyboxx.com/download/Copyboxx-Setup.exe");
   assert.equal(latest.size, installer.length);
   assert.equal(latest.sha256, createHash("sha256").update(installer).digest("hex"));
   assert.ok(Array.isArray(latest.notes) && latest.notes.length > 0);
@@ -124,7 +124,7 @@ test("website build writes every page, the stylesheet, icons, images, preview, i
     "404.html",
     "apple-touch-icon.png",
     cssKey,
-    "download/Clipboxx-Setup.exe",
+    "download/Copyboxx-Setup.exe",
     "download/index.html",
     "download/latest.json",
     "favicon.ico",
@@ -152,7 +152,7 @@ test("website build writes every page, the stylesheet, icons, images, preview, i
     assert.equal(entry.metadata.size, bytes.length);
     assert.equal(entry.metadata.sha256, createHash("sha256").update(bytes).digest("hex"));
   }
-  assert.equal(bulk.find((entry) => entry.key === "download/Clipboxx-Setup.exe").metadata.type, "application/x-msdownload");
+  assert.equal(bulk.find((entry) => entry.key === "download/Copyboxx-Setup.exe").metadata.type, "application/x-msdownload");
   assert.equal(bulk.find((entry) => entry.key === cssKey).metadata.type, "text/css; charset=utf-8");
   assert.deepEqual(JSON.parse(read("manifest.json")), { keys });
 });
@@ -167,7 +167,7 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     assert.match(html, /^<!doctype html>\n<html lang="zh-CN">/, key);
     assert.ok(html.includes(`<title>${page.title}</title>`), key);
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/, key);
-    assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg"[^>]*><b>Clipboxx<\/b><span>复制盒<\/span><\/a>/, key);
+    assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg"[^>]*><b>Copyboxx<\/b><span>复制盒<\/span><\/a>/, key);
     assert.match(html, /<nav class="nav" aria-label="网站导航">/, key);
     const nav = /<nav class="nav" aria-label="网站导航">([\s\S]*?)<\/nav>/.exec(html)[1];
     assert.deepEqual([...nav.matchAll(/<a href="([^"]*)"/g)].map((m) => m[1]), ["/", "/download/", "/help/"], key);
@@ -184,7 +184,7 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png">/, key);
     assert.match(html, /clipboxx-site-theme/, key);
     assert.match(html, /data-theme-toggle aria-label="[^"]+"/, key);
-    assert.match(html, /Clipboxx · v\d+\.\d+ · 更新于 \d{4}-\d{2}-\d{2} · 数据只保存在你的电脑上/, key);
+    assert.match(html, /Copyboxx · v\d+\.\d+ · 更新于 \d{4}-\d{2}-\d{2} · 数据只保存在你的电脑上/, key);
     assert.equal(html.includes('<meta name="robots" content="noindex">'), Boolean(page.noindex), key);
   }
 });
@@ -236,7 +236,7 @@ test("website download page shows the version, size, date and sha256", () => {
   const version = readFileSync("tools/preview/VERSION", "utf8").trim();
   assert.ok(html.includes(`v${version} · ${formatSize(latest.size)} · 更新于 `));
   assert.ok(html.includes(`<code>${latest.sha256}</code>`));
-  assert.match(html, /<a class="pill" href="\/download\/Clipboxx-Setup\.exe">/);
+  assert.match(html, /<a class="pill" href="\/download\/Copyboxx-Setup\.exe">/);
   for (const id of ["install", "smartscreen", "move", "update", "mac"]) assert.ok(html.includes(`id="${id}"`), id);
 });
 
@@ -273,8 +273,8 @@ test("website search-engine files: sitemap, robots.txt and the web manifest", ()
   assert.match(robots, /^Sitemap: https:\/\/copyboxx\.com\/sitemap\.xml$/m);
 
   const manifest = JSON.parse(site.read("site.webmanifest"));
-  assert.equal(manifest.short_name, "Clipboxx");
-  assert.match(manifest.name, /Clipboxx/);
+  assert.equal(manifest.short_name, "Copyboxx");
+  assert.match(manifest.name, /Copyboxx/);
   assert.equal(manifest.lang, "zh-CN");
   assert.deepEqual(manifest.icons.map((icon) => [icon.src, icon.sizes]), [["/icon-192.png", "192x192"], ["/icon-512.png", "512x512"]]);
   assert.equal(manifest.theme_color, "#f8fafc");
@@ -296,7 +296,7 @@ test("website build only warns when the icons or images folder is missing", asyn
 
 test("website preview gate keeps its form, message slot and noindex", () => {
   const gate = site.read("preview-gate.html");
-  assert.match(gate, /<title>网页测试版 · Clipboxx<\/title>/);
+  assert.match(gate, /<title>网页测试版 · Copyboxx<\/title>/);
   assert.match(gate, /<meta name="robots" content="noindex">/);
   assert.match(gate, /输入口令/);
   assert.match(gate, /<form class="gate-form" method="post" action="\/preview\/">/);
@@ -317,12 +317,15 @@ test("website installer: the newest tauri-test release with a Windows asset wins
   const releases = [
     { tag_name: "tauri-test-93", published_at: "2026-10-13T12:00:00Z", assets: [win("Clipboxx-Tauri-test-macOS.dmg")] },
     { tag_name: "v2.0.0", published_at: "2026-10-13T13:00:00Z", assets: [win("Clipbox-Windows-setup.exe")] },
-    { tag_name: "tauri-test-91", published_at: "2026-10-11T09:00:00Z", assets: [win("Clipboxx-Tauri-test-Windows-setup.exe")] },
+    { tag_name: "tauri-test-91", published_at: "2026-10-11T09:00:00Z", assets: [win("Clipbox-Tauri-test-Windows-setup.exe")] },
     { tag_name: "tauri-test-92", published_at: "2026-10-12T09:00:00Z", assets: [win("Clipboxx-Tauri-test-Windows-setup.exe")] },
   ];
   const { release, asset } = pickInstaller(releases);
   assert.equal(release.tag_name, "tauri-test-92");
   assert.equal(asset.name, "Clipboxx-Tauri-test-Windows-setup.exe");
+  // D-046: release assets are now Copyboxx-Windows-setup.exe; the newest release still wins whatever its name.
+  const renamed = { tag_name: "tauri-test-94", published_at: "2026-10-14T09:00:00Z", assets: [win("Copyboxx-macOS-arm64.zip"), win("Copyboxx-Windows-setup.exe")] };
+  assert.equal(pickInstaller([...releases, renamed]).asset.name, "Copyboxx-Windows-setup.exe");
   assert.throws(() => pickInstaller([releases[0], releases[1]]), /No tauri-test release/);
   assert.throws(() => pickInstaller([]), /No tauri-test release/);
 });
@@ -338,7 +341,7 @@ test("website latest.json has the update-check shape plus size and checksum", ()
   assert.deepEqual(latest, {
     version: "1.65.0",
     notes: ["一", "二"],
-    url: "https://copyboxx.com/download/Clipboxx-Setup.exe",
+    url: "https://copyboxx.com/download/Copyboxx-Setup.exe",
     size: 10,
     sha256: "ab",
     updatedAt: "2026-10-13T19:56:00+08:00",
@@ -349,11 +352,11 @@ test("website KV entries: sorted, base64 values, type, checksum and size", () =>
   const exe = Buffer.from([0x4d, 0x5a, 0, 255]);
   const entries = bulkEntries([
     { key: "preview/index.html", bytes: Buffer.from("<p>hi</p>") },
-    { key: "download/Clipboxx-Setup.exe", bytes: exe },
+    { key: "download/Copyboxx-Setup.exe", bytes: exe },
   ]);
   assert.deepEqual(entries, [
     {
-      key: "download/Clipboxx-Setup.exe",
+      key: "download/Copyboxx-Setup.exe",
       value: "TVoA/w==",
       base64: true,
       metadata: { type: "application/x-msdownload", sha256: createHash("sha256").update(exe).digest("hex"), size: 4 },

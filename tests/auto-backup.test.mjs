@@ -53,8 +53,8 @@ test("runAutoBackup saves once a day, never when switched off, and never throws"
 
 test("a saved backup reads back to the same payload, and anything else is refused", async () => {
   assert.deepEqual(readBackupText(backupText(payload, 1)), payload);
-  assert.throws(() => readBackupText("not json"), /不是 Clipboxx 的备份文件/);
-  assert.throws(() => readBackupText(JSON.stringify({ format: "other", version: 1, payload })), /不是 Clipboxx 的备份文件/);
+  assert.throws(() => readBackupText("not json"), /不是 Copyboxx 的备份文件/);
+  assert.throws(() => readBackupText(JSON.stringify({ format: "other", version: 1, payload })), /不是 Copyboxx 的备份文件/);
   assert.throws(() => readBackupText(JSON.stringify({ format: "clipbox-auto-backup", version: 1, payload: { localStorage: { "bad": "1" }, indexedDB: {} } })), /文件内容不对/);
 });
 

@@ -13,7 +13,7 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
 | `/preview/` | Asks for the passphrase first (see below), then the web preview, a copy of `dist-preview/` (its pages use relative paths, so a subfolder works); `/preview` redirects there |
-| `/download/Clipboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`) |
+| `/download/Copyboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`) |
 | `/download/latest.json` | `{ version, notes, url, size, sha256, updatedAt }`, same shape as the desktop update check (D-023); not wired yet |
 | `/assets/site.<hash>.css` | The stylesheet; its name carries the first 8 hex of its sha256, so a changed file gets a new name |
 | `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/og-image.png` | Icons and the share card, copied from `icons/` |
@@ -42,7 +42,7 @@ so the upload fails with 401. KV writes and the script upload use the normal tok
 The Worker answers GET and HEAD (plus POST of the passphrase form to `/preview/`), sends an `ETag` (the file's
 sha256, 304 on a match), `no-cache` for `.html` and `.json` and for the other files under `preview/` (no hash in their
 names), a one-year immutable cache for `preview/assets/` (hashed names), one hour for the installer, and the installer
-as a download named `Clipboxx-Setup.exe`.
+as a download named `Copyboxx-Setup.exe`.
 
 ## 网页测试版口令 (preview passphrase)
 

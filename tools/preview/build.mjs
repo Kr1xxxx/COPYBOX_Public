@@ -79,7 +79,7 @@ export function renderWrapper(template, version, updated = "", updatedIso = "") 
 }
 
 export function ensureTitle(html) {
-  return html.includes("<title>") ? html : html.replace("<head>", "<head><title>Clipboxx</title>");
+  return html.includes("<title>") ? html : html.replace("<head>", "<head><title>Copyboxx</title>");
 }
 
 function walk(dir) {
