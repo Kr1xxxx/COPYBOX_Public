@@ -76,6 +76,30 @@ type BlobRecord = { id: string; iv: string; ciphertext: ArrayBuffer };
 type ThumbRecord = { id: string; bytes: ArrayBuffer; type: string };
 type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 
+// Writes still under way (encrypting or committing), so quitting and restoring a backup can wait for them.
+const pendingWrites = new Set<Promise<void>>();
+const WRITE_METHODS = ["add", "rename", "remove", "trash", "restore", "markUsed", "moveImage", "setPinned", "createFolder", "renameFolder", "reorderFolders", "setFolderColor", "deleteFolder"] as const satisfies readonly (keyof ImageStore)[];
+
+function trackWrites(store: ImageStore): ImageStore {
+  const tracked: Record<string, unknown> = { ...store };
+  for (const name of WRITE_METHODS) {
+    const write = store[name] as (...args: unknown[]) => Promise<unknown>;
+    tracked[name] = (...args: unknown[]) => {
+      const work = write(...args);
+      const settled = work.then(() => undefined, () => undefined);
+      pendingWrites.add(settled);
+      void settled.then(() => pendingWrites.delete(settled));
+      return work;
+    };
+  }
+  return tracked as ImageStore;
+}
+
+// Resolves once no image write is under way, including ones started while waiting. Never rejects.
+export async function waitForImageWrites(): Promise<void> {
+  while (pendingWrites.size > 0) await Promise.all(pendingWrites);
+}
+
 export function normalizeImageTitle(raw: string, fallback: string): string {
   const title = raw.trim().replace(/\s+/g, " ");
   return Array.from(title || fallback.trim()).slice(0, IMAGE_TITLE_MAX).join("");
@@ -339,7 +363,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
     return new Blob([await unseal(key, "blobs", record)], { type: meta.type });
   }
 
-  return {
+  return trackWrites({
     async list() {
       return (await listImages()).sort((a, b) => b.createdAt - a.createdAt);
     },
@@ -510,7 +534,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
         ({ folder, ...rest }) => (folder === target.name ? { ...rest, updatedAt: time } : null),
       );
     },
-  };
+  });
 }
 
 export async function toPngBytes(blob: Blob): Promise<Uint8Array> {

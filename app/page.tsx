@@ -62,6 +62,11 @@ import {
   type SnippetImportPreview,
 } from "./snippet-import";
 import { createLazyWriter, type LazyWriter } from "./lazy-writer";
+import { derivePbkdf2AesKey } from "./key-cache";
+import { assertWritesOpen, onQuiesce, writesClosed } from "./write-gate";
+import { drainAll } from "./store-queue";
+import { waitForImageWrites } from "./image-store";
+import { isQuotaError, isStorageNearlyFull, STORAGE_FULL_MESSAGE, STORAGE_NEARLY_FULL_MESSAGE } from "./clipbox-core";
 import { FolderRow } from "./folder-row";
 import { ListEmptyState } from "./list-empty-state";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
@@ -153,8 +158,9 @@ function timestampNow() {
 }
 
 function bytesToBase64(bytes: Uint8Array) {
+  // 32 KB at a time: one call per byte is slow for a large vault, one call for everything overflows the stack.
   let binary = "";
-  bytes.forEach((byte) => (binary += String.fromCharCode(byte)));
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
   return btoa(binary);
 }
 
@@ -167,21 +173,9 @@ function createDeviceKey() {
   return bytesToBase64(crypto.getRandomValues(new Uint8Array(32)));
 }
 
+// The vault keeps its salt between saves, so this is the same key every time; it is worked out once (key-cache.ts).
 async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
+  return derivePbkdf2AesKey(password, salt, iterations);
 }
 
 async function encryptVault(data: VaultData, password: string, oldSalt?: string) {
@@ -729,10 +723,22 @@ export default function Home() {
     return queued;
   }, []);
 
+  // The "storage is nearly full" warning shows once per app session.
+  const storageWarnedRef = useRef(false);
   const storeVault = useCallback(async (data: VaultData) => {
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as VaultEnvelope | null;
     const envelope = await encryptVault(data, deviceKey, current?.salt);
+    // A backup restore may be replacing everything right now (write-gate.ts): then this old data must not be written.
+    assertWritesOpen();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+    if (!storageWarnedRef.current && isStorageNearlyFull(localStorage)) {
+      storageWarnedRef.current = true;
+      // After the save's own message (such as 条目已更新), so that one does not replace it at once.
+      window.setTimeout(() => {
+        setToast(STORAGE_NEARLY_FULL_MESSAGE);
+        window.setTimeout(() => setToast(""), 3600);
+      }, 0);
+    }
   }, [deviceKey]);
 
   const commitVaultToMemory = useCallback((data: VaultData) => {
@@ -772,23 +778,38 @@ export default function Home() {
     if (loading || !deviceKey) return;
     const writer = createLazyWriter({
       write: () => enqueueVaultTask(() => storeVault(readVault())),
-      onError: () => { setToast("最近的改动保存失败，请再操作一次"); },
+      onError: (error) => {
+        // A backup restore is replacing everything and the page reloads next: nothing to tell.
+        if (writesClosed()) return;
+        setToast(isQuotaError(error) ? STORAGE_FULL_MESSAGE : "最近的改动保存失败，请再操作一次");
+      },
     });
     lazyWriterRef.current = writer;
     const flush = () => { void writer.flush(); };
     const flushWhenHidden = () => { if (document.hidden) flush(); };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flushWhenHidden);
+    // Everything waiting is saved: queued edits, the delayed writer, the 账号 stores and pictures being written.
+    const saveEverything = async () => {
+      await persistQueueRef.current;
+      await writer.flush();
+      await persistQueueRef.current;
+      await drainAll();
+      await waitForImageWrites();
+    };
     const removeFlushRequest = window.clipboxDesktop?.onFlushRequest?.(() => {
       // Immediate edits and queued lazy mutations must finish before we drain the lazy writer.
-      void persistQueueRef.current.then(() => writer.flush()).then(() => {
+      void saveEverything().then(() => {
         if (!writer.hasPending()) window.clipboxDesktop?.flushDone?.();
       });
     });
+    // Before a backup restore replaces the stored data, what is still waiting is saved (write-gate.ts).
+    const removeQuiesce = onQuiesce(saveEverything);
     return () => {
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", flushWhenHidden);
       removeFlushRequest?.();
+      removeQuiesce();
       void writer.flush();
       if (lazyWriterRef.current === writer) lazyWriterRef.current = null;
     };
