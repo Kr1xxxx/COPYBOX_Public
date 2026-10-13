@@ -8,6 +8,9 @@ export type VaultBoxPayload = { totp: TotpAccount[]; items: VaultItem[] };
 export type VaultBoxEnvelope = { version: 1; salt: string; iv: string; ciphertext: string; iterations: number };
 
 const ITERATIONS = 310_000;
+// A file may ask for its own PBKDF2 count; outside this range it is refused, so a made-up file cannot freeze the app.
+export const MIN_ITERATIONS = 100_000;
+export const MAX_ITERATIONS = 5_000_000;
 const LABEL = new TextEncoder().encode("clipbox-vault-box:backup");
 
 function toBase64(bytes: Uint8Array) {
@@ -42,7 +45,12 @@ export function looksLikeVaultBox(value: unknown): value is VaultBoxEnvelope {
   return !!box && box.version === 1 && typeof box.salt === "string" && typeof box.iv === "string" && typeof box.ciphertext === "string" && typeof box.iterations === "number";
 }
 
+export function isSaneIterationCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= MIN_ITERATIONS && value <= MAX_ITERATIONS;
+}
+
 export async function decryptVaultBox(envelope: VaultBoxEnvelope, password: string): Promise<VaultBoxPayload> {
+  if (!isSaneIterationCount(envelope.iterations)) throw new Error("这不是有效的 Clipbox 加密备份。");
   const key = await deriveKey(password, fromBase64(envelope.salt), envelope.iterations);
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(envelope.iv), additionalData: LABEL }, key, fromBase64(envelope.ciphertext));
   const parsed = JSON.parse(new TextDecoder().decode(plain)) as Partial<VaultBoxPayload>;
