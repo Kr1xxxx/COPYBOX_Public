@@ -14,7 +14,14 @@ struct Inner {
     quick_mode: bool,
     /// Opened by the tray or 快速搜索: the window may hide itself after a copy.
     mini_auto_hide: bool,
+    /// 固定在最上层 in the full window (the page remembers it and sends it on start).
+    pinned: bool,
     normal: Option<Bounds>,
+}
+
+/// Whether the window stays above others: the mini window always does, the full window only when pinned.
+pub fn stays_on_top(mini: bool, pinned: bool) -> bool {
+    mini || pinned
 }
 
 #[derive(Clone, Default)]
@@ -146,6 +153,18 @@ impl WindowMode {
         self.emit_mode(window);
     }
 
+    /// Remembers the pin; the mini window is on top anyway, so it only changes the full window now.
+    pub fn set_pinned(&self, window: &WebviewWindow, pinned: bool) {
+        let mini = {
+            let mut inner = self.inner.lock().unwrap();
+            inner.pinned = pinned;
+            inner.quick_mode
+        };
+        if !mini {
+            let _ = window.set_always_on_top(stays_on_top(false, pinned));
+        }
+    }
+
     pub fn enter_full(&self, window: &WebviewWindow) {
         if !self.is_mini() {
             self.emit_mode(window);
@@ -158,7 +177,8 @@ impl WindowMode {
             inner.quick_mode = false;
             inner.mini_auto_hide = false;
         }
-        let _ = window.set_always_on_top(false);
+        let pinned = self.inner.lock().unwrap().pinned;
+        let _ = window.set_always_on_top(stays_on_top(false, pinned));
         let _ = window.set_max_size(None::<LogicalSize<f64>>);
         let _ = window.set_maximizable(true);
         let _ = window.set_min_size(Some(LogicalSize::new(ws::MIN_WIDTH, ws::MIN_HEIGHT)));
@@ -178,6 +198,12 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 pub fn set_window_mode(app: AppHandle, state: tauri::State<WindowMode>, mode: String) -> Result<(), String> {
     let window = main_window(&app)?;
     if mode == "mini" { state.enter_mini(&window, false) } else { state.enter_full(&window) }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_pinned(app: AppHandle, state: tauri::State<WindowMode>, pinned: bool) -> Result<(), String> {
+    state.set_pinned(&main_window(&app)?, pinned);
     Ok(())
 }
 
@@ -205,4 +231,17 @@ pub fn page_ready(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
     main_window(&app)?.show().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stays_on_top;
+
+    #[test]
+    fn mini_is_always_on_top_and_full_only_when_pinned() {
+        assert!(stays_on_top(true, false));
+        assert!(stays_on_top(true, true));
+        assert!(stays_on_top(false, true));
+        assert!(!stays_on_top(false, false));
+    }
 }
