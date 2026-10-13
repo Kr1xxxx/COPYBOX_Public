@@ -157,8 +157,9 @@ function copyFolder(from, to, expected, label) {
     console.warn(`warning: no ${label} folder at ${from}; the site is built without ${label}.`);
     return;
   }
+  // Only picture files: the folders also hold a README that must not end up on the site.
   const names = readdirSync(from, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && !entry.name.startsWith("."))
+    .filter((entry) => entry.isFile() && !entry.name.startsWith(".") && /\.(ico|svg|png|jpe?g|webp)$/i.test(entry.name))
     .map((entry) => entry.name);
   for (const name of expected) if (!names.includes(name)) console.warn(`warning: ${label} file ${name} is missing in ${from}.`);
   mkdirSync(to, { recursive: true });
