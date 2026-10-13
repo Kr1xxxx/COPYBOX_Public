@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the Clipboxx brand files in docs/brand/ (icon, wordmark, lockups).
+"""Builds the COPYBOXX brand files in docs/brand/ (icon, wordmark, lockups).
 
 Text is converted to outlines, so the SVG files need no fonts. To rebuild:
 
@@ -18,9 +18,8 @@ from fontTools.pens.transformPen import TransformPen
 # Palette (from the existing icon and app/globals.css)
 TILE = "#f6f5f2"       # icon background tile
 DARK = "#232325"       # icon squircle
-LAVENDER = "#ddd8ff"   # lock frame
-PAPER = "#f9f8ff"      # lock body
-VIOLET = "#776fb6"     # keyhole / accent letter (light)
+LAVENDER = "#ddd8ff"   # the U
+VIOLET = "#776fb6"     # accent letter (light), dot variant
 INK = "#1f1e1c"; INK_DARK = "#f1efe7"
 LINE = "#d9d5c9"; LINE_DARK = "#3f3d37"
 MUTED = "#55534d"; MUTED_DARK = "#b3b0a4"
@@ -48,28 +47,26 @@ class Face:
 def paths(glyphs, dx, dy, color, cls=None):
     return "".join(f'<path fill="{color}" transform="translate({dx + x:.2f} {dy:.2f})" d="{d}"/>' for d, x, _ in glyphs if d)
 
+NAME = "COPYBOXX"; TRACK = 0.02   # all caps: a little positive tracking
+
 def wordmark(inter, size, dx, dy, ink, accent):
-    """'Clipboxx' with the last x in the accent colour. Returns (svg, width)."""
-    g, w = inter.shape("Clipboxx", size, tracking=-0.028)
+    """The wordmark with the last X in the accent colour. Returns (svg, width)."""
+    g, w = inter.shape(NAME, size, tracking=TRACK)
     return paths(g[:-1], dx, dy, ink) + paths(g[-1:], dx, dy, accent), w
 
 def cn(noto, text, size, dx, dy, color, tracking=0.0):
     g, w = noto.shape(text, size, tracking)
     return paths(g, dx, dy, color), w
 
-def mark(x, y, h, with_tile=False):
-    """The icon squircle with the lock, scaled so the dark square is h tall (tile adds its margin)."""
+def mark(x, y, h, with_tile=False, dot=False):
+    """The icon: a sideways U (the C of COPYBOXX, an open box) in the dark squircle; h = squircle height."""
     k = h / 656.0
     tile = f'<rect x="0" y="0" width="1024" height="1024" rx="228" fill="{TILE}"/>' if with_tile else ""
     off = 0 if with_tile else -184
+    extra = f'<circle cx="596" cy="512" r="46" fill="{VIOLET}"/>' if dot else ""
     inner = f'''
 <rect x="184" y="184" width="656" height="656" rx="196" fill="{DARK}"/>
-<rect x="330" y="330" width="364" height="364" rx="104" fill="{LAVENDER}"/>
-<rect x="392" y="362" width="240" height="220" rx="70" fill="{DARK}"/>
-<rect x="366" y="471" width="292" height="192" rx="54" fill="{DARK}"/>
-<path d="M454 398H570A26 26 0 0 1 596 424V442A10 10 0 0 1 586 452H438A10 10 0 0 1 428 442V424A26 26 0 0 1 454 398Z" fill="{LAVENDER}"/>
-<rect x="403" y="489" width="218" height="137" rx="44" fill="{PAPER}"/>
-<rect x="498" y="503" width="28" height="111" rx="14" fill="{VIOLET}"/>'''
+<path d="M681 350H486A162 162 0 0 0 486 674H681" fill="none" stroke="{LAVENDER}" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/>{extra}'''
     return f'<g transform="translate({x:.2f} {y:.2f}) scale({k:.5f}) translate({off} {off})">{tile}{inner}</g>'
 
 def svg(w, h, body, bg=None):
@@ -81,29 +78,30 @@ def build(inter, noto, out):
     os.makedirs(out, exist_ok=True)
     def write(name, s): open(os.path.join(out, name), "w").write(s)
 
-    # 1. App icon (refined original): 1024 with tile, and the bare mark.
+    # 1. App icon: 1024 with tile, and the bare mark.
     write("icon.svg", svg(1024, 1024, mark(0, 0, 656, with_tile=True)))
     write("icon-mark.svg", svg(656, 656, mark(0, 0, 656)))
+    write("icon-dot.svg", svg(1024, 1024, mark(0, 0, 656, with_tile=True, dot=True)))   # alternative, not used
 
     for theme, ink, accent, line, muted, bg in (("light", INK, VIOLET, LINE, MUTED, None),
                                                ("dark", INK_DARK, LAVENDER, LINE_DARK, MUTED_DARK, None)):
         sfx = "" if theme == "light" else "-dark"
         pad = 24; size = 100; cap = CAP * size
 
-        # 2. Wordmark: Clipboxx alone.
+        # 2. Wordmark alone.
         wm, w = wordmark(inter, size, pad, pad + cap, ink, accent)
-        write(f"wordmark{sfx}.svg", svg(w + 2 * pad, cap + 2 * pad + 4, wm))
+        write(f"wordmark{sfx}.svg", svg(w + 2 * pad, cap + 2 * pad, wm))
         wm_mono, _ = wordmark(inter, size, pad, pad + cap, ink, ink)   # single colour (print, stamps)
-        write(f"wordmark-mono{sfx}.svg", svg(w + 2 * pad, cap + 2 * pad + 4, wm_mono))
+        write(f"wordmark-mono{sfx}.svg", svg(w + 2 * pad, cap + 2 * pad, wm_mono))
 
-        # 3. Wordmark with Chinese: Clipboxx 复制盒 (one line, as in the settings header).
+        # 3. Wordmark with Chinese: COPYBOXX 复制盒 (one line, for a page header).
         cn_size = 46; gap = 22
         cn_base = pad + cap - cap / 2 + CN_MID * cn_size
         wm, w = wordmark(inter, size, pad, pad + cap, ink, accent)
         c, cw = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, muted, tracking=0.04)
-        write(f"wordmark-cn{sfx}.svg", svg(w + gap + cw + 2 * pad, cap + 2 * pad + 4, wm + c))
+        write(f"wordmark-cn{sfx}.svg", svg(w + gap + cw + 2 * pad, cap + 2 * pad, wm + c))
 
-        # 4. Horizontal lockup: mark + Clipboxx | 复制盒.
+        # 4. Horizontal lockup: mark + COPYBOXX | 复制盒.
         mh = 104; mid = pad + mh / 2
         body = mark(pad, pad, mh)
         x = pad + mh + 26
@@ -114,11 +112,12 @@ def build(inter, noto, out):
         c, cw = cn(noto, "复制盒", 40, x, mid + CN_MID * 40, muted, tracking=0.06); body += c
         write(f"lockup-horizontal{sfx}.svg", svg(x + cw + pad, mh + 2 * pad, body))
 
-        # 5. Stacked lockup: mark above, Clipboxx, 复制盒 letter-spaced.
-        mh = 168; W = 520
+        # 5. Stacked lockup: mark above, COPYBOXX, 复制盒 letter-spaced.
+        mh = 168
+        g, w = inter.shape(NAME, size, tracking=TRACK)
+        W = w + 2 * pad + 32
         body = mark((W - mh) / 2, pad, mh)
         y = pad + mh + 40 + cap
-        g, w = inter.shape("Clipboxx", size, tracking=-0.028)
         body += paths(g[:-1], (W - w) / 2, y, ink) + paths(g[-1:], (W - w) / 2, y, accent)
         cn_size = 34; y += 46 + cn_size * 0.85
         g2, w2 = noto.shape("复制盒", cn_size, tracking=0.5)
