@@ -148,12 +148,13 @@ export function RecoveryCloseConfirm({ onCancel, onConfirm }: { onCancel: () => 
   const cancelRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { cancelRef.current?.focus(); }, []);
   return (
-    <div className="delete-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
-      <section className="delete-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="recovery-close-title" aria-describedby="recovery-close-description">
-        <header><h2 id="recovery-close-title">恢复码还没保存，确定关闭吗？</h2><p id="recovery-close-description">关闭后这个恢复码就看不到了。下次用密码打开账号页时，会再给你一个新的。</p></header>
-        <form onSubmit={(event) => { event.preventDefault(); onConfirm(); }}>
-          <div className="delete-confirm-actions"><button ref={cancelRef} type="button" onClick={onCancel}>回去保存</button><button className="danger">仍然关闭</button></div>
-        </form>
+    <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+      <section className="backup-dialog" role="alertdialog" aria-modal="true" aria-labelledby="recovery-close-title" aria-describedby="recovery-close-description">
+        <header className="backup-head"><div><p>账号页密码</p><h2 id="recovery-close-title">恢复码还没保存，确定关闭吗？</h2></div></header>
+        <div className="backup-form">
+          <p className="backup-intro" id="recovery-close-description">关闭后这个恢复码就看不到了。下次用密码打开账号页时，会再给你一个新的。</p>
+          <div className="backup-actions"><button type="button" onClick={onConfirm}>仍然关闭</button><button ref={cancelRef} type="button" className="primary" onClick={onCancel}>回去保存</button></div>
+        </div>
       </section>
     </div>
   );

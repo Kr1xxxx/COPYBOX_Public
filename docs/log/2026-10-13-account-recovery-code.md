@@ -1,0 +1,7 @@
+# 账号: unseen recovery code is replaced; pre-migration copy deletes itself
+
+- Date: 2026-10-13 · Thread/agent: coordinator worker W3 (fix-account-recovery)
+- What changed: The version 2 lock record (`clipbox.account-lock.v1`) gets an optional `codeShown` field (false when a code is made, true once the user ticks and presses 完成; missing = saved). Unlocking with the password while it is false makes a new recovery code (the old one stops working) and shows it on the lock screen before the page opens; closing 设置 while a code is on screen asks first. The pre-migration copy (`clipbox.account-premigration.v1`) now records the page load that made it and the later page loads in which the data opened with K; on the third it is deleted (only when the migration is finished and the stores read fine with K). D-042. Files: `app/account-lock.ts`, `app/account-encryption.ts`, `app/account-lock-ui.tsx`, `app/settings.tsx` (close guard only); tests `tests/account-recovery.test.mjs`, `tests/e2e/account-recovery.e2e.mjs`.
+- User-visible change (plain Chinese, for the preview changelog): 设密码时如果恢复码还没确认保存就中断了，下次用密码打开账号页会重新给你一个新的恢复码；关设置时恢复码还没保存会先问你；开启加密前留的旧数据备份，之后三次打开账号页都正常后会自动删除。
+- Not done / risks: Not walked through in the desktop app (Windows/Mac); browser only. The lock-screen code panel reuses existing classes plus two small inline styles (tick box size, text width) because `app/globals.css` was outside this task. A full backup restored from before this change may bring back a pre-migration copy without a counter; it is then counted like any old copy.
+- Next step: 无
