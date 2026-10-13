@@ -7,7 +7,7 @@ The public site. `build.mjs` writes the files to `dist-website/`; a Cloudflare W
 | Path | What it is |
 | --- | --- |
 | `/` | Product introduction in Chinese (`index.html`; version, installer size and date are filled in at build time) |
-| `/preview/` | The web preview, a copy of `dist-preview/` (its pages use relative paths, so a subfolder works); `/preview` redirects there |
+| `/preview/` | Asks for the passphrase first (see below), then the web preview, a copy of `dist-preview/` (its pages use relative paths, so a subfolder works); `/preview` redirects there |
 | `/download/Clipboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`) |
 | `/download/latest.json` | `{ version, notes, url, size, sha256, updatedAt }`, same shape as the desktop update check (D-023); not wired yet |
 | anything else | `404.html` with status 404 |
@@ -18,10 +18,23 @@ Why KV and not Workers static assets: wrangler uploads static assets with a shor
 `Authorization` header, and the agent proxy of the Claude cloud session replaces that header with the account token,
 so the upload fails with 401. KV writes and the script upload use the normal token.
 
-The Worker answers GET and HEAD only, sends an `ETag` (the file's sha256, 304 on a match), `no-cache` for `.html` and
-`.json` and for the other files under `preview/` (no hash in their names), a one-year immutable cache for
-`preview/assets/` (hashed names), one hour for the installer, and the
-installer as a download named `Clipboxx-Setup.exe`.
+The Worker answers GET and HEAD (plus POST of the passphrase form to `/preview/`), sends an `ETag` (the file's
+sha256, 304 on a match), `no-cache` for `.html` and `.json` and for the other files under `preview/` (no hash in their
+names), a one-year immutable cache for `preview/assets/` (hashed names), one hour for the installer, and the installer
+as a download named `Clipboxx-Setup.exe`.
+
+## 网页测试版口令 (preview passphrase)
+
+Everything under `/preview/` asks for a passphrase first; `/`, `/download/*` and the 404 page do not. The passphrase is
+`PREVIEW_SECRET` in `wrangler.jsonc` (`vars`); it is case-insensitive and surrounding spaces are ignored. To change it,
+edit it there and run `npm run website:deploy` (changing it also logs everyone out). If it is missing or blank, nobody
+gets in and the page says 网页测试版暂未开放.
+
+The page is `preview-gate.html` (KV key of the same name, with an inline fallback in `worker.mjs`); the form posts to
+`/preview/`. A right answer sets the cookie `preview_pass` (a SHA-256 of the passphrase, `HttpOnly`, `Secure`,
+`Path=/preview`) for 30 days. Without it, preview pages show the passphrase page and other preview files answer 401
+「需要口令」. This is a light gate that keeps the preview to colleagues, not a security boundary: anyone who knows
+the passphrase can share it, and the preview holds only sample data.
 
 ## Build and deploy
 

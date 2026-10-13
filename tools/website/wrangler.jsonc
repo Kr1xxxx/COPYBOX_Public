@@ -6,6 +6,8 @@
   "workers_dev": false,
   "preview_urls": false,
   "main": "worker.mjs",
+  // PREVIEW_SECRET is the 口令 (passphrase) for /preview/, case-insensitive. Change it here and deploy again.
+  "vars": { "PREVIEW_SECRET": "comely" },
   "kv_namespaces": [{ "binding": "FILES", "id": "fb78ad5c8e0e4469adff21ebbe638088" }],
   "routes": [
     { "pattern": "copyboxx.com", "custom_domain": true },
