@@ -16,10 +16,8 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 
 # Palette (from the existing icon and app/globals.css)
-TILE = "#f6f5f2"       # icon background tile
-DARK = "#232325"       # icon squircle
-LAVENDER = "#ddd8ff"   # the U
-VIOLET = "#776fb6"     # accent letter (light), dot variant
+LAVENDER = "#c9c2ff"   # accent letter on dark
+VIOLET = "#7d6ee6"     # accent letter (light)
 INK = "#1f1e1c"; INK_DARK = "#f1efe7"
 LINE = "#d9d5c9"; LINE_DARK = "#3f3d37"
 MUTED = "#55534d"; MUTED_DARK = "#b3b0a4"
@@ -58,15 +56,26 @@ def cn(noto, text, size, dx, dy, color, tracking=0.0):
     g, w = noto.shape(text, size, tracking)
     return paths(g, dx, dy, color), w
 
-def mark(x, y, h, with_tile=False, dot=False):
-    """The icon: a sideways U (the C of COPYBOXX, an open box) in the dark squircle; h = squircle height."""
-    k = h / 656.0
+GREEN = "#36d07a"      # the two clips
+INNER = "#262626"      # inner plate
+CREAM = "#f4f3ef"      # the U
+PURPLE = "#8b7df0"     # the copied item in the U's mouth
+TILE = "#f3f3f1"; DARK = "#161616"
+
+def mark(x, y, h, with_tile=False):
+    """The icon (owner's original, redrawn): dark squircle with two green clips, an inner plate, a cream
+    sideways U (the C of COPYBOXX / an open box) and a purple item in its mouth. h = squircle height."""
+    k = h / 784.0
     tile = f'<rect x="0" y="0" width="1024" height="1024" rx="228" fill="{TILE}"/>' if with_tile else ""
-    off = 0 if with_tile else -184
-    extra = f'<circle cx="596" cy="512" r="46" fill="{VIOLET}"/>' if dot else ""
+    off = 0 if with_tile else -120
     inner = f'''
-<rect x="184" y="184" width="656" height="656" rx="196" fill="{DARK}"/>
-<path d="M681 350H486A162 162 0 0 0 486 674H681" fill="none" stroke="{LAVENDER}" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/>{extra}'''
+<rect x="120" y="120" width="784" height="784" rx="210" fill="{DARK}"/>
+<rect x="412" y="96" width="200" height="76" rx="30" fill="{GREEN}"/>
+<rect x="412" y="852" width="200" height="76" rx="30" fill="{GREEN}"/>
+<rect x="268" y="268" width="488" height="488" rx="118" fill="{INNER}"/>
+<path d="M646 358H480A122 122 0 0 0 358 480V544A122 122 0 0 0 480 666H646" fill="none" stroke="{CREAM}" stroke-width="84" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="590" y="478" width="82" height="68" rx="20" fill="{PURPLE}"/>
+<circle cx="150" cy="512" r="13" fill="#4a4a4a"/>'''
     return f'<g transform="translate({x:.2f} {y:.2f}) scale({k:.5f}) translate({off} {off})">{tile}{inner}</g>'
 
 def svg(w, h, body, bg=None):
@@ -79,9 +88,8 @@ def build(inter, noto, out):
     def write(name, s): open(os.path.join(out, name), "w").write(s)
 
     # 1. App icon: 1024 with tile, and the bare mark.
-    write("icon.svg", svg(1024, 1024, mark(0, 0, 656, with_tile=True)))
-    write("icon-mark.svg", svg(656, 656, mark(0, 0, 656)))
-    write("icon-dot.svg", svg(1024, 1024, mark(0, 0, 656, with_tile=True, dot=True)))   # alternative, not used
+    write("icon.svg", svg(1024, 1024, mark(0, 0, 784, with_tile=True)))
+    write("icon-mark.svg", svg(784, 784, mark(0, 0, 784)))
 
     for theme, ink, accent, line, muted, bg in (("light", INK, VIOLET, LINE, MUTED, None),
                                                ("dark", INK_DARK, LAVENDER, LINE_DARK, MUTED_DARK, None)):
