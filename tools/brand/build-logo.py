@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the COPYBOXX brand files in docs/brand/ (icon, wordmark, lockups).
+"""Builds the Copyboxx brand files in docs/brand/ (icon, wordmark, lockups).
 
 Text is converted to outlines, so the SVG files need no fonts. To rebuild:
 
@@ -149,7 +149,7 @@ def build(inter, noto, out):
         c_mono, _ = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink, purple=ink)
         write(f"wordmark-cn-mono{sfx}.svg", svg(w + gap + cw + 2 * pad, H, wm_mono + c_mono))
 
-        # 4. Horizontal lockup: mark + COPYBOXX | 复制盒.
+        # 4. Horizontal lockup: mark + Copyboxx | 复制盒.
         mh = 112; mid = pad + mh / 2
         body = mark(pad, pad, mh)
         x = pad + mh + 26
@@ -160,7 +160,7 @@ def build(inter, noto, out):
         c, cw = cn(noto, "复制盒", 50, x, mid + CN_MID * 50, ink, purple=accent); body += c
         write(f"lockup-horizontal{sfx}.svg", svg(x + cw + pad, max(mh + 2 * pad, mid + cap / 2 + desc + pad), body))
 
-        # 5. Stacked lockup: mark above, COPYBOXX, 复制盒 letter-spaced.
+        # 5. Stacked lockup: mark above, Copyboxx, 复制盒 letter-spaced.
         mh = 168
         g, w = inter.shape(NAME, size, tracking=TRACK)
         W = w + 2 * pad + 32
