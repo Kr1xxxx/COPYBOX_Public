@@ -23,6 +23,11 @@
     backupSave: function (name, bytes) { return invoke("backup_save", bytes, { headers: { "x-backup-name": name } }).then(noop); },
     backupList: function () { return invoke("backup_list"); },
     backupRead: function (name) { return invoke("backup_read", { name: name }).then(function (buffer) { return new Uint8Array(buffer); }); },
+    // The backups' pictures, one shared file each in backups/images/ (D-043); same body/header shape as backupSave.
+    backupImageSave: function (name, bytes) { return invoke("backup_image_save", bytes, { headers: { "x-backup-name": name } }).then(noop); },
+    backupImageList: function () { return invoke("backup_image_list"); },
+    backupImageRead: function (name) { return invoke("backup_image_read", { name: name }).then(function (buffer) { return new Uint8Array(buffer); }); },
+    backupImagePrune: function (keep) { return invoke("backup_image_prune", { keep: keep }).then(noop); },
     didCopy: function () { fireAndForget("did_copy"); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
     setMiniHidePolicy: function (policy) { fireAndForget("set_mini_hide_policy", { policy: policy }); },
