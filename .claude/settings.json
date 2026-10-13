@@ -2,6 +2,6 @@
   "model": "opus",
   "effortLevel": "high",
   "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus"
   }
 }

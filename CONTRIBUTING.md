@@ -22,8 +22,9 @@ For company developers and AI agents. Read `AGENTS.md` first.
 - CI runs three checks: lint + tests, browser end-to-end tests, and a handoff check (fails if `app/`,
   `src-tauri/` or `package.json` changed without a new note in `docs/log/`). All three must be green.
 - CI also runs `merge policy` (`scripts/classify-pr.mjs`): small PRs merge themselves when everything is green;
-  big ones get the `needs-owner` label and wait. Label new/removed features and layout changes `major` yourself.
-- A `needs-owner` PR is merged only after the owner says 合并 in the conversation. Never push to `main`.
+  big ones get the `needs-owner` label. Label new/removed features and layout changes `major` yourself.
+- Who merges what is in AGENTS.md "Merging" (D-041): green PRs are merged by the agent, high-risk ones only after
+  the owner says 合并. Never push to `main`.
 
 ## Finishing a task
 
