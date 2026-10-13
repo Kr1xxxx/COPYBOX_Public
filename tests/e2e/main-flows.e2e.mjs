@@ -2,6 +2,19 @@ import { expect, test } from "@playwright/test";
 import { pinyin } from "pinyin-pro";
 import { seedSnippets } from "./helpers.mjs";
 
+// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
+// checks 50 ms apart (this also covers spring motion and scrolling, which document.getAnimations() does not list).
+async function settle(page) {
+  await page.evaluate(() => { window.__settleShot = undefined; });
+  await page.waitForFunction(() => {
+    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
+    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
+    const same = shot === window.__settleShot;
+    window.__settleShot = shot;
+    return same;
+  }, null, { polling: 50 });
+}
+
 test.beforeEach(async ({ page }) => { await seedSnippets(page); });
 
 test("importing the sample sheet gives 34 snippets and the standard folders", async ({ page }) => {
@@ -11,19 +24,23 @@ test("importing the sample sheet gives 34 snippets and the standard folders", as
 
 test("switching entries folds the old card away gradually instead of removing it at once", async ({ page }) => {
   await page.locator(".native-row .row-main").nth(1).click();
-  await page.waitForTimeout(500);
+  await settle(page);
   await page.evaluate(() => {
     window.__heights = [];
+    window.__sampled = false;
+    // Sample every frame from the moment the old card starts folding until it is gone (a slow click must not eat the window).
     const start = performance.now();
     const tick = () => {
       const closing = document.querySelector(".row-detail.closing");
       if (closing) window.__heights.push(closing.getBoundingClientRect().height);
-      if (performance.now() - start < 500) requestAnimationFrame(tick);
+      const done = (!closing && window.__heights.length > 0) || performance.now() - start > 3000;
+      if (done) window.__sampled = true;
+      else requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
   await page.locator(".native-row .row-main").nth(4).click();
-  await page.waitForTimeout(700);
+  await page.waitForFunction(() => window.__sampled);
   const heights = await page.evaluate(() => window.__heights);
   expect(heights.length).toBeGreaterThan(4);
   expect(heights[0]).toBeGreaterThan(heights.at(-1));
@@ -254,7 +271,7 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await name.blur();
   // bring the list fully into view first: a scroll after the menu opened would close it
   await options.first().scrollIntoViewIfNeeded();
-  await page.waitForTimeout(200);
+  await settle(page);
   await options.first().click({ button: "right" });
   await expect(page.getByRole("menuitem", { name: "固定" })).toBeDisabled();
   await page.getByRole("menuitem", { name: "解锁" }).click();
@@ -288,7 +305,7 @@ test("the Chinese text only asks for its own variables, and a long value stays i
 test("no keyboard shortcut hints anywhere and Ctrl+E does nothing", async ({ page }) => {
   await expect(page.locator("kbd")).toHaveCount(0);
   await page.keyboard.press("Control+e");
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(200); // on purpose: nothing may open in this time (there is no event to wait for)
   await expect(page.locator(".inline-editor")).toHaveCount(0);
   // plain arrows in the search box still move the selection
   await page.locator("input[placeholder*=搜索]").focus();
@@ -505,6 +522,7 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   await row("甲").hover();
   const handle = row("甲").locator(".folder-drag-handle");
   await expect(handle).toHaveCSS("opacity", "1");
+  await settle(page); // measure the handle and the target once the new rows and the sidebar have stopped moving
   const [h, label, rowBox] = await Promise.all([handle.boundingBox(), row("甲").locator(".directory-main").boundingBox(), row("甲").boundingBox()]);
   expect(h.x - rowBox.x).toBeLessThanOrEqual(8);
   expect(h.x + h.width).toBeLessThan(label.x + label.width / 2);
@@ -527,7 +545,10 @@ test("a folder can be dragged by the three-bar handle on its left, right in the 
   await page.locator(".settings-dialog").getByRole("tab", { name: "目录" }).click();
   const group = page.locator(".settings-dialog .settings-folder-group").nth(0);
   await group.getByRole("button", { name: /话术目录/ }).click();
-  expect(await group.locator(".settings-folder-name").allInnerTexts()).toEqual(after);
+  // The panel is visibility:hidden while closed and becomes visible a frame after the click; innerText of hidden text is "",
+  // so read the names only once they show (this was the cause of the empty names in the old flake).
+  await expect(group.locator(".settings-folder-name").first()).toBeVisible();
+  await expect(group.locator(".settings-folder-name")).toHaveText(after, { useInnerText: true });
 
   // Every drag handle is the same six-dot pill.
   const look = (locator) => locator.evaluate((element) => { const c = getComputedStyle(element); return { w: c.width, h: c.height, r: c.borderRadius, dots: element.querySelector("path").getAttribute("d").split("M").length - 1 }; });
@@ -602,9 +623,12 @@ test("the standard 话术 folders can be dragged to a new place and the order is
   const row = (n) => page.locator(".sidebar .directory-row", { hasText: n });
   const before = await names();
   expect(before.slice(0, 3)).toEqual(["询盘接待", "产品样品", "报价成交"]);
+  const storedVault = () => page.evaluate(() => localStorage.getItem("clipbox.vault.v1"));
+  const savedBefore = await storedVault();
   await row("询盘接待").hover();
   const handle = row("询盘接待").locator(".folder-drag-handle");
   await expect(handle).toHaveCSS("opacity", "1");
+  await settle(page);
   const h = await handle.boundingBox();
   const target = await row("报价成交").boundingBox();
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
@@ -618,7 +642,7 @@ test("the standard 话术 folders can be dragged to a new place and the order is
   const after = await names();
   expect([...after].sort()).toEqual([...before].sort());
   await expect(page.locator(".toast")).toContainText("目录顺序已更新");
-  await page.waitForTimeout(1500); // the vault is saved a moment after a change
+  await expect.poll(storedVault).not.toBe(savedBefore); // the vault is saved a moment after a change
   await page.reload();
   await page.waitForSelector(".app-shell");
   expect(await names()).toEqual(after);

@@ -13,7 +13,10 @@ export async function seedSnippets(page) {
   await chooser.setFiles(SAMPLE_CSV);
   await page.locator("[role=dialog]").getByRole("button", { name: /导入 \d+ 条/ }).click();
   await page.waitForSelector(".native-row");
-  await page.waitForTimeout(2500); // list entrance animation
+  // Wait for the list entrance animation (rows slide in one after another) instead of a fixed pause.
+  // Endless animations (a spinner) never finish, so they are left out.
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  // The "已导入 … 条话术" toast may still show; a newer toast replaces it together with its timer (app/use-toast.ts).
 }
 
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").

@@ -27,6 +27,19 @@ const navCount = (page, label) => sidebar(page).locator(".nav-item", { hasText: 
 const folderRow = (page, name) => sidebar(page).locator(".directory-row", { hasText: name });
 const title = (page) => page.locator(".section-head h1");
 
+// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
+// checks 50 ms apart (this also covers spring motion and scrolling, which document.getAnimations() does not list).
+async function settle(page) {
+  await page.evaluate(() => { window.__settleShot = undefined; });
+  await page.waitForFunction(() => {
+    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
+    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
+    const same = shot === window.__settleShot;
+    window.__settleShot = shot;
+    return same;
+  }, null, { polling: 50 });
+}
+
 async function createFolder(page, name) {
   await page.getByRole("button", { name: "新建目录" }).click();
   const input = page.getByRole("textbox", { name: "新目录名称" });
@@ -418,7 +431,7 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
     await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth), { message: name }).toBe(width);
     await expect.poll(() => image.evaluate((element) => element.naturalHeight)).toBe(height);
     await expect(image).toHaveCSS("object-fit", "contain");
-    await page.waitForTimeout(350); // Let the row finish opening.
+    await settle(page); // Let the row finish opening.
 
     const panel = await page.locator(".content-panel").boundingBox();
     const box = await preview.boundingBox();
@@ -557,6 +570,7 @@ test("图片 folders can be dragged by the three-bar handle in the sidebar, and 
   await row("甲").hover();
   const handle = row("甲").locator(".folder-drag-handle");
   await expect(handle).toHaveCSS("opacity", "1");
+  await settle(page); // measure the handle and the target once the new rows have stopped moving
   const h = await handle.boundingBox();
   const target = await row("丙").boundingBox();
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);

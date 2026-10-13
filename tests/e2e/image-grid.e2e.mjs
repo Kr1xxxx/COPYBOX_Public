@@ -27,6 +27,19 @@ const tile = (page, title) => page.locator(".image-tile", { has: page.getByRole(
 const card = (page) => page.locator(".image-card");
 const sidebar = (page) => page.locator(".sidebar");
 
+// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
+// checks 50 ms apart (this also covers spring motion driven from script, which document.getAnimations() does not list).
+async function settle(page) {
+  await page.evaluate(() => { window.__settleShot = undefined; });
+  await page.waitForFunction(() => {
+    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
+    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
+    const same = shot === window.__settleShot;
+    window.__settleShot = shot;
+    return same;
+  }, null, { polling: 50 });
+}
+
 async function boxes(locator) {
   const result = [];
   for (let index = 0; index < (await locator.count()); index += 1) result.push(await locator.nth(index).boundingBox());
@@ -99,7 +112,7 @@ test("clicking a tile opens a full-width card under its row; another tile moves 
   await mainButton(tiles(page).nth(1)).click();
   await expect(card(page)).toHaveCount(1);
   await expect(tiles(page).nth(1)).toHaveClass(/selected/);
-  await page.waitForTimeout(500); // the card opens with a short animation
+  await settle(page); // the card opens with a short animation
   const allTiles = await boxes(tiles(page));
   const open = await card(page).boundingBox();
   const rowOne = allTiles.slice(0, 4);
@@ -119,7 +132,7 @@ test("clicking a tile opens a full-width card under its row; another tile moves 
   await expect(card(page)).toHaveCount(1);
   await expect(tiles(page).nth(1)).not.toHaveClass(/selected/);
   await expect(tiles(page).nth(4)).toHaveClass(/selected/);
-  await page.waitForTimeout(500);
+  await settle(page);
   const moved = await card(page).boundingBox();
   const rows = await boxes(tiles(page));
   expect(moved.y).toBeGreaterThan(Math.max(...rows.slice(4, 6).map((box) => box.y + box.height)) - 1);
@@ -135,7 +148,7 @@ test("a card opened on the last, short row scrolls into view and the copy button
   await addSix(page, ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一"]);
   await mainButton(tiles(page).last()).click();
   await expect(card(page).getByRole("button", { name: "删除", exact: true })).toBeInViewport({ ratio: 1 });
-  await page.waitForTimeout(500);
+  await settle(page);
   const rows = await boxes(tiles(page));
   const open = await card(page).boundingBox();
   expect(open.y).toBeGreaterThan(rows[10].y + rows[10].height - 1);
@@ -303,7 +316,7 @@ test("extreme pictures neither overflow the window nor the opened card", async (
     await tile(page, title).getByRole("button", { name: `展开 ${title}` }).click();
     await expect(card(page)).toHaveCount(1);
     await expect.poll(() => card(page).locator(".image-preview img").evaluate((img) => img.naturalWidth)).toBe(sizes[index][0]);
-    await page.waitForTimeout(500);
+    await settle(page);
     const panel = await page.locator(".content-panel").boundingBox();
     const open = await card(page).boundingBox();
     const preview = await card(page).locator(".image-preview img").boundingBox();
@@ -324,7 +337,7 @@ test("the mini window shows a four-column grid, no switch, and a click copies", 
   await page.getByRole("button", { name: "迷你模式" }).click();
   await page.setViewportSize({ width: 360, height: 440 });
   await expect(page.locator(".mini-tile")).toHaveCount(5);
-  await page.waitForTimeout(500); // the window resizes and the tiles fade in; measure after they settle
+  await settle(page); // the window resizes and the tiles fade in; measure after they settle
   await expect(page.getByRole("button", { name: "宫格视图" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "列表视图" })).toHaveCount(0);
   const all = await boxes(page.locator(".mini-tile"));
@@ -370,7 +383,7 @@ test("the tile's copy icon turns into a check and back, and the toast appears an
   await card(page).getByRole("button", { name: "删除", exact: true }).click();
   const toast = page.locator(".toast");
   await expect(toast).toContainText("图片已移入回收站");
-  await page.waitForTimeout(500); // the toast rises with a short spring
+  await settle(page); // the toast rises with a short spring
   const box = await toast.boundingBox();
   const viewport = page.viewportSize();
   expect(box.y + box.height).toBeLessThan(viewport.height - 20);
