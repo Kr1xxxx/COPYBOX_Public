@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Share card for copyboxx.com (Open Graph / Twitter). Rendered to icons/og-image.png at 1200×630 by
+     make-icons.mjs; edit here and run `node tools/website/make-icons.mjs` again. -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Clipboxx 分享图</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden; position: relative;
+    background: #f7f8fa; color: #111318;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  }
+  .text { position: absolute; left: 80px; top: 0; bottom: 0; width: 720px; display: flex; flex-direction: column; justify-content: center; }
+  .brand { display: flex; align-items: center; gap: 20px; }
+  .brand img { width: 72px; height: 72px; }
+  .brand b { font-size: 64px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .brand span { font-size: 34px; color: #6b7280; line-height: 1; margin-top: 10px; }
+  h1 { margin: 52px 0 0; font-size: 54px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; }
+  p { margin: 28px 0 0; font-size: 28px; color: #6b7280; }
+  .glow { position: absolute; right: -80px; top: 50%; width: 620px; height: 620px; transform: translateY(-50%); border-radius: 50%;
+    background: radial-gradient(closest-side, #ffffff 0%, rgba(255,255,255,.7) 45%, rgba(247,248,250,0) 100%); }
+  .cards { position: absolute; right: 50px; top: 120px; width: 340px; height: 400px; }
+  .card { position: absolute; width: 230px; height: 290px; border-radius: 22px; background: #ffffff; padding: 26px 24px;
+    box-shadow: 0 1px 2px rgba(16,18,24,.06), 0 24px 60px rgba(16,18,24,.16); }
+  .card.a { left: 0; top: 40px; transform: rotate(-8deg); }
+  .card.b { left: 60px; top: 10px; transform: rotate(0deg); }
+  .card.c { left: 116px; top: 70px; transform: rotate(6deg); background: linear-gradient(150deg, #e9e6fb 0%, #c9c3f5 100%); }
+  .bar { height: 14px; border-radius: 7px; background: #e5e7eb; margin-bottom: 14px; }
+  .bar.title { width: 60%; height: 18px; background: #3b3f47; margin-bottom: 22px; }
+  .bar.short { width: 72%; }
+  .dots { display: flex; gap: 10px; margin: 6px 0 24px; }
+  .dots i { width: 14px; height: 14px; border-radius: 50%; background: #3b3f47; }
+  .chip { position: absolute; left: 24px; bottom: 26px; width: 78px; height: 34px; border-radius: 999px; background: #e9e6fb; }
+  .chip::after { content: ""; position: absolute; left: 22px; right: 22px; top: 14px; height: 6px; border-radius: 3px; background: #6f67c9; }
+  .tile { position: absolute; left: 24px; right: 24px; bottom: 26px; height: 150px; border-radius: 14px; background: rgba(255,255,255,.45); }
+  .tile::before { content: ""; position: absolute; left: 24px; top: 26px; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.85); }
+  .tile::after { content: ""; position: absolute; left: 22px; right: 22px; bottom: 22px; height: 52px; border-radius: 10px;
+    background: linear-gradient(160deg, rgba(111,103,201,.35), rgba(111,103,201,.6)); clip-path: polygon(0 100%, 32% 20%, 55% 65%, 75% 35%, 100% 100%); }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="text">
+    <div class="brand"><img src="icons/favicon.svg" alt=""><b>Clipboxx</b><span>复制盒</span></div>
+    <h1>常用话术、账号资料、图片，<br>一键复制</h1>
+    <p>本地加密 · 不用注册 · 不用联网</p>
+  </div>
+  <div class="cards" aria-hidden="true">
+    <div class="card a"><div class="bar title"></div><div class="bar"></div><div class="bar short"></div><div class="chip"></div></div>
+    <div class="card b"><div class="bar title"></div><div class="dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="bar short"></div><div class="chip"></div></div>
+    <div class="card c"><div class="bar title" style="background: rgba(255,255,255,.8)"></div><div class="tile"></div></div>
+  </div>
+</body>
+</html>
