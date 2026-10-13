@@ -51,7 +51,6 @@ async function fetchServerHtml() {
 const vinext = join(repo, "node_modules/vinext/dist/cli.js");
 const built = spawnSync(process.execPath, [vinext, "build"], {
   cwd: repo,
-  env: { ...process.env, WRANGLER_LOG_PATH: ".wrangler/wrangler.log" },
   stdio: "inherit",
 });
 if (built.status !== 0 || !existsSync(join(repo, "dist/client/_next"))) {
