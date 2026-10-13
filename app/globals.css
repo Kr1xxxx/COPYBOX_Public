@@ -178,6 +178,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .native-list::-webkit-scrollbar { display: none; }
 .native-row { position: relative; flex: 0 0 auto; border-radius: 9px; opacity: 0; transform: translateY(6px); animation: row-in .26s cubic-bezier(.2,.75,.2,1) forwards; transition: background .14s, box-shadow .18s; }
 .native-row:nth-child(2) { animation-delay: .03s; } .native-row:nth-child(3) { animation-delay: .06s; } .native-row:nth-child(4) { animation-delay: .09s; } .native-row:nth-child(n+5) { animation-delay: .12s; }
+/* A row slides in once. data-entered is set on the DOM node when row-in ends (app/row-entrance.ts), so a row that React
+   moves (starred to the top, dropped after a drag) does not fade in again. Editing and dragging keep their own look. */
+.native-row[data-entered]:not(.editing):not(.dragging) { animation: none; opacity: 1; transform: none; }
 .row-line { height: 52px; padding: 0 8px 0 4px; display: flex; align-items: center; gap: 2px; }
 .secret-row .row-line { height: 44px; }
 .native-row:not(.selected):hover { background: var(--hover); }
