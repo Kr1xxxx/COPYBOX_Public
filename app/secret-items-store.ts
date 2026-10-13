@@ -1,7 +1,9 @@
 // Encrypted store for the typed items of the hidden 保险箱 (Mac only): 收款信息 now, 账号密码 and API 密钥 later.
 // A separate AES-GCM envelope in its own localStorage key. The 验证码 accounts keep their own key (`clipbox.totp.v1`,
 // totp-store.ts) and are not touched, so older data stays readable without any migration.
+import { derivePbkdf2AesKey } from "./key-cache.ts";
 import { serialFor } from "./store-queue.ts";
+import { assertWritesOpen } from "./write-gate.ts";
 import type { ApiKeyItem, LoginItem, MarkItem, PaymentItem, RecoveryItem } from "./payment-core.ts";
 
 // Fired after every write, so the sidebar counts of the 账号 page stay right.
@@ -37,9 +39,20 @@ function base64ToBytes(value: string) {
   return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 }
 
-async function deriveKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(deviceKey), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+function deriveKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
+  return derivePbkdf2AesKey(deviceKey, salt, iterations);
+}
+
+// A rewrite keeps the salt of what is stored (the IV is new every time), so the key is the same and comes from memory.
+function saltFor(raw: string | null) {
+  try {
+    const stored = raw ? (JSON.parse(raw) as Partial<Envelope>) : null;
+    if (stored && stored.iterations === ITERATIONS && typeof stored.salt === "string") {
+      const salt = base64ToBytes(stored.salt);
+      if (salt.length === 16) return salt;
+    }
+  } catch { /* unreadable: start a new salt */ }
+  return crypto.getRandomValues(new Uint8Array(16));
 }
 
 export function openSecretItemsStore(deviceKey: string, storage: SecretItemsStorage = localStorage, maxItems = 200): SecretItemsStore {
@@ -57,12 +70,13 @@ export function openSecretItemsStore(deviceKey: string, storage: SecretItemsStor
   }
 
   async function write(items: VaultItem[]) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const salt = saltFor(storage.getItem(SECRET_ITEMS_KEY));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const key = await deriveKey(deviceKey, salt, ITERATIONS);
     const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: LABEL }, key, new TextEncoder().encode(JSON.stringify({ items })));
     const envelope: Envelope = { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(encrypted)), iterations: ITERATIONS };
-    storage.setItem(SECRET_ITEMS_KEY, JSON.stringify(envelope));
+    assertWritesOpen();
+  storage.setItem(SECRET_ITEMS_KEY, JSON.stringify(envelope));
     if (typeof window !== "undefined") window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
     return items;
   }

@@ -3,6 +3,8 @@
 // cannot see the old data by itself. Records are copied as they are (already-encrypted stays encrypted), so nothing is
 // re-encrypted or interpreted here; the file as a whole is sealed with a password on top.
 
+import { quiesceWrites, reopenWrites } from "./write-gate.ts";
+
 export class TransferError extends Error {}
 
 // The copy of the current data taken before an import lives in its own small database until the import has finished,
@@ -250,11 +252,13 @@ async function writePayload(payload: TransferPayload, storage: Storage, factory:
 // written back, so a half-finished import never leaves new images beside the old vault.
 export async function applyPayload(input: TransferPayload, storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<void> {
   const payload = validatePayload(input);
+  await quiesceWrites();
   let backup: TransferPayload;
   try {
     backup = await collectPayload(storage, factory);
     await writeStash(factory, backup);
   } catch {
+    reopenWrites();
     throw new TransferError("没能先备份现有内容，所以没有导入。现有内容没有改动。");
   }
   try {
@@ -266,6 +270,7 @@ export async function applyPayload(input: TransferPayload, storage: Storage = lo
     } catch {
       throw new TransferError("导入中断了，而且没能恢复原来的内容。请不要关闭这个窗口，马上联系管理员。");
     }
+    reopenWrites();
     throw new TransferError("导入没有成功（可能是磁盘空间不够）。现有内容已经原样保留，没有改动。");
   }
   await writeStash(factory, null).catch(() => undefined);

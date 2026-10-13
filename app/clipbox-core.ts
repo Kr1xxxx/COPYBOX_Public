@@ -174,12 +174,49 @@ export function normalizeSecretSegments(value: unknown): [string, string] | unde
   return [value[0], value[1]];
 }
 
+// All 话术 live in one localStorage entry, and every origin gets about 5 million characters there (shared with the
+// 账号 keys). When it is full, retrying never helps, so the person is told what to do instead.
+export const STORAGE_FULL_MESSAGE = "存储空间满了，请清空回收站或删掉不用的内容";
+export const STORAGE_NEARLY_FULL_MESSAGE = "存储空间快满了，请清空回收站或删掉不用的内容";
+export const STORAGE_QUOTA_CHARS = 5_000_000;
+export const STORAGE_WARN_RATIO = 0.85;
+
+// The browser's "storage is full" error, under the names and codes the engines have used for it.
+export function isQuotaError(error: unknown): boolean {
+  let current = error;
+  for (let depth = 0; depth < 3 && current && typeof current === "object"; depth += 1) {
+    const { name, code, cause } = current as { name?: unknown; code?: unknown; cause?: unknown };
+    if (name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED" || code === 22 || code === 1014) return true;
+    current = cause;
+  }
+  return false;
+}
+
+// Characters Clipbox keeps in localStorage (keys and values of every clipbox.* entry).
+export function clipboxStorageChars(storage: Pick<Storage, "length" | "key" | "getItem">): number {
+  let total = 0;
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (!key || !key.startsWith("clipbox.")) continue;
+    total += key.length + (storage.getItem(key)?.length ?? 0);
+  }
+  return total;
+}
+
+export function storageUsageRatio(chars: number, quota = STORAGE_QUOTA_CHARS): number {
+  return quota > 0 ? chars / quota : 1;
+}
+
+export function isStorageNearlyFull(storage: Pick<Storage, "length" | "key" | "getItem">): boolean {
+  return storageUsageRatio(clipboxStorageChars(storage)) > STORAGE_WARN_RATIO;
+}
+
 export async function attemptEditorSave(save: () => Promise<void>) {
   try {
     await save();
     return { saved: true, error: "" } as const;
-  } catch {
-    return { saved: false, error: "保存失败，当前内容仍保留，请重试" } as const;
+  } catch (error) {
+    return { saved: false, error: isQuotaError(error) ? STORAGE_FULL_MESSAGE : "保存失败，当前内容仍保留，请重试" } as const;
   }
 }
 

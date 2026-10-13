@@ -1,6 +1,8 @@
 // Encrypted store for the hidden 验证码 accounts (Mac). One AES-GCM envelope in its own localStorage key, keyed from the
 // device key by PBKDF2 like the vault, but kept apart from it: never in the vault. It goes into a 秘密 backup only as its own password-encrypted block (vault-backup.ts).
+import { derivePbkdf2AesKey } from "./key-cache.ts";
 import { serialFor } from "./store-queue.ts";
+import { assertWritesOpen } from "./write-gate.ts";
 import { VAULT_CHANGED_EVENT } from "./secret-items-store.ts";
 import { TOTP_MAX_ACCOUNTS, type TotpAccount } from "./totp-core.ts";
 
@@ -34,9 +36,20 @@ function base64ToBytes(value: string) {
   return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 }
 
-async function deriveKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(deviceKey), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+function deriveKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
+  return derivePbkdf2AesKey(deviceKey, salt, iterations);
+}
+
+// A rewrite keeps the salt of what is stored (the IV is new every time), so the key is the same and comes from memory.
+function saltFor(raw: string | null) {
+  try {
+    const stored = raw ? (JSON.parse(raw) as Partial<Envelope>) : null;
+    if (stored && stored.iterations === ITERATIONS && typeof stored.salt === "string") {
+      const salt = base64ToBytes(stored.salt);
+      if (salt.length === 16) return salt;
+    }
+  } catch { /* unreadable: start a new salt */ }
+  return crypto.getRandomValues(new Uint8Array(16));
 }
 
 export function openTotpStore(deviceKey: string, storage: TotpStorage = localStorage): TotpStore {
@@ -54,13 +67,14 @@ export function openTotpStore(deviceKey: string, storage: TotpStorage = localSto
   }
 
   async function write(accounts: TotpAccount[]) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const salt = saltFor(storage.getItem(TOTP_STORAGE_KEY));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const key = await deriveKey(deviceKey, salt, ITERATIONS);
     const plain = new TextEncoder().encode(JSON.stringify({ accounts }));
     const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: LABEL }, key, plain);
     const envelope: Envelope = { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(encrypted)), iterations: ITERATIONS };
-    storage.setItem(TOTP_STORAGE_KEY, JSON.stringify(envelope));
+    assertWritesOpen();
+  storage.setItem(TOTP_STORAGE_KEY, JSON.stringify(envelope));
     if (typeof window !== "undefined") window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
     return accounts;
   }

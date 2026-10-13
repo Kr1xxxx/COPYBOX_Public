@@ -1,5 +1,8 @@
 // Encrypted local cache of website icons fetched once from the sites themselves (Mac 保险箱). One AES-GCM envelope in its
 // own localStorage key, keyed from the device key like the other 保险箱 data. A site with no icon is remembered too, and asked again after a month.
+import { derivePbkdf2AesKey } from "./key-cache.ts";
+import { assertWritesOpen } from "./write-gate.ts";
+
 export const SITE_ICONS_KEY = "clipbox.site-icons.v1";
 const ITERATIONS = 310_000;
 const LABEL = new TextEncoder().encode("clipbox-site-icons:icons");
@@ -22,9 +25,20 @@ function fromBase64(value: string) {
   return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 }
 
-async function deriveKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(deviceKey), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+function deriveKey(deviceKey: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
+  return derivePbkdf2AesKey(deviceKey, salt, iterations);
+}
+
+// A rewrite keeps the salt of what is stored (the IV is new every time), so the key is the same and comes from memory.
+function saltFor(raw: string | null) {
+  try {
+    const stored = raw ? (JSON.parse(raw) as Partial<Envelope>) : null;
+    if (stored && stored.iterations === ITERATIONS && typeof stored.salt === "string") {
+      const salt = fromBase64(stored.salt);
+      if (salt.length === 16) return salt;
+    }
+  } catch { /* unreadable: start a new salt */ }
+  return crypto.getRandomValues(new Uint8Array(16));
 }
 
 export function needsFetch(map: SiteIconMap, key: string, now: number) {
@@ -52,10 +66,11 @@ export async function readSiteIcons(deviceKey: string, storage: SiteIconStorage 
 
 export async function writeSiteIcons(deviceKey: string, map: SiteIconMap, storage: SiteIconStorage = localStorage) {
   const newest = Object.entries(map).sort((a, b) => b[1].at - a[1].at).slice(0, MAX_ENTRIES);
-  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const salt = saltFor(storage.getItem(SITE_ICONS_KEY));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(deviceKey, salt, ITERATIONS);
   const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: LABEL }, key, new TextEncoder().encode(JSON.stringify({ icons: Object.fromEntries(newest) })));
   const envelope: Envelope = { version: 1, salt: toBase64(salt), iv: toBase64(iv), ciphertext: toBase64(new Uint8Array(encrypted)), iterations: ITERATIONS };
+  assertWritesOpen();
   storage.setItem(SITE_ICONS_KEY, JSON.stringify(envelope));
 }
