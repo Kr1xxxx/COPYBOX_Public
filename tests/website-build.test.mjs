@@ -240,6 +240,23 @@ test("website download page shows the version, size, date and sha256", () => {
   for (const id of ["install", "smartscreen", "move", "update", "mac"]) assert.ok(html.includes(`id="${id}"`), id);
 });
 
+test("website help page is a short overview: eight sections, then 常见问题, no sub-sections", () => {
+  const html = site.read("help/index.html");
+  const main = /<main id="main">([\s\S]*)<\/main>/.exec(html)[1];
+  const headings = [...main.matchAll(/<h2 id="([^"]+)">([^<]+)<\/h2>/g)].map((m) => m[2]);
+  assert.deepEqual(headings, ["话术", "账号", "图片", "托盘小窗", "备份与恢复", "公司共享话术", "AI 润色和整理", "设置", "常见问题"]);
+  assert.doesNotMatch(main, /<h3/);
+  assert.doesNotMatch(main, /<ol/);
+  assert.equal(main.match(/<a href="#[^"]+">/g).length, 9);
+  assert.equal(main.match(/<details>/g).length, 5);
+  const bodies = [...main.matchAll(/<\/h2>\n\s*<p>([^<]+)<\/p>\n\s*<\/section>/g)].map((m) => m[1]);
+  assert.equal(bodies.length, 8);
+  for (const body of bodies) {
+    const sentences = body.split("。").filter(Boolean).length;
+    assert.ok(sentences >= 2 && sentences <= 3, body);
+  }
+});
+
 test("website search-engine files: sitemap, robots.txt and the web manifest", () => {
   const sitemap = site.read("sitemap.xml");
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
