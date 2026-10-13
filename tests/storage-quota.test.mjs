@@ -50,7 +50,7 @@ test("after a save that leaves storage nearly full, the warning shows once per s
   const h = await pageHarness();
   const data = await seed(h);
   const toasts = [];
-  h.c.setToast = (message) => { if (message) toasts.push(message); };
+  h.c.showToast = (message) => { if (message) toasts.push(message); };
   h.c.window.setTimeout = (callback, ms) => { if (!ms) callback(); return 1; };
   Object.defineProperty(h.c.localStorage, "length", { get: () => h.storage.size });
   h.c.localStorage.key = (index) => [...h.storage.keys()][index] ?? null;

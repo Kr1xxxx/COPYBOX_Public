@@ -334,6 +334,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .toast-icon { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid color-mix(in oklab, var(--ok) 26%, var(--line)); border-radius: 50%; background: var(--ok-bg); color: var(--ok); }
 .toast-text { position: relative; min-width: 0; display: grid; }
 .toast-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Errors: a red circle with an exclamation mark, and the whole message shows (it wraps instead of being cut off). */
+.toast.error .toast-icon { border-color: color-mix(in oklab, var(--danger) 30%, var(--line)); background: var(--danger-bg); color: var(--danger); }
+.toast.error .toast-line { white-space: normal; overflow-wrap: anywhere; }
 .undo-toast button { margin-left: 2px; padding: 3px 10px; border: 0; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, transform .15s; }
 .undo-toast button:hover { background: var(--accent-soft); }
 .undo-toast button:active { transform: scale(.96); }
