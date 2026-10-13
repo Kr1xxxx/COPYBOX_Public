@@ -99,11 +99,9 @@ test.describe("win32", () => {
     expect(Number(await toast(page).evaluate((element) => getComputedStyle(element).opacity))).toBe(1);
 
     await page.mouse.move(5, 5);
-    await expect(toast(page)).toHaveAttribute("data-fading", "", { timeout: 6000 });
-    // Mid-fade it is see-through but still there.
-    await page.waitForTimeout(500);
-    const mid = Number(await toast(page).evaluate((element) => getComputedStyle(element).opacity));
-    expect(mid).toBeLessThan(1);
+    // Watch every frame: the fade starts, the toast turns see-through, and it is still there.
+    await page.waitForFunction(() => document.querySelector(".toast")?.hasAttribute("data-fading"), null, { polling: "raf", timeout: 6000 });
+    await page.waitForFunction(() => Number(getComputedStyle(document.querySelector(".toast")).opacity) < 0.9, null, { polling: "raf", timeout: 2000 });
     // Back on it: full strength again within a short moment.
     const again = await toast(page).boundingBox();
     await page.mouse.move(again.x + 20, again.y + again.height / 2);
