@@ -10,8 +10,7 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | --- | --- |
 | `/` | Home: hero with the three fanned cards, 三个部分, 三步装好 beside the app screenshot, 系统要求, 用起来顺手, 常见问题 |
 | `/download/` | The download card (version, size, date, SHA-256), install steps, the SmartScreen warning, moving data from the old version, updating, Mac |
-| `/help/` | 使用说明: one section per part of the app, with an in-page list at the top and the FAQ at `#faq` |
-| `/updates/` | 更新记录: every entry of `tools/preview/changelog.json`, newest first, the first marked 当前版本 |
+| `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
 | `/preview/` | Asks for the passphrase first (see below), then the web preview, a copy of `dist-preview/` (its pages use relative paths, so a subfolder works); `/preview` redirects there |
 | `/download/Clipboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`) |
@@ -19,14 +18,14 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | `/assets/site.<hash>.css` | The stylesheet; its name carries the first 8 hex of its sha256, so a changed file gets a new name |
 | `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/og-image.png` | Icons and the share card, copied from `icons/` |
 | `/images/*.png` | App screenshots (`app-win-light.png`, `app-win-dark.png`), copied from `images/` |
-| `/site.webmanifest`, `/robots.txt`, `/sitemap.xml` | Written by the build; robots.txt keeps `/preview/` out of search engines, the sitemap lists the five pages |
+| `/site.webmanifest`, `/robots.txt`, `/sitemap.xml` | Written by the build; robots.txt keeps `/preview/` out of search engines, the sitemap lists the four pages |
 | anything else | `404.html` with status 404 |
 
 Source files in this folder:
 
 | File | What it is |
 | --- | --- |
-| `pages/{index,download,help,updates,privacy}.html` | Page bodies (what goes inside `<main>`) with `__PLACEHOLDER__` slots |
+| `pages/{index,download,help,privacy}.html` | Page bodies (what goes inside `<main>`) with `__PLACEHOLDER__` slots |
 | `partials/head.html` | Everything up to `<body>`: title, description, canonical, share-card tags, icons, manifest, the stylesheet link and the theme script (跟随系统 → 浅色 → 深色, `localStorage` key `clipboxx-site-theme`, set as `data-theme` before the page paints) |
 | `partials/header.html`, `partials/footer.html` | Header (brand, nav with `__NAV_HOME__` … slots, theme toggle, 在线试用, 下载) and footer |
 | `site.css` | All styles, light and dark; no fonts or frameworks from the network |
@@ -69,7 +68,7 @@ npm run website:deploy                                     # node tools/website/
 
 - Each page is `partials/head.html` + `partials/header.html` (the current nav item gets `aria-current="page"`) + its
   body + `partials/footer.html`. The build fills `__VERSION__`, `__UPDATED__`, `__SIZE__`, `__SHA256__`, the page
-  title, description and canonical address, the stylesheet name and the escaped changelog in one pass; a placeholder
+  title, description and canonical address, and the stylesheet name in one pass; a placeholder
   left without a value stops the build (except `__MESSAGE__` in the gate). It copies `icons/*` to the site root and
   `images/*` to `images/`; a missing folder or file only prints a warning, so the site still builds.
 - `website:build` also takes `--preview <dir>`, `--out <dir>` (defaults `dist-preview`, `dist-website`, relative

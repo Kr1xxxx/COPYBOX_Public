@@ -56,26 +56,6 @@ export function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-// "2026-10-13 21:10" → "2026-10-13"; an entry without "at" falls back to its "MM-DD" date.
-function entryDate(entry) {
-  const at = /^(\d{4}-\d{2}-\d{2})/.exec(String(entry?.at ?? "").trim());
-  return at ? at[1] : String(entry?.date ?? "").trim();
-}
-
-// The /updates/ list from tools/preview/changelog.json, newest first as the file keeps it; the first entry is
-// marked 当前版本. Every string from the file is escaped.
-export function renderChangelog(entries) {
-  const items = (Array.isArray(entries) ? entries : []).map((entry, index) => {
-    const version = escapeHtml(String(entry?.version ?? "").trim());
-    const date = escapeHtml(entryDate(entry));
-    const time = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `<time datetime="${date}">${date}</time>` : `<time>${date}</time>`;
-    const current = index === 0 ? '<span class="current">当前版本</span>' : "";
-    const notes = (Array.isArray(entry?.items) ? entry.items : []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
-    return `<li id="v${version}"><div><h2>v${version}</h2>${time}${current}</div><ul>${notes}</ul></li>`;
-  });
-  return `<ol class="log">\n${items.join("\n")}\n</ol>`;
-}
-
 // Every page of the site: body source (relative to tools/website/), published key, canonical path, nav item, head
 // text. 404.html and preview-gate.html are left out of the sitemap and carry noindex.
 export const sitePages = [
@@ -85,8 +65,6 @@ export const sitePages = [
     description: "下载 Clipboxx（复制盒）Windows 版，附安装步骤、安装时的提示和从旧版搬数据的方法。" },
   { source: "pages/help.html", key: "help/index.html", path: "/help/", nav: "HELP", title: "使用说明 · Clipboxx",
     description: "Clipboxx（复制盒）怎么用：话术、账号、图片、托盘小窗、备份与恢复、公司共享话术、AI 润色和整理。" },
-  { source: "pages/updates.html", key: "updates/index.html", path: "/updates/", nav: "UPDATES", title: "更新记录 · Clipboxx",
-    description: "Clipboxx（复制盒）每个版本改了什么，最新的在最上面。" },
   { source: "pages/privacy.html", key: "privacy/index.html", path: "/privacy/", nav: "", title: "隐私说明 · Clipboxx",
     description: "Clipboxx（复制盒）不收集你的内容：没有账号，没有服务器，数据加密后只保存在你的电脑上。" },
   { source: "404.html", key: "404.html", path: "/", nav: "", title: "找不到这个页面 · Clipboxx",
@@ -94,10 +72,10 @@ export const sitePages = [
   { source: "preview-gate.html", key: "preview-gate.html", path: "/preview/", nav: "", title: "网页测试版 · Clipboxx",
     description: "Clipboxx 网页测试版，需要口令。", noindex: true, keep: ["MESSAGE"] },
 ];
-const navItems = ["HOME", "DOWNLOAD", "HELP", "UPDATES"];
+const navItems = ["HOME", "DOWNLOAD", "HELP"];
 
 // One page: head + header (its nav item gets aria-current="page") + body + footer, every placeholder filled.
-// parts: { head, header, body, footer }; extra: more values such as { CSS, CHANGELOG }.
+// parts: { head, header, body, footer }; extra: more values such as { CSS }.
 export function assemblePage(page, parts, info, extra = {}) {
   const nav = Object.fromEntries(navItems.map((name) => [`NAV_${name}`, name === page.nav ? ' aria-current="page"' : ""]));
   const template = parts.head + parts.header + parts.body + parts.footer;
@@ -128,8 +106,8 @@ export function webManifest() {
     lang: "zh-CN",
     start_url: "/",
     display: "browser",
-    background_color: "#f7f8fa",
-    theme_color: "#f7f8fa",
+    background_color: "#f8fafc",
+    theme_color: "#f8fafc",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
@@ -264,7 +242,7 @@ export async function main(argv = process.argv.slice(2)) {
   const cssKey = cssAssetKey(css);
   const parts = Object.fromEntries(["head", "header", "footer"].map((name) => [name, readFileSync(join(here, `partials/${name}.html`), "utf8")]));
   const pageInfo = { version, updated, size: formatSize(size), sha256 };
-  const extra = { CSS: `/${cssKey}`, CHANGELOG: renderChangelog(changelog) };
+  const extra = { CSS: `/${cssKey}` };
   const pages = sitePages.map((page) => ({
     key: page.key,
     html: assemblePage(page, { ...parts, body: readFileSync(join(here, page.source), "utf8") }, pageInfo, extra),
