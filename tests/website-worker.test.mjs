@@ -20,6 +20,12 @@ const files = {
   "preview/assets/static/x.js": "console.log(1);",
   "download/Clipboxx-Setup.exe": "MZ fake installer",
   "download/latest.json": '{"version":"1.65.0"}',
+  "favicon.ico": "fake icon",
+  "images/app-win-light.png": "fake screenshot",
+  "assets/site.0123abcd.css": "body{}",
+  "site.webmanifest": '{"name":"Clipboxx"}',
+  "robots.txt": "User-agent: *",
+  "sitemap.xml": "<urlset/>",
 };
 
 function fakeEnv(entries = files, vars = { PREVIEW_SECRET: "Comely" }) {
@@ -81,6 +87,62 @@ test("worker: lookup keys, content types and cache rules", () => {
   assert.equal(cacheControlFor("preview/seed.js"), "no-cache");
   assert.equal(cacheControlFor("preview/samples/1-inquiry-quote.csv"), "no-cache");
   assert.equal(cacheControlFor("download/Clipboxx-Setup.exe"), "public, max-age=3600");
+});
+
+test("worker: content types for the site's icons, screenshots and search-engine files", () => {
+  assert.equal(contentTypeFor("favicon.ico"), "image/x-icon");
+  assert.equal(contentTypeFor("favicon.svg"), "image/svg+xml");
+  assert.equal(contentTypeFor("robots.txt"), "text/plain; charset=utf-8");
+  assert.equal(contentTypeFor("sitemap.xml"), "application/xml; charset=utf-8");
+  assert.equal(contentTypeFor("site.webmanifest"), "application/manifest+json");
+  assert.equal(contentTypeFor("images/a.jpg"), "image/jpeg");
+  assert.equal(contentTypeFor("images/a.JPEG"), "image/jpeg");
+  assert.equal(contentTypeFor("images/a.webp"), "image/webp");
+  assert.equal(contentTypeFor("images/app-win-light.png"), "image/png");
+});
+
+test("worker: site assets are immutable, icons and screenshots keep a day, the rest as before", () => {
+  const immutable = "public, max-age=31536000, immutable";
+  const day = "public, max-age=86400";
+  assert.equal(cacheControlFor("assets/site.0123abcd.css"), immutable);
+  assert.equal(cacheControlFor("assets/fonts/deep/x.woff2"), immutable);
+  assert.equal(cacheControlFor("preview/assets/static/x.js"), immutable);
+  for (const key of ["favicon.ico", "favicon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "og-image.png"]) {
+    assert.equal(cacheControlFor(key), day, key);
+  }
+  assert.equal(cacheControlFor("images/app-win-light.png"), day);
+  assert.equal(cacheControlFor("images/app-win-dark.png"), day);
+  // Only the root icons: a file of the same name elsewhere follows the usual rules.
+  assert.equal(cacheControlFor("preview/favicon.svg"), "no-cache");
+  assert.equal(cacheControlFor("download/icon-512.png"), "public, max-age=3600");
+  assert.equal(cacheControlFor("robots.txt"), "public, max-age=3600");
+  assert.equal(cacheControlFor("sitemap.xml"), "public, max-age=3600");
+  assert.equal(cacheControlFor("site.webmanifest"), "public, max-age=3600");
+  assert.equal(cacheControlFor("help/index.html"), "no-cache");
+});
+
+test("worker: icons, screenshots and site files are served with their type, cache rule and ETag", async () => {
+  const icon = await get("/favicon.ico");
+  assert.equal(icon.status, 200);
+  assert.equal(icon.headers.get("content-type"), "image/x-icon");
+  assert.equal(icon.headers.get("cache-control"), "public, max-age=86400");
+  const etag = icon.headers.get("etag");
+  assert.match(etag, /^"[0-9a-f]{64}"$/);
+  assert.equal((await get("/favicon.ico", { headers: { "If-None-Match": etag } })).status, 304);
+
+  const shot = await get("/images/app-win-light.png");
+  assert.equal(shot.headers.get("content-type"), "image/png");
+  assert.equal(shot.headers.get("cache-control"), "public, max-age=86400");
+
+  const css = await get("/assets/site.0123abcd.css");
+  assert.equal(css.headers.get("cache-control"), "public, max-age=31536000, immutable");
+  assert.match(css.headers.get("content-type"), /^text\/css/);
+
+  assert.equal((await get("/site.webmanifest")).headers.get("content-type"), "application/manifest+json");
+  assert.equal((await get("/robots.txt")).headers.get("content-type"), "text/plain; charset=utf-8");
+  const sitemap = await get("/sitemap.xml");
+  assert.equal(sitemap.headers.get("content-type"), "application/xml; charset=utf-8");
+  assert.equal(await sitemap.text(), files["sitemap.xml"]);
 });
 
 test("worker: pages are served, a folder without slash redirects, html files keep their path", async () => {

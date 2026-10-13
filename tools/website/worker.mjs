@@ -11,11 +11,22 @@ const types = {
   css: "text/css; charset=utf-8",
   json: "application/json; charset=utf-8",
   png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  ico: "image/x-icon",
   svg: "image/svg+xml",
   woff2: "font/woff2",
   csv: "text/csv; charset=utf-8",
+  txt: "text/plain; charset=utf-8",
+  xml: "application/xml; charset=utf-8",
+  webmanifest: "application/manifest+json",
   exe: "application/x-msdownload",
 };
+
+// Icons at the site root and the screenshots under images/ keep their names across releases: cache them for a day
+// and let the ETag revalidate after that.
+const rootIcons = new Set(["favicon.ico", "favicon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "og-image.png"]);
 
 function extensionOf(key) {
   const name = key.slice(key.lastIndexOf("/") + 1);
@@ -30,7 +41,8 @@ export function contentTypeFor(key) {
 export function cacheControlFor(key) {
   const ext = extensionOf(key);
   if (ext === "html" || ext === "json") return "no-cache";
-  if (key.startsWith("preview/assets/")) return "public, max-age=31536000, immutable";
+  if (key.startsWith("assets/") || key.startsWith("preview/assets/")) return "public, max-age=31536000, immutable";
+  if (key.startsWith("images/") || rootIcons.has(key)) return "public, max-age=86400";
   // seed.js, image-store.js and the sample sheets have no hash in their names: a new preview must not run with old ones.
   if (key.startsWith("preview/")) return "no-cache";
   return "public, max-age=3600";
