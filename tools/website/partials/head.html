@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__PAGE_TITLE__</title>
+<meta name="description" content="__PAGE_DESCRIPTION__">
+__ROBOTS__<link rel="canonical" href="__CANONICAL__">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Clipboxx 复制盒">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="__PAGE_TITLE__">
+<meta property="og:description" content="__PAGE_DESCRIPTION__">
+<meta property="og:url" content="__CANONICAL__">
+<meta property="og:image" content="https://copyboxx.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Clipboxx 复制盒：常用话术、账号资料、图片，一键复制">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="__PAGE_TITLE__">
+<meta name="twitter:description" content="__PAGE_DESCRIPTION__">
+<meta name="twitter:image" content="https://copyboxx.com/og-image.png">
+<link rel="stylesheet" href="__CSS__">
+<script>
+// Theme: 跟随系统 → 浅色 → 深色, kept in localStorage and set on <html> before the page paints.
+(function () {
+  var root = document.documentElement, key = "clipboxx-site-theme", names = { light: "浅色", dark: "深色" };
+  function read() { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function apply(theme) {
+    if (theme === "light" || theme === "dark") root.setAttribute("data-theme", theme); else root.removeAttribute("data-theme");
+    var label = "主题：" + (names[theme] || "跟随系统") + "，点一下切换";
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (b) { b.setAttribute("aria-label", label); b.title = label; });
+  }
+  apply(read());
+  document.addEventListener("DOMContentLoaded", function () { apply(read()); });
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest || !event.target.closest("[data-theme-toggle]")) return;
+    var now = root.getAttribute("data-theme"), next = now === "light" ? "dark" : now === "dark" ? "" : "light";
+    try { if (next) localStorage.setItem(key, next); else localStorage.removeItem(key); } catch (e) {}
+    apply(next);
+  });
+})();
+</script>
+</head>
+<body>
