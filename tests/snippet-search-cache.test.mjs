@@ -38,10 +38,10 @@ test("searching 3,000 snippets again is much faster and gives the same results",
   const warm = timed(() => searchSnippets(items, "t"));
   assert.ok(cold.result.length > 0);
   assert.deepEqual(ids(warm.result), ids(cold.result));
-  assert.ok(warm.ms < cold.ms * 0.5, `warm ${warm.ms.toFixed(1)} ms should be under half of cold ${cold.ms.toFixed(1)} ms`);
+  assert.ok(warm.ms < cold.ms * 0.3, `warm ${warm.ms.toFixed(1)} ms should be under 30% of cold ${cold.ms.toFixed(1)} ms`);
   // A different query on the same snippets reuses the work too.
   const other = timed(() => searchSnippets(items, "tk"));
-  assert.ok(other.ms < cold.ms * 0.5, `second query ${other.ms.toFixed(1)} ms should be under half of cold ${cold.ms.toFixed(1)} ms`);
+  assert.ok(other.ms < cold.ms * 0.3, `second query ${other.ms.toFixed(1)} ms should be under 30% of cold ${cold.ms.toFixed(1)} ms`);
 });
 
 test("an edited snippet is found by its new text, not the old", () => {
