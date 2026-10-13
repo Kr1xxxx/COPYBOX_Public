@@ -24,6 +24,8 @@ const BY_DESIGN = [
 
 BY_DESIGN.push({ el: /image-tile-title/, type: /文字省略/, reason: "图片名单行显示，过长时用 … 结尾（迷你窗口的小图块只有约 80px 宽）" });
 BY_DESIGN.push({ el: /image-tile-main/, type: /元素重疊/, reason: "图片卡片的「复制」小按钮故意浮在整张卡片按钮上" });
+// `by` narrows an entry to overlaps with one particular element.
+BY_DESIGN.push({ el: /row-main|snippet-label|snippet-preview/, by: /mini-copy/, type: /元素重疊/, reason: "迷你窗口话术行的「复制」小按钮故意浮在行上（鼠标移上去、用 Tab 选中或刚复制时才出现）" });
 
 const SIZES = {
   normal: { width: 680, height: 620 },
@@ -99,7 +101,11 @@ for (const { platform, theme, size } of cases) {
 
     await state("list", async () => {});
     await state("row-open", async () => { await page.locator(".row-main").nth(2).click(); });
-    // The mini window copies on click and shows variable chips only: there is no popup to open there.
+    if (mini) {
+      await state("mini-copied", async () => { const row = page.locator(".mini-row.snippet-row").nth(1); await row.hover(); await row.locator(".mini-copy").click(); });
+      await state("mini-edit", async () => { await page.locator(".mini-row.snippet-row .row-main").nth(1).click(); await page.waitForTimeout(300); await page.locator(".mini-detail").getByRole("button", { name: /^修改/ }).click(); });
+    }
+    // The mini window opens a 话术 in place with only 修改 (no variable chips to type in): there is no popup to open there.
     if (!mini) await state("variable-popup", async () => {
       await page.locator(".native-row .row-main").first().click(); await settle(page);
       await page.locator(".native-row.selected input[data-var]").first().click();
@@ -163,7 +169,7 @@ for (const { platform, theme, size } of cases) {
 
     const real = [], known = [];
     for (const f of found) {
-      if (BY_DESIGN.some((x) => x.el.test(f.el) && x.type.test(f.type))) continue;
+      if (BY_DESIGN.some((x) => x.el.test(f.el) && x.type.test(f.type) && (!x.by || x.by.test(f.by || "")))) continue;
       const k = f.type === "步骤失败" ? null : KNOWN.find((x) => x.state.test(f.state) && x.type.test(f.type));
       (k ? known : real).push(f);
     }

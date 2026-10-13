@@ -79,6 +79,7 @@ import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHid
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
+import { folderShortName } from "./folder-short-name";
 import { countImagesByFolder, IMAGE_FILTER_ALL, IMAGE_FILTER_PINNED, IMAGE_FILTER_RECENT, IMAGE_FILTER_TRASH, IMAGE_FILTER_UNCATEGORIZED, imageFilterTitle, imageFolderColors, imageFolderFilter } from "./image-folders-core";
 import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
@@ -260,6 +261,9 @@ export default function Home() {
     setOpenIdState(id);
     try { if (id) localStorage.setItem(OPEN_CARD_KEY, id); else localStorage.removeItem(OPEN_CARD_KEY); } catch { /* the open card is only remembered for this session */ }
   }
+  // Mini window: the one 话术 row opened in place, and the one folding away (kept mounted for its close animation).
+  const [miniOpenId, setMiniOpenId] = useState("");
+  const [miniClosingId, setMiniClosingId] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
   const { toastState, showToast, clearToast, pauseToast, resumeToast } = useToast();
@@ -999,6 +1003,16 @@ export default function Home() {
     await finishCopy(item, source);
   }
 
+  // Mini window: a click on a 话术 row opens it in place (one at a time); a second click closes it.
+  function toggleMiniRow(item: SecretItem, index: number) {
+    setSelected(index);
+    const leaving = miniOpenId;
+    setMiniOpenId(leaving === item.id ? "" : item.id);
+    if (!leaving) return;
+    setMiniClosingId(leaving);
+    window.setTimeout(() => setMiniClosingId((id) => id === leaving ? "" : id), DETAIL_CLOSE_MS + 40);
+  }
+
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (imageView) {
       if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
@@ -1735,9 +1749,14 @@ export default function Home() {
   const miniTopTabs: MiniTab[] = imageView
     ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, { id: IMAGE_FILTER_RECENT, label: "最近" }]
     : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }];
+  // Folder tabs show a two-character name (folder-short-name.ts); the whole name is the tooltip.
+  const miniFolderTab = (id: string, name: string): MiniTab => {
+    const label = folderShortName(name);
+    return label === name.trim() ? { id, label } : { id, label, fullName: name };
+  };
   const miniFolderTabs: MiniTab[] = imageView
-    ? [...imageLibrary.folders.map((folder) => ({ id: imageFolderFilter(folder.name), label: folder.name })), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
-    : [...activeFolders.map((folder) => ({ id: `folder:${folder}`, label: folder })), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
+    ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
+    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder)), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
@@ -1934,13 +1953,40 @@ export default function Home() {
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch" onAnimationEnd={onRowAnimationEnd}>
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
+              if (activeKind === "snippet") {
+                if (modalOpen && editing?.id === item.id) return <article key={item.id} data-row-index={index} className="native-row selected editing snippet-row mini-editing">{editorNode}</article>;
+                const open = miniOpenId === item.id;
+                const closing = !open && miniClosingId === item.id;
+                const copied = copiedId === item.id;
+                return (
+                  <article key={item.id} data-row-index={index} className={`native-row mini-row snippet-row ${isSelected ? "selected" : ""} ${open ? "open" : ""} ${copied ? "copied" : ""}`}>
+                    <button type="button" className="row-main" onClick={() => toggleMiniRow(item, index)} aria-expanded={open} aria-label={`${open ? "收起" : "展开"} ${item.label}`}>
+                      <i className="row-dot" aria-hidden="true" style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} />
+                      <span className="row-copy">
+                        <strong className="snippet-label"><SnippetTitle label={item.label} query={query} /></strong>
+                        {!open && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
+                      </span>
+                      {item.pinned && <Icon name="star" filled className="row-star" />}
+                    </button>
+                    <button type="button" className="mini-copy" data-copied={copied ? "" : undefined} onClick={() => { setSelected(index); void copyRaw(item); }} aria-label={copied ? `已复制 ${item.label}` : `复制 ${item.label}`}>
+                      <span className="mini-copy-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span>
+                      <span className="mini-copy-label" aria-hidden="true"><span>复制</span><span>已复制</span></span>
+                    </button>
+                    {(open || closing) && <div className={`row-detail mini-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
+                      <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>
+                      <div className="mini-actions"><button type="button" className="ghost-button" onClick={() => openEditor(item)} aria-label={`修改 ${item.label}`}>修改</button></div>
+                    </div></div>}
+                    {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
+                  </article>
+                );
+              }
+              // 账号 rows copy on click, as before: opening one would show its contents in the small window.
               return (
-                <article key={item.id} data-row-index={index} className={`native-row mini-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""}`}>
+                <article key={item.id} data-row-index={index} className={`native-row mini-row secret-row ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""}`}>
                   <button type="button" className="row-main" onClick={() => { setSelected(index); void copyRaw(item); }} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`}>
                     <i className="row-dot" aria-hidden="true" style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} />
                     <span className="row-copy">
-                      <strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
-                      {activeKind === "snippet" && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
+                      <strong><Highlight text={item.label} query={query} /></strong>
                     </span>
                     {item.pinned && <Icon name="star" filled className="row-star" />}
                     {copiedId === item.id && <span className="mini-copied">已复制</span>}
