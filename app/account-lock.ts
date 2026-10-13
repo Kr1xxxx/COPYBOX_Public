@@ -11,7 +11,10 @@ type LockRecord = { version: 1; salt: string; hash: string; iterations: number; 
 // Version 2: the password really protects the data. The account stores are encrypted with a random key K; the record only
 // holds K wrapped by the password and, separately, by a recovery code (so a forgotten password never loses the data).
 export type Wrapped = { salt: string; iv: string; ct: string; iterations: number };
-export type EncryptedLockRecord = { version: 2; wrapPw: Wrapped; wrapRecovery: Wrapped; email?: string; phase: "migrating" | "ready"; at: number };
+// codeShown: false from the moment a recovery code is made until the user ticks that they saved it. A record without the field
+// (made before 2026-10-13) counts as saved. While it is false, the next unlock with the password replaces the code with a new one
+// and shows it (the old one is not stored in plain text, so it cannot be shown again). D-042.
+export type EncryptedLockRecord = { version: 2; wrapPw: Wrapped; wrapRecovery: Wrapped; email?: string; phase: "migrating" | "ready"; at: number; codeShown?: boolean };
 export type LockStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 function toBase64(bytes: Uint8Array) {
@@ -191,6 +194,7 @@ export async function writeEncryptedLock(record: { dataKey: string; password: st
     wrapPw: await wrapKey(record.dataKey, record.password),
     wrapRecovery: await wrapKey(record.dataKey, normalizeRecoveryCode(record.recoveryCode)),
     ...(record.email?.trim() ? { email: record.email.trim() } : {}),
+    codeShown: false,
   };
   storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value));
 }
@@ -222,7 +226,8 @@ export async function resetPasswordWithRecovery(code: string, newPassword: strin
   const dataKey = await unwrapKey(record.wrapRecovery, normalizeRecoveryCode(code));
   if (dataKey === null) return null;
   if (Array.from(newPassword).length < ENCRYPTED_LOCK_MIN) throw new Error(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`);
-  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapPw: await wrapKey(dataKey, newPassword) }));
+  // Whoever typed the code has it, so it no longer needs to be shown again.
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapPw: await wrapKey(dataKey, newPassword), ...(record.codeShown === false ? { codeShown: true } : {}) }));
   return dataKey;
 }
 
@@ -236,13 +241,31 @@ export async function changeEncryptedPassword(oldPassword: string, newPassword: 
   return dataKey;
 }
 
-// A new recovery code (the old one stops working). null = wrong password.
+// A new recovery code (the old one stops working). null = wrong password. It counts as not yet saved until markRecoveryCodeShown.
 export async function renewRecoveryCode(password: string, storage: LockStorage = localStorage): Promise<string | null> {
   const record = readEncrypted(storage);
   if (!record) return null;
   const dataKey = await unwrapKey(record.wrapPw, password);
   if (dataKey === null) return null;
   const code = newRecoveryCode();
-  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapRecovery: await wrapKey(dataKey, normalizeRecoveryCode(code)) }));
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, wrapRecovery: await wrapKey(dataKey, normalizeRecoveryCode(code)), codeShown: false }));
   return code;
+}
+
+// True while the current recovery code was made but the user has not confirmed saving it (only version 2 records; old records
+// without the field count as saved).
+export function recoveryCodePending(storage: LockStorage = localStorage): boolean {
+  return readEncrypted(storage)?.codeShown === false;
+}
+
+// The user ticked 「我已经把恢复码保存好了」 and pressed 完成.
+export function markRecoveryCodeShown(storage: LockStorage = localStorage): void {
+  const record = readEncrypted(storage);
+  if (record && record.codeShown === false) storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, codeShown: true }));
+}
+
+// Called right after a successful unlock with the password: when the last code was never confirmed (the app stopped, or 设置 was
+// closed while it was on screen), a new code replaces it and is returned to be shown. null = nothing to show.
+export async function renewUnseenRecoveryCode(password: string, storage: LockStorage = localStorage): Promise<string | null> {
+  return recoveryCodePending(storage) ? renewRecoveryCode(password, storage) : null;
 }
