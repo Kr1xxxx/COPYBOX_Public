@@ -1,0 +1,7 @@
+# Toasts with one timer and an error look; faster list with 1,000+ snippets
+
+- Date: 2026-10-13 · Thread/agent: W4 (worker for the coordinator), branch `fix-toasts-list-speed` on top of `fix-save-path`
+- What changed: Every message in `app/page.tsx` now goes through `useToast()` (`app/use-toast.ts`): one timer, so an older message's timer no longer wipes a newer message early; errors use tone "error" and `ArcToast` draws a red circle with an exclamation mark instead of the ✓ (error text wraps instead of being cut off). 清空回收站 and 话术表格导入 catch save failures and say so; the four `window.alert` calls are error messages (保险箱 → 账号). The list no longer rescans all snippets per row (↑/↓ and folder counts come from `buildCardMoveMap` / `countItemsByFolder` in `clipbox-core.ts`), Windows passes one shared empty legacy list to the 账号 stores, and the desktop "focus search" listener is no longer re-subscribed on every keystroke.
+- User-visible change (plain Chinese, for the preview changelog): 底部提示不再互相抢着消失；出错时显示红色感叹号，不再显示对勾 / 清空回收站、导入话术表格失败时会说清楚，原来的内容不变 / 备份和表格的错误改成底部提示，不再弹出系统对话框 / 话术很多（上千条）时列表和搜索更流畅
+- Not done / risks: With 1,500 snippets the first search keystroke still takes ~1.5–2.5 s in the headless test (it was ~2.5–3 s): what is left is drawing all 1,500 rows, not the per-row scans (73 ms → 1 ms per render at 1,500, 308 ms → 1 ms at 3,000). Components outside page.tsx that only pass text (图片, 账号 panels) get their tone from the words (`toastToneFor`).
+- Next step: A memoised row component or windowing (only drawing the visible rows) for very long lists.

@@ -659,3 +659,27 @@ export function formatBuildTime(value: string | undefined): string {
   const two = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
 }
+
+// Which cards can step up or down in the shown list, worked out once per list instead of once per row (a long list
+// made that slow). Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
+export type CardMoves = { up: boolean; down: boolean };
+export function buildCardMoveMap(list: readonly { id: string; pinned?: boolean }[]): Map<string, CardMoves> {
+  const moves = new Map<string, CardMoves>();
+  for (const pinned of [true, false]) {
+    const group = list.filter((entry) => Boolean(entry.pinned) === pinned);
+    group.forEach((entry, index) => {
+      if (!moves.has(entry.id)) moves.set(entry.id, { up: index > 0, down: index < group.length - 1 });
+    });
+  }
+  return moves;
+}
+
+// How many entries each folder holds, counted in one pass over the list.
+export function countItemsByFolder(list: readonly { folder?: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const entry of list) {
+    const folder = entry.folder ?? "";
+    counts.set(folder, (counts.get(folder) ?? 0) + 1);
+  }
+  return counts;
+}

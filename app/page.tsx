@@ -1,6 +1,8 @@
 "use client";
 
 import { ArcToast } from "./arc/arc-toast";
+import { useToast } from "./use-toast";
+import { buildCardMoveMap, countItemsByFolder } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
@@ -85,7 +87,7 @@ import { ArcSegmented } from "./arc/segmented";
 import { type LockMode, isAccountLockSet, lockMode } from "./account-lock";
 import { AccountLockScreen } from "./account-lock-ui";
 import { AccountPage, type AddRequest } from "./account-page";
-import { countByKind, useAccountEntries } from "./account-entries";
+import { countByKind, useAccountEntries, type LegacySecret } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
 import { useAutoBackup } from "./auto-backup-ui";
@@ -137,6 +139,8 @@ type SecureBackup =
   | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope; vaultBox?: VaultBoxEnvelope };
 
 type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope; vaultBox?: VaultBoxEnvelope };
+// Windows has no old 秘密 list: one shared empty list, so the 账号 stores are not re-read on every change.
+const NO_LEGACY_SECRETS: LegacySecret[] = [];
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -256,7 +260,7 @@ export default function Home() {
   }
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
-  const [toast, setToast] = useState("");
+  const { toast, toastTone, showToast } = useToast();
   const [copiedId, setCopiedId] = useState("");
   const [copiedReferenceId, setCopiedReferenceId] = useState("");
   const [, setMenuOpen] = useState(false);
@@ -311,7 +315,6 @@ export default function Home() {
   const editorTriggerRef = useRef<HTMLElement | null>(null);
   const pendingEditorFocusRef = useRef<{ trigger: HTMLElement | null } | null>(null);
   const copyFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const referenceFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const itemsRef = useRef<SecretItem[]>([]);
   const foldersRef = useRef<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
@@ -403,7 +406,7 @@ export default function Home() {
   const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
-  const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
+  const legacySecrets = useMemo(() => (PLAIN_NOTES ? NO_LEGACY_SECRETS : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
   const accountMode = activeKind === "secret" && !imageView;
   // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
   const [lockSet, setLockSet] = useState(() => typeof window !== "undefined" && isAccountLockSet());
@@ -449,6 +452,9 @@ export default function Home() {
     if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, 50);
     return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
   }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders, englishSearch]);
+  // Worked out once per list, not per row: with 1,000+ snippets the per-row search made every render slow.
+  const cardMoves = useMemo(() => buildCardMoveMap(filtered), [filtered]);
+  const folderCounts = useMemo(() => countItemsByFolder(activeKindItems), [activeKindItems]);
   // Opening an old entry from the 账号 list leads to the 「其他」 list with that entry selected.
   useEffect(() => {
     if (!pendingLegacyOpen.current || vaultCat !== "other") return;
@@ -509,11 +515,9 @@ export default function Home() {
         if (animate) prepareSortAnimation("card");
         return { ...current, items: update(current.items) };
       });
-      setToast(successMessage);
-      window.setTimeout(() => setToast(""), 1800);
+      showToast(successMessage, { ms: 1800 });
     } catch {
-      setToast("排序保存失败，原顺序已保留");
-      window.setTimeout(() => setToast(""), 2400);
+      showToast("排序保存失败，原顺序已保留", { tone: "error", ms: 2400 });
     }
   }
 
@@ -523,11 +527,9 @@ export default function Home() {
         if (animate) prepareSortAnimation("folder");
         return { ...current, folders: { ...current.folders, [activeKind]: update(current.folders[activeKind]) } };
       });
-      setToast(successMessage);
-      window.setTimeout(() => setToast(""), 1800);
+      showToast(successMessage, { ms: 1800 });
     } catch {
-      setToast("目录排序保存失败，原顺序已保留");
-      window.setTimeout(() => setToast(""), 2400);
+      showToast("目录排序保存失败，原顺序已保留", { tone: "error", ms: 2400 });
     }
   }
 
@@ -581,8 +583,7 @@ export default function Home() {
     if (!url) return;
     void fetchSharedLibraryText(url).then(applySharedLibraryText).then((summary) => {
       if (!summary.added && !summary.updated && !summary.keptMine && !summary.retired) return;
-      setToast(`共享话术已同步：${describeSync(summary)}`);
-      window.setTimeout(() => setToast(""), 3600);
+      showToast(`共享话术已同步：${describeSync(summary)}`, { ms: 3600 });
     }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -595,8 +596,7 @@ export default function Home() {
     anchor.download = `clipbox-company-library-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setToast("已导出公司话术库文件");
-    window.setTimeout(() => setToast(""), 2200);
+    showToast("已导出公司话术库文件");
   }
 
   async function refreshLocalVault() {
@@ -618,7 +618,7 @@ export default function Home() {
           query,
           imageView,
         }));
-        setToast("正在重新加载…");
+        showToast("正在重新加载…", { ms: 0 });
         window.clipboxDesktop.relaunch();
         relaunching = true;
         return;
@@ -633,24 +633,20 @@ export default function Home() {
       setFolders(opened.data.folders);
       setFolderColors(opened.data.folderColors);
       setActiveFolder(nextActiveFolder);
-      setToast("已刷新");
-      window.setTimeout(() => setToast(""), 1800);
+      showToast("已刷新", { ms: 1800 });
     } catch {
       localStorage.removeItem(REFRESH_CONTEXT_KEY);
-      setToast("刷新失败，当前数据未改变");
-      window.setTimeout(() => setToast(""), 2400);
+      showToast("刷新失败，当前数据未改变", { tone: "error", ms: 2400 });
     } finally {
       if (!relaunching) setRefreshing(false);
     }
   }
 
-  // A newer message replaces the older one and its timer, so it is never cut short.
+  // For the image section and the 账号 panels, which pass only text: the tone follows the words (use-toast.ts).
   function flashToast(message: string, ms = 2200) {
     // The newest message wins over a pending 撤销 for a picture.
     setUndoImage(null);
-    if (flashToastTimer.current) clearTimeout(flashToastTimer.current);
-    setToast(message);
-    flashToastTimer.current = setTimeout(() => setToast(""), ms);
+    showToast(message, { ms });
   }
 
   function openEditor(item: SecretItem | null) {
@@ -695,18 +691,24 @@ export default function Home() {
         searchRef.current?.blur();
       }
     };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, [loading, inlineEditing, newFolder, auxiliaryDialogOpen, backupMode, bulkMode, homeShortcutsEnabled]);
+
+  // The desktop shell's "focus the search" signal. Subscribed once (not again on every keystroke); it reads whether
+  // shortcuts are allowed right now from a ref.
+  const homeShortcutsRef = useRef(homeShortcutsEnabled);
+  useEffect(() => { homeShortcutsRef.current = homeShortcutsEnabled; }, [homeShortcutsEnabled]);
+  useEffect(() => {
+    if (loading) return;
     const removeDesktopListener = window.clipboxDesktop?.onFocusSearch(() => {
-      if (!homeShortcutsEnabled) return;
+      if (!homeShortcutsRef.current) return;
       setActiveFolder("all");
       setQuery("");
       window.setTimeout(() => searchRef.current?.focus(), 30);
     });
-    window.addEventListener("keydown", shortcut);
-    return () => {
-      window.removeEventListener("keydown", shortcut);
-      removeDesktopListener?.();
-    };
-  }, [loading, inlineEditing, newFolder, auxiliaryDialogOpen, backupMode, bulkMode, homeShortcutsEnabled, filtered, safeSelected, activeFolder, windowMode]);
+    return () => removeDesktopListener?.();
+  }, [loading]);
 
   const readVault = useCallback((): VaultData => ({
     items: itemsRef.current,
@@ -735,11 +737,10 @@ export default function Home() {
       storageWarnedRef.current = true;
       // After the save's own message (such as 条目已更新), so that one does not replace it at once.
       window.setTimeout(() => {
-        setToast(STORAGE_NEARLY_FULL_MESSAGE);
-        window.setTimeout(() => setToast(""), 3600);
+        showToast(STORAGE_NEARLY_FULL_MESSAGE, { tone: "error", ms: 3600 });
       }, 0);
     }
-  }, [deviceKey]);
+  }, [deviceKey, showToast]);
 
   const commitVaultToMemory = useCallback((data: VaultData) => {
     itemsRef.current = data.items;
@@ -781,7 +782,7 @@ export default function Home() {
       onError: (error) => {
         // A backup restore is replacing everything and the page reloads next: nothing to tell.
         if (writesClosed()) return;
-        setToast(isQuotaError(error) ? STORAGE_FULL_MESSAGE : "最近的改动保存失败，请再操作一次");
+        showToast(isQuotaError(error) ? STORAGE_FULL_MESSAGE : "最近的改动保存失败，请再操作一次", { tone: "error", ms: 4800 });
       },
     });
     lazyWriterRef.current = writer;
@@ -813,7 +814,7 @@ export default function Home() {
       void writer.flush();
       if (lazyWriterRef.current === writer) lazyWriterRef.current = null;
     };
-  }, [loading, deviceKey, enqueueVaultTask, storeVault, readVault]);
+  }, [loading, deviceKey, enqueueVaultTask, storeVault, readVault, showToast]);
 
   useEffect(() => {
     if (loading || !deviceKey || !window.clipboxDesktop?.onAutomationCommand) return;
@@ -843,8 +844,7 @@ export default function Home() {
               secretCount: secretData.items.length,
               backup,
             });
-            setToast(`${SECRET_WORD}加密备份已生成`);
-            window.setTimeout(() => setToast(""), 2200);
+            showToast(`${SECRET_WORD}加密备份已生成`);
             return;
           }
           const committed = await commitSnippetAutomationCommand(
@@ -866,26 +866,24 @@ export default function Home() {
             const verb = committed.response.action === "add"
               ? "已新增"
               : committed.response.action === "delete" ? "已移入回收站" : "已更新";
-            setToast(`外部任务${verb} ${number}`);
-            window.setTimeout(() => setToast(""), 2200);
+            showToast(`外部任务${verb} ${number}`);
           }
         } catch (error) {
           const code = error instanceof AutomationCommandError ? error.code : "PERSIST_FAILED";
           const message = error instanceof Error ? error.message : "外部命令执行失败";
           window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: false, error: { code, message } });
-          setToast("外部修改失败");
-          window.setTimeout(() => setToast(""), 2400);
+          showToast("外部修改失败", { tone: "error", ms: 2400 });
         }
       };
       void enqueueVaultTask(execute);
     });
     window.clipboxDesktop.automationReady();
     return remove;
-  }, [deviceKey, enqueueVaultTask, loading, writeVault]);
+  }, [deviceKey, enqueueVaultTask, loading, writeVault, showToast]);
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
-    void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? recordCopy(value, timestampNow()) : value) })).catch(() => setToast("已复制，但使用记录保存失败"));
+    void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? recordCopy(value, timestampNow()) : value) })).catch(() => showToast("已复制，但使用记录保存失败", { tone: "error" }));
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
@@ -898,8 +896,7 @@ export default function Home() {
     setCopiedReferenceId(item.id);
     if (referenceFeedbackTimer.current) clearTimeout(referenceFeedbackTimer.current);
     referenceFeedbackTimer.current = window.setTimeout(() => setCopiedReferenceId(""), 1600);
-    setToast("引用已复制，可直接发给其他任务");
-    window.setTimeout(() => setToast(""), 2200);
+    showToast("引用已复制，可直接发给其他任务");
     window.clipboxDesktop?.didCopy();
   }
 
@@ -918,8 +915,7 @@ export default function Home() {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== expandedIndex) selectRow(index);
       const missing = readiness.missingPlaceholders;
-      setToast(`先填写：${missing.join("、")}`);
-      window.setTimeout(() => setToast(""), 2200);
+      showToast(`先填写：${missing.join("、")}`, { tone: "ok" });
       window.setTimeout(() => {
         const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
         Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
@@ -932,8 +928,7 @@ export default function Home() {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== expandedIndex) selectRow(index);
       setFill({ ...state, values: state.values, remembered: [] });
-      setToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`);
-      window.setTimeout(() => setToast(""), 3600);
+      showToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`, { tone: "ok", ms: 3600 });
       return;
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
@@ -943,18 +938,16 @@ export default function Home() {
   // Right-click on a block (or on one of its remembered values) pins the value: a pinned value is not pushed out by new ones.
   function pinValue(item: SecretItem, name: string, value = fillFor(item).values[name] || "") {
     const outcome = togglePin(valueMemory, pinnedValues, name, value);
-    if (outcome.result === "empty") { setToast("先填一个值，再右键固定"); }
-    else if (outcome.result === "full") { setToast(`${name} 已固定 3 个，先取消一个再固定`); }
-    else { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); setToast(outcome.result === "pinned" ? `已固定「${value.trim()}」，不会被新值顶掉` : `已取消固定「${value.trim()}」`); }
-    window.setTimeout(() => setToast(""), 2400);
+    if (outcome.result === "empty") { showToast("先填一个值，再右键固定", { ms: 2400 }); }
+    else if (outcome.result === "full") { showToast(`${name} 已固定 3 个，先取消一个再固定`, { tone: "ok", ms: 2400 }); }
+    else { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); showToast(outcome.result === "pinned" ? `已固定「${value.trim()}」，不会被新值顶掉` : `已取消固定「${value.trim()}」`, { ms: 2400 }); }
   }
   // Delete a remembered value everywhere; the menu on a listed value calls this.
   function removeValue(name: string, value: string) {
     const outcome = deleteValue(valueMemory, pinnedValues, name, value);
     setValueMemory(outcome.memory);
     setPinnedValues(outcome.pins);
-    setToast(`已删除「${value}」`);
-    window.setTimeout(() => setToast(""), 2000);
+    showToast(`已删除「${value}」`, { ms: 2000 });
   }
   const { startOptionDrag } = useValueOptionDrag(valueMemory, pinnedValues, setValueMemory, setPinnedValues);
   // The menu on a value's handle moves it one place; pinned values only change places among themselves.
@@ -980,8 +973,7 @@ export default function Home() {
   }
 
   function showVariableHelp() {
-    setToast("最多记 3 个值，右键固定，固定的不会被新值顶掉");
-    window.setTimeout(() => setToast(""), 4200);
+    showToast("最多记 3 个值，右键固定，固定的不会被新值顶掉", { ms: 4200 });
   }
 
   // Clicking a remembered value fills the block. If every other block is already filled it copies at once, otherwise the cursor moves on.
@@ -1029,8 +1021,7 @@ export default function Home() {
       await persist((current) => ({ ...current, items: [{ ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now }, ...current.items] }));
     }
     closeEditor();
-    setToast(wasEditing ? "条目已更新" : "条目已加密保存");
-    window.setTimeout(() => setToast(""), 2200);
+    showToast(wasEditing ? "条目已更新" : "条目已加密保存");
   }
 
   function startNewFolder() {
@@ -1057,8 +1048,7 @@ export default function Home() {
       if (result.created) await persist((current) => ({ ...current, folders: addFolder(current.folders, activeKind, newFolder.name).folders }));
       setNewFolder(null);
       selectFolder(`folder:${result.folder}`);
-      setToast(result.created ? "目录已创建" : "目录已存在，已打开");
-      window.setTimeout(() => setToast(""), 2200);
+      showToast(result.created ? "目录已创建" : "目录已存在，已打开");
     } catch {
       setNewFolder({ ...newFolder, error: "创建失败，请重试" });
     }
@@ -1071,8 +1061,7 @@ export default function Home() {
       await writeVault(result.data);
       return "";
     }).catch(() => "保存失败，目录保持原样");
-    setToast(failure || success);
-    window.setTimeout(() => setToast(""), failure ? 2800 : 2000);
+    showToast(failure || success, failure ? { tone: "error", ms: 2800 } : { tone: "ok", ms: 2000 });
     return failure;
   }
 
@@ -1196,8 +1185,7 @@ export default function Home() {
     try {
       await persist((current) => ({ ...current, items: moveItemsToTrash(current.items, ids, timestampNow()) }));
     } catch {
-      setToast("移入回收站失败，条目保持原位");
-      window.setTimeout(() => setToast(""), 2400);
+      showToast("移入回收站失败，条目保持原位", { tone: "error", ms: 2400 });
       return;
     }
     setSelected(0);
@@ -1216,11 +1204,10 @@ export default function Home() {
     try {
       await persist((current) => ({ ...current, items: restoreTrashedItems(current.items, list.map((item) => item.id)) }));
       setSelected(0);
-      setToast(list.length > 1 ? `已恢复 ${list.length} 条` : "已恢复到原目录");
+      showToast(list.length > 1 ? `已恢复 ${list.length} 条` : "已恢复到原目录");
     } catch {
-      setToast("恢复失败，内容仍保留在回收站");
+      showToast("恢复失败，内容仍保留在回收站", { tone: "error" });
     }
-    window.setTimeout(() => setToast(""), 2200);
   }
 
   // A picture went to the 回收站: the same 6-second 撤销 as for 话术.
@@ -1258,11 +1245,10 @@ export default function Home() {
     if (ids.length === 0) return;
     try {
       await persist((current) => ({ ...current, items: moveItemsToFolder(current.items, ids, folder, timestampNow()) }));
-      setToast(folder ? `已把 ${ids.length} 条移到「${folder}」` : `已把 ${ids.length} 条移到未分类`);
+      showToast(folder ? `已把 ${ids.length} 条移到「${folder}」` : `已把 ${ids.length} 条移到未分类`);
     } catch {
-      setToast("移动失败，条目保持原位");
+      showToast("移动失败，条目保持原位", { tone: "error" });
     }
-    window.setTimeout(() => setToast(""), 2200);
     exitBulk();
   }
 
@@ -1279,8 +1265,7 @@ export default function Home() {
       : moveItemToTrash(current.items, deleteRequest.item.id, timestampNow()) }));
     setDeleteRequest(null);
     setSelected(0);
-    setToast(deleteRequest.permanent ? "已永久删除" : "已移入回收站");
-    window.setTimeout(() => setToast(""), 2200);
+    showToast(deleteRequest.permanent ? "已永久删除" : "已移入回收站");
   }
 
   const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
@@ -1324,8 +1309,8 @@ export default function Home() {
     if (expired.length === 0) return;
     const ids = new Set(expired.map((item) => item.id));
     void persist((current) => ({ ...current, items: current.items.filter((item) => !(ids.has(item.id) && isTrashedItem(item))) }))
-      .catch(() => setToast("自动清理回收站失败，内容已保留"));
-  }, [loading, trashDays, items, persist]);
+      .catch(() => showToast("自动清理回收站失败，内容已保留", { tone: "error", ms: 2800 }));
+  }, [loading, trashDays, items, persist, showToast]);
 
   // Pictures that have sat in the 回收站 longer than the chosen retention are removed for good (same setting as 话术).
   // Runs once the 图片 section has been read (nothing is opened before that).
@@ -1358,8 +1343,7 @@ export default function Home() {
     try {
       await window.clipboxDesktop?.openDataFolder?.();
     } catch {
-      setToast("无法打开数据文件夹");
-      window.setTimeout(() => setToast(""), 2200);
+      showToast("无法打开数据文件夹", { tone: "error" });
     }
   }
 
@@ -1367,20 +1351,23 @@ export default function Home() {
     const count = items.filter((item) => isTrashedItem(item)).length;
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     setUndoTrash(null);
-    await persist((current) => ({ ...current, items: current.items.filter((item) => !isTrashedItem(item)) }));
-    setToast(`已永久删除 ${count} 条`);
-    window.setTimeout(() => setToast(""), 2200);
+    try {
+      // Nothing is changed in memory until the encrypted save succeeded (writeVault), so a failure leaves the trash as it was.
+      await persist((current) => ({ ...current, items: current.items.filter((item) => !isTrashedItem(item)) }));
+    } catch (error) {
+      showToast(isQuotaError(error) ? STORAGE_FULL_MESSAGE : "清空失败，回收站没有变化", { tone: "error", ms: 3600 });
+      return;
+    }
+    showToast(`已永久删除 ${count} 条`);
   }
 
   async function restoreItem(item: SecretItem) {
     try {
       await persist((current) => ({ ...current, items: restoreTrashedItem(current.items, item.id) }));
       setSelected(0);
-      setToast("已恢复到原目录");
-      window.setTimeout(() => setToast(""), 2200);
+      showToast("已恢复到原目录");
     } catch {
-      setToast("恢复失败，内容仍保留在回收站");
-      window.setTimeout(() => setToast(""), 2400);
+      showToast("恢复失败，内容仍保留在回收站", { tone: "error", ms: 2400 });
     }
   }
 
@@ -1388,7 +1375,7 @@ export default function Home() {
     void persistLazy((current) => {
       prepareSortAnimation("card"); // starred cards sort first: slide the cards to their new places
       return { ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) };
-    }).catch(() => setToast("收藏保存失败，请重试"));
+    }).catch(() => showToast("收藏保存失败，请重试", { tone: "error", ms: 2400 }));
   }
 
   function showImages() {
@@ -1513,11 +1500,9 @@ export default function Home() {
     setRowMenuId("");
     try {
       await persist((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, folder, updatedAt: timestampNow() } : value) }));
-      setToast(folder ? `已移动到「${folder}」` : "已移到未分类");
-      window.setTimeout(() => setToast(""), 2000);
+      showToast(folder ? `已移动到「${folder}」` : "已移到未分类", { ms: 2000 });
     } catch {
-      setToast("移动失败，条目保持原位");
-      window.setTimeout(() => setToast(""), 2400);
+      showToast("移动失败，条目保持原位", { tone: "error", ms: 2400 });
     }
   }
 
@@ -1535,7 +1520,7 @@ export default function Home() {
         const payload: VaultBoxPayload = { totp: await openTotpStore(accountKey).list(), items: await openSecretItemsStore(accountKey).list() };
         if (!isVaultBoxEmpty(payload)) vaultBox = await encryptVaultBox(payload, password);
       } catch {
-        window.alert("保险箱里的内容读不出来，备份没有生成，数据没有改动。");
+        showToast("账号里的内容读不出来，备份没有生成，数据没有改动", { tone: "error", ms: 5000 });
         return;
       }
     }
@@ -1550,14 +1535,12 @@ export default function Home() {
     URL.revokeObjectURL(url);
     setBackupMode(null);
     if (scope === "secret") {
-      setToast(`${SECRET_WORD}备份已导出`);
-      window.setTimeout(() => setToast(""), 2200);
+      showToast(`${SECRET_WORD}备份已导出`);
       return;
     }
     try { localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); } catch { /* optional hint only */ }
     setLastBackupAt(Date.now());
-    setToast("话术备份已导出");
-    window.setTimeout(() => setToast(""), 2200);
+    showToast("话术备份已导出");
   }
 
   async function importVault(file: File) {
@@ -1585,7 +1568,7 @@ export default function Home() {
       setBackupMode("import");
       setMenuOpen(false);
     } catch {
-      window.alert("这不是有效的 Clipbox 加密备份。");
+      showToast("这不是有效的 Clipbox 加密备份", { tone: "error", ms: 3600 });
     }
   }
 
@@ -1605,9 +1588,9 @@ export default function Home() {
       await writeVault(result.data);
       return result;
     });
-    if (importedBox && !accountKey) {
-      window.alert("账号页已上锁，备份里的账号内容没有导入。先打开账号页、输入密码，再导入一次。");
-    } else if (importedBox) {
+    // 账号 locked: its part of the backup waits; the closing message says so (it would replace a separate one).
+    const boxSkipped = Boolean(importedBox && !accountKey);
+    if (importedBox && !boxSkipped) {
       const totpStore = openTotpStore(accountKey);
       const itemStore = openSecretItemsStore(accountKey);
       const merged = mergeVaultBox({ totp: await totpStore.list(), items: await itemStore.list() }, importedBox, strategy);
@@ -1617,8 +1600,9 @@ export default function Home() {
     }
     setPendingImport(null);
     setBackupMode(null);
-    setToast(strategy === "replace" ? `已恢复 ${result.importedCount} 条内容` : `已安全导入 ${result.importedCount} 条内容`);
-    window.setTimeout(() => setToast(""), 2400);
+    const done = strategy === "replace" ? `已恢复 ${result.importedCount} 条内容` : `已安全导入 ${result.importedCount} 条内容`;
+    if (boxSkipped) showToast(`${done}。账号页已上锁，备份里的账号内容没有导入。先打开账号页、输入密码，再导入一次`, { tone: "error", ms: 7000 });
+    else showToast(done, { ms: 2400 });
   }
 
   async function prepareSnippetImport(file: File) {
@@ -1629,17 +1613,24 @@ export default function Home() {
       setSnippetImportName(file.name);
       setMenuOpen(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "无法读取这份话术表格");
+      showToast(error instanceof Error ? error.message : "无法读取这份话术表格", { tone: "error", ms: 4000 });
     }
   }
 
   async function applySnippetImport() {
     if (!snippetImport || snippetImport.importableCount === 0) return;
-    await persist((current) => ({
-      ...current,
-      items: [...snippetImport.items, ...current.items],
-      folders: { secret: current.folders.secret, snippet: Array.from(new Set([...current.folders.snippet, ...snippetImport.folders])) },
-    }));
+    try {
+      // As with every immediate save, memory changes only after the encrypted write succeeded.
+      await persist((current) => ({
+        ...current,
+        items: [...snippetImport.items, ...current.items],
+        folders: { secret: current.folders.secret, snippet: Array.from(new Set([...current.folders.snippet, ...snippetImport.folders])) },
+      }));
+    } catch (error) {
+      // The dialog stays open, so the person can try again or cancel.
+      showToast(isQuotaError(error) ? STORAGE_FULL_MESSAGE : "导入没有成功，原来的内容没有改动", { tone: "error", ms: 4000 });
+      return;
+    }
     const importedCount = snippetImport.importableCount;
     setSnippetImport(null);
     setSnippetImportName("");
@@ -1649,8 +1640,7 @@ export default function Home() {
     setProductFilter("全部产品");
     setQuery("");
     setSelected(0);
-    setToast(`已导入 ${importedCount} 条话术`);
-    window.setTimeout(() => setToast(""), 2600);
+    showToast(`已导入 ${importedCount} 条话术`, { ms: 2600 });
   }
 
   if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipbox 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
@@ -1724,15 +1714,12 @@ export default function Home() {
   // Every folder, the standard 话术 ones too (D-035), can move to any other place in the list.
   const canMoveFolder = (folder: string, delta: -1 | 1) => Boolean(activeFolders[activeFolders.indexOf(folder) + delta]);
   // Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
-  const canMoveCard = (item: SecretItem, delta: -1 | 1) => {
-    const group = filtered.filter((entry) => Boolean(entry.pinned) === Boolean(item.pinned));
-    return Boolean(group[group.findIndex((entry) => entry.id === item.id) + delta]);
-  };
+  const canMoveCard = (item: SecretItem, delta: -1 | 1) => Boolean(cardMoves.get(item.id)?.[delta < 0 ? "up" : "down"]);
   const renderFolderRow = (folder: string) => {
     const sortable = true;
     const active = activeFolder === `folder:${folder}`;
     const renaming = renamingFolder?.from === folder;
-    const count = activeKindItems.filter((item) => item.folder === folder).length;
+    const count = folderCounts.get(folder) ?? 0;
     return (
       <FolderRow
         key={folder}
@@ -1764,7 +1751,7 @@ export default function Home() {
     );
   };
   const menuFolder = folderMenu && activeFolders.includes(folderMenu) ? folderMenu : "";
-  const menuFolderCount = menuFolder ? activeKindItems.filter((item) => item.folder === menuFolder).length : 0;
+  const menuFolderCount = menuFolder ? folderCounts.get(menuFolder) ?? 0 : 0;
 
   const legacyList = (
             <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`} onAnimationEnd={onRowAnimationEnd}>
@@ -2135,6 +2122,7 @@ export default function Home() {
       <ArcToast
         message={undoImage ? "图片已移入回收站" : undoTrash ? (undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站") : toast}
         className={undoTrash || undoImage ? "undo-toast" : undefined}
+        tone={undoTrash || undoImage ? "ok" : toastTone}
         action={undoImage ? { label: "撤销", onClick: () => void undoImageTrash() } : undoTrash ? { label: "撤销", onClick: () => void undoTrashNow() } : undefined}
       />
     </main>
