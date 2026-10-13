@@ -17,6 +17,8 @@
     "test:e2e": "npm run build && playwright test",
     "preview:build": "node tools/preview/build.mjs",
     "preview:serve": "node tools/preview/serve.mjs",
+    "website:build": "node tools/website/build.mjs",
+    "website:deploy": "npx --yes wrangler@4.150.0 deploy --config tools/website/wrangler.jsonc",
     "tauri:frontend": "node scripts/tauri-frontend.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "node scripts/sync-version.mjs && tauri build"
