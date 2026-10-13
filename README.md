@@ -1,10 +1,10 @@
 # Clipbox
 
-Clipbox is a local, encrypted copy box that opens instantly. It has two sections: 话术 (snippets — canned
-customer-service replies) a 图片 section for copying images, and on macOS a 秘密 section.
+Clipbox is a local, encrypted copy box that opens instantly. It has three sections on Windows and macOS: 话术
+(snippets — canned customer-service replies), 账号 (logins, payments, API keys, verification codes; optional password
+that encrypts it, D-038/D-040) and 图片 (images to copy, D-017).
 
-> On Windows the sections are 话术 and 图片; the former plain-text 备注 section was replaced by 图片 (D-017).
-> On macOS, 秘密 keeps masked content and copy-by-reference.
+> On macOS, 账号 still holds the old 秘密 list (masked content, copy by reference).
 
 ## Working on this repository
 
