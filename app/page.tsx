@@ -778,7 +778,10 @@ export default function Home() {
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flushWhenHidden);
     const removeFlushRequest = window.clipboxDesktop?.onFlushRequest?.(() => {
-      void writer.flush().finally(() => window.clipboxDesktop?.flushDone?.());
+      // Immediate edits and queued lazy mutations must finish before we drain the lazy writer.
+      void persistQueueRef.current.then(() => writer.flush()).then(() => {
+        if (!writer.hasPending()) window.clipboxDesktop?.flushDone?.();
+      });
     });
     return () => {
       window.removeEventListener("pagehide", flush);

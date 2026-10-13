@@ -210,20 +210,26 @@ export function countImages(payload: TransferPayload): number {
 }
 
 async function writePayload(payload: TransferPayload, storage: Storage, factory: IDBFactory): Promise<void> {
-  for (const [name, tables] of Object.entries(payload.indexedDB)) {
+  const present = await existingDatabases(factory);
+  for (const name of DATABASES) {
+    if (!(name in payload.indexedDB) && !present.has(name)) continue;
+    const tables = payload.indexedDB[name] ?? {};
     const open = factory.open(name, 1);
     open.onupgradeneeded = () => {
-      for (const store of Object.keys(tables)) if (!open.result.objectStoreNames.contains(store)) open.result.createObjectStore(store, { keyPath: "id" });
+      const stores = new Set([...(name === "clipbox-images" ? ["meta", "blobs"] : ["thumbs"]), ...Object.keys(tables)]);
+      for (const store of stores) if (!open.result.objectStoreNames.contains(store)) open.result.createObjectStore(store, { keyPath: "id" });
     };
     const db = await request(open);
     try {
-      const names = Object.keys(tables).filter((store) => db.objectStoreNames.contains(store));
+      // Clear every existing table, including ones absent from this backup. Keep the schema and
+      // live image-store connections usable instead of blocking on deleteDatabase.
+      const names = Array.from(db.objectStoreNames);
       if (names.length === 0) continue;
       const tx = db.transaction(names, "readwrite");
       for (const store of names) {
         const target = tx.objectStore(store);
         target.clear();
-        for (const row of tables[store]) target.put(decodeValue(row));
+        for (const row of tables[store] ?? []) target.put(decodeValue(row));
       }
       await done(tx);
     } finally {

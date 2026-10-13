@@ -143,6 +143,40 @@ test("a payload with foreign keys or databases is refused before anything is wri
   assert.equal(idb.dbs.size, 0);
 });
 
+test("restoring a backup without image databases removes existing pictures and thumbnails", async () => {
+  const idb = fakeIndexedDB({
+    "clipbox-images": { meta: [{ id: "settings" }, { id: "old-picture" }], blobs: [{ id: "old-picture" }] },
+    "clipbox-image-thumbs": { thumbs: [{ id: "old-picture" }] },
+  });
+  const storage = fakeStorage({ "clipbox.device-key.v1": "current-key" });
+  await applyPayload({ localStorage: { "clipbox.device-key.v1": "backup-key" }, indexedDB: {} }, storage, idb);
+  assert.equal(countImages(await collectPayload(storage, idb)), 0);
+  for (const name of ["clipbox-images", "clipbox-image-thumbs"]) for (const rows of idb.dbs.get(name).values()) assert.equal(rows.size, 0);
+  assert.equal(storage.getItem("clipbox.device-key.v1"), "backup-key");
+});
+
+test("a missing table in a backup is cleared rather than retaining its previous rows", async () => {
+  const idb = fakeIndexedDB({ "clipbox-images": { meta: [{ id: "old" }], blobs: [{ id: "old" }] } });
+  const storage = fakeStorage();
+  await applyPayload({ localStorage: {}, indexedDB: { "clipbox-images": { meta: [] } } }, storage, idb);
+  assert.equal(idb.dbs.get("clipbox-images").get("blobs").size, 0);
+});
+
+test("rollback to a backup without images clears pictures created by the failed import", async () => {
+  const idb = fakeIndexedDB();
+  const storage = fakeStorage({ "clipbox.device-key.v1": "old-key" });
+  const set = storage.setItem;
+  let fail = true;
+  storage.setItem = (key, value) => { if (fail) { fail = false; throw new Error("disk full"); } set(key, value); };
+  await assert.rejects(() => applyPayload({ localStorage: { "clipbox.device-key.v1": "new-key" }, indexedDB: {
+    "clipbox-images": { meta: [{ id: "new" }], blobs: [{ id: "new" }] },
+    "clipbox-image-thumbs": { thumbs: [{ id: "new" }] },
+  } }, storage, idb), /原样保留/);
+  assert.equal(countImages(await collectPayload(storage, idb)), 0);
+  assert.equal(idb.dbs.get("clipbox-image-thumbs").get("thumbs").size, 0);
+  assert.equal(storage.getItem("clipbox.device-key.v1"), "old-key");
+});
+
 test("a failure half-way puts the old data back (images and settings)", async () => {
   const oldImages = { "clipbox-images": { meta: [{ id: "settings", salt: "s" }, { id: "old1", iv: "a", ciphertext: "b" }, { id: "old2", iv: "a", ciphertext: "b" }], blobs: [{ id: "old1", iv: "a", ciphertext: Uint8Array.from([1]).buffer }] } };
   const payload = {
