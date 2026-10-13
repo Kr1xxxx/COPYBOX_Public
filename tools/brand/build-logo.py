@@ -5,7 +5,7 @@ Text is converted to outlines, so the SVG files need no fonts. To rebuild:
 
     pip install fonttools uharfbuzz
     python3 tools/brand/build-logo.py --inter /usr/share/fonts/opentype/inter/InterDisplay-SemiBold.otf \
-        --noto NotoSansSC-500.ttf   # Noto Sans SC Medium (fonts.google.com/noto)
+        --noto NotoSansSC-700.ttf   # Noto Sans SC Bold (fonts.google.com/noto)
 
 Only the outputs in docs/brand/ are committed; the fonts are not.
 """
@@ -24,6 +24,7 @@ MUTED = "#55534d"; MUTED_DARK = "#b3b0a4"
 
 CAP = 1490 / 2048          # Inter Display cap height (em)
 CN_MID = 0.385             # visual centre of 复制盒 above baseline (em), measured
+CN_TRACK = 0.08
 
 class Face:
     def __init__(self, path):
@@ -45,21 +46,55 @@ class Face:
 def paths(glyphs, dx, dy, color, cls=None):
     return "".join(f'<path fill="{color}" transform="translate({dx + x:.2f} {dy:.2f})" d="{d}"/>' for d, x, _ in glyphs if d)
 
-NAME = "COPYBOXX"; TRACK = 0.02   # all caps: a little positive tracking
+NAME = "Copyboxx"; TRACK = -0.025   # mixed case, tight
+DESC = 494 / 2048                  # Inter descender (p, y)
 
 def wordmark(inter, size, dx, dy, ink, accent):
     """The wordmark with the last X in the accent colour. Returns (svg, width)."""
     g, w = inter.shape(NAME, size, tracking=TRACK)
     return paths(g[:-1], dx, dy, ink) + paths(g[-1:], dx, dy, accent), w
 
-def cn(noto, text, size, dx, dy, color, tracking=0.0):
-    g, w = noto.shape(text, size, tracking)
-    return paths(g, dx, dy, color), w
-
 DARK_A = "#2d2b33"; DARK_B = "#16151b"   # squircle gradient, top-left -> bottom-right
 WHITE = "#ffffff"                        # the C
 PURPLE_A = "#c4b9ff"; PURPLE_B = "#8f7ff6" # the copied item, top-left -> bottom-right
 DASH = "rgba(40, 30, 90, .45)"             # the text line on the item
+
+from fontTools.pens.recordingPen import RecordingPen
+
+def _contours(face, ch, size):
+    """A glyph split into contours: [(svg_d, (x0, y0, x1, y1) in px, y up)], and the advance."""
+    name = face.tt.getBestCmap()[ord(ch)]
+    rp = RecordingPen(); face.gs[name].draw(rp)
+    k = size / face.upm; out = []; cur = []
+    for op, args in rp.value:
+        cur.append((op, args))
+        if op in ("closePath", "endPath"):
+            pen = SVGPathPen(face.gs); tp = TransformPen(pen, (k, 0, 0, -k, 0, 0)); xs = []; ys = []
+            for o, a in cur:
+                getattr(tp, o)(*a)
+                for pt in a:
+                    if isinstance(pt, tuple): xs.append(pt[0] * k); ys.append(pt[1] * k)
+            out.append((pen.getCommands(), (min(xs), min(ys), max(xs), max(ys)))); cur = []
+    return out, face.gs[name].width * k
+
+def cn(noto, text, size, dx, dy, color, tracking=CN_TRACK, purple=None):
+    """复制盒 in Noto Sans SC Bold. The 口 inside 盒 becomes the icon's tilted purple card (the thing in the
+    box), so the Chinese carries the same idea as the mark. Returns (svg, width)."""
+    parts = []; x = dx
+    for ch in text:
+        cs, adv = _contours(noto, ch, size); keep = []; box = None
+        for d, bb in cs:
+            if purple and ch == "盒" and bb[1] > 0.35 * size and bb[3] < 0.66 * size and (bb[2] - bb[0]) < 0.45 * size:
+                box = bb if box is None else (min(box[0], bb[0]), min(box[1], bb[1]), max(box[2], bb[2]), max(box[3], bb[3]))
+            else:
+                keep.append(d)
+        parts.append(f'<path fill="{color}" transform="translate({x:.2f} {dy:.2f})" d="{"".join(keep)}"/>')
+        if box:
+            x0, y0, x1, y1 = box; w = x1 - x0; h = y1 - y0; cx = x + (x0 + x1) / 2; cy = dy - (y0 + y1) / 2
+            parts.append(f'<g transform="rotate(-6 {cx:.2f} {cy:.2f})"><rect x="{x + x0:.2f}" y="{dy - y1:.2f}" width="{w:.2f}" height="{h:.2f}" rx="{0.22 * h:.2f}" fill="{purple}"/>'
+                         f'<rect x="{cx - 0.26 * w:.2f}" y="{cy - 0.07 * h:.2f}" width="{0.52 * w:.2f}" height="{0.14 * h:.2f}" rx="{0.07 * h:.2f}" fill="{DASH}"/></g>')
+        x += adv + tracking * size
+    return "".join(parts), x - dx - tracking * size
 
 def mark(x, y, h, with_tile=False):
     """The icon, traced from the owner's 1024 px original: a dark gradient squircle (928 of 1024, r 230),
@@ -97,31 +132,33 @@ def build(inter, noto, out):
     for theme, ink, accent, line, muted, bg in (("light", INK, VIOLET, LINE, MUTED, None),
                                                ("dark", INK_DARK, LAVENDER, LINE_DARK, MUTED_DARK, None)):
         sfx = "" if theme == "light" else "-dark"
-        pad = 24; size = 100; cap = CAP * size
+        pad = 24; size = 100; cap = CAP * size; desc = DESC * size
+        H = cap + desc + 2 * pad   # room for the descenders of p and y
 
         # 2. Wordmark alone.
         wm, w = wordmark(inter, size, pad, pad + cap, ink, accent)
-        write(f"wordmark{sfx}.svg", svg(w + 2 * pad, cap + 2 * pad, wm))
+        write(f"wordmark{sfx}.svg", svg(w + 2 * pad, H, wm))
         wm_mono, _ = wordmark(inter, size, pad, pad + cap, ink, ink)   # single colour (print, stamps)
-        write(f"wordmark-mono{sfx}.svg", svg(w + 2 * pad, cap + 2 * pad, wm_mono))
+        write(f"wordmark-mono{sfx}.svg", svg(w + 2 * pad, H, wm_mono))
 
-        # 3. Wordmark with Chinese: COPYBOXX 复制盒 (one line, for a page header).
-        cn_size = 46; gap = 22
+        # 3. Wordmark with Chinese: Copyboxx 复制盒 (one line, for a page header).
+        cn_size = 56; gap = 22
         cn_base = pad + cap - cap / 2 + CN_MID * cn_size
-        wm, w = wordmark(inter, size, pad, pad + cap, ink, accent)
-        c, cw = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, muted, tracking=0.04)
-        write(f"wordmark-cn{sfx}.svg", svg(w + gap + cw + 2 * pad, cap + 2 * pad, wm + c))
+        c, cw = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink, purple=accent)
+        write(f"wordmark-cn{sfx}.svg", svg(w + gap + cw + 2 * pad, H, wm + c))
+        c_mono, _ = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink, purple=ink)
+        write(f"wordmark-cn-mono{sfx}.svg", svg(w + gap + cw + 2 * pad, H, wm_mono + c_mono))
 
         # 4. Horizontal lockup: mark + COPYBOXX | 复制盒.
-        mh = 104; mid = pad + mh / 2
+        mh = 112; mid = pad + mh / 2
         body = mark(pad, pad, mh)
         x = pad + mh + 26
         wm, w = wordmark(inter, size, x, mid + cap / 2, ink, accent); body += wm
         x += w + 26
         body += f'<rect x="{x:.2f}" y="{mid - 30:.2f}" width="2" height="60" rx="1" fill="{line}"/>'
         x += 2 + 24
-        c, cw = cn(noto, "复制盒", 40, x, mid + CN_MID * 40, muted, tracking=0.06); body += c
-        write(f"lockup-horizontal{sfx}.svg", svg(x + cw + pad, mh + 2 * pad, body))
+        c, cw = cn(noto, "复制盒", 50, x, mid + CN_MID * 50, ink, purple=accent); body += c
+        write(f"lockup-horizontal{sfx}.svg", svg(x + cw + pad, max(mh + 2 * pad, mid + cap / 2 + desc + pad), body))
 
         # 5. Stacked lockup: mark above, COPYBOXX, 复制盒 letter-spaced.
         mh = 168
@@ -130,9 +167,10 @@ def build(inter, noto, out):
         body = mark((W - mh) / 2, pad, mh)
         y = pad + mh + 40 + cap
         body += paths(g[:-1], (W - w) / 2, y, ink) + paths(g[-1:], (W - w) / 2, y, accent)
-        cn_size = 34; y += 46 + cn_size * 0.85
-        g2, w2 = noto.shape("复制盒", cn_size, tracking=0.5)
-        body += paths(g2, (W - w2) / 2, y, muted)
+        cn_size = 40; y += desc + 36 + cn_size * 0.85
+        c2, w2 = cn(noto, "复制盒", cn_size, 0, 0, ink, tracking=0.3, purple=accent)
+        c2, _ = cn(noto, "复制盒", cn_size, (W - w2) / 2, y, ink, tracking=0.3, purple=accent)
+        body += c2
         write(f"lockup-stacked{sfx}.svg", svg(W, y + cn_size * 0.15 + pad, body))
 
 if __name__ == "__main__":
