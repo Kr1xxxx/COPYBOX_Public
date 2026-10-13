@@ -105,16 +105,16 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .actions .more { font-size: 16px; }
 
 /* Sections */
-.section { padding: 96px 0; }
+.section { padding-block: 96px; }
 .section + .section { padding-top: 0; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 32px; }
 .section-head p { margin-top: 8px; color: var(--muted); }
-.page-head { padding: 80px 0 48px; }
+.page-head { padding-block: 80px 48px; }
 .page-head p { margin-top: 16px; }
 .page-head + .section { padding-top: 0; }
 
 /* Hero */
-.hero { padding: 72px 0 96px; }
+.hero { padding-block: 72px 48px; overflow-x: clip; }
 .hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 14px; color: var(--muted); }
 .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
@@ -130,7 +130,7 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   background: radial-gradient(closest-side, var(--glow), transparent);
 }
 .fan {
-  position: relative; z-index: 1; width: min(100%, 480px); margin: 0 auto; aspect-ratio: 1 / .86;
+  position: relative; z-index: 1; width: min(100%, 480px); margin: 0 auto; aspect-ratio: 1 / 1;
   container-type: inline-size; animation: rise .4s ease both;
 }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
@@ -138,9 +138,9 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   position: absolute; width: 56%; padding: 5cqi; border-radius: 4cqi; background: var(--card);
   border: 1px solid var(--border); box-shadow: var(--shadow-float); font-size: 3.4cqi; line-height: 1.55; color: var(--ink-2);
 }
-.fcard-1 { left: 0; top: 16%; z-index: 1; transform: rotate(-8deg); }
-.fcard-2 { left: 22%; top: 0; z-index: 2; }
-.fcard-3 { right: 0; top: 40%; z-index: 3; transform: rotate(6deg); }
+.fcard-1 { left: 0; top: 40%; z-index: 3; transform: rotate(-8deg); }
+.fcard-2 { left: 28%; top: 0; z-index: 1; }
+.fcard-3 { right: 0; top: 46%; z-index: 2; transform: rotate(6deg); }
 .fcard-label { display: flex; align-items: center; gap: 1.6cqi; font-size: 2.9cqi; color: var(--muted); margin-bottom: 2.4cqi; }
 .fcard-label i { width: 1.8cqi; height: 1.8cqi; border-radius: 50%; background: var(--accent); }
 .fcard strong { display: block; color: var(--ink); font-size: 4cqi; font-weight: 600; margin-bottom: 1.2cqi; }
@@ -185,7 +185,7 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .steps .n { color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; line-height: 1.6; }
 .steps h3 { font-size: 17px; line-height: 1.6; }
 .steps p { grid-column: 2; color: var(--muted); font-size: 15px; }
-.steps p a { font-weight: 500; }
+.steps p a { font-weight: 500; white-space: nowrap; }
 .panel { background: var(--panel); border-radius: var(--r-panel); padding: 40px; }
 .window { border-radius: var(--r-small); overflow: hidden; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
 .window-bar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--hairline); }
@@ -236,6 +236,8 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .doc li::marker { color: var(--muted); }
 .doc .steps { padding-left: 0; }
 .doc .steps li + li { margin-top: 0; }
+.doc .steps h3 { margin: 0; }
+.doc .steps li:last-child { border-bottom: 0; padding-bottom: 0; }
 .toc { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin-bottom: 56px; }
 .toc a {
   display: inline-block; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card);
@@ -304,10 +306,11 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   .nav { order: 3; width: 100%; gap: 20px; padding: 2px 0 8px; overflow-x: auto; }
   .header-actions { gap: 6px; }
   .header-actions .try { display: none; }
-  .section { padding: 56px 0; }
-  .hero { padding: 40px 0 56px; }
+  .section { padding-block: 56px; }
+  .hero { padding-block: 40px 32px; }
   .hero .wrap { gap: 32px; }
-  .page-head { padding: 48px 0 32px; }
+  .hero h1 { font-size: 32px; }
+  .page-head { padding-block: 48px 32px; }
   .lead { font-size: 17px; }
   .actions { gap: 14px 22px; margin-top: 28px; }
   .grid-3, .grid-2, .features { grid-template-columns: minmax(0, 1fr); }
