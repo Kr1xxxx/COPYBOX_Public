@@ -130,6 +130,7 @@ export async function main(argv = process.argv.slice(2)) {
   mkdirSync(join(out, "download"), { recursive: true });
   writeFileSync(join(out, "index.html"), page);
   cpSync(join(here, "404.html"), join(out, "404.html"));
+  cpSync(join(here, "preview-gate.html"), join(out, "preview-gate.html"));
   cpSync(preview, join(out, "preview"), { recursive: true });
   writeFileSync(join(out, installerPath), installer);
   writeFileSync(join(out, "download/latest.json"), JSON.stringify(latest, null, 2) + "\n");

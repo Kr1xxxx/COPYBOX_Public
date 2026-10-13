@@ -75,6 +75,7 @@ test("website build writes the page, 404, preview copy, installer and latest.jso
     assert.match(page, /href="\/download\/Clipboxx-Setup\.exe"/);
     assert.match(page, /href="\/preview\/"/);
     assert.ok(existsSync(join(out, "404.html")));
+    assert.equal(readFileSync(join(out, "preview-gate.html"), "utf8"), readFileSync("tools/website/preview-gate.html", "utf8"));
     assert.equal(readFileSync(join(out, "preview/assets/static/x.js"), "utf8"), "console.log(1);");
     assert.equal(readFileSync(join(out, "preview/app-win.html"), "utf8"), "<title>app</title>");
     assert.deepEqual(readFileSync(join(out, "download/Clipboxx-Setup.exe")), installer);
@@ -92,6 +93,7 @@ test("website build writes the page, 404, preview copy, installer and latest.jso
       "download/Clipboxx-Setup.exe",
       "download/latest.json",
       "index.html",
+      "preview-gate.html",
       "preview/app-win.html",
       "preview/assets/static/x.js",
       "preview/index.html",
@@ -168,4 +170,13 @@ test("website page template: Chinese, fixed security line, no eyebrow labels, no
   assert.match(notFound, /找不到这个页面/);
   assert.match(notFound, /href="\/"/);
   assert.doesNotMatch(notFound, /__[A-Z]+__/);
+  const gate = readFileSync("tools/website/preview-gate.html", "utf8");
+  assert.match(gate, /<html lang="zh-CN">/);
+  assert.match(gate, /<title>网页测试版 · Clipboxx<\/title>/);
+  assert.match(gate, /输入口令/);
+  assert.match(gate, /<form method="post" action="\/preview\/">/);
+  assert.match(gate, /<input name="key" type="password"[^>]*aria-label="口令">/);
+  assert.match(gate, /href="\/"/);
+  assert.deepEqual(gate.match(/__[A-Z]+__/g), ["__MESSAGE__"]);
+  assert.doesNotMatch(gate, /<script|https?:\/\//);
 });

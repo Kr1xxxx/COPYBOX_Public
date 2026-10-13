@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>网页测试版 · Clipboxx</title>
+<style>
+  :root { --ground: #e9e6e0; --ink: #3a3631; --soft: #6f695f; --line: #d3cec4; --bar: #f4f2ee; --field: #fff; --accent: #b4573a; --accent-ink: #fff; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground: #1c1b19; --ink: #e6e1d8; --soft: #a39d92; --line: #3a3732; --bar: #242220; --field: #1c1b19; --accent: #d9794f; --accent-ink: #1c1b19; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--ground); color: var(--ink); font: 15px/1.7 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; -webkit-font-smoothing: antialiased; }
+  .box { width: 100%; max-width: 420px; background: var(--bar); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; text-align: center; }
+  h1 { margin: 0 0 8px; font-size: 22px; }
+  p { margin: 0; color: var(--soft); }
+  form { display: flex; gap: 8px; margin-top: 20px; }
+  input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; }
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { padding: 10px 20px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  p.msg { margin-top: 12px; color: var(--accent); font-size: 14px; }
+  p.msg:empty { display: none; }
+  a { display: inline-block; margin-top: 16px; color: var(--soft); font-size: 13px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>输入口令</h1>
+  <p>网页测试版只给内部同事看，请输入口令。</p>
+  <form method="post" action="/preview/">
+    <input name="key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-label="口令">
+    <button type="submit">进入</button>
+  </form>
+  <p class="msg" role="alert">__MESSAGE__</p>
+  <a href="/">回到首页</a>
+</div>
+</body>
+</html>
