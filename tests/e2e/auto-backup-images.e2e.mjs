@@ -64,9 +64,10 @@ async function addImage(page, name, color) {
 test("pictures are backed up once as their own files without thumbnails, and come back with a thumbnail after restoring", async ({ page }) => {
   await asDesktop(page, "win32", { imageView: "list" });
   await fakeBackupFolder(page);
-  await page.addInitScript(() => { try { localStorage.setItem("clipbox.account-premigration.v1", "OLD-DEVICE-KEY-COPY"); } catch { /* ignore */ } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
+  // Set once (not on every load), so the check after the restore sees what the restore did to it.
+  await page.evaluate(() => localStorage.setItem("clipbox.account-premigration.v1", "OLD-DEVICE-KEY-COPY"));
   await openImages(page);
   await addImage(page, "大图一.png", [40, 120, 200]);
   // The thumbnail (320 wide) is made and kept while the picture is shown.
@@ -104,8 +105,8 @@ test("pictures are backed up once as their own files without thumbnails, and com
   await expect(page.locator(".image-row").first()).toContainText("大图一");
   await expect.poll(() => page.locator(".image-thumb img").first().evaluate((img) => img.naturalWidth)).toBe(320);
   await expect.poll(() => thumbCount(page)).toBe(1);
-  // This device's own pre-migration copy is left as it was.
-  expect(await page.evaluate(() => localStorage.getItem("clipbox.account-premigration.v1"))).toBe("OLD-DEVICE-KEY-COPY");
+  // The pre-migration copy belongs to the data that was replaced, so the restore removes it.
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.account-premigration.v1"))).toBeNull();
 });
 
 test("a failed automatic backup is told in 设置 → 数据, and the next good one clears it", async ({ page }) => {

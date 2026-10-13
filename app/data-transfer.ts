@@ -17,10 +17,12 @@ const KEY_PREFIX = "clipbox.";
 // The browser build keeps its AI key in plain text in localStorage; it never travels. Desktop builds keep it in the OS store.
 // The browser build's own list of automatic backups never goes inside a backup.
 const SKIPPED_KEYS = new Set(["clipbox.ai-key.web.v1", "clipbox.web-backups.v1"]);
-// Kept on this device only (D-043): never copied into any backup, dropped when an older backup file still carries them,
-// and left as they are by a restore. The pre-migration copy of the 账号 data is encrypted with the device key only, so
+// Kept on this device only (D-043): never copied into any backup, and dropped when an older backup file still carries them. The pre-migration copy of the 账号 data is encrypted with the device key only, so
 // putting it next to the device key in an automatic backup would undo D-040; the last auto-backup error is about this device.
 export const LOCAL_ONLY_KEYS = new Set(["clipbox.account-premigration.v1", "clipbox.auto-backup.last-error"]);
+// Of those, what a restore leaves alone. The pre-migration copy is removed by a restore (as before D-043): it belongs to the
+// data being replaced, and the restored device key may not even open it.
+const KEPT_BY_RESTORE = new Set(["clipbox.auto-backup.last-error"]);
 export const IMAGE_DB = "clipbox-images";
 export const THUMB_DB = "clipbox-image-thumbs";
 const DATABASES = [IMAGE_DB, THUMB_DB];
@@ -271,7 +273,7 @@ async function writePayload(payload: TransferPayload, storage: Storage, factory:
   const stale: string[] = [];
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (key && key.startsWith(KEY_PREFIX) && !SKIPPED_KEYS.has(key) && !LOCAL_ONLY_KEYS.has(key)) stale.push(key);
+    if (key && key.startsWith(KEY_PREFIX) && !SKIPPED_KEYS.has(key) && !KEPT_BY_RESTORE.has(key)) stale.push(key);
   }
   for (const key of stale) storage.removeItem(key);
   for (const [key, text] of Object.entries(payload.localStorage)) if (!LOCAL_ONLY_KEYS.has(key)) storage.setItem(key, text);

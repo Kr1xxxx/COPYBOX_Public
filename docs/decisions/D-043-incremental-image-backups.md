@@ -22,12 +22,12 @@
     thumbnails again when pictures are shown. The 完整备份 file format does not change (it still carries thumbnails; files
     with or without them restore).
   - **Pre-migration copy out of all backups** (amends D-039/D-040): `clipbox.account-premigration.v1` is never collected into
-    a 完整备份 or automatic backup; when an older file still carries it, it is dropped on restore; a restore leaves this
-    device's own copy as it is (it is still deleted from 设置 as D-040 says).
+    a 完整备份 or automatic backup; when an older file still carries it, it is dropped on restore; a restore also removes this
+    device's own copy, as before (it belongs to the data being replaced). Otherwise it goes from 设置 or automatically (D-042).
   - **Failure notice**: a failed automatic backup is remembered in `clipbox.auto-backup.last-error` (`{ at, reason }`,
     reason "space" when disk, storage or size limits ran out) and shown under 「每天自动备份」 in 设置 → 数据, e.g.
     「最近一次自动备份没有成功（10月13日）。会自动再试，也可以用「完整备份」手动存一份。」; the next successful backup removes it.
-    The key is kept on this device only, like the pre-migration copy (never in a backup, untouched by a restore).
+    The key is kept on this device only (never in a backup, untouched by a restore).
 - Consequences: daily backups cost only the settings and the new pictures; the backups folder holds each picture once.
   New pref key `clipbox.auto-backup.last-error`; four new desktop commands (`backup_image_save/list/read/prune`); no change to
   how stored data is encrypted. An app older than this decision cannot restore a version 2 file (it says it is not a

@@ -46,7 +46,7 @@ function pictures(...ids) {
   };
 }
 
-test("the pre-migration copy and the last backup error never go into any backup, and a restore keeps this device's own", async () => {
+test("the pre-migration copy and the last backup error never go into any backup; a restore drops the copy and keeps the error", async () => {
   assert.ok(LOCAL_ONLY_KEYS.has(PREMIGRATION));
   assert.ok(LOCAL_ONLY_KEYS.has(AUTO_BACKUP_ERROR_KEY));
   const storage = fakeStorage({ "clipbox.vault.v1": "V", [PREMIGRATION]: "device-key copy", [AUTO_BACKUP_ERROR_KEY]: "{}" });
@@ -57,10 +57,11 @@ test("the pre-migration copy and the last backup error never go into any backup,
   // The 完整备份 file seals the same settings.
   assert.ok(!(await sealTransfer(full, "long-enough")).ciphertext.includes("device-key"));
 
-  // An older backup file that still carries a pre-migration copy restores, without writing that copy back.
-  const target = fakeStorage({ "clipbox.vault.v1": "NOW", [PREMIGRATION]: "this device's copy" });
+  // An older backup file that still carries a pre-migration copy restores without writing that copy back, and this device's
+  // own copy goes too (it belongs to the data being replaced). The last backup error stays.
+  const target = fakeStorage({ "clipbox.vault.v1": "NOW", [PREMIGRATION]: "this device's copy", [AUTO_BACKUP_ERROR_KEY]: "{}" });
   await applyPayload({ localStorage: { "clipbox.vault.v1": "OLD", [PREMIGRATION]: "old copy from the file" }, indexedDB: {} }, target, fakeIndexedDB());
-  assert.deepEqual(target.snapshot(), { "clipbox.vault.v1": "OLD", [PREMIGRATION]: "this device's copy" });
+  assert.deepEqual(target.snapshot(), { "clipbox.vault.v1": "OLD", [AUTO_BACKUP_ERROR_KEY]: "{}" });
   const fresh = fakeStorage();
   await applyPayload({ localStorage: { "clipbox.vault.v1": "OLD", [PREMIGRATION]: "old copy from the file" }, indexedDB: {} }, fresh, fakeIndexedDB());
   assert.deepEqual(fresh.snapshot(), { "clipbox.vault.v1": "OLD" });
