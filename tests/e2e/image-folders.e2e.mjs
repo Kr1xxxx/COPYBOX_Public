@@ -512,7 +512,7 @@ test("the 话术 mini window keeps its own folder tabs", async ({ page }) => {
 
 test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs", async ({ page }) => {
   await openImages(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await expect(navCount(page, "全部图片")).toHaveText("0");
   await expect(sidebar(page).locator(".nav-item", { hasText: "未分类" })).toBeVisible();
   await createFolder(page, "收款码");

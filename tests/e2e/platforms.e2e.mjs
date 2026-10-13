@@ -5,7 +5,7 @@ test("Windows: the sections are 话术, 账号 and 图片, and there is no empty
   await asDesktop(page, "win32");
   await seedSnippets(page);
   expect(await page.locator(".sidebar-top").evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(20);
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await page.getByRole("button", { name: "图片" }).first().click();
   await expect(page.getByRole("button", { name: "新增图片" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("备注");

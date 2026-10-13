@@ -31,7 +31,7 @@ test("settings shows the version and the editor calls the snippet note 小提示
 
 test("the secrets section is called 账号 on both platforms", () => {
   assert.match(platformSource, /export const SECRET_WORD = "账号"/);
-  assert.match(page, /label: kind === "snippet" \? "话术" : SECRET_WORD/);
+  assert.match(page, /\{ value: "secret", label: SECRET_WORD \}/);
 });
 
 test("settings can create, rename, recolour, reorder and delete folders for both kinds", () => {

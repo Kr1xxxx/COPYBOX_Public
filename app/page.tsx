@@ -1665,9 +1665,11 @@ export default function Home() {
       label="内容板块"
       value={imageView ? "image" : activeKind}
       onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      // Order fixed by the owner (2026-10-13): 话术 | 图片 | 账号.
       options={[
-        ...(["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
+        { value: "snippet", label: "话术" },
         { value: "image", label: "图片" },
+        { value: "secret", label: SECRET_WORD },
       ]}
     />
   );
