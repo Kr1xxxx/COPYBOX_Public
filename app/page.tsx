@@ -2,6 +2,7 @@
 
 import { ArcToast } from "./arc/arc-toast";
 import { useToast } from "./use-toast";
+import { buildCardMoveMap, countItemsByFolder } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
@@ -86,7 +87,7 @@ import { ArcSegmented } from "./arc/segmented";
 import { type LockMode, isAccountLockSet, lockMode } from "./account-lock";
 import { AccountLockScreen } from "./account-lock-ui";
 import { AccountPage, type AddRequest } from "./account-page";
-import { countByKind, useAccountEntries } from "./account-entries";
+import { countByKind, useAccountEntries, type LegacySecret } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
 import { useAutoBackup } from "./auto-backup-ui";
@@ -138,6 +139,8 @@ type SecureBackup =
   | { format: "clipbox-secure-backup"; version: 3; scope: BackupScope; createdAt: number; envelope: VaultEnvelope; vaultBox?: VaultBoxEnvelope };
 
 type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope; vaultBox?: VaultBoxEnvelope };
+// Windows has no old 秘密 list: one shared empty list, so the 账号 stores are not re-read on every change.
+const NO_LEGACY_SECRETS: LegacySecret[] = [];
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -403,7 +406,7 @@ export default function Home() {
   const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
-  const legacySecrets = useMemo(() => (PLAIN_NOTES ? [] : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
+  const legacySecrets = useMemo(() => (PLAIN_NOTES ? NO_LEGACY_SECRETS : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
   const accountMode = activeKind === "secret" && !imageView;
   // 账号页密码: asked every time the 账号 section is opened; leaving the section locks it again.
   const [lockSet, setLockSet] = useState(() => typeof window !== "undefined" && isAccountLockSet());
@@ -449,6 +452,9 @@ export default function Home() {
     if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, 50);
     return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
   }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders, englishSearch]);
+  // Worked out once per list, not per row: with 1,000+ snippets the per-row search made every render slow.
+  const cardMoves = useMemo(() => buildCardMoveMap(filtered), [filtered]);
+  const folderCounts = useMemo(() => countItemsByFolder(activeKindItems), [activeKindItems]);
   // Opening an old entry from the 账号 list leads to the 「其他」 list with that entry selected.
   useEffect(() => {
     if (!pendingLegacyOpen.current || vaultCat !== "other") return;
@@ -685,18 +691,24 @@ export default function Home() {
         searchRef.current?.blur();
       }
     };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, [loading, inlineEditing, newFolder, auxiliaryDialogOpen, backupMode, bulkMode, homeShortcutsEnabled]);
+
+  // The desktop shell's "focus the search" signal. Subscribed once (not again on every keystroke); it reads whether
+  // shortcuts are allowed right now from a ref.
+  const homeShortcutsRef = useRef(homeShortcutsEnabled);
+  useEffect(() => { homeShortcutsRef.current = homeShortcutsEnabled; }, [homeShortcutsEnabled]);
+  useEffect(() => {
+    if (loading) return;
     const removeDesktopListener = window.clipboxDesktop?.onFocusSearch(() => {
-      if (!homeShortcutsEnabled) return;
+      if (!homeShortcutsRef.current) return;
       setActiveFolder("all");
       setQuery("");
       window.setTimeout(() => searchRef.current?.focus(), 30);
     });
-    window.addEventListener("keydown", shortcut);
-    return () => {
-      window.removeEventListener("keydown", shortcut);
-      removeDesktopListener?.();
-    };
-  }, [loading, inlineEditing, newFolder, auxiliaryDialogOpen, backupMode, bulkMode, homeShortcutsEnabled, filtered, safeSelected, activeFolder, windowMode]);
+    return () => removeDesktopListener?.();
+  }, [loading]);
 
   const readVault = useCallback((): VaultData => ({
     items: itemsRef.current,
@@ -1702,15 +1714,12 @@ export default function Home() {
   // Every folder, the standard 话术 ones too (D-035), can move to any other place in the list.
   const canMoveFolder = (folder: string, delta: -1 | 1) => Boolean(activeFolders[activeFolders.indexOf(folder) + delta]);
   // Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
-  const canMoveCard = (item: SecretItem, delta: -1 | 1) => {
-    const group = filtered.filter((entry) => Boolean(entry.pinned) === Boolean(item.pinned));
-    return Boolean(group[group.findIndex((entry) => entry.id === item.id) + delta]);
-  };
+  const canMoveCard = (item: SecretItem, delta: -1 | 1) => Boolean(cardMoves.get(item.id)?.[delta < 0 ? "up" : "down"]);
   const renderFolderRow = (folder: string) => {
     const sortable = true;
     const active = activeFolder === `folder:${folder}`;
     const renaming = renamingFolder?.from === folder;
-    const count = activeKindItems.filter((item) => item.folder === folder).length;
+    const count = folderCounts.get(folder) ?? 0;
     return (
       <FolderRow
         key={folder}
@@ -1742,7 +1751,7 @@ export default function Home() {
     );
   };
   const menuFolder = folderMenu && activeFolders.includes(folderMenu) ? folderMenu : "";
-  const menuFolderCount = menuFolder ? activeKindItems.filter((item) => item.folder === menuFolder).length : 0;
+  const menuFolderCount = menuFolder ? folderCounts.get(menuFolder) ?? 0 : 0;
 
   const legacyList = (
             <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`} onAnimationEnd={onRowAnimationEnd}>
