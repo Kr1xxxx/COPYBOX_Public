@@ -277,7 +277,7 @@ test("website search-engine files: sitemap, robots.txt and the web manifest", ()
   assert.match(manifest.name, /Clipboxx/);
   assert.equal(manifest.lang, "zh-CN");
   assert.deepEqual(manifest.icons.map((icon) => [icon.src, icon.sizes]), [["/icon-192.png", "192x192"], ["/icon-512.png", "512x512"]]);
-  assert.equal(manifest.theme_color, "#f7f8fa");
+  assert.equal(manifest.theme_color, "#f8fafc");
 });
 
 test("website build only warns when the icons or images folder is missing", async () => {

@@ -7,8 +7,8 @@
 <meta name="description" content="__PAGE_DESCRIPTION__">
 __ROBOTS__<link rel="canonical" href="__CANONICAL__">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14171c" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -46,6 +46,10 @@ __ROBOTS__<link rel="canonical" href="__CANONICAL__">
     try { if (next) localStorage.setItem(key, next); else localStorage.removeItem(key); } catch (e) {}
     apply(next);
   });
+  // The header shows a hairline only once the page has scrolled.
+  function scrolled() { root.classList.toggle("scrolled", window.scrollY > 4); }
+  window.addEventListener("scroll", scrolled, { passive: true });
+  document.addEventListener("DOMContentLoaded", scrolled);
 })();
 </script>
 </head>
