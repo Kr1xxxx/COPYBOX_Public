@@ -1,7 +1,7 @@
 // A website's own small icon for the 保险箱 (Mac): one plain GET to the site itself, nothing else is contacted.
 // Same rules as desktop/site-icon.cjs: https only, public addresses only (the answer of the name lookup is pinned for
 // the request), redirects followed by hand and only within the same site, images only (no SVG), size-limited.
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, UNIX_EPOCH};
 
 use url::Url;
@@ -47,19 +47,42 @@ pub fn site_of(host: &str) -> String {
     parts[parts.len() - take..].join(".")
 }
 
+/// The IPv4 address hidden inside an IPv6 one (mapped `::ffff:a.b.c.d`, translated `::ffff:0:a.b.c.d`, the old
+/// compatible form `::a.b.c.d`, NAT64 `64:ff9b::a.b.c.d` and 6to4 `2002:aabb:ccdd::`), so it gets the IPv4 rules.
+pub fn embedded_ipv4(v6: Ipv6Addr) -> Option<Ipv4Addr> {
+    let s = v6.segments();
+    let tail = Ipv4Addr::new((s[6] >> 8) as u8, s[6] as u8, (s[7] >> 8) as u8, s[7] as u8);
+    match s {
+        [0, 0, 0, 0, 0, 0xffff, _, _] | [0, 0, 0, 0, 0xffff, 0, _, _] | [0, 0, 0, 0, 0, 0, _, _] => Some(tail),
+        [0x64, 0xff9b, 0, 0, 0, 0, _, _] => Some(tail),
+        [0x2002, a, b, ..] => Some(Ipv4Addr::new((a >> 8) as u8, a as u8, (b >> 8) as u8, b as u8)),
+        _ => None,
+    }
+}
+
 pub fn is_private_address(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
-            let [a, b, _, _] = v4.octets();
+            let [a, b, c, _] = v4.octets();
             a == 0 || a == 10 || a == 127 || (a == 100 && (64..=127).contains(&b)) || (a == 169 && b == 254)
                 || (a == 172 && (16..=31).contains(&b)) || (a == 192 && b == 168) || a >= 224
+                || (a == 192 && b == 0 && (c == 0 || c == 2)) || (a == 198 && (b == 18 || b == 19))
+                || (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113)
         }
         IpAddr::V6(v6) => {
-            if let Some(mapped) = v6.to_ipv4_mapped() {
-                return is_private_address(IpAddr::V4(mapped));
+            if let Some(inner) = embedded_ipv4(v6) {
+                return is_private_address(IpAddr::V4(inner));
             }
-            let first = v6.segments()[0];
-            v6.is_unspecified() || v6.is_loopback() || first & 0xfe00 == 0xfc00 || first & 0xffc0 == 0xfe80
+            let s = v6.segments();
+            // Teredo and documentation (2001:0::/32, 2001:db8::/32), local NAT64 (64:ff9b:1::/48), discard (100::/64),
+            // unique local (fc00::/7), link-local (fe80::/10), old site-local (fec0::/10), multicast (ff00::/8).
+            (s[0] == 0x2001 && (s[1] == 0 || s[1] == 0x0db8))
+                || (s[0] == 0x64 && s[1] == 0xff9b && s[2] == 1)
+                || (s[0] == 0x100 && s[1] == 0 && s[2] == 0 && s[3] == 0)
+                || s[0] & 0xfe00 == 0xfc00
+                || s[0] & 0xffc0 == 0xfe80
+                || s[0] & 0xffc0 == 0xfec0
+                || s[0] & 0xff00 == 0xff00
         }
     }
 }
@@ -136,18 +159,23 @@ pub fn base64_encode(bytes: &[u8]) -> String {
     out
 }
 
-async fn read_limited(mut response: reqwest::Response, max: usize) -> Result<Vec<u8>, ()> {
-    if response.content_length().is_some_and(|len| len as usize > max) {
-        return Err(());
+/// Reads at most `max` bytes of the body; `Ok(None)` when the body is (or would become) larger. Never buffers more.
+pub(crate) async fn read_capped(mut response: reqwest::Response, max: usize) -> Result<Option<Vec<u8>>, reqwest::Error> {
+    if response.content_length().is_some_and(|len| len > max as u64) {
+        return Ok(None);
     }
     let mut body = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| ())? {
-        body.extend_from_slice(&chunk);
-        if body.len() > max {
-            return Err(());
+    while let Some(chunk) = response.chunk().await? {
+        if body.len() + chunk.len() > max {
+            return Ok(None);
         }
+        body.extend_from_slice(&chunk);
     }
-    Ok(body)
+    Ok(Some(body))
+}
+
+async fn read_limited(response: reqwest::Response, max: usize) -> Result<Vec<u8>, ()> {
+    read_capped(response, max).await.ok().flatten().ok_or(())
 }
 
 // GET that follows redirects by hand, so every hop stays https, on the same site and on a public address.
@@ -167,6 +195,8 @@ async fn get_with_guards(start: Url, origin: &str) -> Result<(reqwest::Response,
         }
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            // A system proxy would make its own name lookup and skip the address check above.
+            .no_proxy()
             .timeout(TIMEOUT)
             .resolve(&host, addresses[0])
             .build()
@@ -257,6 +287,39 @@ mod tests {
         }
         assert!(!is_private_address("93.184.216.34".parse().unwrap()));
         assert!(!is_private_address("2606:2800:220:1::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn ipv4_hidden_inside_ipv6_gets_the_ipv4_rules() {
+        for address in [
+            "::",                      // unspecified
+            "::127.0.0.1",             // IPv4-compatible
+            "::10.0.0.1",
+            "::ffff:127.0.0.1",        // IPv4-mapped
+            "::ffff:0:192.168.1.1",    // IPv4-translated
+            "64:ff9b::10.0.0.1",       // NAT64
+            "64:ff9b::169.254.169.254",
+            "2002:7f00:1::",           // 6to4 of 127.0.0.1
+            "2002:c0a8:101::1",        // 6to4 of 192.168.1.1
+        ] {
+            assert!(is_private_address(address.parse().unwrap()), "{address}");
+        }
+        // The same forms around a public IPv4 address are fine.
+        for address in ["::ffff:93.184.216.34", "64:ff9b::93.184.216.34", "2002:5db8:d822::1"] {
+            assert!(!is_private_address(address.parse().unwrap()), "{address}");
+        }
+        assert_eq!(embedded_ipv4("2002:c0a8:101::1".parse().unwrap()), Some(Ipv4Addr::new(192, 168, 1, 1)));
+        assert_eq!(embedded_ipv4("2606:2800:220:1::1".parse().unwrap()), None);
+    }
+
+    #[test]
+    fn other_special_ipv6_and_ipv4_ranges_are_refused() {
+        for address in [
+            "ff02::1", "ff05::2", "fec0::1", "feff::1", "fc00::1", "2001::1", "2001:db8::1", "64:ff9b:1::1", "100::1",
+            "224.0.0.1", "255.255.255.255", "192.0.0.8", "192.0.2.1", "198.18.0.1", "198.51.100.1", "203.0.113.1",
+        ] {
+            assert!(is_private_address(address.parse().unwrap()), "{address}");
+        }
     }
 
     #[test]
