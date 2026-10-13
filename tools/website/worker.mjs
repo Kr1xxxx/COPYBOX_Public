@@ -99,7 +99,8 @@ async function notFound(request, env) {
   });
 }
 
-export const previewCookie = "preview_pass";
+// Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
+const previewCookie = "preview_pass";
 const cookieAttributes = "Path=/preview; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000";
 const gateKey = "preview-gate.html";
 const gateMessages = { closed: "网页测试版暂未开放", wrong: "口令不对，再试一次" };

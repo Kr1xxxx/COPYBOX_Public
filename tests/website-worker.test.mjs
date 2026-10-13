@@ -161,6 +161,14 @@ test("worker: matching ETag gives 304, HEAD has no body, other methods are refus
   assert.equal(post.headers.get("allow"), "GET, HEAD");
 });
 
+test("worker: every named export is a function (workerd refuses the workerModule otherwise)", async () => {
+  const workerModule = await import("../tools/website/worker.mjs");
+  for (const [name, value] of Object.entries(workerModule)) {
+    if (name !== "default") assert.equal(typeof value, "function", name);
+  }
+  assert.equal(typeof workerModule.default.fetch, "function");
+});
+
 test("worker: passphrase helpers", async () => {
   for (const input of ["comely", "COMELY", " Comely ", "comely\n"]) assert.equal(secretMatches(input, "Comely"), true, input);
   assert.equal(secretMatches("comel", "comely"), false);
