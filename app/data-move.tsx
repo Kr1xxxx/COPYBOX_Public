@@ -127,7 +127,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
             {leftover && !pending && <p className="backup-warning" role="status">上一次导入没有完成。<button type="button" className="secondary-button" onClick={() => void restoreLeftover()} disabled={busy}>恢复导入前的内容</button></p>}
             {pending && <p className="backup-warning" role="alert">密码正确。继续会用文件里的内容（含 {countImages(pending.payload)} 张图片）替换现有的 {itemCount} 条内容、{pending.currentImages} 张图片，替换后不能撤销。</p>}
             {error && <p className="backup-error">{error}</p>}
-            <p className="backup-note">{exporting ? "密码越长越安全，建议用 12 个字符以上。请妥善保存，Clipbox 无法找回。AI 的密钥不在备份里，换电脑后需要重新填一次。" : "导入成功后会自动重新打开。"}</p>
+            <p className="backup-note">{exporting ? "密码越长越安全，建议用 12 个字符以上。请妥善保存，Clipboxx 无法找回。AI 的密钥不在备份里，换电脑后需要重新填一次。" : "导入成功后会自动重新打开。"}</p>
             <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={exporting ? "primary" : "danger"} disabled={busy}>{busy ? (exporting ? "正在加密…" : "正在导入…") : exporting ? "加密并导出" : pending ? "确认替换" : "验证并替换"}</button></div>
           </form>
         )}
