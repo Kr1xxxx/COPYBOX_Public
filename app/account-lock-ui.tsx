@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ENCRYPTED_LOCK_MIN, type LockMode, changeEncryptedPassword, checkRecoveryEmail, getRecoveryEmail, lockMode, maskEmail, removeAccountLock, renewRecoveryCode, requestPasswordReset, resetPasswordWithRecovery, setRecoveryEmail, unlockEncrypted, verifyAccountLock } from "./account-lock";
-import { deletePremigrationBackup, disableAccountEncryption, enableAccountEncryption, finishAccountMigration, hasPremigrationBackup } from "./account-encryption";
+import { ENCRYPTED_LOCK_MIN, type LockMode, changeEncryptedPassword, checkRecoveryEmail, getRecoveryEmail, lockMode, markRecoveryCodeShown, maskEmail, removeAccountLock, renewRecoveryCode, renewUnseenRecoveryCode, requestPasswordReset, resetPasswordWithRecovery, setRecoveryEmail, unlockEncrypted, verifyAccountLock } from "./account-lock";
+import { deletePremigrationBackup, disableAccountEncryption, enableAccountEncryption, finishAccountMigration, hasPremigrationBackup, notePremigrationUnlock } from "./account-encryption";
 import { VaultMark } from "./ui-atoms";
 
 // Shown instead of the 账号 page while a password is set and has not been entered yet. `onUnlock(key)`: the key the password
 // opened (null for the old door-only password, whose data is still under the device key).
 export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; onUnlock: (key: string | null) => void }) {
   const [password, setPassword] = useState("");
+  // A recovery code that was never confirmed as saved is replaced at unlock and shown here before the page opens (D-042).
+  const [fresh, setFresh] = useState<{ code: string; key: string } | null>(null);
+  const [freshSaved, setFreshSaved] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
@@ -23,7 +26,13 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
 
   async function open(key: string) {
     await finishAccountMigration(deviceKey, key); // only does anything after an interrupted change
+    reveal(key);
+  }
+
+  function reveal(key: string) {
     onUnlock(key);
+    // The pre-migration copy goes after the data opened fine with K in three later app sessions.
+    void notePremigrationUnlock(key).catch(() => undefined);
   }
 
   async function submit(event: FormEvent) {
@@ -33,7 +42,13 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
     try {
       if (mode === "encrypted") {
         const key = await unlockEncrypted(password);
-        if (key !== null) { await open(key); return; }
+        if (key !== null) {
+          await finishAccountMigration(deviceKey, key); // only does anything after an interrupted change
+          const code = await renewUnseenRecoveryCode(password);
+          if (code !== null) { setFresh({ code, key }); return; }
+          reveal(key);
+          return;
+        }
       } else if (await verifyAccountLock(password)) { onUnlock(null); return; }
       setError("密码不对，请再试一次");
       setPassword("");
@@ -68,6 +83,23 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
     }
   }
 
+  if (fresh) {
+    return (
+      <div className="account-lock-screen account-recovery-code" role="group" aria-label="新的恢复码">
+        <VaultMark />
+        <strong>请保存好新的恢复码</strong>
+        <div style={{ display: "grid", gap: 8, justifyItems: "center", maxWidth: 340, textAlign: "center" }}>
+          <span>上次的恢复码还没确认保存，已经换成下面这个新的，旧的不能再用了。</span>
+          <RecoveryCodeBody code={fresh.code} saved={freshSaved} onSaved={setFreshSaved} compact />
+          <div className="settings-inline-actions">
+            <CopyCodeButton code={fresh.code} />
+            <button type="button" className="primary-button" disabled={!freshSaved} onClick={() => { markRecoveryCodeShown(); reveal(fresh.key); }}>完成</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form className="account-lock-screen" onSubmit={(event) => void submit(event)} aria-label="账号页已上锁">
       <VaultMark />
@@ -95,11 +127,45 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
   );
 }
 
+// The code, what it is for, and the 「已保存」 tick. Shared by 设置 and the lock screen.
+function RecoveryCodeBody({ code, saved, onSaved, compact = false }: { code: string; saved: boolean; onSaved: (saved: boolean) => void; compact?: boolean }) {
+  return (
+    <>
+      <code className="recovery-code-text" aria-label="恢复码">{code}</code>
+      <small>恢复码只显示这一次。忘记密码时，靠它重设密码并找回账号数据；密码和恢复码都丢了，账号数据就打不开了。请抄下来或存到别处，不要和电脑放在一起。</small>
+      {/* compact: the lock screen styles every input as a wide text box, so the tick box is set back to its own size. */}
+      <label className="recovery-saved"><input type="checkbox" checked={saved} style={compact ? { width: "auto", minHeight: 0 } : undefined} onChange={(event) => onSaved(event.target.checked)} /> 我已经把恢复码保存好了</label>
+    </>
+  );
+}
+
+function CopyCodeButton({ code }: { code: string }) {
+  return <button type="button" className="secondary-button" onClick={() => void (window.clipboxDesktop?.copyText ?? navigator.clipboard.writeText.bind(navigator.clipboard))(code)}>复制</button>;
+}
+
+// Asked when 设置 is about to close while a recovery code is still on screen and not confirmed as saved.
+export function RecoveryCloseConfirm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { cancelRef.current?.focus(); }, []);
+  return (
+    <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+      <section className="backup-dialog" role="alertdialog" aria-modal="true" aria-labelledby="recovery-close-title" aria-describedby="recovery-close-description">
+        <header className="backup-head"><div><p>账号页密码</p><h2 id="recovery-close-title">恢复码还没保存，确定关闭吗？</h2></div></header>
+        <div className="backup-form">
+          <p className="backup-intro" id="recovery-close-description">关闭后这个恢复码就看不到了。下次用密码打开账号页时，会再给你一个新的。</p>
+          <div className="backup-actions"><button type="button" onClick={onConfirm}>仍然关闭</button><button ref={cancelRef} type="button" className="primary" onClick={onCancel}>回去保存</button></div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 type Mode = "idle" | "set" | "upgrade" | "change" | "remove" | "recovery";
 export type LockChange = (mode: LockMode, key: string | null) => void;
 
 // The 「账号页密码」 row in Settings → 数据 → 安全. A password now also encrypts the 账号 data, and comes with a recovery code.
-export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged }: { mode: LockMode; deviceKey: string; onChanged: LockChange }) {
+// onCodeShowing: told whenever a recovery code appears on screen or goes away, so 设置 can ask before closing over it.
+export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCodeShowing }: { mode: LockMode; deviceKey: string; onChanged: LockChange; onCodeShowing?: (showing: boolean) => void }) {
   const [mode, setMode] = useState<Mode>("idle");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -111,8 +177,13 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged }: { m
   const [saved, setSaved] = useState(false);
   const [backup, setBackup] = useState(() => typeof window !== "undefined" && hasPremigrationBackup());
   const [backupAsk, setBackupAsk] = useState(false);
+  const showingRef = useRef(onCodeShowing);
+  useEffect(() => { showingRef.current = onCodeShowing; });
+  useEffect(() => { showingRef.current?.(code !== ""); }, [code]);
+  useEffect(() => () => showingRef.current?.(false), []);
 
   function open(to: Mode) { setEmail(getRecoveryEmail()); setMode(to); }
+  function done() { markRecoveryCodeShown(); close(); }
   function close() { setMode("idle"); setCurrent(""); setNext(""); setAgain(""); setEmail(""); setError(""); setCode(""); setSaved(false); }
 
   async function submit(event: FormEvent) {
@@ -172,13 +243,11 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged }: { m
       <div className="settings-row account-lock-form account-recovery-code" data-local-esc="">
         <div>
           <strong>请保存好恢复码</strong>
-          <code className="recovery-code-text" aria-label="恢复码">{code}</code>
-          <small>恢复码只显示这一次。忘记密码时，靠它重设密码并找回账号数据；密码和恢复码都丢了，账号数据就打不开了。请抄下来或存到别处，不要和电脑放在一起。</small>
-          <label className="recovery-saved"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> 我已经把恢复码保存好了</label>
+          <RecoveryCodeBody code={code} saved={saved} onSaved={setSaved} />
         </div>
         <div className="settings-inline-actions">
-          <button type="button" className="secondary-button" onClick={() => void (window.clipboxDesktop?.copyText ?? navigator.clipboard.writeText.bind(navigator.clipboard))(code)}>复制</button>
-          <button type="button" className="primary-button" disabled={!saved} onClick={close}>完成</button>
+          <CopyCodeButton code={code} />
+          <button type="button" className="primary-button" disabled={!saved} onClick={done}>完成</button>
         </div>
       </div>
     );
@@ -197,7 +266,7 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged }: { m
                 <button type="button" className="secondary-button" onClick={() => open("remove")}>关闭…</button>
               </div>}
         </div>
-        {backup && <div className="settings-row"><div><strong>设密码前的备份</strong><small>{lockNow === "none" ? "留着没有用了，可以删除。" : "设密码前的数据副本，仍用旧方式加密（拿到电脑文件的人能打开它）。确认一切正常后，建议删除。"}</small></div>
+        {backup && <div className="settings-row"><div><strong>设密码前的备份</strong><small>{lockNow === "none" ? "留着没有用了，可以删除。" : "设密码前的数据副本，仍用旧方式加密（拿到电脑文件的人能打开它）。之后三次重新打开 Clipbox、用密码打开账号页都正常，就会自动删除；也可以现在删除。"}</small></div>
           {backupAsk
             ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setBackupAsk(false)}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => { deletePremigrationBackup(); setBackup(false); setBackupAsk(false); }}>确认删除备份</button></div>
             : <button type="button" className="secondary-button" onClick={() => setBackupAsk(true)}>删除备份…</button>}
@@ -216,7 +285,7 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged }: { m
           <input type="password" aria-label="再输入一次新密码" placeholder="再输入一次" autoComplete="off" value={again} onChange={(event) => { setAgain(event.target.value); setError(""); }} />
           <input type="text" inputMode="email" aria-label="找回邮箱" placeholder="找回邮箱（可不填，服务器开通后用来重置）" autoComplete="off" maxLength={120} value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} />
         </>}
-        {(mode === "set" || mode === "upgrade") && <small>设置后，账号里的内容会用这个密码加密，并给你一个恢复码（只显示一次）。设置前的数据会先留一份备份。Mac 上旧的「其他」列表不在加密范围内。</small>}
+        {(mode === "set" || mode === "upgrade") && <small>设置后，账号里的内容会用这个密码加密，并给你一个恢复码（只显示一次）。设置前的数据会先留一份备份，确认正常后自动删除。Mac 上旧的「其他」列表不在加密范围内。</small>}
         {mode === "remove" && lockNow === "encrypted" && <small>关闭后，账号数据会改回不用密码的加密方式。</small>}
         {error && <small className="account-lock-error" role="alert">{error}</small>}
       </div>
