@@ -1178,6 +1178,10 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] { --set-card: #2a2925; --set-edge: rgba(255, 255, 255, .08); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --set-card: #2a2925; --set-edge: rgba(255, 255, 255, .08); } }
 .settings-body { gap: 14px; padding: 0 18px 20px 10px; }
+/* D-044: product name + Chinese name at the top of the first settings page; name in the section-head serif, 复制盒 muted. */
+.settings-brand { display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 12px; border-bottom: 1px solid var(--line-soft); }
+.settings-brand strong { font-family: var(--font-serif); font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+.settings-brand span { color: var(--muted); font-size: 12.5px; }
 .settings-page-title { margin: 0; padding: 4px 2px 0; color: var(--ink); font-size: 18px; font-weight: 650; text-wrap: balance; }
 .settings-body > .settings-card { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .settings-body > .settings-card > h3 { margin: 0; padding: 14px 0 8px; border: 0; color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: 0; }

@@ -61,10 +61,10 @@ test("关于 shows the version and when it was updated; tapping the version open
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
   await settings.getByRole("tab", { name: "关于" }).click();
-  await expect(settings.getByText("Clipbox v0.0.0-test")).toBeVisible();
+  await expect(settings.getByText("Clipboxx v0.0.0-test")).toBeVisible();
   const row = settings.locator(".settings-row", { hasText: "更新时间" });
   await expect(row).toContainText("2026-10-10 21:37");
-  for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipbox v/).click();
+  for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipboxx v/).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
 });
 

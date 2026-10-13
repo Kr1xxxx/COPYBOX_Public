@@ -163,7 +163,7 @@ test("files from before D-043 (pictures and thumbnails inside, version 1) still 
   assert.equal(storage.getItem("clipbox.vault.v1"), "OLD");
   // Picture files from a version 1 file are never asked for, so tidying keeps none for it.
   assert.equal(referencedImages(JSON.parse(text).payload).size, 0);
-  assert.throws(() => readBackupText(JSON.stringify({ format: "clipbox-auto-backup", version: 3, payload: old })), /不是 Clipbox 的备份文件/);
+  assert.throws(() => readBackupText(JSON.stringify({ format: "clipbox-auto-backup", version: 3, payload: old })), /不是 Clipboxx 的备份文件/);
 });
 
 test("the browser trial keeps pictures inside its day file (version 1) and restores them", async () => {

@@ -83,7 +83,7 @@ fn main() {
         .setup(|app| {
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Clipbox")
+                .title("Clipboxx")
                 .min_inner_size(window_state::MIN_WIDTH, window_state::MIN_HEIGHT)
                 .visible(false)
                 .initialization_script(&bridge);

@@ -50,7 +50,7 @@ export function isSaneIterationCount(value: unknown): value is number {
 }
 
 export async function decryptVaultBox(envelope: VaultBoxEnvelope, password: string): Promise<VaultBoxPayload> {
-  if (!isSaneIterationCount(envelope.iterations)) throw new Error("这不是有效的 Clipbox 加密备份。");
+  if (!isSaneIterationCount(envelope.iterations)) throw new Error("这不是有效的 Clipboxx 加密备份。");
   const key = await deriveKey(password, fromBase64(envelope.salt), envelope.iterations);
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(envelope.iv), additionalData: LABEL }, key, fromBase64(envelope.ciphertext));
   const parsed = JSON.parse(new TextDecoder().decode(plain)) as Partial<VaultBoxPayload>;
