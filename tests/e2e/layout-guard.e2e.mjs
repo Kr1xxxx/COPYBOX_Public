@@ -103,7 +103,7 @@ for (const { platform, theme, size } of cases) {
     await state("row-open", async () => { await page.locator(".row-main").nth(2).click(); });
     if (mini) {
       await state("mini-copied", async () => { const row = page.locator(".mini-row.snippet-row").nth(1); await row.hover(); await row.locator(".mini-copy").click(); });
-      await state("mini-edit", async () => { await page.locator(".mini-row.snippet-row .row-main").nth(1).click(); await page.waitForTimeout(300); await page.locator(".mini-detail").getByRole("button", { name: /^修改/ }).click(); });
+      await state("mini-edit", async () => { await page.locator(".mini-row.snippet-row .row-main").nth(1).click(); await settle(page); await page.locator(".mini-detail").getByRole("button", { name: /^修改/ }).click(); });
     }
     // The mini window opens a 话术 in place with only 修改 (no variable chips to type in): there is no popup to open there.
     if (!mini) await state("variable-popup", async () => {
