@@ -32,7 +32,8 @@ for (const platform of ["win32", "darwin"]) {
     // Importing again changes nothing.
     s = await openData(page);
     await s.getByRole("button", { name: "导入", exact: true }).click();
-    await expect(page.getByText(platform === "darwin" ? /已放入测试内容|测试内容都在/ : "测试内容都在，没有缺的")).toBeVisible();
+    // The first import's message may still be fading out (aria-hidden) when this one appears: check the current one.
+    await expect(page.locator(".toast-line:not([aria-hidden])", { hasText: platform === "darwin" ? /已放入测试内容|测试内容都在/ : "测试内容都在，没有缺的" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator(".native-row")).toHaveCount(withTest);
 
