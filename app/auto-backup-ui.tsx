@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArcSegmented } from "./arc/segmented";
-import { AUTO_BACKUP_KEEP, backupDateLabel, backupSizeLabel, describeBackup, getBackupStore, readAutoBackupEnabled, readBackupText, runAutoBackup, writeAutoBackupEnabled, type BackupFile } from "./auto-backup";
-import { applyPayload, collectPayload, countImages, TransferError, type TransferPayload } from "./data-transfer";
+import { AUTO_BACKUP_EVENT, AUTO_BACKUP_KEEP, backupDateLabel, backupErrorMessage, backupFullSize, backupSizeLabel, describeBackup, getBackupStore, readAutoBackupEnabled, readBackup, readBackupError, runAutoBackup, writeAutoBackupEnabled, type BackupError, type BackupFile } from "./auto-backup";
+import { applyPayload, countStoredImages, TransferError, type TransferPayload } from "./data-transfer";
 
 const FIRST_RUN_DELAY_MS = 8_000;
 const RECHECK_MS = 30 * 60 * 1000;
@@ -13,7 +13,14 @@ const RECHECK_MS = 30 * 60 * 1000;
 export function useAutoBackup(ready: boolean) {
   useEffect(() => {
     if (!ready) return;
-    const run = () => { void runAutoBackup(getBackupStore(), readAutoBackupEnabled()); };
+    let running = false;
+    const run = () => {
+      if (running) return; // a slow run (many new pictures) is never started twice
+      running = true;
+      void runAutoBackup(getBackupStore(), readAutoBackupEnabled()).then((result) => {
+        if (result !== "skipped") window.dispatchEvent(new Event(AUTO_BACKUP_EVENT));
+      }).finally(() => { running = false; });
+    };
     const first = window.setTimeout(run, FIRST_RUN_DELAY_MS);
     const again = window.setInterval(run, RECHECK_MS);
     return () => { window.clearTimeout(first); window.clearInterval(again); };
@@ -25,15 +32,24 @@ export function AutoBackupRows({ itemCount }: { itemCount: number }) {
   const [enabled, setEnabled] = useState(() => readAutoBackupEnabled());
   const [files, setFiles] = useState<BackupFile[] | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [failure, setFailure] = useState<BackupError | null>(() => readBackupError());
+  // A backup run that finishes while 设置 is open updates these rows.
+  const [runs, setRuns] = useState(0);
+  useEffect(() => {
+    const onRun = () => { setFailure(readBackupError()); setRuns((count) => count + 1); };
+    window.addEventListener(AUTO_BACKUP_EVENT, onRun);
+    return () => window.removeEventListener(AUTO_BACKUP_EVENT, onRun);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     void getBackupStore().list().then((list) => { if (!cancelled) setFiles(list); }).catch(() => { if (!cancelled) setFiles([]); });
     return () => { cancelled = true; };
-  }, [restoring]);
+  }, [restoring, runs]);
   const latest = files?.[0];
   return (
     <>
-      <div className="settings-row"><div><strong>每天自动备份</strong><small>每天自动存一份完整备份，保留最近 {AUTO_BACKUP_KEEP} 份{latest ? `；最近一份：${backupDateLabel(latest.name)}` : "；还没有备份"}</small></div>
+      <div className="settings-row"><div><strong>每天自动备份</strong><small>每天自动存一份完整备份，保留最近 {AUTO_BACKUP_KEEP} 份{latest ? `；最近一份：${backupDateLabel(latest.name)}` : "；还没有备份"}</small>
+        {enabled && failure && <small className="auto-backup-failure" role="status" style={{ color: "var(--danger)" }}>{backupErrorMessage(failure)}</small>}</div>
         <ArcSegmented className="settings-segment" mode="radio" label="每天自动备份" value={enabled ? "on" : "off"}
           onSelect={(value) => { const next = value === "on"; setEnabled(next); writeAutoBackupEnabled(next); }}
           options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
@@ -52,6 +68,20 @@ function AutoBackupRestoreDialog({ files, itemCount, onClose }: { files: BackupF
   const [error, setError] = useState("");
   // After a day is chosen and read, nothing is replaced until the person confirms what will be replaced.
   const [pending, setPending] = useState<{ file: BackupFile; payload: TransferPayload; currentImages: number } | null>(null);
+  // Since D-043 a day file only points at its pictures; the list shows the size with them.
+  const [sizes, setSizes] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const store = getBackupStore();
+      for (const file of files) {
+        const size = await backupFullSize(store, file);
+        if (cancelled) return;
+        setSizes((known) => ({ ...known, [file.name]: size }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [files]);
   // Focus inside the dialog, so Esc closes this dialog and not the settings behind it (see data-local-esc in settings.tsx).
   useEffect(() => { dialogRef.current?.focus(); }, []);
   useEffect(() => {
@@ -65,8 +95,8 @@ function AutoBackupRestoreDialog({ files, itemCount, onClose }: { files: BackupF
     setBusy(true);
     setError("");
     try {
-      const payload = readBackupText(await getBackupStore().read(file.name));
-      setPending({ file, payload, currentImages: countImages(await collectPayload()) });
+      const payload = await readBackup(getBackupStore(), file.name);
+      setPending({ file, payload, currentImages: await countStoredImages() });
     } catch (problem) {
       setError(problem instanceof TransferError ? problem.message : "没能读取这份备份，现有内容没有改动");
     } finally {
@@ -107,7 +137,7 @@ function AutoBackupRestoreDialog({ files, itemCount, onClose }: { files: BackupF
               <p className="backup-intro">选一天的备份。选好后会先显示要替换多少内容，确认以后才会替换。</p>
               <ul className="backup-list" aria-label="自动备份">
                 {files.map((file) => (
-                  <li key={file.name}><button type="button" className="secondary-button" disabled={busy} onClick={() => void choose(file)}>{backupDateLabel(file.name)} · {backupSizeLabel(file.size)}</button></li>
+                  <li key={file.name}><button type="button" className="secondary-button" disabled={busy} onClick={() => void choose(file)}>{backupDateLabel(file.name)} · {backupSizeLabel(sizes[file.name] ?? file.size)}</button></li>
                 ))}
               </ul>
               {error && <p className="backup-error">{error}</p>}

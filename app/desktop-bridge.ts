@@ -14,6 +14,12 @@ export type ClipboxDesktop = {
   backupSave?: (name: string, bytes: Uint8Array) => Promise<void>;
   backupList?: () => Promise<{ name: string; size: number }[]>;
   backupRead?: (name: string) => Promise<Uint8Array>;
+  // The pictures of those backups, one file each (`<sha-256>.bin` in backups/images/), shared by all the days (D-043).
+  backupImageSave?: (name: string, bytes: Uint8Array) => Promise<void>;
+  backupImageList?: () => Promise<{ name: string; size: number }[]>;
+  backupImageRead?: (name: string) => Promise<Uint8Array>;
+  // Removes every picture file not named in `keep`.
+  backupImagePrune?: (keep: string[]) => Promise<void>;
   didCopy: () => void;
   setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;

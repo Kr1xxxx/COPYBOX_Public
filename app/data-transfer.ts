@@ -19,9 +19,18 @@ const KEY_PREFIX = "clipbox.";
 // The browser build keeps its AI key in plain text in localStorage; it never travels. Desktop builds keep it in the OS store.
 // The browser build's own list of automatic backups never goes inside a backup.
 const SKIPPED_KEYS = new Set(["clipbox.ai-key.web.v1", "clipbox.web-backups.v1"]);
-const DATABASES = ["clipbox-images", "clipbox-image-thumbs"];
+// Kept on this device only (D-043): never copied into any backup, and dropped when an older backup file still carries them. The pre-migration copy of the 账号 data is encrypted with the device key only, so
+// putting it next to the device key in an automatic backup would undo D-040; the last auto-backup error is about this device.
+export const LOCAL_ONLY_KEYS = new Set(["clipbox.account-premigration.v1", "clipbox.auto-backup.last-error"]);
+// Of those, what a restore leaves alone. The pre-migration copy is removed by a restore (as before D-043): it belongs to the
+// data being replaced, and the restored device key may not even open it.
+const KEPT_BY_RESTORE = new Set(["clipbox.auto-backup.last-error"]);
+export const IMAGE_DB = "clipbox-images";
+export const THUMB_DB = "clipbox-image-thumbs";
+const DATABASES = [IMAGE_DB, THUMB_DB];
 
-type Wire = null | boolean | number | string | { $b64: string } | Wire[] | { [key: string]: Wire };
+// Raw bytes (ArrayBuffer) only appear in memory, after an automatic backup's image files were read back; never in a file.
+export type Wire = null | boolean | number | string | ArrayBuffer | { $b64: string } | Wire[] | { [key: string]: Wire };
 export type TransferPayload = {
   localStorage: Record<string, string>;
   indexedDB: Record<string, Record<string, Wire[]>>;
@@ -61,6 +70,7 @@ export function encodeValue(value: unknown): Wire {
 }
 
 export function decodeValue(wire: Wire): unknown {
+  if (wire instanceof ArrayBuffer) return wire;
   if (wire === null || typeof wire !== "object") return wire;
   if (Array.isArray(wire)) return wire.map(decodeValue);
   const keys = Object.keys(wire);
@@ -100,14 +110,24 @@ async function existingDatabases(factory: IDBFactory): Promise<Set<string>> {
   return new Set(DATABASES);
 }
 
-export async function collectPayload(storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<TransferPayload> {
+// The `clipbox.*` settings a backup carries: not the never-copied ones, not the ones kept on this device only.
+export function collectLocal(storage: Storage = localStorage): Record<string, string> {
   const local: Record<string, string> = {};
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (!key || !key.startsWith(KEY_PREFIX) || SKIPPED_KEYS.has(key)) continue;
+    if (!key || !key.startsWith(KEY_PREFIX) || SKIPPED_KEYS.has(key) || LOCAL_ONLY_KEYS.has(key)) continue;
     const value = storage.getItem(key);
     if (value !== null) local[key] = value;
   }
+  return local;
+}
+
+export function listDatabases(factory: IDBFactory = indexedDB): Promise<Set<string>> {
+  return existingDatabases(factory);
+}
+
+export async function collectPayload(storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<TransferPayload> {
+  const local = collectLocal(storage);
   const databases: TransferPayload["indexedDB"] = {};
   const present = await existingDatabases(factory);
   for (const name of DATABASES) {
@@ -157,7 +177,8 @@ async function writeStash(factory: IDBFactory, backup: TransferPayload | null): 
     const tx = db.transaction("backup", "readwrite");
     const store = tx.objectStore("backup");
     store.clear();
-    if (backup) store.put({ id: STASH_ID, json: JSON.stringify(backup) });
+    // Kept as a structured object rather than one JSON string: a string that large can pass the browser's limit.
+    if (backup) store.put({ id: STASH_ID, payload: backup });
     await done(tx);
   } finally {
     db.close();
@@ -182,33 +203,46 @@ export async function hasStashedBackup(factory: IDBFactory = indexedDB): Promise
 // Puts back what was here before an import that was cut off (power loss, crash). No-op when nothing is stashed.
 export async function restoreStashedBackup(storage: Storage = localStorage, factory: IDBFactory = indexedDB): Promise<boolean> {
   const db = await openStash(factory);
-  let rows: { json?: string }[];
+  let rows: { json?: string; payload?: unknown }[];
   try {
-    rows = (await request(db.transaction("backup").objectStore("backup").getAll())) as { json?: string }[];
+    rows = (await request(db.transaction("backup").objectStore("backup").getAll())) as { json?: string; payload?: unknown }[];
   } finally {
     db.close();
   }
-  if (!rows[0]?.json) return false;
-  await writePayload(validatePayload(JSON.parse(rows[0].json)), storage, factory);
+  // `json` is how the copy was kept before D-043; one can still be waiting after an update.
+  const saved = rows[0]?.payload ?? (rows[0]?.json ? JSON.parse(rows[0].json) : null);
+  if (!saved) return false;
+  await writePayload(validatePayload(saved), storage, factory);
   await writeStash(factory, null);
   return true;
 }
 
 // An automatic backup file (not password-sealed): checks it is one of ours and its contents are well-formed before anything is restored.
-export function parseBackupText(text: string, format: string): TransferPayload {
+export function parseBackupText(text: string, format: string, versions: readonly number[] = [1]): TransferPayload {
   let file: { format?: unknown; version?: unknown; payload?: unknown };
   try { file = JSON.parse(text); } catch { throw new TransferError("这不是 Clipbox 的备份文件"); }
-  if (file?.format !== format || file.version !== 1) throw new TransferError("这不是 Clipbox 的备份文件");
+  if (file?.format !== format || !versions.includes(file.version as number)) throw new TransferError("这不是 Clipbox 的备份文件");
   return validatePayload(file.payload);
 }
 
 // What the person sees in the confirmation: pictures only (the two bookkeeping rows are not pictures).
 export function countImages(payload: TransferPayload): number {
-  const rows = payload.indexedDB["clipbox-images"]?.meta ?? [];
-  return rows.filter((row) => {
-    const id = (row as { id?: unknown } | null)?.id;
-    return id !== "settings" && id !== "folders";
-  }).length;
+  const rows = payload.indexedDB[IMAGE_DB]?.meta ?? [];
+  return rows.filter((row) => !isBookkeepingId((row as { id?: unknown } | null)?.id)).length;
+}
+
+export const isBookkeepingId = (id: unknown) => id === "settings" || id === "folders";
+
+// The same count for the pictures stored here now, reading only the record keys instead of every picture.
+export async function countStoredImages(factory: IDBFactory = indexedDB): Promise<number> {
+  if (!(await existingDatabases(factory)).has(IMAGE_DB)) return 0;
+  const db = await request(factory.open(IMAGE_DB));
+  try {
+    if (!db.objectStoreNames.contains("meta")) return 0;
+    return (await request(db.transaction("meta").objectStore("meta").getAllKeys())).filter((key) => !isBookkeepingId(key)).length;
+  } finally {
+    db.close();
+  }
 }
 
 async function writePayload(payload: TransferPayload, storage: Storage, factory: IDBFactory): Promise<void> {
@@ -241,10 +275,10 @@ async function writePayload(payload: TransferPayload, storage: Storage, factory:
   const stale: string[] = [];
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (key && key.startsWith(KEY_PREFIX) && !SKIPPED_KEYS.has(key)) stale.push(key);
+    if (key && key.startsWith(KEY_PREFIX) && !SKIPPED_KEYS.has(key) && !KEPT_BY_RESTORE.has(key)) stale.push(key);
   }
   for (const key of stale) storage.removeItem(key);
-  for (const [key, text] of Object.entries(payload.localStorage)) storage.setItem(key, text);
+  for (const [key, text] of Object.entries(payload.localStorage)) if (!LOCAL_ONLY_KEYS.has(key)) storage.setItem(key, text);
 }
 
 // Replaces what is stored here with the payload. The databases are written first and the settings last. Before
@@ -288,6 +322,13 @@ export async function sealTransfer(payload: TransferPayload, password: string, n
   const plain = new TextEncoder().encode(JSON.stringify(payload));
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(`${TRANSFER_FORMAT}:${TRANSFER_VERSION}`) }, key, plain);
   return { format: TRANSFER_FORMAT, version: TRANSFER_VERSION, createdAt: now, iterations: ITERATIONS, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) };
+}
+
+// The file's text in pieces for a Blob: the same text as JSON.stringify(file) (ciphertext is last there too), without one
+// more copy of the large ciphertext. Base64 never needs escaping inside a JSON string.
+export function transferFileParts(file: TransferFile): string[] {
+  const { ciphertext, ...head } = file;
+  return [JSON.stringify(head).slice(0, -1), ',"ciphertext":"', ciphertext, '"}'];
 }
 
 export function parseTransferFile(text: string): TransferFile {
