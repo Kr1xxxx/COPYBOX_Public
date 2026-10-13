@@ -18,7 +18,7 @@ from fontTools.pens.transformPen import TransformPen
 # Palette (from the existing icon and app/globals.css)
 LAVENDER = "#c4b9ff"   # accent letter on dark (= icon item, light end)
 VIOLET = "#8f7ff6"     # accent letter on light (= icon item, dark end)
-INK = "#1f1e1c"; INK_DARK = "#f1efe7"
+INK = "#000000"; INK_DARK = "#ffffff"   # text is pure black (owner), pure white on dark
 LINE = "#d9d5c9"; LINE_DARK = "#3f3d37"
 MUTED = "#55534d"; MUTED_DARK = "#b3b0a4"
 
@@ -50,7 +50,7 @@ NAME = "Copyboxx"; TRACK = -0.025   # mixed case, tight
 DESC = 494 / 2048                  # Inter descender (p, y)
 
 def wordmark(inter, size, dx, dy, ink, accent):
-    """The wordmark with the last X in the accent colour. Returns (svg, width)."""
+    """The wordmark; `accent` colours the last x (currently the same as ink: text is one colour). Returns (svg, width)."""
     g, w = inter.shape(NAME, size, tracking=TRACK)
     return paths(g[:-1], dx, dy, ink) + paths(g[-1:], dx, dy, accent), w
 
@@ -77,6 +77,12 @@ def _contours(face, ch, size):
             out.append((pen.getCommands(), (min(xs), min(ys), max(xs), max(ys)))); cur = []
     return out, face.gs[name].width * k
 
+def rrect(x, y, w, h, r):
+    """Rounded rectangle as a path (so it can be combined with a knockout)."""
+    return (f"M{x + r:.2f} {y:.2f}H{x + w - r:.2f}A{r:.2f} {r:.2f} 0 0 1 {x + w:.2f} {y + r:.2f}V{y + h - r:.2f}"
+            f"A{r:.2f} {r:.2f} 0 0 1 {x + w - r:.2f} {y + h:.2f}H{x + r:.2f}A{r:.2f} {r:.2f} 0 0 1 {x:.2f} {y + h - r:.2f}"
+            f"V{y + r:.2f}A{r:.2f} {r:.2f} 0 0 1 {x + r:.2f} {y:.2f}Z")
+
 def cn(noto, text, size, dx, dy, color, tracking=CN_TRACK, purple=None):
     """复制盒 in Noto Sans SC Bold. The 口 inside 盒 becomes the icon's tilted purple card (the thing in the
     box), so the Chinese carries the same idea as the mark. Returns (svg, width)."""
@@ -91,8 +97,8 @@ def cn(noto, text, size, dx, dy, color, tracking=CN_TRACK, purple=None):
         parts.append(f'<path fill="{color}" transform="translate({x:.2f} {dy:.2f})" d="{"".join(keep)}"/>')
         if box:
             x0, y0, x1, y1 = box; w = x1 - x0; h = y1 - y0; cx = x + (x0 + x1) / 2; cy = dy - (y0 + y1) / 2
-            parts.append(f'<g transform="rotate(-6 {cx:.2f} {cy:.2f})"><rect x="{x + x0:.2f}" y="{dy - y1:.2f}" width="{w:.2f}" height="{h:.2f}" rx="{0.22 * h:.2f}" fill="{purple}"/>'
-                         f'<rect x="{cx - 0.26 * w:.2f}" y="{cy - 0.07 * h:.2f}" width="{0.52 * w:.2f}" height="{0.14 * h:.2f}" rx="{0.07 * h:.2f}" fill="{DASH}"/></g>')
+            card = rrect(x + x0, dy - y1, w, h, 0.22 * h) + rrect(cx - 0.26 * w, cy - 0.07 * h, 0.52 * w, 0.14 * h, 0.07 * h)
+            parts.append(f'<path transform="rotate(-6 {cx:.2f} {cy:.2f})" d="{card}" fill="{purple}" fill-rule="evenodd"/>')
         x += adv + tracking * size
     return "".join(parts), x - dx - tracking * size
 
@@ -129,8 +135,8 @@ def build(inter, noto, out):
     write("icon.svg", svg(1024, 1024, mark(0, 0, 928, with_tile=True)))
     write("icon-mark.svg", svg(928, 928, mark(0, 0, 928)))
 
-    for theme, ink, accent, line, muted, bg in (("light", INK, VIOLET, LINE, MUTED, None),
-                                               ("dark", INK_DARK, LAVENDER, LINE_DARK, MUTED_DARK, None)):
+    for theme, ink, accent, line, muted, bg in (("light", INK, INK, LINE, MUTED, None),        # text: one colour only
+                                               ("dark", INK_DARK, INK_DARK, LINE_DARK, MUTED_DARK, None)):
         sfx = "" if theme == "light" else "-dark"
         pad = 24; size = 100; cap = CAP * size; desc = DESC * size
         H = cap + desc + 2 * pad   # room for the descenders of p and y
@@ -138,16 +144,12 @@ def build(inter, noto, out):
         # 2. Wordmark alone.
         wm, w = wordmark(inter, size, pad, pad + cap, ink, accent)
         write(f"wordmark{sfx}.svg", svg(w + 2 * pad, H, wm))
-        wm_mono, _ = wordmark(inter, size, pad, pad + cap, ink, ink)   # single colour (print, stamps)
-        write(f"wordmark-mono{sfx}.svg", svg(w + 2 * pad, H, wm_mono))
 
         # 3. Wordmark with Chinese: Copyboxx 复制盒 (one line, for a page header).
         cn_size = 56; gap = 22
         cn_base = pad + cap - cap / 2 + CN_MID * cn_size
         c, cw = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink, purple=accent)
         write(f"wordmark-cn{sfx}.svg", svg(w + gap + cw + 2 * pad, H, wm + c))
-        c_mono, _ = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink, purple=ink)
-        write(f"wordmark-cn-mono{sfx}.svg", svg(w + gap + cw + 2 * pad, H, wm_mono + c_mono))
 
         # 4. Horizontal lockup: mark + Copyboxx | 复制盒.
         mh = 112; mid = pad + mh / 2
