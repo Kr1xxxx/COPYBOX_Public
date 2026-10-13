@@ -5,7 +5,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { accountAddButton, asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory, seedSnippets, settle } from "./helpers.mjs";
 
 const DETECT = readFileSync(new URL("./layout-detect.js", import.meta.url), "utf8");
 const PNG = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
@@ -24,19 +24,6 @@ const BY_DESIGN = [
 
 BY_DESIGN.push({ el: /image-tile-title/, type: /文字省略/, reason: "图片名单行显示，过长时用 … 结尾（迷你窗口的小图块只有约 80px 宽）" });
 BY_DESIGN.push({ el: /image-tile-main/, type: /元素重疊/, reason: "图片卡片的「复制」小按钮故意浮在整张卡片按钮上" });
-
-// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
-// checks 50 ms apart (this also covers spring motion driven from script, which document.getAnimations() does not list).
-async function settle(page) {
-  await page.evaluate(() => { window.__settleShot = undefined; });
-  await page.waitForFunction(() => {
-    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
-    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
-    const same = shot === window.__settleShot;
-    window.__settleShot = shot;
-    return same;
-  }, null, { polling: 50 });
-}
 
 const SIZES = {
   normal: { width: 680, height: 620 },

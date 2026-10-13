@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { makePng } from "../helpers/png.mjs";
-import { asDesktop, changesSeen, recordChanges } from "./helpers.mjs";
+import { asDesktop, changesSeen, recordChanges, settle } from "./helpers.mjs";
 
 // The 图片 nine-grid (docs/specs/image-grid.md). Every picture is generated here, so no binary fixtures are needed.
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -26,19 +26,6 @@ const tiles = (page) => page.locator(".image-section:not(.compact) .image-tile")
 const tile = (page, title) => page.locator(".image-tile", { has: page.getByRole("button", { name: new RegExp(`^(展开|已展开) ${title}$`) }) });
 const card = (page) => page.locator(".image-card");
 const sidebar = (page) => page.locator(".sidebar");
-
-// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
-// checks 50 ms apart (this also covers spring motion driven from script, which document.getAnimations() does not list).
-async function settle(page) {
-  await page.evaluate(() => { window.__settleShot = undefined; });
-  await page.waitForFunction(() => {
-    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
-    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
-    const same = shot === window.__settleShot;
-    window.__settleShot = shot;
-    return same;
-  }, null, { polling: 50 });
-}
 
 async function boxes(locator) {
   const result = [];

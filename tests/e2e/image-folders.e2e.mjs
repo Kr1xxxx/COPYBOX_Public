@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { makePng } from "../helpers/png.mjs";
-import { asDesktop } from "./helpers.mjs";
+import { asDesktop, settle } from "./helpers.mjs";
 
 // The 图片 folders (docs/specs/image-folders.md). Every picture is generated here, so no binary fixtures are needed.
 const png = (name, width = 40, height = 40, color = [90, 140, 220]) => ({ name: `${name}.png`, mimeType: "image/png", buffer: makePng(width, height, color) });
@@ -26,19 +26,6 @@ const rows = (page) => page.locator(".image-row");
 const navCount = (page, label) => sidebar(page).locator(".nav-item", { hasText: label }).locator("b");
 const folderRow = (page, name) => sidebar(page).locator(".directory-row", { hasText: name });
 const title = (page) => page.locator(".section-head h1");
-
-// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
-// checks 50 ms apart (this also covers spring motion and scrolling, which document.getAnimations() does not list).
-async function settle(page) {
-  await page.evaluate(() => { window.__settleShot = undefined; });
-  await page.waitForFunction(() => {
-    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
-    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
-    const same = shot === window.__settleShot;
-    window.__settleShot = shot;
-    return same;
-  }, null, { polling: 50 });
-}
 
 async function createFolder(page, name) {
   await page.getByRole("button", { name: "新建目录" }).click();

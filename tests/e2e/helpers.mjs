@@ -19,6 +19,19 @@ export async function seedSnippets(page) {
   // The "已导入 … 条话术" toast may still show; a newer toast replaces it together with its timer (app/use-toast.ts).
 }
 
+// Waits until nothing on the page moves: every finite animation has finished and no element's box changed between two
+// checks 50 ms apart (this also covers spring motion and scrolling, which document.getAnimations() does not list).
+export async function settle(page) {
+  await page.evaluate(() => { window.__settleShot = undefined; });
+  await page.waitForFunction(() => {
+    if (document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
+    const shot = Array.from(document.querySelectorAll("body *"), (el) => { const r = el.getBoundingClientRect(); return `${r.x},${r.y},${r.width},${r.height}`; }).join(";");
+    const same = shot === window.__settleShot;
+    window.__settleShot = shot;
+    return same;
+  }, null, { polling: 50 });
+}
+
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").
 // `imageView: "list"` starts the 图片 section in the list view (the default is the grid), for tests about list rows.
 export async function asDesktop(page, platform, { imageView } = {}) {
