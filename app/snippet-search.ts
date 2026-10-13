@@ -12,8 +12,6 @@ const BODY_WEIGHT = 1;
 
 type PinyinForms = { syllables: string[]; initials: string };
 
-const pinyinCache = new Map<string, PinyinForms>();
-const PINYIN_CACHE_LIMIT = 4000;
 const EMPTY_FORMS: PinyinForms = { syllables: [], initials: "" };
 
 function hasChinese(text: string) {
@@ -21,28 +19,30 @@ function hasChinese(text: string) {
 }
 
 function pinyinForms(text: string): PinyinForms {
-  const cached = pinyinCache.get(text);
-  if (cached) return cached;
-  let forms = EMPTY_FORMS;
-  if (hasChinese(text)) {
-    try {
-      const syllables = (pinyin(text, { toneType: "none", type: "array", nonZh: "removed" }) as string[])
-        .map((syllable) => syllable.toLowerCase())
-        .filter(Boolean);
-      forms = { syllables, initials: syllables.map((syllable) => syllable[0]).join("") };
-    } catch {
-      forms = EMPTY_FORMS;
-    }
+  if (!hasChinese(text)) return EMPTY_FORMS;
+  try {
+    const syllables = (pinyin(text, { toneType: "none", type: "array", nonZh: "removed" }) as string[])
+      .map((syllable) => syllable.toLowerCase())
+      .filter(Boolean);
+    return { syllables, initials: syllables.map((syllable) => syllable[0]).join("") };
+  } catch {
+    return EMPTY_FORMS;
   }
-  if (pinyinCache.size >= PINYIN_CACHE_LIMIT) pinyinCache.clear();
-  pinyinCache.set(text, forms);
-  return forms;
 }
+
+// What search derives from a snippet (lower-cased text, pinyin) is kept per snippet object.
+// Snippets are never changed in place (an edit makes a new object with `{ ...item }`), so
+// this never goes stale and needs no size limit: it is dropped together with the old object.
+// Pinyin is still worked out only the first time a letters-only term reaches that field.
+type Field = { text: string; lowered: string; weight: number; pinyin: boolean; forms?: PinyinForms };
+
+const fieldCache = new WeakMap<SecretItem, Field[]>();
 
 // Pinyin matches only start at a syllable: initials ("tk" in tkxm) or whole syllables
 // ("tuik" in tui-kuan), never from the middle of one ("an" must not hit "xian").
-function pinyinMatches(text: string, term: string) {
-  const forms = pinyinForms(text);
+function pinyinMatches(entry: Field, term: string) {
+  if (!entry.forms) entry.forms = pinyinForms(entry.text);
+  const forms = entry.forms;
   if (forms.initials.includes(term)) return true;
   for (let start = 0; start < forms.syllables.length; start += 1) {
     let joined = "";
@@ -58,13 +58,11 @@ function pinyinMatches(text: string, term: string) {
 const LITERAL_BONUS = 10;
 
 /** Literal hits always outrank pinyin hits: 10 x weight vs weight. */
-function termScore(entry: { text: string; lowered: string; weight: number; pinyin: boolean }, term: string) {
+function termScore(entry: Field, term: string, lettersOnly: boolean) {
   if (entry.lowered.includes(term)) return entry.weight * LITERAL_BONUS;
-  if (entry.pinyin && /^[a-z]+$/.test(term) && pinyinMatches(entry.text, term)) return entry.weight;
+  if (entry.pinyin && lettersOnly && pinyinMatches(entry, term)) return entry.weight;
   return 0;
 }
-
-type Field = { text: string; lowered: string; weight: number; pinyin: boolean };
 
 function field(text: string | undefined, weight: number, pinyinToo: boolean): Field {
   const value = text || "";
@@ -72,13 +70,17 @@ function field(text: string | undefined, weight: number, pinyinToo: boolean): Fi
 }
 
 function snippetFields(item: SecretItem): Field[] {
+  const cached = fieldCache.get(item);
+  if (cached) return cached;
   const meta = item.snippetMeta;
-  return [
+  const fields = [
     field(item.label, TITLE_WEIGHT, true),
     field([item.summary, item.note, meta?.usageNote].filter(Boolean).join(" "), HINT_WEIGHT, true),
     field([item.secret, meta?.chineseText].filter(Boolean).join(" "), BODY_WEIGHT, false),
     field([item.snippetNumber, displaySnippetNumber(item.snippetNumber), displaySnippetNumber(item.snippetNumber).replace(/^#0+(?=\d)/, "#"), item.folder, meta?.stage, meta?.scene, meta?.action, meta?.rawProduct, meta?.productGroups?.join(" ")].filter(Boolean).join(" "), BODY_WEIGHT, true),
   ];
+  fieldCache.set(item, fields);
+  return fields;
 }
 
 /** Score of a snippet for the query terms, or 0 when any term is missing. */
@@ -86,8 +88,9 @@ export function snippetSearchScore(item: SecretItem, terms: string[]) {
   const fields = snippetFields(item);
   let score = 0;
   for (const term of terms) {
+    const lettersOnly = /^[a-z]+$/.test(term);
     let best = 0;
-    for (const entry of fields) best = Math.max(best, termScore(entry, term));
+    for (const entry of fields) best = Math.max(best, termScore(entry, term, lettersOnly));
     if (best === 0) return 0;
     score += best;
   }
