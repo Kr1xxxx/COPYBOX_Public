@@ -37,9 +37,8 @@ For company developers and AI agents. Read `AGENTS.md` first.
 ## Repository settings
 
 - Everyone, agents included, works through the owner's GitHub account; the owner does not use the website.
-- The repository is private on a free plan, so GitHub branch protection, rulesets and native auto-merge are not
-  available. The merge policy therefore runs inside CI (`merge policy` job), and "never push to `main`" is a rule,
-  not something GitHub enforces.
-- With GitHub Pro (or a public repository) add a ruleset for `main`: require a pull request (0 approvals), require
-  the status checks `lint + tests`, `browser end-to-end`, `handoff updated`, `merge policy`, block force pushes
-  and deletions. Then nothing can reach `main` without passing CI.
+- The repository is public, so GitHub Actions on GitHub-hosted runners (macOS included) cost nothing. The merge
+  policy runs inside CI (`merge policy` job), and "never push to `main`" is a rule, not something GitHub enforces.
+- A ruleset for `main` is possible on a public repository and not set up yet: require a pull request (0 approvals),
+  require the status checks `lint + tests`, `browser end-to-end`, `handoff updated`, `merge policy`, block force
+  pushes and deletions. Then nothing can reach `main` without passing CI.
