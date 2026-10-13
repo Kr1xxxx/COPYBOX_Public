@@ -73,8 +73,8 @@ impl Shell {
         app.exit(0);
     }
 
-    /// Returns true when the close should go ahead. It never does: even 「关闭即退出」 hides the window and quits
-    /// through `quit`, so the page is still there to save before the app exits.
+    /// Returns true when the close should go ahead: only while a quit is already under way (the page was asked to save
+    /// first). 「关闭即退出」 itself hides the window and quits through `quit`, so the page is still there to save.
     pub fn on_close_requested(&self, window: &WebviewWindow, mode: &WindowMode) -> bool {
         mode.save_now(window);
         let (behavior, quitting) = {
@@ -82,13 +82,13 @@ impl Shell {
             (s.close, s.quitting)
         };
         match close_action(behavior, quitting, cfg!(target_os = "windows")) {
+            // A quit already asked the page to save; the window may now close as before.
+            CloseAction::Quit if quitting => true,
             CloseAction::Quit => {
-                // Never let the window close here: once it is gone the page cannot save what it still holds back
+                // Do not let the window close yet: once it is gone the page cannot save what it still holds back
                 // (flush.rs needs the window). Hide it and quit like the tray's 退出, which asks the page to save first.
                 let _ = window.hide();
-                if !quitting {
-                    self.quit(window.app_handle(), mode);
-                }
+                self.quit(window.app_handle(), mode);
                 false
             }
             CloseAction::Minimize => {

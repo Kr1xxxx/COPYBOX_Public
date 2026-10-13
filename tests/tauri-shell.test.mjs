@@ -57,6 +57,8 @@ test("「关闭即退出」 keeps the window until the page has saved: it hides 
   assert.match(arm, /window\.hide\(\)/);
   assert.match(arm, /self\.quit\(/);
   assert.match(arm, /\bfalse\s*$/);
+  // Only once a quit is under way (the page was already asked to save) may the window close as before.
+  assert.match(shell, /CloseAction::Quit if quitting => true,/);
   // quit() ends in app.exit, whose exit request is held back until the page answered (or 1.5 s passed).
   assert.match(shell.slice(shell.indexOf("pub fn quit"), shell.indexOf("pub fn on_close_requested")), /app\.exit\(0\)/);
   assert.match(read("src-tauri/src/main.rs"), /RunEvent::ExitRequested[\s\S]*?api\.prevent_exit\(\);\s*flush::then_after_flush\(app, \|app\| app\.exit\(0\)\)/);
