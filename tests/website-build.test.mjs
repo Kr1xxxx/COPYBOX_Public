@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { formatSize, latestJson, main, pickInstaller, renderPage } from "../tools/website/build.mjs";
+import { bulkEntries, formatSize, latestJson, main, pickInstaller, renderPage } from "../tools/website/build.mjs";
+import { parseKeyList, staleKeys } from "../tools/website/deploy.mjs";
 
 test("website page: placeholders are filled, a leftover one throws", () => {
   const html = renderPage("<p>v__VERSION__ · __SIZE__ · 更新于 __UPDATED__</p><i>__VERSION__</i>", {
@@ -83,9 +84,62 @@ test("website build writes the page, 404, preview copy, installer and latest.jso
     assert.equal(latest.size, installer.length);
     assert.equal(latest.sha256, createHash("sha256").update(installer).digest("hex"));
     assert.ok(Array.isArray(latest.notes) && latest.notes.length > 0);
+
+    const bulk = JSON.parse(readFileSync(join(out, "kv-bulk.json"), "utf8"));
+    const keys = bulk.map((entry) => entry.key);
+    assert.deepEqual(keys, [
+      "404.html",
+      "download/Clipboxx-Setup.exe",
+      "download/latest.json",
+      "index.html",
+      "preview/app-win.html",
+      "preview/assets/static/x.js",
+      "preview/index.html",
+    ]);
+    for (const entry of bulk) {
+      const bytes = readFileSync(join(out, entry.key));
+      assert.equal(entry.base64, true);
+      assert.deepEqual(Buffer.from(entry.value, "base64"), bytes, entry.key);
+      assert.equal(entry.metadata.size, bytes.length);
+      assert.equal(entry.metadata.sha256, createHash("sha256").update(bytes).digest("hex"));
+    }
+    assert.equal(bulk[1].metadata.type, "application/x-msdownload");
+    assert.deepEqual(JSON.parse(readFileSync(join(out, "manifest.json"), "utf8")), { keys });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("website KV entries: sorted, base64 values, type, checksum and size", () => {
+  const exe = Buffer.from([0x4d, 0x5a, 0, 255]);
+  const entries = bulkEntries([
+    { key: "preview/index.html", bytes: Buffer.from("<p>hi</p>") },
+    { key: "download/Clipboxx-Setup.exe", bytes: exe },
+  ]);
+  assert.deepEqual(entries, [
+    {
+      key: "download/Clipboxx-Setup.exe",
+      value: "TVoA/w==",
+      base64: true,
+      metadata: { type: "application/x-msdownload", sha256: createHash("sha256").update(exe).digest("hex"), size: 4 },
+    },
+    {
+      key: "preview/index.html",
+      value: Buffer.from("<p>hi</p>").toString("base64"),
+      base64: true,
+      metadata: { type: "text/html; charset=utf-8", sha256: createHash("sha256").update("<p>hi</p>").digest("hex"), size: 9 },
+    },
+  ]);
+});
+
+test("website deploy: keys no longer in the build are removed, the key list is read past warnings", () => {
+  assert.deepEqual(staleKeys(["index.html", "preview/assets/static/old.js", "a.txt", "a.txt"], ["index.html", "404.html"]), [
+    "a.txt",
+    "preview/assets/static/old.js",
+  ]);
+  assert.deepEqual(staleKeys(["index.html"], ["index.html"]), []);
+  assert.deepEqual(parseKeyList('warning: proxy\n[{"name":"index.html"},{"name":"404.html","metadata":{}}]'), ["index.html", "404.html"]);
+  assert.throws(() => parseKeyList("nothing"), /key list/);
 });
 
 test("website build refuses a file that is not a Windows program", async () => {
