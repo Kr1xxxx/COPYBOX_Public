@@ -1268,7 +1268,8 @@ export default function Home() {
     showToast(deleteRequest.permanent ? "已永久删除" : "已移入回收站");
   }
 
-  const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
+  // The mini window stays after a copy unless the person picks otherwise (owner, 2026-10-13: it vanished after a copy on Windows).
+  const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "never"));
   const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
   useAutoBackup(!loading && !startupError);
   useEffect(() => {

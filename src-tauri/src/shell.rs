@@ -35,7 +35,7 @@ pub struct Shell {
 
 impl Default for Shell {
     fn default() -> Self {
-        Shell { settings: Arc::new(Mutex::new(Settings { close: CloseBehavior::Tray, mini_hide: MiniHidePolicy::Hotkey, quitting: false })) }
+        Shell { settings: Arc::new(Mutex::new(Settings { close: CloseBehavior::Tray, mini_hide: MiniHidePolicy::Never, quitting: false })) }
     }
 }
 
