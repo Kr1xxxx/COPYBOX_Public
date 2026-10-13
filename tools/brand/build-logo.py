@@ -16,8 +16,8 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 
 # Palette (from the existing icon and app/globals.css)
-LAVENDER = "#c9c2ff"   # accent letter on dark
-VIOLET = "#7d6ee6"     # accent letter (light)
+LAVENDER = "#c4b9ff"   # accent letter on dark (= icon item, light end)
+VIOLET = "#8f7ff6"     # accent letter on light (= icon item, dark end)
 INK = "#1f1e1c"; INK_DARK = "#f1efe7"
 LINE = "#d9d5c9"; LINE_DARK = "#3f3d37"
 MUTED = "#55534d"; MUTED_DARK = "#b3b0a4"
@@ -56,27 +56,30 @@ def cn(noto, text, size, dx, dy, color, tracking=0.0):
     g, w = noto.shape(text, size, tracking)
     return paths(g, dx, dy, color), w
 
-GREEN = "#36d07a"      # the two clips
-INNER = "#262626"      # inner plate
-CREAM = "#f4f3ef"      # the U
-PURPLE = "#8b7df0"     # the copied item in the U's mouth
-TILE = "#f3f3f1"; DARK = "#161616"
+DARK_A = "#2d2b33"; DARK_B = "#16151b"   # squircle gradient, top-left -> bottom-right
+WHITE = "#ffffff"                        # the C
+PURPLE_A = "#c4b9ff"; PURPLE_B = "#8f7ff6" # the copied item, top-left -> bottom-right
+DASH = "rgba(40, 30, 90, .45)"             # the text line on the item
 
 def mark(x, y, h, with_tile=False):
-    """The icon (owner's original, redrawn): dark squircle with two green clips, an inner plate, a cream
-    sideways U (the C of COPYBOXX / an open box) and a purple item in its mouth. h = squircle height."""
-    k = h / 784.0
-    tile = f'<rect x="0" y="0" width="1024" height="1024" rx="228" fill="{TILE}"/>' if with_tile else ""
-    off = 0 if with_tile else -120
+    """The icon, traced from the owner's 1024 px original: a dark gradient squircle (928 of 1024, r 230),
+    a white C (sideways U, stroke 108, round caps) and a tilted purple item with a text line in its mouth.
+    h = squircle height. with_tile is accepted for compatibility; the icon has no tile, the outside is transparent."""
+    k = h / 928.0
+    off = 0 if with_tile else -48
     inner = f'''
-<rect x="120" y="120" width="784" height="784" rx="210" fill="{DARK}"/>
-<rect x="412" y="96" width="200" height="76" rx="30" fill="{GREEN}"/>
-<rect x="412" y="852" width="200" height="76" rx="30" fill="{GREEN}"/>
-<rect x="268" y="268" width="488" height="488" rx="118" fill="{INNER}"/>
-<path d="M646 358H480A122 122 0 0 0 358 480V544A122 122 0 0 0 480 666H646" fill="none" stroke="{CREAM}" stroke-width="84" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="590" y="478" width="82" height="68" rx="20" fill="{PURPLE}"/>
-<circle cx="150" cy="512" r="13" fill="#4a4a4a"/>'''
-    return f'<g transform="translate({x:.2f} {y:.2f}) scale({k:.5f}) translate({off} {off})">{tile}{inner}</g>'
+<defs>
+<linearGradient id="sq" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{DARK_A}"/><stop offset="1" stop-color="{DARK_B}"/></linearGradient>
+<linearGradient id="pu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{PURPLE_A}"/><stop offset="1" stop-color="{PURPLE_B}"/></linearGradient>
+</defs>
+<rect x="48" y="48" width="928" height="928" rx="230" fill="url(#sq)"/>
+<rect x="49.5" y="49.5" width="925" height="925" rx="228.5" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3"/>
+<path d="M673 280H404A160 160 0 0 0 244 440V584A160 160 0 0 0 404 744H673" fill="none" stroke="{WHITE}" stroke-width="108" stroke-linecap="round" stroke-linejoin="round"/>
+<g transform="rotate(-6 734 512)">
+<rect x="646" y="434" width="176" height="156" rx="40" fill="url(#pu)"/>
+<rect x="676" y="474" width="88" height="20" rx="10" fill="{DASH}"/>
+</g>'''
+    return f'<g transform="translate({x:.2f} {y:.2f}) scale({k:.5f}) translate({off} {off})">{inner}</g>'
 
 def svg(w, h, body, bg=None):
     rect = f'<rect width="{w:.0f}" height="{h:.0f}" fill="{bg}"/>' if bg else ""
@@ -88,8 +91,8 @@ def build(inter, noto, out):
     def write(name, s): open(os.path.join(out, name), "w").write(s)
 
     # 1. App icon: 1024 with tile, and the bare mark.
-    write("icon.svg", svg(1024, 1024, mark(0, 0, 784, with_tile=True)))
-    write("icon-mark.svg", svg(784, 784, mark(0, 0, 784)))
+    write("icon.svg", svg(1024, 1024, mark(0, 0, 928, with_tile=True)))
+    write("icon-mark.svg", svg(928, 928, mark(0, 0, 928)))
 
     for theme, ink, accent, line, muted, bg in (("light", INK, VIOLET, LINE, MUTED, None),
                                                ("dark", INK_DARK, LAVENDER, LINE_DARK, MUTED_DARK, None)):
