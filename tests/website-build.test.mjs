@@ -14,7 +14,6 @@ import {
   latestJson,
   main,
   pickInstaller,
-  renderChangelog,
   renderPage,
   robotsTxt,
   sitemapXml,
@@ -22,9 +21,8 @@ import {
 } from "../tools/website/build.mjs";
 import { parseKeyList, staleKeys } from "../tools/website/deploy.mjs";
 
-const pageKeys = ["index.html", "download/index.html", "help/index.html", "updates/index.html", "privacy/index.html"];
+const pageKeys = ["index.html", "download/index.html", "help/index.html", "privacy/index.html"];
 const allPageKeys = [...pageKeys, "404.html", "preview-gate.html"];
-const changelog = JSON.parse(readFileSync("tools/preview/changelog.json", "utf8"));
 
 // Builds into a temp dir with a fake preview and installer. Placeholder icons and screenshots are written unless
 // `assets` is false, in which case --icons and --images point at folders that do not exist.
@@ -83,25 +81,8 @@ test("website page: placeholders are filled in one pass, a leftover one throws",
   assert.equal(renderPage("<p>__MESSAGE__</p>", { version: "1", updated: "x", size: "y" }, {}, ["MESSAGE"]), "<p>__MESSAGE__</p>");
 });
 
-test("website changelog: newest first, 当前版本 on the first entry, every string escaped", () => {
-  const html = renderChangelog([
-    { version: "1.67", date: "10-13", at: "2026-10-13 21:10", items: ["<b>粗</b> & 细", "第二条"] },
-    { version: "1.66", date: "10-12", items: ['引号 " 和 \''] },
-  ]);
-  assert.match(html, /^<ol class="log">/);
-  assert.ok(html.indexOf("v1.67") < html.indexOf("v1.66"));
-  assert.equal(html.match(/当前版本/g).length, 1);
-  assert.ok(html.indexOf("当前版本") < html.indexOf("v1.66"));
-  assert.ok(html.includes("<li>&lt;b&gt;粗&lt;/b&gt; &amp; 细</li>"));
-  assert.ok(html.includes("<li>引号 &quot; 和 &#39;</li>"));
-  assert.doesNotMatch(html, /<b>/);
-  assert.ok(html.includes('<time datetime="2026-10-13">2026-10-13</time>'));
-  assert.ok(html.includes("<time>10-12</time>"));
-  assert.equal(renderChangelog([]), '<ol class="log">\n\n</ol>');
-});
-
 test("website pages: head, header, body and footer are joined and the current nav item is marked", () => {
-  const parts = { head: "<title>__PAGE_TITLE__</title>__ROBOTS__", header: '<a href="/"__NAV_HOME__>首页</a><a href="/help/"__NAV_HELP__>使用说明</a>__NAV_DOWNLOAD____NAV_UPDATES__', body: "<p>__CSS__</p>", footer: "<i>__CANONICAL__</i>" };
+  const parts = { head: "<title>__PAGE_TITLE__</title>__ROBOTS__", header: '<a href="/"__NAV_HOME__>首页</a><a href="/help/"__NAV_HELP__>使用说明</a>__NAV_DOWNLOAD__', body: "<p>__CSS__</p>", footer: "<i>__CANONICAL__</i>" };
   const info = { version: "1.67", updated: "2026-10-13", size: "1.0 MB" };
   const help = sitePages.find((page) => page.key === "help/index.html");
   assert.equal(
@@ -110,7 +91,7 @@ test("website pages: head, header, body and footer are joined and the current na
   );
   const notFound = sitePages.find((page) => page.key === "404.html");
   assert.match(assemblePage(notFound, parts, info, { CSS: "" }), /<meta name="robots" content="noindex">/);
-  assert.throws(() => assemblePage(help, { ...parts, body: "__CHANGELOG__" }, info, { CSS: "" }), /__CHANGELOG__/);
+  assert.throws(() => assemblePage(help, { ...parts, body: "__NAV_UPDATES__" }, info, { CSS: "" }), /__NAV_UPDATES__/);
   assert.match(cssAssetKey("body{}"), /^assets\/site\.[0-9a-f]{8}\.css$/);
   assert.notEqual(cssAssetKey("body{}"), cssAssetKey("body{ }"));
 });
@@ -163,7 +144,6 @@ test("website build writes every page, the stylesheet, icons, images, preview, i
     "robots.txt",
     "site.webmanifest",
     "sitemap.xml",
-    "updates/index.html",
   ]);
   for (const entry of bulk) {
     const bytes = readFileSync(join(out, entry.key));
@@ -189,7 +169,10 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/, key);
     assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg"[^>]*><b>Clipboxx<\/b><span>复制盒<\/span><\/a>/, key);
     assert.match(html, /<nav class="nav" aria-label="网站导航">/, key);
-    for (const href of ["/", "/download/", "/help/", "/updates/"]) assert.ok(html.includes(`<a href="${href}"`), `${key} nav ${href}`);
+    const nav = /<nav class="nav" aria-label="网站导航">([\s\S]*?)<\/nav>/.exec(html)[1];
+    assert.deepEqual([...nav.matchAll(/<a href="([^"]*)"/g)].map((m) => m[1]), ["/", "/download/", "/help/"], key);
+    assert.doesNotMatch(nav, /更新记录/, key);
+    assert.doesNotMatch(html, /\/updates\//, key);
     assert.ok(html.includes(`<link rel="stylesheet" href="/${cssKey}">`), key);
     assert.ok(html.includes(`<link rel="canonical" href="https://copyboxx.com${page.path}">`), key);
     assert.ok(html.includes(`<meta property="og:url" content="https://copyboxx.com${page.path}">`), key);
@@ -211,7 +194,6 @@ test("website pages: the current nav item is marked, and only that one", () => {
     "index.html": "/",
     "download/index.html": "/download/",
     "help/index.html": "/help/",
-    "updates/index.html": "/updates/",
     "privacy/index.html": null,
     "404.html": null,
     "preview-gate.html": null,
@@ -258,20 +240,12 @@ test("website download page shows the version, size, date and sha256", () => {
   for (const id of ["install", "smartscreen", "move", "update", "mac"]) assert.ok(html.includes(`id="${id}"`), id);
 });
 
-test("website updates page lists the changelog, newest first, with 当前版本", () => {
-  const html = site.read("updates/index.html");
-  assert.ok(html.includes(`<h2>v${changelog[0].version}</h2>`));
-  assert.ok(html.includes("当前版本"));
-  assert.ok(html.indexOf(`v${changelog[0].version}<`) < html.indexOf(`v${changelog[1].version}<`));
-  assert.equal(html.match(/<li id="v/g).length, changelog.length);
-});
-
 test("website search-engine files: sitemap, robots.txt and the web manifest", () => {
   const sitemap = site.read("sitemap.xml");
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-  assert.deepEqual(urls, ["/", "/download/", "/help/", "/updates/", "/privacy/"].map((path) => `https://copyboxx.com${path}`));
+  assert.deepEqual(urls, ["/", "/download/", "/help/", "/privacy/"].map((path) => `https://copyboxx.com${path}`));
   const updated = JSON.parse(site.read("download/latest.json")).updatedAt.slice(0, 10);
-  assert.equal(sitemap.match(/<lastmod>(\d{4}-\d{2}-\d{2})<\/lastmod>/g).length, 5);
+  assert.equal(sitemap.match(/<lastmod>(\d{4}-\d{2}-\d{2})<\/lastmod>/g).length, 4);
   assert.ok(sitemap.includes(`<lastmod>${updated}</lastmod>`));
   assert.equal(sitemapXml("2026-10-13"), sitemap.replaceAll(updated, "2026-10-13"));
 

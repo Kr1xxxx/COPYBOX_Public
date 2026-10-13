@@ -37,7 +37,7 @@ text is plain Chinese; no English eyebrow labels, no badges, no emoji, no filler
 ## Layout patterns
 
 1. **Header** (sticky, `--page` at 85% with backdrop blur, hairline bottom): left the mark (`/favicon.svg`, 24px) +
-   `Clipboxx` (700) + `复制盒` (muted); nav 首页 · 下载 · 使用说明 · 更新记录 (muted, current page in `--ink`); right:
+   `Clipboxx` (700) + `复制盒` (muted); nav 首页 · 下载 · 使用说明 (muted, current page in `--ink`); right:
    theme toggle (icon button, `aria-label`), text link 在线试用, primary pill 下载 Windows 版. On phones the nav wraps
    under the brand in a second row; no hamburger.
 2. **Hero** (home): two columns (text / visual), stacked on phones. Eyebrow `● v__VERSION__ · __UPDATED__ 更新`
@@ -66,27 +66,26 @@ text is plain Chinese; no English eyebrow labels, no badges, no emoji, no filler
 | Path | Title | Content |
 | --- | --- | --- |
 | `/` | `Clipboxx · 复制盒` | hero; 三个部分 card row (话术 / 账号 / 图片, texts as on the current page); 三步装好 steps (下载安装包 / 双击运行，看到「未知发布者」点「更多信息」→「仍要运行」 / 用过旧版的话先在旧版「设置 → 数据 → 导出到新版」，再在新版「从旧版导入」) beside the app image; 系统要求 cards (Windows 10 / 11，64 位；Mac（Apple 芯片）暂不提供下载；网页测试版：任意浏览器，需要口令); 用起来顺手 feature grid (托盘小窗 / 搜索 / 备份 / AI 润色和整理 / 公司共享话术 / 主题); 常见问题 (5 questions, see /help/); footer |
-| `/download/` | `下载 · Clipboxx` | one big download card: Windows 版 v__VERSION__ · __SIZE__ · 更新于 __UPDATED__, primary pill 下载, a muted line with the SHA-256 (`__SHA256__`, wrapped, tabular); 安装步骤 (numbered, as above); 安装时的提示 (SmartScreen); 从旧版搬数据; 更新方法 (回到这里下载新版本，直接覆盖安装，数据不会丢); Mac 版 note; link to 更新记录 |
+| `/download/` | `下载 · Clipboxx` | one big download card: Windows 版 v__VERSION__ · __SIZE__ · 更新于 __UPDATED__, primary pill 下载, a muted line with the SHA-256 (`__SHA256__`, wrapped, tabular); 安装步骤 (numbered, as above); 安装时的提示 (SmartScreen); 从旧版搬数据; 更新方法 (回到这里下载新版本，直接覆盖安装，数据不会丢); Mac 版 note |
 | `/help/` | `使用说明 · Clipboxx` | sections with anchors and a small in-page list at the top: 话术 (目录、搜索拼音和首字母、带【变量】的话术复制前填空、常用置顶、批量移动和删除、导入表格), 账号 (分类、设密码后单独加密、恢复码一定要存好、解锁), 图片 (放入、目录、九宫格、回收站、点一下复制), 托盘小窗 (托盘图标、迷你窗口、复制完自动收起、关闭按钮的两种选择、开机启动), 备份与恢复 (完整备份加密、自己设密码、每天自动备份、恢复), 公司共享话术 (管理员给文件、自动同步、不覆盖个人话术), AI 润色和整理 (可选、填自己的接口和密钥、密钥由系统加密保存在本机), 设置 (主题、数据位置、回收站), 常见问题 (数据存在哪里 / 忘了账号密码怎么办 / 换电脑怎么搬 / 为什么 Windows 提示未知发布者 / 和旧版 Clipbox 是什么关系). Only say what the app really does: check `README.md`, `docs/features.json` and the labels in `app/settings.tsx`, `app/page.tsx`; when unsure, leave it out |
-| `/updates/` | `更新记录 · Clipboxx` | the entries of `tools/preview/changelog.json`, newest first: `v1.65` + date + items as a list; the first entry marked 当前版本; rendered at build time, HTML-escaped |
 | `/privacy/` | `隐私说明 · Clipboxx` | short: no account, no server, data encrypted on the device; the website collects nothing and sets no analytics; the web preview keeps its data in the visitor's browser; the passphrase cookie is the only cookie |
 | `404.html` | `找不到这个页面 · Clipboxx` | same header/footer, short text, link home |
 | `preview-gate.html` | `网页测试版 · Clipboxx` | same look (card on `--page`), unchanged behaviour |
 
 ## Files and build
 
-- `tools/website/pages/{index,download,help,updates,privacy}.html` — page bodies with `__PLACEHOLDER__` slots;
+- `tools/website/pages/{index,download,help,privacy}.html` — page bodies with `__PLACEHOLDER__` slots;
   `tools/website/partials/{head,header,footer}.html`; `tools/website/site.css`; `tools/website/icons/` (favicon.ico,
   favicon.svg, apple-touch-icon.png 180, icon-192.png, icon-512.png, og-image.png 1200×630) and
   `tools/website/images/` (app-win-light.png, app-win-dark.png, optionally app-mini-light.png, app-images-light.png)
   are committed assets produced by `make-icons.mjs` and `make-screenshots.mjs` (Playwright; run by hand when the
   icon or the UI changes).
 - `build.mjs` assembles each page (head + header with the current nav item marked + body + footer), fills version /
-  date / size / sha256 / changelog, writes `assets/site.<8-hex-of-sha256>.css` and links it, copies `icons/*` to the
+  date / size / sha256, writes `assets/site.<8-hex-of-sha256>.css` and links it, copies `icons/*` to the
   site root and `images/*` to `/images/`, writes `site.webmanifest` (name Clipboxx, short_name Clipboxx, lang zh-CN,
   icons 192/512, theme/background colours), `robots.txt` (`User-agent: *`, `Disallow: /preview/`, `Sitemap:`), and
-  `sitemap.xml` (the five pages, `lastmod` = the update date). Output keys: `index.html`, `download/index.html`,
-  `help/index.html`, `updates/index.html`, `privacy/index.html`, `404.html`, `preview-gate.html`, `assets/...`,
+  `sitemap.xml` (the four pages, `lastmod` = the update date). Output keys: `index.html`, `download/index.html`,
+  `help/index.html`, `privacy/index.html`, `404.html`, `preview-gate.html`, `assets/...`,
   `images/...`, root icon files, `download/Clipboxx-Setup.exe`, `download/latest.json`, `preview/**`.
 - Worker: content types for ico, txt, xml, webmanifest, jpg, webp; `assets/` (any depth) immutable; `images/` and the
   root icon files one day with ETag.

@@ -246,15 +246,6 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .toc a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
 .note { margin-top: 20px; padding: 16px 20px; border-radius: var(--r-small); background: var(--panel); color: var(--ink-2); font-size: 15px; }
 
-/* Changelog */
-.log { list-style: none; padding: 0; max-width: 820px; border-top: 1px solid var(--hairline); }
-.log > li { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 8px 32px; padding: 28px 0; border-bottom: 1px solid var(--hairline); }
-.log h2 { font-size: 20px; }
-.log time { display: block; font-size: 14px; color: var(--muted); }
-.log .current { display: inline-block; margin-top: 6px; padding: 1px 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent); font-size: 13px; font-weight: 600; }
-.log ul { padding-left: 1.2em; color: var(--ink-2); }
-.log ul li + li { margin-top: 6px; }
-
 /* Single-card pages: 404 and the preview passphrase */
 .solo { display: grid; place-items: center; padding: 96px var(--gutter); min-height: calc(100vh - 61px - 220px); }
 .solo-card { width: 100%; max-width: 440px; padding: 40px 32px; text-align: center; box-shadow: var(--shadow-card); }
@@ -321,7 +312,6 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   .download-card { grid-template-columns: minmax(0, 1fr); padding: 28px 22px; }
   .download-card h2 { font-size: 26px; }
   .download-card .pill { width: 100%; }
-  .log > li { grid-template-columns: minmax(0, 1fr); }
   .doc section { padding: 36px 0; }
   .solo { padding: 56px var(--gutter); }
   .solo-card { padding: 32px 20px; }
