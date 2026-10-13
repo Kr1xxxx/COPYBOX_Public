@@ -915,7 +915,7 @@ export default function Home() {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== expandedIndex) selectRow(index);
       const missing = readiness.missingPlaceholders;
-      showToast(`先填写：${missing.join("、")}`);
+      showToast(`先填写：${missing.join("、")}`, { tone: "ok" });
       window.setTimeout(() => {
         const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
         Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
@@ -928,7 +928,7 @@ export default function Home() {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== expandedIndex) selectRow(index);
       setFill({ ...state, values: state.values, remembered: [] });
-      showToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`, { ms: 3600 });
+      showToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`, { tone: "ok", ms: 3600 });
       return;
     }
     await finishCopy(item, fillSnippetTemplate(source, state.values).text);
@@ -939,7 +939,7 @@ export default function Home() {
   function pinValue(item: SecretItem, name: string, value = fillFor(item).values[name] || "") {
     const outcome = togglePin(valueMemory, pinnedValues, name, value);
     if (outcome.result === "empty") { showToast("先填一个值，再右键固定", { ms: 2400 }); }
-    else if (outcome.result === "full") { showToast(`${name} 已固定 3 个，先取消一个再固定`, { ms: 2400 }); }
+    else if (outcome.result === "full") { showToast(`${name} 已固定 3 个，先取消一个再固定`, { tone: "ok", ms: 2400 }); }
     else { setValueMemory(outcome.memory); setPinnedValues(outcome.pins); showToast(outcome.result === "pinned" ? `已固定「${value.trim()}」，不会被新值顶掉` : `已取消固定「${value.trim()}」`, { ms: 2400 }); }
   }
   // Delete a remembered value everywhere; the menu on a listed value calls this.
