@@ -72,6 +72,7 @@
       fireAndForget("automation_response", { requestId: requestId, response: response });
     },
     automationReady: function () { fireAndForget("automation_ready"); },
+    setPinned: function (pinned) { fireAndForget("set_pinned", { pinned: Boolean(pinned) }); },
     setWindowMode: function (mode) { fireAndForget("set_window_mode", { mode: mode === "mini" ? "mini" : "full" }); },
     onWindowMode: function (callback) {
       var stopped = false;

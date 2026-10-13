@@ -51,6 +51,8 @@ export async function asDesktop(page, platform, { imageView } = {}) {
       respondAutomationCommand() {},
       automationReady() {},
       aiStatus: async () => ({ hasKey: false, origin: "" }),
+      // 固定在最上层: every value the page sends is kept in order, for tests to read.
+      setPinned(pinned) { (window.__pinCalls ??= []).push(pinned); },
     };
     document.addEventListener("DOMContentLoaded", () => document.documentElement.classList.add("desktop-app", `platform-${pl}`));
   }, platform);

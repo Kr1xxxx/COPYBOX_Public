@@ -147,6 +147,8 @@ const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
+// 固定在最上层 for the full window: "1" when on, absent when off.
+const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
 const VALUES_COLLAPSED_KEY = "clipbox.values-collapsed";
 // The 话术 card that was open last (only its id), so the list comes back the way it was; empty = all folded.
@@ -1278,6 +1280,20 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [pinOnTop, setPinOnTop] = useState(() => readStoredChoice(PIN_ON_TOP_KEY, ["1"], "") === "1");
+  useEffect(() => {
+    window.clipboxDesktop?.setPinned?.(pinOnTop);
+    // Sent once on start; later changes go through togglePinOnTop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function togglePinOnTop() {
+    const next = !pinOnTop;
+    setPinOnTop(next);
+    try { if (next) localStorage.setItem(PIN_ON_TOP_KEY, "1"); else localStorage.removeItem(PIN_ON_TOP_KEY); } catch { /* keep the in-memory choice for this session */ }
+    window.clipboxDesktop?.setPinned?.(next);
+  }
+
   const [closeBehavior, setCloseBehavior] = useState<CloseBehavior>(() => readStoredChoice<CloseBehavior>(CLOSE_BEHAVIOR_KEY, ["tray", "taskbar", "quit"], "tray"));
   useEffect(() => {
     window.clipboxDesktop?.setCloseBehavior?.(closeBehavior);
@@ -1980,6 +1996,8 @@ export default function Home() {
                     </span>
                     : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
                 </>}
+              {/* Only a desktop shell (or the web preview's stand-in) can keep the window on top; a plain browser tab gets no button. */}
+              {typeof window !== "undefined" && window.clipboxDesktop?.setPinned && <button type="button" className={`icon-button pin-on-top${pinOnTop ? " active" : ""}`} onClick={togglePinOnTop} aria-pressed={pinOnTop} aria-label={pinOnTop ? "取消固定" : "固定在最上层"} title={pinOnTop ? "取消固定" : "固定在最上层"}><Icon name="pin" filled={pinOnTop} /></button>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
             {lockedHere ? <AccountLockScreen deviceKey={deviceKey} onUnlock={(key) => { setAccountSecret(key ?? deviceKey); setAccountUnlocked(true); }} /> : <>

@@ -214,6 +214,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .add-button { height: 34px; padding: 0 13px 0 10px; border-radius: 9px; font-size: 13px; }
 .toolbar .icon-button { width: 34px; height: 34px; border-radius: 9px; color: var(--ink-2); }
 .toolbar .icon-button .icon { width: 17px; height: 17px; }
+/* 固定在最上层: the on state is tinted with the accent so it reads as switched on at a glance. */
+.toolbar .icon-button.pin-on-top.active { background: var(--accent-tint); color: var(--accent); }
+.toolbar .icon-button.pin-on-top.active:hover { background: var(--accent-soft); color: var(--accent); }
 .section-head { position: relative; z-index: 3; height: 40px; flex: 0 0 auto; padding: 0 12px 4px 18px; display: flex; align-items: center; gap: 8px; }
 .section-head h1 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-serif); font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--ink); }
 .section-count { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }

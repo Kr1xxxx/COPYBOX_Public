@@ -50,6 +50,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             window_mode::set_window_mode,
             window_mode::get_window_mode,
+            window_mode::set_pinned,
             window_mode::set_theme,
             window_mode::page_ready,
             shell::set_close_behavior,

@@ -47,6 +47,8 @@ export type ClipboxDesktop = {
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;
   setWindowMode?: (mode: WindowMode) => void;
+  // 固定在最上层: keeps the full window above other windows (the mini window always is).
+  setPinned?: (pinned: boolean) => void;
   onWindowMode?: (callback: (mode: WindowMode) => void) => () => void;
 };
 
