@@ -204,6 +204,11 @@ export async function markEncryptedReady(storage: LockStorage = localStorage): P
   if (record && record.phase !== "ready") storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, phase: "ready" }));
 }
 
+export function markEncryptedMigrating(storage: LockStorage = localStorage): void {
+  const record = readEncrypted(storage);
+  if (record) storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...record, phase: "migrating" }));
+}
+
 // The data key if the password is right, otherwise null.
 export async function unlockEncrypted(password: string, storage: LockStorage = localStorage): Promise<string | null> {
   const record = readEncrypted(storage);

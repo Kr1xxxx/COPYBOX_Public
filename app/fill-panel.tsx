@@ -56,6 +56,14 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => onChange(name, event.target.value)}
+          onMouseDown={(event) => {
+            // WebKit's default mouse placement otherwise undoes the focus-time selection.
+            // Once focused, ordinary clicks and drag selection still place the caret normally.
+            if (event.button === 0 && document.activeElement !== event.currentTarget) {
+              event.preventDefault();
+              event.currentTarget.focus();
+            }
+          }}
           onFocus={(event) => { onFocusChange?.(true); onActive?.(name); event.currentTarget.select(); }}
           onBlur={(event) => { onFocusChange?.(false); onActive?.(null); event.currentTarget.scrollLeft = 0; }}
           onKeyDown={(event) => {

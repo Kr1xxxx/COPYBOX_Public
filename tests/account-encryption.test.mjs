@@ -4,6 +4,7 @@ import { ACCOUNT_LOCK_KEY, changeEncryptedPassword, encryptedPhase, lockMode, re
 import { PREMIGRATION_KEY, deletePremigrationBackup, disableAccountEncryption, enableAccountEncryption, finishAccountMigration, hasPremigrationBackup } from "../app/account-encryption.ts";
 import { SECRET_ITEMS_KEY, openSecretItemsStore } from "../app/secret-items-store.ts";
 import { TOTP_STORAGE_KEY, openTotpStore } from "../app/totp-store.ts";
+import { SITE_ICONS_KEY, readSiteIcons, writeSiteIcons } from "../app/site-icon-store.ts";
 
 const DEVICE = "device-key-for-tests";
 const memory = (failOn) => {
@@ -100,4 +101,46 @@ test("turning the encryption off puts the data back under the device key (passwo
   assert.equal(lockMode(storage), "none");
   assert.deepEqual(await openSecretItemsStore(DEVICE, storage).list(), [login]);
   assert.deepEqual(await openTotpStore(DEVICE, storage).list(), [totp]);
+});
+
+test("every persisted checkpoint while disabling encryption can be reopened without losing current accounts", async () => {
+  const storage = await seeded();
+  const { dataKey } = await enableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, storage);
+  const updated = { ...login, password: "changed-after-encryption" };
+  const icons = { "x.test": { data: "data:image/png;base64,AA==", at: 1 } };
+  await openSecretItemsStore(dataKey, storage).replaceAll([updated]);
+  await writeSiteIcons(dataKey, icons, storage);
+  deletePremigrationBackup(storage); // recovery must not depend on an old or deleted upgrade backup
+  const checkpoints = [];
+  const capture = (key) => { if ([ACCOUNT_LOCK_KEY, SECRET_ITEMS_KEY, TOTP_STORAGE_KEY, SITE_ICONS_KEY].includes(key)) checkpoints.push(new Map(storage.raw)); };
+  const observed = {
+    ...storage,
+    setItem: (key, value) => { storage.setItem(key, value); capture(key); },
+    removeItem: (key) => { storage.removeItem(key); capture(key); },
+  };
+  await disableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, observed);
+  assert.ok(checkpoints.length >= 4);
+  for (const snapshot of checkpoints) {
+    const reopened = memory();
+    for (const [key, value] of snapshot) reopened.setItem(key, value);
+    let key = DEVICE;
+    if (lockMode(reopened) === "encrypted") {
+      key = await unlockEncrypted("correct horse", reopened);
+      assert.ok(key);
+      await finishAccountMigration(DEVICE, key, reopened);
+    }
+    assert.deepEqual(await openSecretItemsStore(key, reopened).list(), [updated]);
+    assert.deepEqual(await openTotpStore(key, reopened).list(), [totp]);
+    assert.deepEqual(await readSiteIcons(key, reopened), icons);
+  }
+});
+
+test("failure removing the password record rolls disabling encryption back", async () => {
+  const storage = await seeded();
+  const { dataKey } = await enableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, storage);
+  const before = new Map(storage.raw);
+  const failing = { ...storage, removeItem: (key) => { if (key === ACCOUNT_LOCK_KEY) throw new Error("disk full"); storage.removeItem(key); } };
+  await assert.rejects(() => disableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, failing));
+  assert.deepEqual(storage.raw, before);
+  assert.deepEqual(await openSecretItemsStore(dataKey, storage).list(), [login]);
 });

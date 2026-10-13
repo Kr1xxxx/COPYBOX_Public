@@ -1,7 +1,7 @@
 // Moves the 账号 data between the device key and the account key K (see account-lock.ts, version 2). Three stores hold it:
 // 保险箱 items, 验证码 and the site-icon cache. Every move is: read everything, write it under the new key, read it back and
 // compare. A raw copy of the three stores is taken first and kept (`clipbox.account-premigration.v1`) so nothing can be lost.
-import { ACCOUNT_LOCK_KEY, ENCRYPTED_LOCK_MIN, type LockStorage, encryptedPhase, lockMode, markEncryptedReady, newDataKey, newRecoveryCode, unlockEncrypted, writeEncryptedLock } from "./account-lock.ts";
+import { ACCOUNT_LOCK_KEY, ENCRYPTED_LOCK_MIN, type LockStorage, encryptedPhase, lockMode, markEncryptedMigrating, markEncryptedReady, newDataKey, newRecoveryCode, unlockEncrypted, writeEncryptedLock } from "./account-lock.ts";
 import { SECRET_ITEMS_KEY, openSecretItemsStore } from "./secret-items-store.ts";
 import { SITE_ICONS_KEY, readSiteIcons, writeSiteIcons } from "./site-icon-store.ts";
 import { TOTP_STORAGE_KEY, openTotpStore } from "./totp-store.ts";
@@ -103,12 +103,16 @@ export async function disableAccountEncryption(args: { deviceKey: string; passwo
   await finishAccountMigration(args.deviceKey, dataKey, storage);
   const data = await readAll(dataKey, storage);
   const raw = rawCopy(storage);
+  // Until the lock is removed, an interrupted disable resumes the existing migration back to K.
+  // Keep both wrapped keys intact; no old upgrade backup or new storage format is needed.
+  markEncryptedMigrating(storage);
   try {
     await writeAll(args.deviceKey, data, storage);
     if (JSON.stringify(await readAll(args.deviceKey, storage)) !== JSON.stringify(data)) throw new Error("核对不一致");
+    storage.removeItem(ACCOUNT_LOCK_KEY);
   } catch (error) {
     restoreRaw(raw, storage);
+    await markEncryptedReady(storage);
     throw new Error("没能关闭，数据没有改动", { cause: error });
   }
-  storage.removeItem(ACCOUNT_LOCK_KEY);
 }
