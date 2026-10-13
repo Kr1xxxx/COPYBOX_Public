@@ -1094,6 +1094,8 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .backup-warning{background:var(--warn-bg);color:var(--warn)}
 .backup-dialog.data-move .backup-intro,.backup-dialog.data-move .backup-note,.backup-dialog.data-move .backup-field{color:#5b5b60}.backup-dialog.data-move .backup-head p{color:#7a5a43}.backup-dialog.data-move:focus{outline:0}
 /* 英文/中文 sits in the card's top row, just left of the favourite star */
+/* 收起 on the open snippet card: the header 收起 look, at the 英文|中文 toggle's height, just left of it. */
+.row-line .row-collapse { height: 24px; flex: none; margin-left: 2px; padding: 0 8px 1px; border-radius: 7px; font-size: 12px; }
 .row-line .copy-language.row-language { width: auto; height: 24px; margin: 0 4px; padding: 2px; display: inline-flex; flex: none; border-radius: 8px; background: var(--fill); }
 .row-line .copy-language.row-language button { padding: 0 9px 1px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .row-line .copy-language.row-language button.active { background: var(--card); color: var(--ink); }
