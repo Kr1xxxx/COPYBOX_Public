@@ -49,6 +49,7 @@ yarn-error.log*
 /.claude/worktrees/
 /dist-preview/
 /dist-website/
+/tools/website/.wrangler/
 /dist-tauri/
 /src-tauri/target/
 /src-tauri/gen/

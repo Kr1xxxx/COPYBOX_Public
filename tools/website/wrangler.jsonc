@@ -1,15 +1,12 @@
-// Cloudflare Worker (static assets only) that serves copyboxx.com from dist-website/.
-// `npm run website:deploy` uses this file; build dist-website/ first (see README.md).
+// Cloudflare Worker that serves copyboxx.com: worker.mjs reads the files of dist-website/ from the KV namespace
+// copyboxx-site-files (binding FILES). `npm run website:deploy` (deploy.mjs) uses this file; see README.md.
 {
   "name": "copyboxx-site",
   "compatibility_date": "2026-09-01",
   "workers_dev": false,
   "preview_urls": false,
-  "assets": {
-    "directory": "../../dist-website",
-    "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
-  },
+  "main": "worker.mjs",
+  "kv_namespaces": [{ "binding": "FILES", "id": "fb78ad5c8e0e4469adff21ebbe638088" }],
   "routes": [
     { "pattern": "copyboxx.com", "custom_domain": true },
     { "pattern": "www.copyboxx.com", "custom_domain": true }
