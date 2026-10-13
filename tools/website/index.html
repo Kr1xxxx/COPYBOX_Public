@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clipboxx · 复制盒</title>
+<meta name="description" content="Clipboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，不用联网，内容加密保存。">
+<style>
+  :root {
+    --ground: #e9e6e0; --ink: #3a3631; --soft: #6f695f; --line: #d3cec4; --bar: #f4f2ee;
+    --accent: #b4573a; --accent-ink: #fff;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #1c1b19; --ink: #e6e1d8; --soft: #a39d92; --line: #3a3732; --bar: #242220;
+      --accent: #d9794f; --accent-ink: #1c1b19;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #1c1b19; --ink: #e6e1d8; --soft: #a39d92; --line: #3a3732; --bar: #242220;
+    --accent: #d9794f; --accent-ink: #1c1b19;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.7 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  h1, h2, h3 { line-height: 1.35; margin: 0; text-wrap: balance; }
+  p { margin: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  header { background: var(--bar); border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .brand b { font-size: 16px; letter-spacing: .02em; }
+  .brand span { color: var(--soft); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header nav { display: flex; gap: 4px; flex: none; }
+  header nav a { color: var(--ink); text-decoration: none; font-size: 14px; padding: 6px 10px; border-radius: 7px; }
+  header nav a:hover { background: var(--ground); }
+
+  .hero { padding: 64px 0 48px; }
+  .hero h1 { font-size: clamp(26px, 5vw, 38px); letter-spacing: .01em; }
+  .hero h1 span { display: inline-block; }
+  .hero .lead { margin-top: 16px; max-width: 34em; color: var(--soft); font-size: 16px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; align-items: flex-start; }
+  .btn { display: inline-flex; flex-direction: column; justify-content: center; min-height: 48px; padding: 10px 20px; border-radius: 10px; text-decoration: none; font-size: 15px; font-weight: 600; line-height: 1.4; border: 1px solid var(--accent); transition: transform .12s ease, background-color .12s ease; }
+  .btn:active { transform: scale(.98); }
+  .btn small { font-weight: 400; font-size: 12.5px; opacity: .85; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+  .btn.secondary { color: var(--ink); border-color: var(--line); background: transparent; }
+  .btn.secondary:hover { background: var(--bar); }
+  .hint { margin-top: 16px; max-width: 40em; color: var(--soft); font-size: 13.5px; }
+
+  section { padding: 40px 0; border-top: 1px solid var(--line); }
+  section > .wrap > h2 { font-size: 21px; margin-bottom: 20px; }
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .card { background: var(--bar); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .card h3 { font-size: 18px; margin-bottom: 8px; }
+  .card p { color: var(--soft); font-size: 14.5px; }
+
+  .features { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+  .features li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .features b { display: block; font-size: 15.5px; }
+  .features span { color: var(--soft); font-size: 14.5px; }
+
+  .panel { background: var(--bar); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .panel p { color: var(--soft); max-width: 38em; }
+  .panel .btn { margin-top: 18px; }
+
+  .steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 12px; }
+  .steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: baseline; }
+  .steps li::before { content: counter(step); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; transform: translateY(-1px); }
+  .after { margin-top: 18px; color: var(--soft); }
+
+  footer { border-top: 1px solid var(--line); padding: 24px 0 40px; color: var(--soft); font-size: 13px; }
+
+  @media (max-width: 760px) {
+    .cards, .features { grid-template-columns: minmax(0, 1fr); }
+    .hero { padding: 40px 0 36px; }
+    .actions .btn { width: 100%; }
+    section { padding: 32px 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn { transition: none; }
+    .btn:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand"><b>Clipboxx</b><span>复制盒</span></div>
+    <nav aria-label="页面导航">
+      <a href="/download/Clipboxx-Setup.exe">下载</a>
+      <a href="/preview/" target="_blank" rel="noopener">在线试用</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <h1><span>常用话术、账号资料、</span><span>图片，一键复制</span></h1>
+      <p class="lead">装在自己电脑上，不用注册、不用联网就能用。内容用 AES-256 加密，只保存在这台设备上。</p>
+      <div class="actions">
+        <a class="btn primary" href="/download/Clipboxx-Setup.exe">下载 Windows 版<small class="num">v__VERSION__ · __SIZE__ · 更新于 __UPDATED__</small></a>
+        <a class="btn secondary" href="/preview/" target="_blank" rel="noopener">在线试用（网页测试版）</a>
+      </div>
+      <p class="hint">安装时 Windows 可能提示「未知发布者」，点「更多信息」再点「仍要运行」就可以。目前只提供 Windows 版下载。</p>
+    </div>
+  </div>
+
+  <section aria-labelledby="parts">
+    <div class="wrap">
+      <h2 id="parts">三个部分</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>话术</h3>
+          <p>客服常用回复按目录放好。搜索能用拼音和首字母。带【变量】的话术，复制前先把空填上。常用的排在最前面。</p>
+        </div>
+        <div class="card">
+          <h3>账号</h3>
+          <p>登录、支付、接口密钥、验证码分开存。可以设一个密码，设了以后这部分会单独加密，还会给你一个恢复码。</p>
+        </div>
+        <div class="card">
+          <h3>图片</h3>
+          <p>常发的图片存进来，点一下就复制。有目录、九宫格和回收站。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="handy">
+    <div class="wrap">
+      <h2 id="handy">用起来顺手</h2>
+      <ul class="features">
+        <li><b>托盘小窗</b><span>点托盘图标弹出小窗口，复制完自动收起。</span></li>
+        <li><b>搜索</b><span>几个词可以一起搜，只搜当前目录或者全部都行。</span></li>
+        <li><b>备份</b><span>备份文件是加密的，密码自己设；每天自动备份一次。</span></li>
+        <li><b>AI 润色和整理</b><span>可选功能，填上自己的接口就能用。</span></li>
+        <li><b>公司共享话术</b><span>管理员给一个文件，自动同步，不会覆盖你自己的话术。</span></li>
+        <li><b>主题</b><span>跟随系统、浅色、深色，三种随你选。</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="web">
+    <div class="wrap">
+      <h2 id="web">网页测试版</h2>
+      <div class="panel">
+        <p>和软件界面一样，可以提前看看新功能、先试一试。数据只存在你的浏览器里，不会上传。里面已经放好了测试话术和测试图片。</p>
+        <a class="btn secondary" href="/preview/" target="_blank" rel="noopener">打开网页测试版</a>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="install">
+    <div class="wrap">
+      <h2 id="install">安装与更新</h2>
+      <ol class="steps">
+        <li><span>下载安装包。</span></li>
+        <li><span>双击运行。</span></li>
+        <li><span>看到「未知发布者」，就点「更多信息」，再点「仍要运行」。</span></li>
+        <li><span>用过旧版的话：先在旧版里点「设置 → 数据 → 导出到新版」，再在新版里点「从旧版导入」。</span></li>
+      </ol>
+      <p class="after">更新时回到这里下载新版本，直接覆盖安装，数据不会丢。</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap num">Clipboxx · v__VERSION__ · 更新于 __UPDATED__ · 数据只保存在你的电脑上</div>
+</footer>
+</body>
+</html>
