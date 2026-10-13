@@ -61,7 +61,22 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
     respondAutomationCommand: function () {},
     automationReady: function () {},
     checkUpdate: function () { return Promise.resolve({ status: "available", version: "9.9.9", notes: ["这是演示：真实版本会在这里列出新版本的改动"] }); },
-    openUpdate: function () { return Promise.resolve(true); },
+    openUpdate: function () { return Promise.resolve(true); },${platform === "win32" ? `
+    // 立即更新 demo (D-047): a pretend 5.2 MB download in about three seconds, then the page reopens like the app would.
+    onUpdateProgress: function (callback) { window.__clipboxUpdateProgress = callback; return function () { window.__clipboxUpdateProgress = null; }; },
+    installUpdate: function () {
+      var total = 5452595, received = 0;
+      return new Promise(function (resolve) {
+        var timer = setInterval(function () {
+          received = Math.min(total, received + 190000);
+          if (window.__clipboxUpdateProgress) window.__clipboxUpdateProgress({ received: received, total: total });
+          if (received < total) return;
+          clearInterval(timer);
+          resolve({ status: "installing" });
+          setTimeout(function () { location.reload(); }, 2500);
+        }, 100);
+      });
+    },` : ""}
     aiStatus: function () { return Promise.resolve({ hasKey: false, origin: "" }); },
     // A browser tab cannot stay above other windows; the button is there so it can be seen and tried.
     setPinned: function () {},

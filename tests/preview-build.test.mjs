@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import {
   ensureTitle,
   patchPreloadHelper,
@@ -65,4 +66,34 @@ test("the shim answers getVersion and getBuildTime, and the wrapper shows the up
 test("renderWrapper also hands the update moment to the page, which shows it in the viewer's clock", () => {
   const html = renderWrapper('<span data-at="__UPDATED_ISO__">__UPDATED__</span>', "1.39", "2026-10-11 20:02", "2026-10-11T20:02:00+08:00");
   assert.equal(html, '<span data-at="2026-10-11T20:02:00+08:00">2026-10-11 20:02</span>');
+});
+
+test("the Windows preview demos 立即更新 with progress and a reopen; the Mac preview keeps 下载", async () => {
+  const html = "<html><head></head><body></body></html>";
+  const run = (platform) => {
+    const ticks = [];
+    const later = [];
+    const context = {
+      window: {},
+      document: { documentElement: { classList: { add() {} } } },
+      location: { reloads: 0, reload() { this.reloads += 1; } },
+      setInterval: (callback) => { ticks.push(callback); return ticks.length; },
+      clearInterval: (id) => { ticks[id - 1] = null; },
+      setTimeout: (callback) => { later.push(callback); },
+    };
+    runInNewContext(withDesktopShim(html, platform).match(/<script>([\s\S]*?)<\/script>/)[1], context);
+    return { desktop: context.window.clipboxDesktop, ticks, later, location: context.location };
+  };
+  assert.equal(run("darwin").desktop.installUpdate, undefined);
+  const { desktop, ticks, later, location } = run("win32");
+  const seen = [];
+  desktop.onUpdateProgress((progress) => seen.push(progress));
+  const done = desktop.installUpdate();
+  while (ticks[0]) ticks[0]();
+  assert.equal((await done).status, "installing");
+  assert.ok(seen.length > 10);
+  assert.ok(seen.every((p, i) => p.total === 5452595 && (i === 0 || p.received > seen[i - 1].received)));
+  assert.equal(seen.at(-1).received, 5452595);
+  later.forEach((callback) => callback());
+  assert.equal(location.reloads, 1);
 });
