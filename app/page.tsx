@@ -107,6 +107,8 @@ import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
+import { onRowAnimationEnd } from "./row-entrance";
+import { ListScrollFrame } from "./list-scroll-rail";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
 
 type VaultEnvelope = {
@@ -1362,7 +1364,10 @@ export default function Home() {
   }
 
   function togglePinned(item: SecretItem) {
-    void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) })).catch(() => setToast("收藏保存失败，请重试"));
+    void persistLazy((current) => {
+      prepareSortAnimation("card"); // starred cards sort first: slide the cards to their new places
+      return { ...current, items: current.items.map((value) => value.id === item.id ? { ...value, pinned: !value.pinned } : value) };
+    }).catch(() => setToast("收藏保存失败，请重试"));
   }
 
   function showImages() {
@@ -1741,7 +1746,7 @@ export default function Home() {
   const menuFolderCount = menuFolder ? activeKindItems.filter((item) => item.folder === menuFolder).length : 0;
 
   const legacyList = (
-            <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`}>
+            <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`} onAnimationEnd={onRowAnimationEnd}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
               {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
                 <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
@@ -1781,6 +1786,7 @@ export default function Home() {
                       </button>
                       {!isSnippet && !PLAIN_NOTES && <button type="button" className="native-reference" onClick={() => void copySecretReference(item)} aria-label={copiedReferenceId === item.id ? `已复制引用 ${item.label}` : `复制引用 ${item.label}`} title={copiedReferenceId === item.id ? "引用已复制" : "复制引用，发给其他任务"}><span className="reference-glyph" aria-hidden="true" /><span className="reference-check" aria-hidden="true">✓</span></button>}
                       <button type="button" className="native-copy" onClick={() => void copy(item)} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`} title={copiedId === item.id ? "已复制" : "复制"}><span className="copy-glyph" aria-hidden="true" /><span className="copy-check" aria-hidden="true">✓</span></button>
+                      {isSelected && isSnippet && <button type="button" className="ghost-button select-toggle row-collapse" onClick={collapseCards} aria-label="收起这条话术">收起</button>}
                       {isSelected && isSnippet && hasPreparedCopy(item) && item.snippetMeta?.chineseText?.trim() && <div className="copy-language row-language" role="group" aria-label="复制语言">
                         <button type="button" className={fillFor(item).language === "en" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "en" }))}>英文</button>
                         <button type="button" className={fillFor(item).language === "zh" ? "active" : ""} onClick={() => updateFill(item)((current) => ({ ...current, language: "zh" }))}>中文</button>
@@ -1857,7 +1863,7 @@ export default function Home() {
           <div className="mini-folders">{miniFolderTabs.length > 0 && <MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} />}</div>
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} selecting={false} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
-          {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch">
+          {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch" onAnimationEnd={onRowAnimationEnd}>
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
               return (
@@ -2007,7 +2013,7 @@ export default function Home() {
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>}
             {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} selecting={imageSelecting} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
-            {!imageView && !vaultPage && legacyList}
+            {!imageView && !vaultPage && <ListScrollFrame>{legacyList}</ListScrollFrame>}
             {bulkMode && <div className="bulk-bar" role="toolbar" aria-label="批量操作">
               <strong>已选 {bulkCount} 条</strong>
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>

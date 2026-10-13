@@ -176,8 +176,22 @@ button { -webkit-tap-highlight-color: transparent; }
 /* List */
 .native-list { flex: 1 1 auto; min-height: 0; padding: 0 10px 12px; display: flex; flex-direction: column; gap: 2px; overflow: auto; scrollbar-width: none; }
 .native-list::-webkit-scrollbar { display: none; }
+/* Frame around the 话术 / 账号 lists (app/list-scroll-rail.tsx): same place and size the list had, plus a shadow under
+   the header once the list is scrolled and a thin bar on the right. z-index 2 keeps both under the header's menus. */
+.list-frame { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; --depth-shade: rgba(31,30,28,.09); --depth-line: rgba(31,30,28,.07); --rail-thumb: rgba(31,30,28,.34); --rail-thumb-strong: rgba(31,30,28,.5); }
+.list-depth { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 10px; pointer-events: none; opacity: 0; background: linear-gradient(to bottom, var(--depth-line) 0, var(--depth-line) 1px, var(--depth-shade) 1px, transparent 100%); transition: opacity .15s ease-out; }
+.list-frame[data-scrolled] > .list-depth { opacity: 1; }
+.scroll-rail { position: absolute; top: 6px; bottom: 12px; right: 0; z-index: 2; width: 10px; visibility: hidden; touch-action: none; cursor: default; }
+.list-frame[data-overflow] > .scroll-rail { visibility: visible; }
+.scroll-rail-thumb { position: absolute; top: 0; right: 3px; width: 4px; min-height: 0; border-radius: 999px; background: var(--rail-thumb); opacity: .55; transition-property: opacity, width, right; transition-duration: .8s, .12s, .12s; transition-timing-function: ease-out; }
+.list-frame[data-active] .scroll-rail-thumb, .list-frame[data-dragging] .scroll-rail-thumb, .scroll-rail:hover .scroll-rail-thumb { opacity: 1; transition-duration: .15s, .12s, .12s; }
+.scroll-rail:hover .scroll-rail-thumb, .list-frame[data-dragging] .scroll-rail-thumb { right: 2px; width: 6px; background: var(--rail-thumb-strong); }
+@media (prefers-reduced-motion: reduce) { .list-depth, .scroll-rail-thumb { transition: none; } }
 .native-row { position: relative; flex: 0 0 auto; border-radius: 9px; opacity: 0; transform: translateY(6px); animation: row-in .26s cubic-bezier(.2,.75,.2,1) forwards; transition: background .14s, box-shadow .18s; }
 .native-row:nth-child(2) { animation-delay: .03s; } .native-row:nth-child(3) { animation-delay: .06s; } .native-row:nth-child(4) { animation-delay: .09s; } .native-row:nth-child(n+5) { animation-delay: .12s; }
+/* A row slides in once. data-entered is set on the DOM node when row-in ends (app/row-entrance.ts), so a row that React
+   moves (starred to the top, dropped after a drag) does not fade in again. Editing and dragging keep their own look. */
+.native-row[data-entered]:not(.editing):not(.dragging) { animation: none; opacity: 1; transform: none; }
 .row-line { height: 52px; padding: 0 8px 0 4px; display: flex; align-items: center; gap: 2px; }
 .secret-row .row-line { height: 44px; }
 .native-row:not(.selected):hover { background: var(--hover); }
@@ -611,6 +625,7 @@ button { -webkit-tap-highlight-color: transparent; }
   :root:not([data-theme="light"]) .dropdown, :root:not([data-theme="light"]) .product-filter-menu { background: var(--card); border-color: var(--line); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
   :root:not([data-theme="light"]) .dropdown button.danger:hover, :root:not([data-theme="light"]) .trash-permanent:hover { background: var(--danger-bg); }
   :root:not([data-theme="light"]) .native-row.selected { border-color: var(--line); }
+  :root:not([data-theme="light"]) .list-frame { --depth-shade: rgba(0,0,0,.3); --depth-line: rgba(0,0,0,.42); --rail-thumb: rgba(241,239,231,.26); --rail-thumb-strong: rgba(241,239,231,.42); }
   :root:not([data-theme="light"]) .native-row.editing { border-color: var(--accent); }
   :root:not([data-theme="light"]) .native-search input::placeholder { color: var(--muted); }
   :root:not([data-theme="light"]) .copied .native-copy, :root:not([data-theme="light"]) .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
@@ -634,6 +649,7 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .dropdown, :root[data-theme="dark"] .product-filter-menu { background: var(--card); border-color: var(--line); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
 :root[data-theme="dark"] .dropdown button.danger:hover, :root[data-theme="dark"] .trash-permanent:hover { background: var(--danger-bg); }
 :root[data-theme="dark"] .native-row.selected { border-color: var(--line); }
+:root[data-theme="dark"] .list-frame { --depth-shade: rgba(0,0,0,.3); --depth-line: rgba(0,0,0,.42); --rail-thumb: rgba(241,239,231,.26); --rail-thumb-strong: rgba(241,239,231,.42); }
 :root[data-theme="dark"] .native-row.editing { border-color: var(--accent); }
 :root[data-theme="dark"] .native-search input::placeholder { color: var(--muted); }
 :root[data-theme="dark"] .copied .native-copy, :root[data-theme="dark"] .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
@@ -1078,6 +1094,8 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .backup-warning{background:var(--warn-bg);color:var(--warn)}
 .backup-dialog.data-move .backup-intro,.backup-dialog.data-move .backup-note,.backup-dialog.data-move .backup-field{color:#5b5b60}.backup-dialog.data-move .backup-head p{color:#7a5a43}.backup-dialog.data-move:focus{outline:0}
 /* 英文/中文 sits in the card's top row, just left of the favourite star */
+/* 收起 on the open snippet card: the header 收起 look, at the 英文|中文 toggle's height, just left of it. */
+.row-line .row-collapse { height: 24px; flex: none; margin-left: 2px; padding: 0 8px 1px; border-radius: 7px; font-size: 12px; }
 .row-line .copy-language.row-language { width: auto; height: 24px; margin: 0 4px; padding: 2px; display: inline-flex; flex: none; border-radius: 8px; background: var(--fill); }
 .row-line .copy-language.row-language button { padding: 0 9px 1px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .row-line .copy-language.row-language button.active { background: var(--card); color: var(--ink); }
@@ -1161,7 +1179,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 
 .acct-row.selecting { grid-template-columns: auto minmax(0, 1fr); }
-.vault-inline + .bulk-bar, .vault-panel .bulk-bar { margin: 8px 0 0; }
+.vault-inline + .bulk-bar, .list-frame.vault-frame + .bulk-bar, .vault-panel .bulk-bar { margin: 8px 0 0; }
 
 .account-lock-recover { display: grid; gap: 6px; justify-items: center; }
 .account-lock-recover input { width: 100%; }
