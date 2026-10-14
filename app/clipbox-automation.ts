@@ -68,6 +68,31 @@ export function isAutomationReadAction(action: AutomationResult["action"]) {
   return action === "status" || action === "list" || action === "get" || action === "secret-get" || action === "secret-verify";
 }
 
+// Commands that hand out a 秘密 (its value, a yes/no about its value, or an encrypted copy of all of them). Any program
+// running as this user can reach the command line socket, so each of these waits for the person at the app to allow it,
+// and is refused at once while the 账号 page is locked.
+export type SecretAutomationAction = "secret-get" | "secret-verify" | "secret-export";
+// The app waits this long for 允许 / 拒绝, then refuses; the shell (automation.rs) waits a little longer for the answer.
+export const SECRET_CONSENT_MS = 45_000;
+
+export function secretAutomationAction(command: unknown): SecretAutomationAction | null {
+  const action = command && typeof command === "object" ? (command as { action?: unknown }).action : undefined;
+  return action === "secret-get" || action === "secret-verify" || action === "secret-export" ? action : null;
+}
+
+export function secretConsentQuestion(action: SecretAutomationAction) {
+  if (action === "secret-export") return "有程序想通过命令行导出全部秘密（加密备份）。";
+  if (action === "secret-verify") return "有程序想通过命令行核对一条秘密。";
+  return "有程序想通过命令行读取一条秘密。";
+}
+
+/** The answer sent back when a 秘密 command is not allowed, or null when the person said yes. */
+export function secretGateRefusal(state: { accountLocked: boolean; allowed: boolean }) {
+  if (state.accountLocked) return { code: "ACCOUNT_LOCKED", message: "账号已上锁，请先在 Copyboxx 里打开账号页并解锁" };
+  if (!state.allowed) return { code: "NOT_ALLOWED", message: "Copyboxx 里没有允许这次读取" };
+  return null;
+}
+
 export class AutomationCommandError extends Error {
   code: string;
 
