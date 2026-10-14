@@ -3,6 +3,7 @@
 mod ai;
 mod automation;
 mod backup;
+mod device_key;
 mod flush;
 // Windows only; elsewhere just the pure decision logic and its tests (D-046).
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -71,6 +72,8 @@ fn main() {
             backup::backup_image_list,
             backup::backup_image_read,
             backup::backup_image_prune,
+            device_key::device_key_get,
+            device_key::device_key_set,
             ai::ai_status,
             ai::ai_save,
             ai::ai_clear,
