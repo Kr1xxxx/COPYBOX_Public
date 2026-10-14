@@ -1,7 +1,11 @@
-// 每日 Tips: the small card above 回收站 in the sidebar shows one tip a day. The library is the built-in list below plus
-// tips read from the company tips file (TIPS_URL, off for now); one entry per local calendar day, in library order.
+// 每日小贴士: the small card above 回收站 in the sidebar shows one tip a day. The library is the company's sales tips
+// (app/company-tips.ts), then the built-in usage tips below, then tips read from the company tips file (TIPS_URL, off
+// for now); one entry per local calendar day, in library order.
+import { COMPANY_TIPS } from "./company-tips.ts";
 
-export type Tip = { id: string; title: string; text: string };
+// An example is a line to say (good, shown as a highlight block) or one not to say; source names where the data is from.
+export type TipExample = { good: boolean; text: string };
+export type Tip = { id: string; title: string; text: string; examples?: TipExample[]; source?: string };
 
 // What the person sees: plain Chinese about features that exist. No keyboard keys or shortcuts (D-005).
 export const BUILT_IN_TIPS: Tip[] = [
@@ -47,7 +51,9 @@ export const TIPS_URL = "";
 // Plain JSON in localStorage (not encrypted: tips are not personal data). The `clipbox.` prefix puts it in 完整备份.
 export const TIPS_KEY = "clipbox.tips.v1";
 
-export type TipsState = { version: 1; extra: Tip[]; shownId: string; shownDate: string; fetchedDate?: string };
+// companyFirst: the company tips were reached once, so a person who was in the middle of the usage tips when they
+// arrived jumps to the first company tip once and then moves on normally.
+export type TipsState = { version: 1; extra: Tip[]; shownId: string; shownDate: string; fetchedDate?: string; companyFirst?: true };
 
 const ID_MAX = 40;
 const TITLE_MAX = 12;
@@ -111,12 +117,19 @@ export function mergeTips(current: Tip[], incoming: Tip[]): Tip[] {
 }
 
 export function tipsLibrary(state: TipsState): Tip[] {
-  return mergeTips(BUILT_IN_TIPS, state.extra);
+  return mergeTips([...COMPANY_TIPS, ...BUILT_IN_TIPS], state.extra);
 }
 
-// The same tip all day; on a new day exactly one step further (after the last comes the first again).
+const isCompanyTip = (id: string) => COMPANY_TIPS.some((tip) => tip.id === id);
+
+// The same tip all day; on a new day exactly one step further (after the last comes the first again). The first time
+// company tips exist and have not been reached, the first of them shows at once, even on the same day.
 export function pickTipForDay(state: TipsState, today: string): { tip: Tip; state: TipsState } {
   const library = tipsLibrary(state);
+  if (COMPANY_TIPS.length && !state.companyFirst && !isCompanyTip(state.shownId)) {
+    const first = library[0];
+    return { tip: first, state: { ...state, shownId: first.id, shownDate: today, companyFirst: true } };
+  }
   const at = library.findIndex((tip) => tip.id === state.shownId);
   if (state.shownDate === today && at >= 0) return { tip: library[at], state };
   const next = library[at < 0 ? 0 : (at + 1) % library.length];
@@ -144,6 +157,7 @@ export function readTipsState(storage?: Pick<Storage, "getItem">): TipsState {
       shownDate: typeof data.shownDate === "string" && DAY.test(data.shownDate) ? data.shownDate : "",
     };
     if (typeof data.fetchedDate === "string" && DAY.test(data.fetchedDate)) state.fetchedDate = data.fetchedDate;
+    if (data.companyFirst === true) state.companyFirst = true;
     return state;
   } catch {
     return freshTipsState();

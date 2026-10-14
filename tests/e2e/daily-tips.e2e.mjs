@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { asDesktop, seedSnippets } from "./helpers.mjs";
 
-// The 每日 Tips card above 回收站 in the sidebar (app/daily-tips-card.tsx).
+// The 每日小贴士 card above 回收站 in the sidebar (app/daily-tips-card.tsx).
 const card = (page) => page.locator(".sidebar .daily-tips");
 const trashButton = (page) => page.locator(".sidebar .nav-footer").getByRole("button", { name: /^回收站/ });
 
 async function expectAboveTrash(page) {
   await expect(card(page)).toBeVisible();
-  await expect(card(page)).toContainText("每日 Tips");
+  await expect(card(page)).toContainText("每日小贴士");
   await expect(page.locator(".sidebar .daily-tips-title")).not.toHaveText("");
   await expect.poll(async () => {
     const [tip, trash] = await Promise.all([card(page).boundingBox(), trashButton(page).boundingBox()]);
@@ -46,7 +46,7 @@ test("clicking the card shows the whole tip; 知道了 and Esc close it and focu
   await card(page).click();
   const dialog = page.getByRole("dialog", { name: title });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("每日 Tips");
+  await expect(dialog).toContainText("每日小贴士");
   await expect(dialog.getByRole("heading", { name: title })).toBeVisible();
   const text = (await dialog.locator(".tips-text").textContent()).trim();
   expect(text.length).toBeGreaterThan(0);
@@ -83,7 +83,7 @@ test("a new day moves to the next tip", async ({ page }) => {
     try {
       if (!sessionStorage.getItem("tips-seeded")) {
         sessionStorage.setItem("tips-seeded", "1");
-        localStorage.setItem("clipbox.tips.v1", JSON.stringify({ version: 1, extra: [], shownId: "T-001", shownDate: "2000-01-01" }));
+        localStorage.setItem("clipbox.tips.v1", JSON.stringify({ version: 1, extra: [], shownId: "T-001", shownDate: "2000-01-01", companyFirst: true }));
       }
     } catch { /* optional */ }
   });
@@ -91,4 +91,40 @@ test("a new day moves to the next tip", async ({ page }) => {
   await page.waitForSelector(".app-shell");
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.tips.v1") || "{}").shownId)).toBe("T-002");
   await expect(page.locator(".daily-tips-title")).toHaveText("拼音也能搜");
+});
+
+async function seedTips(page, state) {
+  await page.addInitScript((value) => {
+    try {
+      if (!sessionStorage.getItem("tips-seeded")) {
+        sessionStorage.setItem("tips-seeded", "1");
+        localStorage.setItem("clipbox.tips.v1", JSON.stringify(value));
+      }
+    } catch { /* optional */ }
+  }, state);
+}
+
+test("someone in the middle of the usage tips sees the first company tip right away", async ({ page }) => {
+  await seedTips(page, { version: 1, extra: [], shownId: "T-012", shownDate: "2000-01-01" });
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await expect(page.locator(".daily-tips-title")).toHaveText("拿不准就叫 lovely");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.tips.v1") || "{}"))).toMatchObject({ shownId: "C-001", companyFirst: true });
+});
+
+test("a company tip shows the right way as a highlight block, the wrong way struck through, and its source", async ({ page }) => {
+  await seedTips(page, { version: 1, extra: [], shownId: "C-007", shownDate: "2000-01-01", companyFirst: true });
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await expect(page.locator(".daily-tips-title")).toHaveText("结尾问一个好回答的问题");
+  await card(page).click();
+  const dialog = page.getByRole("dialog", { name: "结尾问一个好回答的问题" });
+  await expect(dialog.locator(".tips-text")).toContainText("867 个会话");
+  await expect(dialog.locator(".tips-good")).toHaveText(["What curl & thickness do you usually use?"]);
+  await expect(dialog.locator(".tips-bad s")).toHaveText(["If you have any needs, please feel free to contact me."]);
+  await expect(dialog.locator(".tips-source")).toHaveText("来源: 根据 2026 年阿里对话数据");
+  await expect(dialog).not.toContainText("✅");
+  await expect(dialog).not.toContainText("❌");
+  await page.setViewportSize({ width: 680, height: 620 });
+  await page.screenshot({ path: test.info().outputPath("company-tip.png") });
 });
