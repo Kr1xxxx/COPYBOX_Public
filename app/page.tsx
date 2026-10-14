@@ -4,7 +4,7 @@ import { ArcToast } from "./arc/arc-toast";
 import { useToast } from "./use-toast";
 import { buildCardMoveMap, countItemsByFolder, undoItemSave, type ItemSaveRecord } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
 import {
   canReorderCards,
@@ -90,6 +90,8 @@ import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image
 import { ArcSegmented } from "./arc/segmented";
 import { type LockMode, isAccountLockSet, lockMode } from "./account-lock";
 import { AccountLockScreen } from "./account-lock-ui";
+import { AccountVeil } from "./account-veil";
+import { readSlideUnlockOn, writeSlideUnlockOn } from "./slide-unlock";
 import { AccountPage, type AddRequest } from "./account-page";
 import { countByKind, useAccountEntries, type LegacySecret } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
@@ -433,12 +435,22 @@ export default function Home() {
   const [acctFolded, setAcctFolded] = useState(false);
   const accountLocked = lockSet && !(accountMode && accountUnlocked);
   const lockedHere = accountMode && lockSet && !accountUnlocked;
+  // 账号 slide-to-unlock (D-050): frosted until slid open; closes again on leaving the section or when the window hides.
+  // The 账号页密码 screen, when set, is the only gate. The mini window is left as it was.
+  const [slideUnlockOn, setSlideUnlockOn] = useState(() => typeof window === "undefined" || readSlideUnlockOn());
+  const [accountSlidOpen, setAccountSlidOpen] = useState(false);
   // Leaving the 账号 section locks it again (state adjusted while rendering, not in an effect).
   const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
   if (seenAccountMode !== accountMode) {
     setSeenAccountMode(accountMode);
-    if (!accountMode) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); }
+    if (!accountMode) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); setAccountSlidOpen(false); }
   }
+  const accountVeiled = accountMode && windowMode === "full" && slideUnlockOn && !lockSet && !accountSlidOpen;
+  useEffect(() => {
+    const onVisibility = () => { if (document.visibilityState === "hidden") setAccountSlidOpen(false); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
@@ -1037,6 +1049,7 @@ export default function Home() {
       return;
     }
     if (lockedHere) return;
+    if (accountVeiled && event.key === "Enter") return;
     if (event.key === "ArrowDown") { event.preventDefault(); moveSelection((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
     if (event.key === "ArrowUp") { event.preventDefault(); moveSelection((value) => Math.max(0, value - 1)); }
     if (event.key === "Enter" && activeFolder !== "trash" && !(accountMode && activeFolder === "all" && vaultCat !== "other") && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
@@ -1785,6 +1798,8 @@ export default function Home() {
     : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder])), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
+  // The 账号 section's content goes inside the veil (it stays mounted, so sliding open shows it at once); other sections are left as they are.
+  const wrapAccountVeil = (content: ReactNode) => (accountMode && slideUnlockOn ? <AccountVeil veiled={accountVeiled} onUnlock={() => setAccountSlidOpen(true)}>{content}</AccountVeil> : content);
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = (
@@ -2098,7 +2113,7 @@ export default function Home() {
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
                 : <>
                   {vaultPage
-                    ? activeFolder !== "trash" && !lockedHere && <span className="add-menu-wrap">
+                    ? activeFolder !== "trash" && !lockedHere && !accountVeiled && <span className="add-menu-wrap">
                       <button type="button" className="primary-button add-button" aria-label="新增条目" aria-haspopup={addAsksType ? "menu" : undefined} aria-expanded={addAsksType ? addMenuOpen : undefined}
                         onClick={() => { if (addAsksType) setAddMenuOpen((open) => !open); else addAccount(vaultCat as EntryKind); }}><Icon name="plus" />新增</button>
                       {addMenuOpen && addAsksType && <>
@@ -2108,17 +2123,17 @@ export default function Home() {
                         </div>
                       </>}
                     </span>
-                    : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+                    : canAddItemInFolder(activeFolder) && !accountVeiled && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
                 </>}
               {/* Only a desktop shell (or the web preview's stand-in) can keep the window on top; a plain browser tab gets no button. */}
               {typeof window !== "undefined" && window.clipboxDesktop?.setPinned && <button type="button" className={`icon-button pin-on-top${pinOnTop ? " active" : ""}`} onClick={togglePinOnTop} aria-pressed={pinOnTop} aria-label={pinOnTop ? "取消固定" : "固定在最上层"} title={pinOnTop ? "取消固定" : "固定在最上层"}><Icon name="pin" filled={pinOnTop} /></button>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
-            {lockedHere ? <AccountLockScreen deviceKey={deviceKey} onUnlock={(key) => { setAccountSecret(key ?? deviceKey); setAccountUnlocked(true); }} /> : <>
+            {lockedHere ? <AccountLockScreen deviceKey={deviceKey} onUnlock={(key) => { setAccountSecret(key ?? deviceKey); setAccountUnlocked(true); }} /> : wrapAccountVeil(<>
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
-                {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
-                {activeFolder !== "trash" && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
+                {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
+                {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
                 <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
               <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
@@ -2143,7 +2158,7 @@ export default function Home() {
                 options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
               />}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
-              {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
+              {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
                 <AnimatePresence>{productMenuOpen && <ArcMenu className="product-filter-menu">
@@ -2170,7 +2185,7 @@ export default function Home() {
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>
             </div>}
-            </>}
+            </>)}
           </section>
         </>}
       </section>
@@ -2235,7 +2250,8 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
-        accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}
+        slideUnlock={{ on: slideUnlockOn, onChange: (on) => { writeSlideUnlockOn(on); setSlideUnlockOn(on); } }}
+        accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { if (mode === "none" && accountMode) setAccountSlidOpen(true); setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}
         accountLocked={accountLocked}
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}
         onImportSheet={() => { setSettingsOpen(false); spreadsheetFileRef.current?.click(); }}

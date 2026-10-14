@@ -5,9 +5,16 @@ export const SAMPLE_CSV = fileURLToPath(new URL("../../docs/samples/clipbox-test
 // The first-run guide (app/first-run-guide.tsx) covers the window on a fresh start. playwright.config.mjs starts every
 // test with it already seen (this storage state); a test about the guide uses `test.use({ storageState: GUIDE_UNSEEN })`.
 export const FIRST_RUN_GUIDE_KEY = "clipbox.first-run-guide.v1";
-export function guideSeenState(baseURL) {
-  return { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: FIRST_RUN_GUIDE_KEY, value: "1" }] }] };
+// The 账号 page is frosted until slid open (D-050, on by default). The shared state turns that off, so tests about the
+// 账号 content reach it at once; tests about the slide itself use `test.use({ storageState: SLIDE_UNLOCK_ON })`.
+export const SLIDE_UNLOCK_KEY = "clipbox.account-slide-unlock.v1";
+export function guideSeenState(baseURL, { slideUnlock = false } = {}) {
+  const localStorage = [{ name: FIRST_RUN_GUIDE_KEY, value: "1" }];
+  if (!slideUnlock) localStorage.push({ name: SLIDE_UNLOCK_KEY, value: "0" });
+  return { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage }] };
 }
+// Guide seen, slide unlock left at its default (on), as on a real install.
+export const SLIDE_UNLOCK_ON = async ({ baseURL }, use) => { await use(guideSeenState(baseURL, { slideUnlock: true })); };
 export const GUIDE_UNSEEN = { cookies: [], origins: [] };
 
 // Imports the 37-row sample sheet (2 invalid rows, 1 duplicate) → 34 snippets.

@@ -13,7 +13,8 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
-    // Tests start with the first-run guide already seen; tests/e2e/first-run-guide.e2e.mjs turns this off.
+    // Tests start with the first-run guide already seen and the 账号 slide unlock off (helpers.mjs);
+    // tests/e2e/first-run-guide.e2e.mjs and account-slide-unlock.e2e.mjs use their own state.
     storageState: guideSeenState(baseURL),
     viewport: { width: 680, height: 620 },
     locale: "zh-CN",
