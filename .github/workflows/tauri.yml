@@ -70,9 +70,15 @@ jobs:
       # A .app uploaded as an artifact loses its executable bits, so the Mac build is zipped with ditto first.
       # File names follow the product name (D-046), ASCII only (GitHub mangles Chinese asset names); the website picks
       # the newest tauri-test-N asset ending in -Windows-setup.exe (tools/website/build.mjs).
+      # release-version.json (D-048) says which app version the installer carries (package.json after sync-version),
+      # which preview number that is, and which branch and commit it came from; the website reads the version it
+      # advertises from this file, never from its own checkout. Test builds are published from main only.
       - name: Name the test installers
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build && github.ref == 'refs/heads/main'
         shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
           mkdir release-files
           if [ "$RUNNER_OS" = "Windows" ]; then
@@ -80,17 +86,28 @@ jobs:
           else
             ditto -c -k --keepParent src-tauri/target/release/bundle/macos/Copyboxx.app "release-files/Copyboxx-macOS-arm64.zip"
           fi
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); fs.writeFileSync('release-files/release-version.json', JSON.stringify({ version: pkg.version, preview: fs.readFileSync('tools/preview/VERSION', 'utf8').trim(), ref: process.env.REF_NAME, commit: process.env.SHA }, null, 2) + '\n');"
+          cat release-files/release-version.json
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build && github.ref == 'refs/heads/main'
         with:
           name: release-${{ matrix.name }}
           path: release-files/*
           retention-days: 7
 
+  # D-048: a test build becomes a release (and so the website's installer) only when it was built from main.
+  publish-skipped:
+    name: test build not published
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::warning::Test builds are published from main only (D-048); nothing was published from ${{ github.ref_name }}. The installers are still in this run's artifacts."
+
   test-release:
     name: publish test build
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
