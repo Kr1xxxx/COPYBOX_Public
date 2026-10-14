@@ -13,7 +13,7 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
 | `/download/Copyboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`), built from `main` (D-048) |
-| `/download/latest.json` | `{ version, notes, url, size, sha256, updatedAt }`, same shape as the desktop update check (D-023); the Windows app reads it (D-047). `version` is the installer's own, from the release's `release-version.json` (D-048) |
+| `/download/latest.json` | `{ version, notes, url, size, sha256, signature, updatedAt }`, same shape as the desktop update check (D-023); the Windows app reads it (D-047). `version` is the installer's own, from the release's `release-version.json` (D-048). `signature` is the release's `Copyboxx-Windows-setup.exe.sig`, checked against `src-tauri/update-public-key.txt` before it is written (D-053); apps that check signatures offer nothing without it |
 | `/assets/site.<hash>.css` | The stylesheet; its name carries the first 8 hex of its sha256, so a changed file gets a new name |
 | `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/og-image.png` | Icons and the share card, copied from `icons/` |
 | `/images/*.png` | App screenshots (`app-win-light.png`, `app-win-dark.png`), copied from `images/` |

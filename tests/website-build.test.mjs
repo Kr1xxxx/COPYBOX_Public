@@ -23,6 +23,7 @@ import {
 } from "../tools/website/build.mjs";
 import { parseKeyList, staleKeys } from "../tools/website/deploy.mjs";
 import { appVersionFrom } from "../scripts/sync-version.mjs";
+import { generateKey, parseSecretKey, signBytes, trustedComment } from "../tools/update-signing.mjs";
 
 // The app version a local installer is declared to carry (D-048): the checkout's preview number, so the fake
 // installer below matches the changelog entry the build looks up.
@@ -31,12 +32,20 @@ const localInstallerVersion = appVersionFrom(readFileSync("tools/preview/VERSION
 const pageKeys = ["index.html", "download/index.html", "help/index.html", "privacy/index.html"];
 const allPageKeys = [...pageKeys, "404.html"];
 
+// A throwaway signing key for the fake installer (D-053); the build checks it against --public-key.
+const testKey = generateKey("website-test-password");
+const testSecret = parseSecretKey(testKey.secret, "website-test-password");
+
 // Builds into a temp dir with a fake installer. Placeholder icons and screenshots are written unless
-// `assets` is false, in which case --icons and --images point at folders that do not exist.
-async function buildSite({ assets = true } = {}) {
+// `assets` is false, in which case --icons and --images point at folders that do not exist. `signature` is the .sig
+// text to pass (true: a good one; false: none).
+async function buildSite({ assets = true, signature = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "clipbox-website-"));
   const installer = Buffer.concat([Buffer.from("MZ"), Buffer.alloc(4096, 7)]);
   writeFileSync(join(dir, "setup.exe"), installer);
+  writeFileSync(join(dir, "update.pub"), testKey.public);
+  const sigText = signature === true ? signBytes(installer, testSecret, trustedComment(localInstallerVersion, "Copyboxx-Windows-setup.exe")) : signature;
+  if (sigText) writeFileSync(join(dir, "setup.exe.sig"), sigText);
   const icons = join(dir, "icons");
   const images = join(dir, "images");
   if (assets) {
@@ -51,13 +60,16 @@ async function buildSite({ assets = true } = {}) {
   console.log = () => {};
   console.warn = (...args) => warnings.push(args.join(" "));
   try {
-    await main(["--installer", join(dir, "setup.exe"), "--installer-version", localInstallerVersion, "--out", out, "--icons", icons, "--images", images]);
+    await main([
+      "--installer", join(dir, "setup.exe"), "--installer-version", localInstallerVersion, "--out", out, "--icons", icons, "--images", images,
+      "--public-key", join(dir, "update.pub"), ...(sigText ? ["--signature", join(dir, "setup.exe.sig")] : []),
+    ]);
   } finally {
     console.log = log;
     console.warn = warn;
   }
   const read = (key) => readFileSync(join(out, key), "utf8");
-  return { dir, out, installer, warnings, read };
+  return { dir, out, installer, warnings, read, sigText };
 }
 
 let site;
@@ -110,6 +122,7 @@ test("website build writes every page, the stylesheet, icons, images, installer 
   for (const name of imageFiles) assert.equal(read(`images/${name}`), `image ${name}`);
   const latest = JSON.parse(read("download/latest.json"));
   assert.match(latest.version, /^\d+\.\d+\.0$/);
+  assert.equal(latest.signature, site.sigText);
   assert.equal(latest.url, "https://copyboxx.com/download/Copyboxx-Setup.exe");
   assert.equal(latest.size, installer.length);
   assert.equal(latest.sha256, createHash("sha256").update(installer).digest("hex"));
@@ -298,6 +311,24 @@ test("website 404 page", () => {
   assert.match(notFound, /<a class="pill" href="\/">回到首页<\/a>/);
 });
 
+test("website build: the installer's signature is checked and copied into latest.json (D-053)", async () => {
+  // No signature: built with a warning, and latest.json carries none (apps that check offer nothing).
+  const unsigned = await buildSite({ signature: false });
+  try {
+    assert.equal(unsigned.warnings.length, 1);
+    assert.match(unsigned.warnings[0], /has no signature/);
+    assert.equal("signature" in JSON.parse(unsigned.read("download/latest.json")), false);
+  } finally {
+    rmSync(unsigned.dir, { recursive: true, force: true });
+  }
+  // A signature made with another key, for another version or of other bytes stops the build.
+  const otherSecret = parseSecretKey(generateKey("website-test-password").secret, "website-test-password");
+  const installer = Buffer.concat([Buffer.from("MZ"), Buffer.alloc(4096, 7)]);
+  await assert.rejects(buildSite({ signature: signBytes(installer, otherSecret, trustedComment(localInstallerVersion, "x.exe")) }), /another key/);
+  await assert.rejects(buildSite({ signature: signBytes(installer, testSecret, trustedComment("0.0.1", "x.exe")) }), /for version 0\.0\.1/);
+  await assert.rejects(buildSite({ signature: signBytes(Buffer.from("MZ other"), testSecret, trustedComment(localInstallerVersion, "x.exe")) }), /does not match the installer/);
+});
+
 test("website installer: the newest tauri-test release with a Windows asset wins", () => {
   const win = (name) => ({ name, url: `https://api.github.com/assets/${name}` });
   const releases = [
@@ -306,16 +337,21 @@ test("website installer: the newest tauri-test release with a Windows asset wins
     { tag_name: "tauri-test-91", published_at: "2026-10-11T09:00:00Z", assets: [win("Clipbox-Tauri-test-Windows-setup.exe")] },
     { tag_name: "tauri-test-92", published_at: "2026-10-12T09:00:00Z", assets: [win("Clipboxx-Tauri-test-Windows-setup.exe")] },
   ];
-  const { release, asset, versionAsset } = pickInstaller(releases);
+  const { release, asset, versionAsset, signatureAsset } = pickInstaller(releases);
   assert.equal(release.tag_name, "tauri-test-92");
   assert.equal(asset.name, "Clipboxx-Tauri-test-Windows-setup.exe");
   assert.equal(versionAsset, undefined, "older releases carry no version file");
+  assert.equal(signatureAsset, undefined, "older releases carry no signature");
   // D-046: release assets are now Copyboxx-Windows-setup.exe; the newest release still wins whatever its name.
   // D-048: it also carries release-version.json, which the build reads for the version it advertises.
   const renamed = { tag_name: "tauri-test-94", published_at: "2026-10-14T09:00:00Z", assets: [win("Copyboxx-macOS-arm64.zip"), win("Copyboxx-Windows-setup.exe"), win(versionAssetName)] };
   const newest = pickInstaller([...releases, renamed]);
   assert.equal(newest.asset.name, "Copyboxx-Windows-setup.exe");
   assert.equal(newest.versionAsset.name, "release-version.json");
+  assert.equal(newest.signatureAsset, undefined);
+  // D-053: signed releases also carry Copyboxx-Windows-setup.exe.sig, which goes into latest.json.
+  const signed = { ...renamed, tag_name: "tauri-test-95", published_at: "2026-10-15T09:00:00Z", assets: [...renamed.assets, win("Copyboxx-macOS-arm64.zip.sig"), win("Copyboxx-Windows-setup.exe.sig")] };
+  assert.equal(pickInstaller([...releases, renamed, signed]).signatureAsset.name, "Copyboxx-Windows-setup.exe.sig");
   assert.throws(() => pickInstaller([releases[0], releases[1]]), /No tauri-test release/);
   assert.throws(() => pickInstaller([]), /No tauri-test release/);
 });
@@ -349,6 +385,7 @@ test("website latest.json has the update-check shape plus size and checksum", ()
     sha256: "ab",
     updatedAt: "2026-10-13T19:56:00+08:00",
   });
+  assert.equal(latestJson({ version: "1.80.0", size: 1, sha256: "a", signature: "sig", updatedAt: "x" }).signature, "sig");
   // The installer's own app version is taken as it is (D-048); anything that is not a version stops the build.
   assert.equal(latestJson({ version: "1.70.0", size: 1, sha256: "a", updatedAt: "x" }).version, "1.70.0");
   assert.throws(() => latestJson({ version: "latest", size: 1, sha256: "a", updatedAt: "x" }), /needs an app version like 1\.67\.0/);

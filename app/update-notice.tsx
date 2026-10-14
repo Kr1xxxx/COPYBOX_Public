@@ -23,6 +23,7 @@ export function updateErrorText(reason: string) {
     case "disk": return "电脑上存不下安装文件";
     case "start": return "安装程序没能打开";
     case "unavailable": return "这个版本请去网站下载";
+    case "signature": return "安装包不是官方发布的，为了安全没有安装";
     default: return "出了点问题";
   }
 }
@@ -113,6 +114,19 @@ export function UpdateNotice() {
             </span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // A file that is not ours (D-053): no retry and no website link, since the website may be what was tampered with.
+  if (phase.kind === "error" && phase.reason === "signature") {
+    return (
+      <div className="update-banner update-banner-error" role="status" data-phase="error">
+        <div className="update-text">
+          <strong>更新没成功：{updateErrorText(phase.reason)}</strong>
+          <span>已经删掉，现在的版本照常能用。请告诉管理员。</span>
+        </div>
+        <button type="button" className="ghost-button" onClick={later}>知道了</button>
       </div>
     );
   }

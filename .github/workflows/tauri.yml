@@ -122,9 +122,42 @@ jobs:
     steps:
       - run: echo "::warning::Test builds are published from main only (D-048); nothing was published from ${{ github.ref_name }}. The installers are still in this run's artifacts."
 
+  # D-053: the Windows installer is signed here, in a job of its own, so the key never reaches the build machines or
+  # a pull request. The secrets UPDATE_SIGNING_KEY and UPDATE_SIGNING_PASSWORD live only in the environment
+  # `update-signing`, which only main may use (its deployment branch rule); a run without them fails and publishes
+  # nothing. The signature is checked against src-tauri/update-public-key.txt, the key the app is built with.
+  sign-update:
+    name: sign Windows installer
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: update-signing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-Windows
+          path: release-files
+      - name: Sign
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          UPDATE_SIGNING_PASSWORD: ${{ secrets.UPDATE_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then echo "::error::UPDATE_SIGNING_KEY is not set in the update-signing environment (D-053)."; exit 1; fi
+          version=$(node -p "JSON.parse(require('fs').readFileSync('release-files/release-version.json', 'utf8')).version")
+          node tools/update-signing.mjs sign --version "$version" release-files/Copyboxx-Windows-setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-signature
+          path: release-files/Copyboxx-Windows-setup.exe.sig
+          retention-days: 7
+
   test-release:
     name: publish test build
-    needs: build
+    needs: [build, sign-update]
     if: github.event_name == 'workflow_dispatch' && inputs.publish_test_build && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

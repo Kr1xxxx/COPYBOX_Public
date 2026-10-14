@@ -1,5 +1,6 @@
 // Builds the public website for copyboxx.com (see README.md):
-//   node tools/website/build.mjs [--installer <file>] [--out <dir>] [--icons <dir>] [--images <dir>]
+//   node tools/website/build.mjs [--installer <file> [--installer-version X] [--signature <file.sig>]] [--out <dir>]
+//     [--icons <dir>] [--images <dir>] [--public-key <file>]
 // Defaults: --out dist-website (relative to the repo root), --icons tools/website/icons,
 // --images tools/website/images. Without --installer the newest tauri-test-N Windows installer is downloaded from
 // GitHub Releases (GITHUB_TOKEN or GH_TOKEN is sent when set; the repo is private). In the Claude cloud environment
@@ -7,6 +8,8 @@
 // Every page is partials/head.html + partials/header.html (current nav item marked) + its body + partials/footer.html;
 // the stylesheet becomes assets/site.<hash>.css. Besides the site files it writes kv-bulk.json and manifest.json,
 // which deploy.mjs uploads to KV for worker.mjs.
+// D-053: the release's <installer>.sig (or --signature) is checked against the app's public key
+// (src-tauri/update-public-key.txt, or --public-key) and copied into latest.json; a bad signature stops the build.
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -14,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { previewBuildInfo } from "../preview/build.mjs";
 import { appVersionFrom } from "../../scripts/sync-version.mjs";
 import { contentTypeFor } from "./worker.mjs";
+import { checkInstallerSignature, publicKeyPath } from "../update-signing.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "../..");
@@ -147,7 +151,8 @@ function copyFolder(from, to, expected, label) {
 }
 
 // The newest (by published_at) tauri-test-N release that carries a Windows setup asset; returns
-// { release, asset, versionAsset } (versionAsset is the release-version.json asset, undefined on older releases).
+// { release, asset, versionAsset, signatureAsset } (versionAsset is the release-version.json asset, signatureAsset the
+// installer's .sig (D-053); each is undefined on older releases).
 export function pickInstaller(releases) {
   const candidates = (Array.isArray(releases) ? releases : [])
     .filter((release) => String(release?.tag_name ?? "").startsWith("tauri-test-"))
@@ -156,6 +161,7 @@ export function pickInstaller(releases) {
       asset: (release.assets ?? []).find((a) => String(a?.name ?? "").endsWith("-Windows-setup.exe")),
       versionAsset: (release.assets ?? []).find((a) => String(a?.name ?? "") === versionAssetName),
     }))
+    .map((entry) => ({ ...entry, signatureAsset: entry.asset && (entry.release.assets ?? []).find((a) => String(a?.name ?? "") === `${entry.asset.name}.sig`) }))
     .filter((entry) => entry.asset)
     .sort((a, b) => Date.parse(b.release.published_at ?? 0) - Date.parse(a.release.published_at ?? 0));
   if (!candidates.length) throw new Error("No tauri-test release with a Windows installer was found on GitHub.");
@@ -183,7 +189,8 @@ export function formatSize(bytes) {
   return `${(Number(bytes) / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// download/latest.json: the { version, notes, url } shape of the desktop update check (D-023), plus size and checksum.
+// download/latest.json: the { version, notes, url } shape of the desktop update check (D-023), plus size and checksum,
+// and the installer's minisign signature when there is one (D-053; apps from then on offer nothing without it).
 // info.version is the installer's app version ("1.65.0"); a bare preview number ("1.65") is widened to it.
 export function latestJson(info) {
   const given = String(info.version ?? "").trim();
@@ -195,6 +202,7 @@ export function latestJson(info) {
     url: `${siteUrl}/${installerPath}`,
     size: info.size,
     sha256: info.sha256,
+    ...(info.signature ? { signature: info.signature } : {}),
     updatedAt: info.updatedAt,
   };
 }
@@ -236,7 +244,7 @@ async function downloadInstaller() {
   if (token) headers.Authorization = `Bearer ${token}`;
   const list = await fetch(releasesApi, { headers });
   if (!list.ok) throw new Error(`GitHub releases could not be listed (HTTP ${list.status}). Set GITHUB_TOKEN or pass --installer.`);
-  const { release, asset, versionAsset } = pickInstaller(await list.json());
+  const { release, asset, versionAsset, signatureAsset } = pickInstaller(await list.json());
   console.log(`installer ${release.tag_name} ${asset.name}`);
   if (!versionAsset) throw new Error(`${release.tag_name} carries no ${versionAssetName}: publish a new test build from main first (the Tauri workflow writes it, D-048).`);
   const binary = { ...headers, Accept: "application/octet-stream" };
@@ -246,7 +254,13 @@ async function downloadInstaller() {
   console.log(`installer version ${info.version} (preview ${info.preview}, commit ${info.commit || "?"})`);
   const file = await fetch(asset.url, { headers: binary });
   if (!file.ok) throw new Error(`Installer download failed (HTTP ${file.status}).`);
-  return { installer: Buffer.from(await file.arrayBuffer()), info };
+  let signature = "";
+  if (signatureAsset) {
+    const sig = await fetch(signatureAsset.url, { headers: binary });
+    if (!sig.ok) throw new Error(`${signatureAsset.name} download failed (HTTP ${sig.status}).`);
+    signature = await sig.text();
+  }
+  return { installer: Buffer.from(await file.arrayBuffer()), info, signature };
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -255,6 +269,8 @@ export async function main(argv = process.argv.slice(2)) {
   const images = resolve(repo, option(argv, "--images", join(here, "images")));
   const installerArg = option(argv, "--installer", "");
   const installerVersionArg = option(argv, "--installer-version", "");
+  const signatureArg = option(argv, "--signature", "");
+  const publicKeyArg = resolve(repo, option(argv, "--public-key", publicKeyPath));
   // The preview number of this checkout (tools/preview/VERSION): the update date and the fallback version.
   const version = readFileSync(join(previewDir, "VERSION"), "utf8").trim();
   // The installer the site serves, and the version it really carries (D-048): from the release's own
@@ -262,7 +278,9 @@ export async function main(argv = process.argv.slice(2)) {
   // checkout's number, with a warning, because then nobody can check it.
   let installer;
   let installed;
+  let signature = "";
   if (installerArg) {
+    if (signatureArg) signature = readFileSync(resolve(repo, signatureArg), "utf8");
     installer = readFileSync(resolve(repo, installerArg));
     if (installerVersionArg) {
       if (!APP_VERSION.test(installerVersionArg)) throw new Error(`--installer-version needs an app version like 1.67.0, got "${installerVersionArg}".`);
@@ -272,9 +290,16 @@ export async function main(argv = process.argv.slice(2)) {
       console.warn(`warning: --installer without --installer-version: latest.json will say ${installed.version} (tools/preview/VERSION); make sure that is the version inside ${installerArg}.`);
     }
   } else {
-    ({ installer, info: installed } = await downloadInstaller());
+    ({ installer, info: installed, signature } = await downloadInstaller());
   }
   if (installer.length < 2 || installer[0] !== 0x4d || installer[1] !== 0x5a) throw new Error("The installer is not a Windows program (it does not start with MZ).");
+  // D-053: a signature that does not fit this installer and version stops the build; none at all only warns, because
+  // installers published before signing still have to be served to the apps that do not check yet.
+  if (signature) {
+    checkInstallerSignature(installer, signature, installed.version, readFileSync(publicKeyArg, "utf8"));
+  } else {
+    console.warn(`warning: the installer ${installed.version} has no signature: apps that check signatures (D-053) will not offer it.`);
+  }
   if (installed.preview !== version) console.warn(`warning: this checkout is preview ${version} but the installer is ${installed.version}; the pages and latest.json follow the installer.`);
 
   const changelog = JSON.parse(readFileSync(join(previewDir, "changelog.json"), "utf8"));
@@ -294,7 +319,7 @@ export async function main(argv = process.argv.slice(2)) {
     key: page.key,
     html: assemblePage(page, { ...parts, body: readFileSync(join(here, page.source), "utf8") }, pageInfo, extra),
   }));
-  const latest = latestJson({ version: installed.version, notes, size, sha256, updatedAt: info.updatedAt });
+  const latest = latestJson({ version: installed.version, notes, size, sha256, signature, updatedAt: info.updatedAt });
 
   rmSync(out, { recursive: true, force: true });
   mkdirSync(join(out, "download"), { recursive: true });
@@ -322,6 +347,7 @@ export async function main(argv = process.argv.slice(2)) {
   console.log("version", latest.version);
   console.log("size", `${size} bytes (${formatSize(size)})`);
   console.log("sha256", sha256);
+  console.log("signature", signature ? "ok" : "none");
   console.log("css", cssKey);
   console.log("kv keys", entries.length);
   return { out, latest };

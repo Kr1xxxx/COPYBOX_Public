@@ -116,3 +116,19 @@ test("a version the shell cannot install itself keeps 下载", async ({ page }) 
   await banner.getByRole("button", { name: "下载" }).click();
   expect(await page.evaluate(() => window.__opened)).toBe(1);
 });
+
+test("an installer that is not ours is refused without 重试 or 去网站下载", async ({ page }) => {
+  await withUpdate(page, available, "win32", { install: true });
+  await seedSnippets(page);
+  const banner = page.locator(".update-banner");
+  await banner.getByRole("button", { name: "立即更新" }).click();
+  await page.evaluate(() => window.__finish({ status: "error", reason: "signature" }));
+  await expect(banner).toContainText("更新没成功：安装包不是官方发布的，为了安全没有安装");
+  await expect(banner).toContainText("现在的版本照常能用");
+  // Retrying would fetch the same file, and the website may be what was tampered with.
+  await expect(banner.getByRole("button", { name: "重试" })).toHaveCount(0);
+  await expect(banner.getByRole("button", { name: "去网站下载" })).toHaveCount(0);
+  await banner.getByRole("button", { name: "知道了" }).click();
+  await expect(banner).toHaveCount(0);
+  expect(await page.evaluate(() => window.__opened)).toBe(0);
+});

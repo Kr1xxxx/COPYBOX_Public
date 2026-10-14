@@ -5,7 +5,7 @@ export type UpdateInfo = { status: "disabled" | "current" | "error" } | { status
 
 export type UpdateInstallResult =
   | { status: "installing" | "busy" }
-  | { status: "error"; reason: "network" | "incomplete" | "disk" | "start" | "unavailable" | string };
+  | { status: "error"; reason: "network" | "incomplete" | "disk" | "start" | "unavailable" | "signature" | string };
 
 export type UpdateProgress = { received: number; total: number };
 
