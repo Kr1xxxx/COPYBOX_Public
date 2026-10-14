@@ -4,6 +4,9 @@ mod ai;
 mod automation;
 mod backup;
 mod flush;
+// Windows only; elsewhere just the pure decision logic and its tests (D-046).
+#[cfg_attr(not(windows), allow(dead_code))]
+mod old_autostart;
 mod power;
 mod shared_library;
 mod site_icon;
@@ -83,9 +86,12 @@ fn main() {
             automation::automation_response,
         ])
         .setup(|app| {
+            // An older product name's launch-at-login entry would start the old copy at login (D-046).
+            #[cfg(windows)]
+            old_autostart::migrate(app.handle());
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Clipboxx")
+                .title("Copyboxx")
                 .min_inner_size(window_state::MIN_WIDTH, window_state::MIN_HEIGHT)
                 .visible(false)
                 .initialization_script(&bridge);

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Copyboxx (复制盒) app icon, D-046: a box holding two overlapping cards (copy).
+       Source of icon.png, icon.icns, the installer picture and the 32 px and larger sizes in icon.ico
+       (cropped to the tile); icon-16.svg and icon-24.svg are the pixel-fitted small sizes. Regenerate with: node scripts/render-icons.mjs -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="#262628"/>
+  <rect x="103" y="103" width="818" height="818" rx="181" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="6"/>
+  <!-- back card -->
+  <rect x="318" y="212" width="300" height="380" rx="44" fill="#7B72B8"/>
+  <!-- front card; the tile-coloured stroke keeps a gap between the cards -->
+  <rect x="410" y="290" width="300" height="380" rx="44" fill="#F8F7FF" stroke="#262628" stroke-width="28" paint-order="stroke"/>
+  <rect x="466" y="356" width="188" height="30" rx="15" fill="#7B72B8"/>
+  <!-- the box the cards sit in, and its handle -->
+  <rect x="236" y="540" width="552" height="270" rx="60" fill="#DCD6FF" stroke="#262628" stroke-width="28" paint-order="stroke"/>
+  <rect x="432" y="630" width="160" height="40" rx="20" fill="#7B72B8"/>
+</svg>

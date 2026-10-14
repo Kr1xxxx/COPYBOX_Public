@@ -266,7 +266,7 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCod
                 <button type="button" className="secondary-button" onClick={() => open("remove")}>关闭…</button>
               </div>}
         </div>
-        {backup && <div className="settings-row"><div><strong>设密码前的备份</strong><small>{lockNow === "none" ? "留着没有用了，可以删除。" : "设密码前的数据副本，仍用旧方式加密（拿到电脑文件的人能打开它）。之后三次重新打开 Clipboxx、用密码打开账号页都正常，就会自动删除；也可以现在删除。"}</small></div>
+        {backup && <div className="settings-row"><div><strong>设密码前的备份</strong><small>{lockNow === "none" ? "留着没有用了，可以删除。" : "设密码前的数据副本，仍用旧方式加密（拿到电脑文件的人能打开它）。之后三次重新打开 Copyboxx、用密码打开账号页都正常，就会自动删除；也可以现在删除。"}</small></div>
           {backupAsk
             ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setBackupAsk(false)}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => { deletePremigrationBackup(); setBackup(false); setBackupAsk(false); }}>确认删除备份</button></div>
             : <button type="button" className="secondary-button" onClick={() => setBackupAsk(true)}>删除备份…</button>}

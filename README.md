@@ -1,6 +1,6 @@
-# Clipboxx（复制盒）
+# Copyboxx（复制盒）
 
-Clipboxx is a local, encrypted copy box that opens instantly. It has three sections on Windows and macOS: 话术
+Copyboxx is a local, encrypted copy box that opens instantly. It has three sections on Windows and macOS: 话术
 (snippets — canned customer-service replies), 账号 (logins, payments, API keys, verification codes; optional password
 that encrypts it, D-038/D-040) and 图片 (images to copy, D-017).
 
@@ -39,7 +39,7 @@ open 设置 → 数据 → 导出到新版, then 从旧版导入 in the new one 
 npm run tauri:build
 ```
 
-The app ends up in `src-tauri/target/release/bundle/macos/Clipboxx.app`. Data stays in the WebKit storage of the app.
+The app ends up in `src-tauri/target/release/bundle/macos/Copyboxx.app`. Data stays in the WebKit storage of the app.
 
 ## Features
 

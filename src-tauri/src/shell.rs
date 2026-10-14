@@ -131,11 +131,11 @@ pub fn show_window(app: &AppHandle, as_quick_search: bool) {
 
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let quick = MenuItem::with_id(app, "quick", "快速搜索", true, None::<&str>)?;
-    let open = MenuItem::with_id(app, "open", "打开 Clipboxx", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "打开 Copyboxx", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quick, &open, &PredefinedMenuItem::separator(app)?, &quit])?;
     let mut tray = TrayIconBuilder::with_id("clipbox")
-        .tooltip("Clipboxx")
+        .tooltip("Copyboxx")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {

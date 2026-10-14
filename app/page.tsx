@@ -80,6 +80,7 @@ import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
 import { folderShortName } from "./folder-short-name";
+import { FirstRunGuide, useFirstRunGuide } from "./first-run-guide";
 import { countImagesByFolder, IMAGE_FILTER_ALL, IMAGE_FILTER_PINNED, IMAGE_FILTER_RECENT, IMAGE_FILTER_TRASH, IMAGE_FILTER_UNCATEGORIZED, imageFilterTitle, imageFolderColors, imageFolderFilter } from "./image-folders-core";
 import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
@@ -117,6 +118,7 @@ import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { onRowAnimationEnd } from "./row-entrance";
 import { ListScrollFrame } from "./list-scroll-rail";
+import { DailyTipsCard } from "./daily-tips-card";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
 
 type VaultEnvelope = {
@@ -508,7 +510,10 @@ export default function Home() {
       }).catch(() => undefined);
     }
   }, [closingIds, selectedCardId]);
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
+  // First-run guide: once, when the full window first shows after the data opened (never in the mini window).
+  const guide = useFirstRunGuide(!loading && !startupError && windowMode === "full");
+  const guideShown = guide.open && windowMode === "full";
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || guideShown);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -1640,7 +1645,7 @@ export default function Home() {
       setBackupMode("import");
       setMenuOpen(false);
     } catch {
-      showToast("这不是有效的 Clipboxx 加密备份", { tone: "error", ms: 3600 });
+      showToast("这不是有效的 Copyboxx 加密备份", { tone: "error", ms: 3600 });
     }
   }
 
@@ -1715,8 +1720,8 @@ export default function Home() {
     showToast(`已导入 ${importedCount} 条话术`, { ms: 2600 });
   }
 
-  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
-  if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipboxx…</span></main>;
+  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Copyboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
+  if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Copyboxx…</span></main>;
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
@@ -2038,6 +2043,7 @@ export default function Home() {
               {activeKind === "secret" && <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>}
             </div></>}
             </>}
+            <DailyTipsCard />
             <div className="nav-footer">
               {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length + (accountMode ? account.trashed.length : 0) > 0 && <b>{trashedKindItems.length + (accountMode ? account.trashed.length : 0)}</b>}</button>}
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
@@ -2216,7 +2222,9 @@ export default function Home() {
         onShowItem={showItemInList}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
+        onShowGuide={() => { setSettingsOpen(false); guide.show(); }}
       />}
+      {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}

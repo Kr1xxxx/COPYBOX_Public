@@ -148,6 +148,16 @@ for (const { platform, theme, size } of cases) {
         await dialog().locator(".settings-row", { hasText: "导出话术备份" }).getByRole("button").first().click();
         await page.locator("#backup-title").waitFor();
       });
+      // First-run guide, every page (opened again from 设置 → 关于 → 再看一遍).
+      for (let pageIndex = 0; pageIndex < 4; pageIndex += 1) {
+        await state(`guide-${pageIndex + 1}`, async () => {
+          await openSettings();
+          await tabs().filter({ hasText: "关于" }).first().click();
+          await dialog().getByRole("button", { name: "再看一遍" }).click();
+          await page.locator(".guide-dialog").waitFor();
+          for (let step = 0; step < pageIndex; step += 1) await page.locator(".guide-dialog").getByRole("button", { name: "下一步" }).click();
+        });
+      }
     }
 
     // 图片
