@@ -46,6 +46,9 @@ export type ClipboxDesktop = {
   // Downloads, checks and installs the version the last check found; the app then closes and opens the new one.
   installUpdate?: () => Promise<UpdateInstallResult>;
   onUpdateProgress?: (callback: (progress: UpdateProgress) => void) => () => void;
+  // Windows only (D-053): the vault's device key in Credential Manager; get gives null when none is stored yet.
+  deviceKeyGet?: () => Promise<string | null>;
+  deviceKeySet?: (key: string) => Promise<void>;
   aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;

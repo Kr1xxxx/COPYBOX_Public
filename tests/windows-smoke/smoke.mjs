@@ -272,6 +272,16 @@ async function main() {
     return `${count} snippets still there`;
   });
 
+  await step("the device key is in Credential Manager, not next to the data (D-053)", async () => {
+    const state = await page.evaluate(async () => ({
+      local: localStorage.getItem("clipbox.device-key.v1"),
+      stored: await window.clipboxDesktop.deviceKeyGet(),
+    }));
+    if (state.local !== null) throw new Error("the device key is still next to the data");
+    if (!/^[A-Za-z0-9+/]{43}=$/.test(state.stored || "")) throw new Error("Credential Manager has no device key");
+    return "key only in Credential Manager";
+  });
+
   await step("a hard kill keeps the data that was already saved", async () => {
     await sleep(2500);
     await stopApp();

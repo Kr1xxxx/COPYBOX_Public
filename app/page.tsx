@@ -67,6 +67,7 @@ import {
 } from "./snippet-import";
 import { createLazyWriter, type LazyWriter } from "./lazy-writer";
 import { derivePbkdf2AesKey } from "./key-cache";
+import { DEVICE_KEY, deviceKeyCandidates, secureKeyStore, settleDeviceKey } from "./device-key-store";
 import { assertWritesOpen, onQuiesce, writesClosed } from "./write-gate";
 import { drainAll } from "./store-queue";
 import { waitForImageWrites } from "./image-store";
@@ -163,7 +164,6 @@ const VALUES_COLLAPSED_KEY = "clipbox.values-collapsed";
 const OPEN_CARD_KEY = "clipbox.open-card";
 
 const STORAGE_KEY = "clipbox.vault.v1";
-const DEVICE_KEY = "clipbox.device-key.v1";
 const REFRESH_CONTEXT_KEY = "clipbox:refresh-context";
 const ITERATIONS = 310_000;
 
@@ -219,13 +219,22 @@ async function decryptVault(envelope: VaultEnvelope, password: string) {
   return normalizeVaultData(parsed);
 }
 
+// Every key that might open the vault is tried (D-053: on Windows the protected one first, then a copy next to the data,
+// e.g. one a 完整备份 restore just wrote); the first that opens it is the device key.
 async function readLocalEncryptedVault() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
-  if (!raw || !storedDeviceKey) throw new Error("Local vault is unavailable");
+  const keys = await deviceKeyCandidates(localStorage, secureKeyStore(), DEVICE_KEY);
+  if (!raw || keys.length === 0) throw new Error("Local vault is unavailable");
   const envelope = JSON.parse(raw) as VaultEnvelope;
-  const data = await decryptVault(envelope, storedDeviceKey);
-  return { data, deviceKey: storedDeviceKey };
+  let failure: unknown = new Error("Local vault is unavailable");
+  for (const key of keys) {
+    try {
+      return { data: await decryptVault(envelope, key), deviceKey: key };
+    } catch (error) {
+      failure = error;
+    }
+  }
+  throw failure;
 }
 
 export default function Home() {
@@ -373,21 +382,25 @@ export default function Home() {
 
     async function openVault() {
       const raw = localStorage.getItem(STORAGE_KEY);
-      const storedDeviceKey = localStorage.getItem(DEVICE_KEY);
+      const secure = secureKeyStore();
+      const knownKeys = await deviceKeyCandidates(localStorage, secure, DEVICE_KEY);
       if (!raw) {
-        const nextDeviceKey = storedDeviceKey || createDeviceKey();
+        const nextDeviceKey = knownKeys[0] || createDeviceKey();
         const data: VaultData = synchronizeVaultData([], EMPTY_FOLDER_REGISTRY, 1);
         const envelope = await encryptVault(data, nextDeviceKey);
+        // Written next to the data first, then moved (D-053), so a crash in between never loses it.
         localStorage.setItem(DEVICE_KEY, nextDeviceKey);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
         finishOpening(data, nextDeviceKey);
+        void settleDeviceKey(nextDeviceKey, localStorage, secure, DEVICE_KEY);
         return;
       }
-      if (!storedDeviceKey) throw new Error("Local vault key is missing");
+      if (knownKeys.length === 0) throw new Error("Local vault key is missing");
       try {
         const openedVault = await readLocalEncryptedVault();
         const opened = openedVault.data;
         finishOpening(opened, openedVault.deviceKey);
+        void settleDeviceKey(openedVault.deviceKey, localStorage, secure, DEVICE_KEY);
       } catch {
         if (!cancelled) {
           setStartupError("本地数据读取失败，原数据和密钥已保留。请重试；如仍失败，请先备份应用数据再排查。");

@@ -50,6 +50,9 @@
         .then(function (off) { if (stopped) off(); else unlisten = off; });
       return function () { stopped = true; if (unlisten) unlisten(); };
     },
+    // Windows only (D-053): the vault's device key in Credential Manager. get resolves to null when none is stored yet.
+    deviceKeyGet: platform === "win32" ? function () { return invoke("device_key_get"); } : undefined,
+    deviceKeySet: platform === "win32" ? function (key) { return invoke("device_key_set", { key: key }).then(noop); } : undefined,
     aiStatus: function () { return invoke("ai_status"); },
     aiSave: function (settings) { return invoke("ai_save", { settings: settings }); },
     aiClear: function () { return invoke("ai_clear"); },
