@@ -1,4 +1,4 @@
-// D-050: the 账号 page is frosted until it is slid open (on by default). It closes again on leaving the section and when
+// D-051: the 账号 page is frosted until it is slid open (on by default). It closes again on leaving the section and when
 // the window hides; the 账号页密码 screen, when set, is the only gate; 设置 can turn the slide off.
 import { expect, test } from "@playwright/test";
 import { asDesktop, seedSnippets, settle, SLIDE_UNLOCK_KEY, SLIDE_UNLOCK_ON } from "./helpers.mjs";

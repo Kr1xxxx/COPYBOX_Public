@@ -1,4 +1,4 @@
-# 账号 page: frosted until slid open (D-050)
+# 账号 page: frosted until slid open (D-051)
 
 - Date: 2026-10-14 · Thread/agent: worker (coordinator's spec, owner's request 「账号页面默认滑动解锁」)
 - What changed: New `app/account-veil.tsx` (frost + classic 「slide to unlock」 control) and `app/slide-unlock.ts` (setting `clipbox.account-slide-unlock.v1`, knob maths), one commented CSS block in `app/globals.css`, a 开/关 row 「打开账号页先滑动解锁」 in 设置 → 数据 → 安全 (`app/settings.tsx`). `app/page.tsx`: state next to the 账号页密码 block (~line 438), `wrapAccountVeil` around the full-window content under the toolbar, 账号 新增/选择/收起 hidden while frosted, Enter in search does not copy while frosted, settings props. Shared e2e storage state turns the slide off (`tests/e2e/helpers.mjs`, `playwright.config.mjs`, `layout-guard.e2e.mjs`); new `tests/e2e/account-slide-unlock.e2e.mjs`, `tests/slide-unlock.test.mjs`.

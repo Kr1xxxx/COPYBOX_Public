@@ -16,6 +16,7 @@ import type { LockMode } from "./account-lock";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
+import { BrandWordmark } from "./brand-wordmark";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
 const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
@@ -138,7 +139,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
         </div>
         <div className="settings-body" id="settings-panel" data-searching={searching ? "" : undefined} role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
           {/* The first page opens with the product name and its Chinese name (D-044). */}
-          {!searching && tab === "look" && <div className="settings-brand"><strong lang="en">Copyboxx</strong><span>复制盒</span></div>}
+          {!searching && tab === "look" && <div className="settings-brand"><BrandWordmark className="settings-brand-mark" /><span className="settings-brand-text"><strong lang="en">Copyboxx</strong><span>复制盒</span></span></div>}
           <h2 className="settings-page-title" aria-hidden="true">{searching ? "搜索结果" : SETTINGS_TABS.find(([id]) => id === tab)?.[1]}</h2>
           {searching && hits.size === 0 && <p className="settings-empty">没有找到「{query.trim()}」相关的设置</p>}
           <section className="settings-card" data-solo="" aria-labelledby="set-look" hidden={hideSection("look", "set-look")}><h3 id="set-look">外观</h3>
@@ -186,7 +187,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           </section>
           <section className="settings-card" aria-labelledby="set-security" hidden={hideSection("data", "set-security")}><h3 id="set-security">安全</h3>
             <AccountLockSettings mode={accountLock.mode} deviceKey={accountLock.deviceKey} onChanged={accountLock.onChanged} onCodeShowing={(showing) => { codeShowingRef.current = showing; }} />
-            {/* D-050: the 账号 page is frosted until slid open; with 账号页密码 set, the password is the only gate. */}
+            {/* D-051: the 账号 page is frosted until slid open; with 账号页密码 set, the password is the only gate. */}
             <div className="settings-row"><div><strong>打开账号页先滑动解锁</strong><small>{accountLock.mode !== "none" ? "已设账号页密码，现在只需输入密码" : "没滑开之前，账号内容是模糊的"}</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="打开账号页先滑动解锁" value={slideUnlock.on ? "on" : "off"} onSelect={(value) => slideUnlock.onChange(value === "on")}
                 options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />

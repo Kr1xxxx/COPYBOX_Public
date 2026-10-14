@@ -1,4 +1,4 @@
-// D-050: the 账号 slide-to-unlock setting and the knob maths (app/slide-unlock.ts).
+// D-051: the 账号 slide-to-unlock setting and the knob maths (app/slide-unlock.ts).
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SLIDE_UNLOCK_KEY, SLIDE_UNLOCK_THRESHOLD, knobOffset, readSlideUnlockOn, slideLabelOpacity, slideProgress, slideReachedEnd, writeSlideUnlockOn } from "../app/slide-unlock.ts";

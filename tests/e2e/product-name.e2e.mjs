@@ -12,8 +12,14 @@ for (const platform of ["win32", "darwin"]) {
     const body = settings.locator(".settings-body");
     const brand = body.locator(".settings-brand");
     await expect(brand).toBeVisible();
+    // The wordmark is the outlined SVG (D-050 brand files); the real text stays underneath for screen readers.
+    const mark = brand.locator("svg.settings-brand-mark");
+    await expect(mark).toBeVisible();
+    const markBox = await mark.boundingBox();
+    expect(markBox.height).toBeGreaterThanOrEqual(20);
+    expect(markBox.width).toBeGreaterThan(markBox.height * 4);
     await expect(brand.locator("strong")).toHaveText("Copyboxx");
-    await expect(brand.locator("span")).toHaveText("复制盒");
+    await expect(brand.locator(".settings-brand-text > span")).toHaveText("复制盒");
     // It is the very first thing on the first page, above the page title and the 外观 rows.
     await expect(body.locator(":scope > *").first()).toHaveClass(/settings-brand/);
     const brandBox = await brand.boundingBox();

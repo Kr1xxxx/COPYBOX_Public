@@ -435,7 +435,7 @@ export default function Home() {
   const [acctFolded, setAcctFolded] = useState(false);
   const accountLocked = lockSet && !(accountMode && accountUnlocked);
   const lockedHere = accountMode && lockSet && !accountUnlocked;
-  // 账号 slide-to-unlock (D-050): frosted until slid open; closes again on leaving the section or when the window hides.
+  // 账号 slide-to-unlock (D-051): frosted until slid open; closes again on leaving the section or when the window hides.
   // The 账号页密码 screen, when set, is the only gate. The mini window is left as it was.
   const [slideUnlockOn, setSlideUnlockOn] = useState(() => typeof window === "undefined" || readSlideUnlockOn());
   const [accountSlidOpen, setAccountSlidOpen] = useState(false);

@@ -1,4 +1,4 @@
-### D-050 The 账号 page is frosted until it is slid open (on by default) (2026-10-14)
+### D-051 The 账号 page is frosted until it is slid open (on by default) (2026-10-14)
 - Context (owner, 2026-10-14): 「账号页面,默认改成需要滑动解锁才能看,否则这个页面全部是毛玻璃的,动效用网上现成的流畅的」.
 - Decision:
   - **Frosted by default.** In the full window, the 账号 section's content (the section head, the 保险箱 list, on macOS

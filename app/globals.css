@@ -754,6 +754,7 @@ button { -webkit-tap-highlight-color: transparent; }
   :root:not([data-theme="light"]) .list-frame { --depth-shade: rgba(0,0,0,.3); --depth-line: rgba(0,0,0,.42); --rail-thumb: rgba(241,239,231,.26); --rail-thumb-strong: rgba(241,239,231,.42); }
   :root:not([data-theme="light"]) .native-row.editing { border-color: var(--accent); }
   :root:not([data-theme="light"]) .native-search input::placeholder { color: var(--muted); }
+  :root:not([data-theme="light"]) .settings-brand { color: #fff; }
   :root:not([data-theme="light"]) .copied .native-copy, :root:not([data-theme="light"]) .reference-copied .native-reference { background: var(--ok-bg); color: var(--ok); }
   :root:not([data-theme="light"]) .mini-row.selected .row-copy small { color: var(--ink-3); }
   :root:not([data-theme="light"]) .mini-copied { color: var(--ok); }
@@ -774,6 +775,7 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] { --bg: #1c1b19; --sidebar: #161513; --card: #262521; --content: #201f1c; --fill: #34322c; --hover: #2b2a25; --line: #3a3832; --line-soft: #2f2d28; --border: #433f38; --ink: #f1efe7; --ink-2: #d8d5ca; --ink-3: #b3b0a4; --muted: #96938a; --accent: #c8663f; --accent-hover: #d4744d; --accent-soft: #4b3024; --accent-tint: #3a2b23; --accent-ink: #f1bba3; --star: #e48f6c; --danger: #ec8573; --ring: rgba(228, 143, 108, .28); --hit: #6b5a1c; --ok: #5fcf92; --ok-bg: #1f3a2d; --danger-bg: #442620; --warn: #e7b98c; --warn-bg: #3d2f20; color-scheme: dark; }
 :root[data-theme="dark"] .dropdown, :root[data-theme="dark"] .product-filter-menu { background: var(--card); border-color: var(--line); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
 :root[data-theme="dark"] .dropdown button.danger:hover, :root[data-theme="dark"] .trash-permanent:hover { background: var(--danger-bg); }
+:root[data-theme="dark"] .settings-brand { color: #fff; }
 :root[data-theme="dark"] .native-row.selected { border-color: var(--line); }
 :root[data-theme="dark"] .list-frame { --depth-shade: rgba(0,0,0,.3); --depth-line: rgba(0,0,0,.42); --rail-thumb: rgba(241,239,231,.26); --rail-thumb-strong: rgba(241,239,231,.42); }
 :root[data-theme="dark"] .native-row.editing { border-color: var(--accent); }
@@ -1264,9 +1266,11 @@ button { -webkit-tap-highlight-color: transparent; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --set-card: #2a2925; --set-edge: rgba(255, 255, 255, .08); } }
 .settings-body { gap: 14px; padding: 0 18px 20px 10px; }
 /* D-044: product name + Chinese name at the top of the first settings page; name in the section-head serif, 复制盒 muted. */
-.settings-brand { display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 12px; border-bottom: 1px solid var(--line-soft); }
-.settings-brand strong { font-family: var(--font-serif); font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--ink); }
-.settings-brand span { color: var(--muted); font-size: 12.5px; }
+/* The wordmark「Copyboxx 复制盒」as outlines (app/brand-wordmark.tsx, from docs/brand/). Brand rule: pure black, pure white on dark;
+   22px tall (the brand minimum is 20px). The real text underneath is only for screen readers and tests. */
+.settings-brand { display: flex; align-items: center; padding: 4px 2px 14px; border-bottom: 1px solid var(--line-soft); color: #000; }
+.settings-brand-mark { display: block; height: 22px; width: auto; margin-left: -3px; } /* the SVG has a 24-unit margin; align its ink with the page title */
+.settings-brand-text { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .settings-page-title { margin: 0; padding: 4px 2px 0; color: var(--ink); font-size: 18px; font-weight: 650; text-wrap: balance; }
 .settings-body > .settings-card { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .settings-body > .settings-card > h3 { margin: 0; padding: 14px 0 8px; border: 0; color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: 0; }
@@ -1316,7 +1320,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .account-lock-link { border: 0; background: none; color: var(--muted, #6b665e); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px; }
 .account-lock-forgot { display: grid; gap: 8px; justify-items: center; max-width: 280px; text-align: center; }
-/* 账号 slide-to-unlock (D-050, app/account-veil.tsx): the 账号 content stays drawn but frosted (blurred + tinted) until the
+/* 账号 slide-to-unlock (D-051, app/account-veil.tsx): the 账号 content stays drawn but frosted (blurred + tinted) until the
    classic phone 「slide to unlock」 control is slid to the end. Open, both wrappers step out of the layout (display: contents).
    Only transform, opacity and filter move, so the drag and the reveal stay smooth. */
 .account-veil-frame, .account-veil-content { display: contents; }

@@ -1,6 +1,6 @@
 "use client";
 
-// 账号 page veil (D-050): until the person slides it open, the 账号 content is drawn but frosted, unreachable and hidden
+// 账号 page veil (D-051): until the person slides it open, the 账号 content is drawn but frosted, unreachable and hidden
 // from screen readers. The control is the classic phone 「slide to unlock」: a round knob that follows the pointer 1:1,
 // a shimmering label that fades as the knob moves, a spring back when let go early, and the frost fading out on success.
 // The knob is a focusable slider: →, End, Enter or Space on it slides it open (a control's own keys, not a shortcut).
