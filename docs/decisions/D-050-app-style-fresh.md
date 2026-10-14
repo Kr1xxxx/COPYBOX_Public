@@ -1,4 +1,4 @@
-### D-049 风格 setting: 经典 (beige) or 清爽 (cool grey + lavender, after cardart.cc) (2026-10-14)
+### D-050 风格 setting: 经典 (beige) or 清爽 (cool grey + lavender, after cardart.cc) (2026-10-14)
 - Context (owner, 2026-10-14): 「按照cardart风格,给我做一个风格主题」, then 「我说的主题是给软件做一个主题」 — a look for the
   desktop app, not the website, in the style of cardart.cc (reference only; the app keeps its own layout).
 - Decision:

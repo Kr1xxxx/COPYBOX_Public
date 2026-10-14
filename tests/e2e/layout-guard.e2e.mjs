@@ -34,7 +34,7 @@ const SIZES = {
 
 const cases = [];
 for (const platform of ["win32", "darwin"]) for (const theme of ["light", "dark"]) for (const size of ["normal", "mini"]) cases.push({ platform, theme, size });
-// 风格 清爽 (D-049) changes colours, radii and shadows only; Windows covers it.
+// 风格 清爽 (D-050) changes colours, radii and shadows only; Windows covers it.
 for (const theme of ["light", "dark"]) for (const size of ["normal", "mini"]) cases.push({ platform: "win32", theme, size, style: "fresh" });
 
 for (const { platform, theme, size, style } of cases) {

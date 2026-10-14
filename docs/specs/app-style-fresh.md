@@ -1,4 +1,4 @@
-# 风格 清爽 (app theme after cardart.cc, D-049)
+# 风格 清爽 (app theme after cardart.cc, D-050)
 
 A second appearance axis next to 主题: 设置 → 外观 → 风格 = 经典 (default, the beige look) or 清爽 (cool grey + lavender).
 Both work with 跟随系统 / 浅色 / 深色. **Nothing moves:** the style changes colours, radii, shadows and font weights only —

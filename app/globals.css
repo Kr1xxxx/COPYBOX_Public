@@ -617,7 +617,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-cli{grid-template-columns:1fr!important}.settings-cli div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.settings-cli dt{min-width:0}.settings-cli code{white-space:nowrap;font-size:11px}.settings-cli dd{flex:none;margin:0;white-space:nowrap}
 :root { --hit: #f6dd8f; --ok: #2f9b62; --ok-bg: #edf8f2; --danger-bg: #fbebe7; --warn: #8b5b37; --warn-bg: #fff4e9; color-scheme: light; }
 
-/* ===== 风格 清爽 (D-049): cool grey + lavender, after cardart.cc. Colours, radii, shadows and weights only; nothing moves.
+/* ===== 风格 清爽 (D-050): cool grey + lavender, after cardart.cc. Colours, radii, shadows and weights only; nothing moves.
    Light tokens sit before the dark blocks so that 跟随系统 on a dark system still picks the dark ones. ===== */
 :root[data-style="fresh"] { --bg: #f8fafc; --sidebar: #f1f3f6; --card: #ffffff; --content: #f4f6f9; --fill: #e6e9ee; --hover: #eceff3; --line: #e3e6eb; --line-soft: #eceef2; --border: #d9dee5; --ink: #1f2733; --ink-2: #3a4350; --ink-3: #5b6472; --muted: #6b7280; --accent: #6f67c9; --accent-hover: #5f57b9; --accent-soft: #e9e6fb; --accent-tint: #f1effc; --accent-ink: #4a4397; --star: #d9a118; --danger: #c0392b; --ring: rgba(111, 103, 201, .18); --hit: #f7e7a0; --set-edge: rgba(31, 39, 51, .08); }
 /* Pills: search, primary buttons, segmented controls (the moving pill inherits the button's radius). */
@@ -906,7 +906,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-swatches > button:not(.settings-mini-button) { width: 18px; height: 18px; padding: 0; border: 2px solid transparent; border-radius: 50%; background-clip: padding-box; cursor: pointer; }
 .settings-swatches > button.on { box-shadow: 0 0 0 1.5px var(--ink); }
 .settings-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; }
-/* 「⋯」 on an own folder: the short name on the mini window (D-049). Quiet until pointed at; the panel sits under the row like the colours. */
+/* 「⋯」 on an own folder: the short name on the mini window (D-050). Quiet until pointed at; the panel sits under the row like the colours. */
 .settings-mini-button.settings-folder-more-button { padding: 0 5px; color: var(--muted); font-size: 14px; line-height: 1; }
 .settings-mini-button.settings-folder-more-button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent-ink); }
 .settings-folder-more { padding: 2px 0 10px 23px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

@@ -1216,7 +1216,7 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  // Short name on the mini window's folder tab (D-049). "" or null goes back to the first two characters.
+  // Short name on the mini window's folder tab (D-050). "" or null goes back to the first two characters.
   async function settingsFolderShortName(kind: SettingsFolderKind, folder: string, shortName: string | null) {
     if (kind === "image") return imageFolderTask((onError) => imageLibrary.setFolderShortName(folder, shortName, onError));
     return commitFolderChange((data) => setFolderShortName(data, kind, folder, shortName), shortName?.trim() ? "简称已保存" : "已恢复默认简称");
