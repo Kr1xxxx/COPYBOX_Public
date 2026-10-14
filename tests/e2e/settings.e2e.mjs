@@ -127,8 +127,8 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog.getByText("导入备份")).toBeVisible();
   await expect(dialog.getByRole("radiogroup", { name: "回收站自动清理" })).toBeVisible();
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeHidden();
-  // No jargon in the security note.
-  await expect(dialog).not.toContainText(/AES|PBKDF2/);
+  // No jargon in the security note, apart from the one line the owner asked for word for word (2026-10-13).
+  await expect(dialog).not.toContainText(/PBKDF2/);
   await expect(dialog).toContainText("内容用 AES-256 加密，只保存在这台设备上");
   // Arrow keys move between groups.
   await dialog.getByRole("tab", { name: "数据" }).press("ArrowDown");
