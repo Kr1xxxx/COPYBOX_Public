@@ -19,4 +19,6 @@ node tools/website/make-icons.mjs
 The ICO is drawn from the brand SVG, so the browser tab shows exactly the app icon (the brand README tested it down to 16 px). The share card uses the brand lockup `docs/brand/lockup-horizontal.svg` and whatever Chinese font the machine has for the headline (on Windows Microsoft YaHei, on a Mac PingFang SC); check the PNG after regenerating.
 
 The app screenshots in `../images/` come from `node tools/website/make-screenshots.mjs` (after `npm run build &&
-npm run preview:build`).
+npm run preview:build`). They import the made-up 话术 in `../showcase-snippets.csv` (no real customers, prices or
+accounts) and recolour the app white + purple to match the site (owner's decision, 2026-10-14); the app itself keeps
+its own colours.
