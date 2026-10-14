@@ -1321,27 +1321,27 @@ button { -webkit-tap-highlight-color: transparent; }
 .account-lock-link { border: 0; background: none; color: var(--muted, #6b665e); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px; }
 .account-lock-forgot { display: grid; gap: 8px; justify-items: center; max-width: 280px; text-align: center; }
 /* 账号 slide-to-unlock (D-051, app/account-veil.tsx): the 账号 content stays drawn but frosted (blurred + tinted) until the
-   classic phone 「slide to unlock」 control is slid to the end. Open, both wrappers step out of the layout (display: contents).
-   Only transform, opacity and filter move, so the drag and the reveal stay smooth. */
+   slide-to-unlock control is slid to the end. Open, both wrappers step out of the layout (display: contents).
+   The gesture follows arc-library's Swipe actions: the knob, the fill, the label and the reveal are driven by motion
+   values in the component (inline transform / opacity / filter); this block only holds the resting look. */
 .account-veil-frame, .account-veil-content { display: contents; }
 .account-veil-frame.veiled { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .account-veil-frame.veiled > .account-veil-content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; filter: blur(16px) saturate(.9); opacity: .75; pointer-events: none; user-select: none; -webkit-user-select: none; will-change: filter, opacity; }
-/* Only the reveal is animated; frosting again is instant, so nothing shows clearly on the way back. */
-.account-veil-frame.revealing > .account-veil-content { filter: blur(0) saturate(1); opacity: 1; transition: filter .28s cubic-bezier(.22, 1, .36, 1), opacity .28s cubic-bezier(.22, 1, .36, 1); }
 .account-veil { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 24px 16px; background: color-mix(in srgb, var(--bg) 52%, transparent); }
-.account-veil-frame.revealing > .account-veil { opacity: 0; pointer-events: none; transition: opacity .28s cubic-bezier(.22, 1, .36, 1); }
 .slide-unlock { --knob: 44px; position: relative; width: min(280px, 100%); height: 52px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--card) 82%, transparent); box-shadow: 0 10px 30px rgba(0, 0, 0, .12), inset 0 1px 2px rgba(0, 0, 0, .06); touch-action: none; user-select: none; -webkit-user-select: none; }
+/* The fill grows out from behind the knob (its right edge rides the knob's right edge) and, once armed, springs over the
+   whole track, like the covering action in Swipe actions. Moved by transform only, clipped to the inside of the track. */
+.slide-unlock-fill-clip { position: absolute; inset: 4px; overflow: hidden; border-radius: 999px; pointer-events: none; }
+.slide-unlock-fill { position: absolute; top: 0; bottom: 0; left: calc(var(--knob) - 100%); width: 100%; border-radius: 999px; background: color-mix(in srgb, var(--accent) 24%, var(--card)); will-change: transform; }
 .slide-unlock-label { position: absolute; inset: 0 18px 0 calc(var(--knob) + 12px); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; letter-spacing: .08em; white-space: nowrap; pointer-events: none;
   color: transparent; background: linear-gradient(100deg, var(--muted) 0%, var(--muted) 38%, var(--ink) 50%, var(--muted) 62%, var(--muted) 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; animation: slide-unlock-shimmer 2.4s linear infinite; }
 @keyframes slide-unlock-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
-.slide-unlock-knob { position: relative; z-index: 1; width: var(--knob); height: var(--knob); display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .2); cursor: grab; touch-action: none; will-change: transform; }
-.slide-unlock-knob:active { cursor: grabbing; background: var(--accent-hover); }
+.slide-unlock-knob { position: relative; z-index: 1; width: var(--knob); height: var(--knob); display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .2); cursor: grab; touch-action: none; will-change: transform; transition: background-color .16s cubic-bezier(.22, 1, .36, 1); }
+.slide-unlock-knob:active, .slide-unlock[data-armed] .slide-unlock-knob { cursor: grabbing; background: var(--accent-hover); }
 .slide-unlock-knob:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
-.slide-unlock.springing .slide-unlock-knob { transition: transform .32s cubic-bezier(.22, 1, .36, 1); }
-.slide-unlock.springing .slide-unlock-label { transition: opacity .32s cubic-bezier(.22, 1, .36, 1); }
 .slide-unlock.settled .slide-unlock-label { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .account-veil-frame.revealing > .account-veil-content, .account-veil-frame.revealing > .account-veil, .slide-unlock.springing .slide-unlock-knob, .slide-unlock.springing .slide-unlock-label { transition: none; }
+  .slide-unlock-knob { transition: none; }
   .slide-unlock-label { animation: none; color: var(--muted); background: none; }
 }
 /* 图片 选择: a tick on the picture, like the check box on a 话术 row. */

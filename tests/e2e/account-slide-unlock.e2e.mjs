@@ -40,8 +40,10 @@ async function expectOpen(page) {
   await expect(page.locator(".account-veil-content")).not.toHaveAttribute("inert", "");
 }
 
-// Presses the knob and moves the mouse right by `share` of the track in small steps, as a hand would.
-async function slide(page, share) {
+// Presses the knob and moves the mouse right by `share` of the track in small steps, as a hand would. `steps` few and
+// large make a fast flick; `release({ still: true })` holds the mouse still first, so the release carries no fling
+// (the release velocity only counts the last 80 ms of movement).
+async function slide(page, share, { steps = 12 } = {}) {
   const track = await page.locator(".slide-unlock").boundingBox();
   const box = await knob(page).boundingBox();
   const startX = box.x + box.width / 2;
@@ -49,8 +51,24 @@ async function slide(page, share) {
   const distance = (track.width - box.width - 8) * share;
   await page.mouse.move(startX, y);
   await page.mouse.down();
-  for (let step = 1; step <= 12; step++) await page.mouse.move(startX + (distance * step) / 12, y);
-  return { release: () => page.mouse.up(), startX };
+  for (let step = 1; step <= steps; step++) await page.mouse.move(startX + (distance * step) / steps, y);
+  return {
+    release: async ({ still = false } = {}) => { if (still) await page.waitForTimeout(150); await page.mouse.up(); },
+    moveTo: (nextShare) => page.mouse.move(startX + (track.width - box.width - 8) * nextShare, y, { steps: 6 }),
+    startX,
+    travel: track.width - box.width - 8,
+  };
+}
+
+// Waits until the knob has stopped moving (the springs run in JS, so poll its position).
+async function knobAtRest(page) {
+  let last = null;
+  await expect.poll(async () => {
+    const box = await knob(page).boundingBox();
+    const same = last !== null && Math.abs(box.x - last) < 0.25;
+    last = box.x;
+    return same;
+  }, { intervals: [60] }).toBe(true);
 }
 
 for (const platform of ["win32", "darwin"]) {
@@ -69,7 +87,12 @@ for (const platform of ["win32", "darwin"]) {
     const held = await knob(page).boundingBox();
     expect(held.x - home.x).toBeGreaterThan(40);
     expect(Number(await knob(page).getAttribute("aria-valuenow"))).toBeGreaterThan(20);
-    await short.release();
+    // The accent fill grows out from behind the knob: its right edge rides the knob's right edge.
+    const fill = await page.locator(".slide-unlock-fill").boundingBox();
+    expect(Math.abs(fill.x + fill.width - (held.x + held.width))).toBeLessThan(2);
+    await expect(page.locator(".slide-unlock")).not.toHaveAttribute("data-armed", "");
+    // Stopped before letting go, so this is not a flick.
+    await short.release({ still: true });
     await settle(page);
     await expect(knob(page)).toHaveAttribute("aria-valuenow", "0");
     expect(Math.abs((await knob(page).boundingBox()).x - home.x)).toBeLessThan(1);
@@ -192,5 +215,89 @@ test("with reduced motion the page opens at once, without the shimmer", async ({
   expect(await page.locator(".slide-unlock-label").evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
   const full = await slide(page, 1);
   await full.release();
+  await expectOpen(page);
+});
+
+// The swipe-actions feel (arc-library): a fast flick opens even short of the end, the knob rubber-bands past either
+// end, past the threshold the fill covers the track, and a slow release just short of the threshold springs home.
+test("a fast flick that does not reach the threshold still opens the page", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  await openAccounts(page);
+  await expectVeiled(page);
+  // Three large steps to half the track (well short of the 88 % threshold), let go at once: the projected travel passes it.
+  // Recorded on the knob as it happens, since nothing may run between the last move and the release.
+  await knob(page).evaluate((el) => {
+    window.__slideSeen = { max: 0, armed: false };
+    el.addEventListener("pointerup", () => {
+      window.__slideSeen = { max: Number(el.getAttribute("aria-valuenow")), armed: el.parentElement.hasAttribute("data-armed") };
+    }, { capture: true, once: true });
+  });
+  const flick = await slide(page, 0.5, { steps: 3 });
+  await flick.release();
+  const seen = await page.evaluate(() => window.__slideSeen);
+  expect(seen.max).toBeLessThan(60);
+  expect(seen.armed).toBe(false);
+  await expectOpen(page);
+});
+
+test("a slow release just short of the threshold springs home and stays frosted", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  await openAccounts(page);
+  const home = await knob(page).boundingBox();
+  const near = await slide(page, 0.8, { steps: 24 });
+  expect(Number(await knob(page).getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(75);
+  expect(Number(await knob(page).getAttribute("aria-valuenow"))).toBeLessThan(88);
+  await expect(page.locator(".slide-unlock")).not.toHaveAttribute("data-armed", "");
+  // The frost lightens a little with the knob, but stays a heavy blur.
+  const blur = Number((await page.locator(".account-veil-content").evaluate((el) => getComputedStyle(el).filter)).match(/blur\(([\d.]+)px\)/)[1]);
+  expect(blur).toBeGreaterThanOrEqual(12);
+  expect(blur).toBeLessThan(16);
+  await near.release({ still: true });
+  await expect(knob(page)).toHaveAttribute("aria-valuenow", "0");
+  await knobAtRest(page);
+  expect(Math.abs((await knob(page).boundingBox()).x - home.x)).toBeLessThan(1);
+  await expectVeiled(page);
+});
+
+test("past either end the knob rubber-bands; armed, the fill covers the track, and backing off a little keeps it armed", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  await openAccounts(page);
+  const track = page.locator(".slide-unlock");
+  const bounds = await track.boundingBox();
+  const home = await knob(page).boundingBox();
+
+  // Pulled well past the start: it follows a little to the left, then springs home.
+  await page.mouse.move(home.x + home.width / 2, home.y + home.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(home.x + home.width / 2 - 120, home.y + home.height / 2, { steps: 8 });
+  const left = await knob(page).boundingBox();
+  expect(left.x).toBeLessThan(home.x - 5);
+  expect(left.x).toBeGreaterThan(home.x - home.width);
+  await expect(knob(page)).toHaveAttribute("aria-valuenow", "0");
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await knobAtRest(page);
+  expect(Math.abs((await knob(page).boundingBox()).x - home.x)).toBeLessThan(1);
+  await expectVeiled(page);
+
+  // Pulled twice the track's length: the knob passes the end (the inside of the track ends 5 px before its outer
+  // edge: 1 px border, 4 px padding), but only by a small overshoot, less than the knob's own width.
+  const pull = await slide(page, 2, { steps: 24 });
+  const far = await knob(page).boundingBox();
+  const end = bounds.x + bounds.width - 5;
+  expect(far.x + far.width).toBeGreaterThan(end + 4);
+  expect(far.x + far.width).toBeLessThan(end + home.width);
+  await expect(knob(page)).toHaveAttribute("aria-valuenow", "100");
+  await expect(track).toHaveAttribute("data-armed", "");
+  // The fill springs over the whole inside of the track.
+  await expect.poll(async () => { const fill = await page.locator(".slide-unlock-fill").boundingBox(); return fill.x + fill.width >= end - 1; }).toBe(true);
+
+  // Back to just under the threshold: still armed (20 px of hysteresis), so letting go opens it.
+  await pull.moveTo(0.86);
+  await expect(track).toHaveAttribute("data-armed", "");
+  await pull.release({ still: true });
   await expectOpen(page);
 });
