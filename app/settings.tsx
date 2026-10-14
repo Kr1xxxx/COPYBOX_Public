@@ -145,7 +145,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
               <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
                 options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
             </div>
-            <div className="settings-row"><div><strong>风格</strong><small>经典是米色底、橙红点缀；清爽是浅灰底、淡紫点缀。两种都有浅色和深色</small></div>
+            <div className="settings-row"><div><strong>风格</strong><small>经典是米色底、橙红点缀；清爽是浅灰底、淡紫点缀</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="风格" value={style} onSelect={(value) => onStyle(value as StyleChoice)}
                 options={[["classic", "经典"], ["fresh", "清爽"]].map(([value, label]) => ({ value, label }))} />
             </div>
