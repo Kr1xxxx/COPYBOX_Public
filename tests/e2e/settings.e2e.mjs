@@ -129,7 +129,7 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeHidden();
   // No jargon in the security note.
   await expect(dialog).not.toContainText(/AES|PBKDF2/);
-  await expect(dialog).toContainText("加密后只保存在这台电脑上");
+  await expect(dialog).toContainText("内容用 AES-256 加密，只保存在这台设备上");
   // Arrow keys move between groups.
   await dialog.getByRole("tab", { name: "数据" }).press("ArrowDown");
   await expect(dialog.getByRole("tab", { name: "使用排行" })).toHaveAttribute("aria-selected", "true");
