@@ -400,8 +400,9 @@ test("a copy that fails says so and leaves the image alone", async ({ page }) =>
 });
 
 // 图片 are shrunk with TinyPNG before they are stored (D-037): at most 100 a month, never losing the picture.
-async function withCompressor(page, behaviour) {
-  await page.addInitScript((mode) => {
+async function withCompressor(page, behaviour, key = "test-key") {
+  await page.addInitScript(([mode, key]) => {
+    if (key) localStorage.setItem("clipbox.tinify.key.v1", key);
     window.__compressCalls = 0;
     const desktop = () => window.clipboxDesktop;
     Object.defineProperty(window, "__installCompressor", { value: () => {
@@ -413,7 +414,7 @@ async function withCompressor(page, behaviour) {
       };
     } });
     document.addEventListener("DOMContentLoaded", () => window.__installCompressor());
-  }, behaviour);
+  }, [behaviour, key]);
 }
 
 test("a new picture is compressed, the saving is shown, and 设置 counts it", async ({ page }) => {
@@ -495,7 +496,7 @@ test("two own compression keys can be set; when the first is used up the second 
     return dialog.locator("section[aria-labelledby=set-compress]");
   };
   let card = await openCompress();
-  await expect(card).toContainText("正在使用内置密钥");
+  await expect(card).toContainText("还没有填写密钥，新图片不会压缩");
   await card.getByRole("button", { name: "更换…" }).click();
   await card.getByLabel("第一个密钥").fill("key-one");
   await card.getByLabel("第二个密钥（选填）").fill(" key-two ");
@@ -511,4 +512,16 @@ test("two own compression keys can be set; when the first is used up the second 
 
   card = await openCompress();
   await expect(card).toContainText("第一个密钥本月不能用了（额度用完或密钥不对），正在使用第二个密钥");
+});
+
+test("with no compression key set, a picture is stored as it is and the toast says where to add a key", async ({ page }) => {
+  await asDesktop(page, "win32", { imageView: "list" });
+  await withCompressor(page, "ok", "");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await addImages(page, PNG_FILE);
+  await expect(page.locator(".toast")).toContainText("未压缩：请先在 设置 → 数据 → 图片压缩 填写压缩密钥");
+  await expect(rows(page)).toHaveCount(1);
+  expect(await page.evaluate(() => window.__compressCalls)).toBe(0);
 });

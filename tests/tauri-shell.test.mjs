@@ -86,6 +86,14 @@ test("compressImage hands the bytes and the key to the shell and turns a failure
   assert.equal(failed.result.reason, "limit");
 });
 
+test("built-in TinyPNG keys come only from the CLIPBOX_TINIFY_KEYS secret at build time, never from the repo", () => {
+  const tinify = read("src-tauri/src/tinify.rs");
+  assert.match(tinify, /option_env!\("CLIPBOX_TINIFY_KEYS"\)/);
+  assert.match(read("src-tauri/src/main.rs"), /tinify::tinify_builtin_count/);
+  assert.match(read("src-tauri/bridge.js"), /invoke\("tinify_builtin_count"\)/);
+  assert.match(read(".github/workflows/tauri.yml"), /CLIPBOX_TINIFY_KEYS: \$\{\{ secrets\.CLIPBOX_TINIFY_KEYS \}\}/);
+});
+
 test("the top band moves the window: the bridge starts a drag and the capability allows it", () => {
   const bridge = read("src-tauri/bridge.js");
   assert.match(bridge, /plugin:window\|start_dragging/);
