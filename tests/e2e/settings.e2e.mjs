@@ -131,16 +131,26 @@ test("风格 清爽: switches the colours, is kept after a reload, and 经典 br
   await expect.poll(background).toBe("rgb(250, 249, 245)");
 });
 
-test("风格 清爽 on a dark system: dark grey when following the system, light grey when 主题 is 浅色", async ({ page }) => {
+test("风格 清爽 is light only: a dark system and 主题 深色 still give the light grey, and the 主题 choice is put away (D-050)", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
+  const dialog = () => page.locator(".settings-dialog");
   const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  await page.locator(".settings-dialog").getByRole("radiogroup", { name: "风格" }).getByRole("radio", { name: "清爽" }).click();
-  await expect.poll(background).toBe("rgb(20, 23, 28)");
-  await page.evaluate(() => localStorage.setItem("clipbox.theme", "light"));
+  await expect(dialog().getByRole("radiogroup", { name: "主题" })).toBeVisible();
+  await dialog().getByRole("radiogroup", { name: "风格" }).getByRole("radio", { name: "清爽" }).click();
+  await expect.poll(background).toBe("rgb(248, 250, 252)");
+  await expect(dialog().getByRole("radiogroup", { name: "主题" })).toBeHidden();
+  await expect(dialog()).toContainText("清爽风格只有浅色");
+  // A 深色 choice kept from before stays stored but does not show while 清爽 is on.
+  await page.evaluate(() => localStorage.setItem("clipbox.theme", "dark"));
   await page.reload();
   await page.waitForSelector(".app-shell");
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
   await expect.poll(background).toBe("rgb(248, 250, 252)");
+  // Back to 经典: the stored 深色 comes back, and so does the 主题 choice.
+  await page.getByRole("button", { name: /^设置$/ }).click();
+  await dialog().getByRole("radiogroup", { name: "风格" }).getByRole("radio", { name: "经典" }).click();
+  await expect.poll(background).toBe("rgb(28, 27, 25)");
+  await expect(dialog().getByRole("radiogroup", { name: "主题" }).getByRole("radio", { name: "深色" })).toHaveAttribute("aria-checked", "true");
 });
 
 test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {

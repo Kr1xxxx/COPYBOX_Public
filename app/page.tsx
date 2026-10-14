@@ -1431,17 +1431,19 @@ export default function Home() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "system") delete root.dataset.theme;
-    else root.dataset.theme = theme;
-    window.clipboxDesktop?.setTheme?.(theme);
-  }, [theme]);
+    // 清爽 only has a light palette (owner, 2026-10-14, D-050): while it is on, the page and the window chrome stay
+    // light; the stored 主题 choice is kept and comes back with 经典.
+    const effective: ThemeChoice = style === "fresh" ? "light" : theme;
+    if (effective === "system") delete root.dataset.theme;
+    else root.dataset.theme = effective;
+    window.clipboxDesktop?.setTheme?.(effective);
+  }, [theme, style]);
 
   function chooseTheme(next: ThemeChoice) {
     setTheme(next);
     writeStoredChoice(THEME_KEY, next);
   }
 
-  // 风格 only changes the page's colours; the window chrome keeps following 主题.
   useEffect(() => {
     const root = document.documentElement;
     if (style === "classic") delete root.dataset.style;

@@ -142,11 +142,12 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           <h2 className="settings-page-title" aria-hidden="true">{searching ? "搜索结果" : SETTINGS_TABS.find(([id]) => id === tab)?.[1]}</h2>
           {searching && hits.size === 0 && <p className="settings-empty">没有找到「{query.trim()}」相关的设置</p>}
           <section className="settings-card" data-solo="" aria-labelledby="set-look" hidden={hideSection("look", "set-look")}><h3 id="set-look">外观</h3>
-            <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
-              <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
-                options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
+            {/* 清爽 only has a light palette (D-050): while it is on, the 主题 choice is put away, not changed. */}
+            <div className="settings-row"><div><strong>主题</strong><small>{style === "fresh" ? "清爽风格只有浅色；换回经典后这里才能选" : "跟随系统会随系统的深浅色设置自动切换"}</small></div>
+              {style !== "fresh" && <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
+                options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />}
             </div>
-            <div className="settings-row"><div><strong>风格</strong><small>经典是米色底、橙红点缀；清爽是浅灰底、淡紫点缀</small></div>
+            <div className="settings-row"><div><strong>风格</strong><small>经典是米色底、橙红点缀；清爽是白底、淡紫点缀，只有浅色</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="风格" value={style} onSelect={(value) => onStyle(value as StyleChoice)}
                 options={[["classic", "经典"], ["fresh", "清爽"]].map(([value, label]) => ({ value, label }))} />
             </div>

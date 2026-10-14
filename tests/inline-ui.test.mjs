@@ -47,20 +47,16 @@ test("theme follows the system by default and can be forced, with dark tokens de
   assert.match(shellMain, /window_mode::set_theme/);
 });
 
-test("风格 清爽 tokens: light before the dark blocks, dark for 跟随系统 inside the media query, forced dark after", () => {
+test("风格 清爽 is light only: one token block before the dark blocks, no dark 清爽 tokens, 主题 forced to 浅色 (D-050)", () => {
   assert.match(page, /STYLE_OPTIONS = \["classic", "fresh"\]/);
+  assert.match(page, /const effective: ThemeChoice = style === "fresh" \? "light" : theme;/);
   const light = css.indexOf(':root[data-style="fresh"] {');
   const media = css.indexOf("@media (prefers-color-scheme: dark) {\n  :root:not([data-theme=\"light\"])");
-  const system = css.indexOf(':root[data-style="fresh"]:not([data-theme="light"]) {');
-  const mediaEnd = css.indexOf("\n}\n", media);
-  const forcedBase = css.indexOf(':root[data-theme="dark"] {');
-  const forced = css.indexOf(':root[data-theme="dark"][data-style="fresh"] {');
-  for (const at of [light, media, system, forcedBase, forced]) assert.ok(at > 0);
-  assert.ok(light < media, "light 清爽 tokens must come before the dark media block");
-  assert.ok(media < system && system < mediaEnd, "跟随系统 dark 清爽 tokens must sit inside the dark media block");
-  assert.ok(forcedBase < forced, "forced dark 清爽 tokens must come after the forced dark tokens");
+  assert.ok(light > 0 && media > 0 && light < media, "清爽 tokens must come before the dark media block");
   assert.match(css, /:root\[data-style="fresh"\] \{[^}]*--bg: #f8fafc/);
-  assert.equal(css.match(/--bg: #14171c/g)?.length, 2);
+  assert.equal(css.includes('[data-style="fresh"]:not([data-theme="light"])'), false, "no 跟随系统 dark 清爽 block");
+  assert.equal(css.includes('[data-theme="dark"][data-style="fresh"]'), false, "no forced dark 清爽 block");
+  assert.equal(css.includes("--bg: #14171c"), false);
 });
 
 test("settings show last backup time and open the data folder on desktop", () => {
