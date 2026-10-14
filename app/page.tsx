@@ -34,6 +34,7 @@ import {
   selectItemsByTrashState,
   type FolderRegistry,
   type FolderColors,
+  type FolderShortNames,
   deleteFolder,
   folderEditBlocker,
   moveItemsToFolder,
@@ -41,6 +42,7 @@ import {
   renameFolder,
   restoreTrashedItems,
   setFolderColor,
+  setFolderShortName,
   type BackupScope,
   type ImportStrategy,
   type ItemKind,
@@ -229,6 +231,7 @@ export default function Home() {
   const [items, setItems] = useState<SecretItem[]>([]);
   const [folders, setFolders] = useState<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
   const [folderColors, setFolderColors] = useState<FolderColors | undefined>(undefined);
+  const [folderShortNames, setFolderShortNames] = useState<FolderShortNames | undefined>(undefined);
   const [activeKind, setActiveKind] = useState<ItemKind>(DEFAULT_ITEM_KIND);
   // The 图片 section is not an ItemKind: its data lives in its own store, never in the vault.
   const [imageView, setImageView] = useState(false);
@@ -326,6 +329,7 @@ export default function Home() {
   const itemsRef = useRef<SecretItem[]>([]);
   const foldersRef = useRef<FolderRegistry>(EMPTY_FOLDER_REGISTRY);
   const folderColorsRef = useRef<FolderColors | undefined>(undefined);
+  const folderShortNamesRef = useRef<FolderShortNames | undefined>(undefined);
   const sharedSeenRef = useRef<string[] | undefined>(undefined);
   const nextSnippetNumberRef = useRef(1);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -345,11 +349,13 @@ export default function Home() {
       itemsRef.current = data.items;
       foldersRef.current = data.folders;
       folderColorsRef.current = data.folderColors;
+      folderShortNamesRef.current = data.folderShortNames;
       sharedSeenRef.current = data.sharedSeen;
       nextSnippetNumberRef.current = data.nextSnippetNumber;
       setItems(data.items);
       setFolders(data.folders);
       setFolderColors(data.folderColors);
+      setFolderShortNames(data.folderShortNames);
       if (refreshContext) {
         // Windows has no second text section any more: an old context that points at it opens 话术.
         const restoredKind: ItemKind = refreshContext.activeKind;
@@ -637,11 +643,13 @@ export default function Home() {
       itemsRef.current = opened.data.items;
       foldersRef.current = opened.data.folders;
       folderColorsRef.current = opened.data.folderColors;
+      folderShortNamesRef.current = opened.data.folderShortNames;
       sharedSeenRef.current = opened.data.sharedSeen;
       nextSnippetNumberRef.current = opened.data.nextSnippetNumber;
       setItems(opened.data.items);
       setFolders(opened.data.folders);
       setFolderColors(opened.data.folderColors);
+      setFolderShortNames(opened.data.folderShortNames);
       setActiveFolder(nextActiveFolder);
       showToast("已刷新", { ms: 1800 });
     } catch {
@@ -723,6 +731,7 @@ export default function Home() {
     folders: foldersRef.current,
     nextSnippetNumber: nextSnippetNumberRef.current,
     folderColors: folderColorsRef.current,
+    folderShortNames: folderShortNamesRef.current,
     sharedSeen: sharedSeenRef.current,
   }), []);
 
@@ -754,16 +763,18 @@ export default function Home() {
     itemsRef.current = data.items;
     foldersRef.current = data.folders;
     folderColorsRef.current = data.folderColors;
+    folderShortNamesRef.current = data.folderShortNames;
     sharedSeenRef.current = data.sharedSeen;
     nextSnippetNumberRef.current = data.nextSnippetNumber;
     setItems(data.items);
     setFolders(data.folders);
     setFolderColors(data.folderColors);
+    setFolderShortNames(data.folderShortNames);
   }, []);
 
   // Saves at once. It writes everything currently in memory, so it also covers any lazy changes still waiting.
   const writeVault = useCallback(async (nextData: VaultData) => {
-    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber, nextData.folderColors, nextData.sharedSeen ?? sharedSeenRef.current);
+    const data = synchronizeVaultData(nextData.items, nextData.folders, nextData.nextSnippetNumber, nextData.folderColors, nextData.sharedSeen ?? sharedSeenRef.current, nextData.folderShortNames);
     await storeVault(data);
     commitVaultToMemory(data);
     lazyWriterRef.current?.cancel();
@@ -778,7 +789,7 @@ export default function Home() {
   const persistLazy = useCallback((update: (current: VaultData) => VaultData) => (
     enqueueVaultTask(async () => {
       const next = update(readVault());
-      commitVaultToMemory(synchronizeVaultData(next.items, next.folders, next.nextSnippetNumber, next.folderColors, next.sharedSeen ?? sharedSeenRef.current));
+      commitVaultToMemory(synchronizeVaultData(next.items, next.folders, next.nextSnippetNumber, next.folderColors, next.sharedSeen ?? sharedSeenRef.current, next.folderShortNames));
       lazyWriterRef.current?.markDirty();
     })
   ), [enqueueVaultTask, readVault, commitVaultToMemory]);
@@ -836,6 +847,7 @@ export default function Home() {
               folders: foldersRef.current,
               nextSnippetNumber: nextSnippetNumberRef.current,
               folderColors: folderColorsRef.current,
+              folderShortNames: folderShortNamesRef.current,
             };
             const secretData = vaultDataForBackupScope(currentData, "secret");
             const envelope = await encryptVault(secretData, secretExport.password);
@@ -861,6 +873,7 @@ export default function Home() {
               folders: foldersRef.current,
               nextSnippetNumber: nextSnippetNumberRef.current,
               folderColors: folderColorsRef.current,
+              folderShortNames: folderShortNamesRef.current,
             },
             command,
             { createId: () => crypto.randomUUID(), now: timestampNow },
@@ -1200,6 +1213,12 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
+  // Short name on the mini window's folder tab (D-048). "" or null goes back to the first two characters.
+  async function settingsFolderShortName(kind: SettingsFolderKind, folder: string, shortName: string | null) {
+    if (kind === "image") return imageFolderTask((onError) => imageLibrary.setFolderShortName(folder, shortName, onError));
+    return commitFolderChange((data) => setFolderShortName(data, kind, folder, shortName), shortName?.trim() ? "简称已保存" : "已恢复默认简称");
+  }
+
   function settingsFolderMove(kind: SettingsFolderKind, folder: string, delta: -1 | 1) {
     if (kind === "image") {
       const names = imageLibrary.folders.map((entry) => entry.name);
@@ -1230,6 +1249,8 @@ export default function Home() {
           count: items.filter((item) => !isTrashedItem(item) && (item.kind || "secret") === kind && item.folder === name).length,
           color: colors[name] || UNCATEGORIZED_COLOR,
           locked: Boolean(folderEditBlocker(kind, name)),
+          shortName: folderShortNames?.[kind]?.[name] || "",
+          defaultShortName: folderShortName(name),
         })),
       };
     });
@@ -1242,7 +1263,7 @@ export default function Home() {
       nameMax: IMAGE_FOLDER_NAME_MAX,
       sortable: true,
       autoColor: false,
-      folders: imageLibrary.folders.map(({ name }) => ({ name, count: imageCountsByFolder[name] ?? 0, color: imageColors[name] || UNCATEGORIZED_COLOR, locked: false })),
+      folders: imageLibrary.folders.map(({ name, shortName }) => ({ name, count: imageCountsByFolder[name] ?? 0, color: imageColors[name] || UNCATEGORIZED_COLOR, locked: false, shortName: shortName || "", defaultShortName: folderShortName(name) })),
     }];
   }
 
@@ -1588,7 +1609,7 @@ export default function Home() {
   }, [safeSelected, windowMode, activeFolder, activeKind]);
 
   async function exportVault(password: string, scope: BackupScope) {
-    const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, sharedSeen: sharedSeenRef.current };
+    const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, folderShortNames: folderShortNamesRef.current, sharedSeen: sharedSeenRef.current };
     const scopedData = vaultDataForBackupScope(currentData, scope);
     const envelope = await encryptVault(scopedData, password);
     let vaultBox: VaultBoxEnvelope | undefined;
@@ -1755,13 +1776,13 @@ export default function Home() {
     ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, { id: IMAGE_FILTER_RECENT, label: "最近" }]
     : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }];
   // Folder tabs show a two-character name (folder-short-name.ts); the whole name is the tooltip.
-  const miniFolderTab = (id: string, name: string): MiniTab => {
-    const label = folderShortName(name);
+  const miniFolderTab = (id: string, name: string, override?: string): MiniTab => {
+    const label = folderShortName(name, override);
     return label === name.trim() ? { id, label } : { id, label, fullName: name };
   };
   const miniFolderTabs: MiniTab[] = imageView
-    ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
-    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder)), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
+    ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name, folder.shortName)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
+    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder])), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
@@ -2199,6 +2220,7 @@ export default function Home() {
         onFolderRename={settingsFolderRename}
         onFolderDelete={settingsFolderDelete}
         onFolderColor={settingsFolderColor}
+        onFolderShortName={settingsFolderShortName}
         onFolderMove={settingsFolderMove}
         onFolderReorder={settingsFolderReorder}
         closeBehavior={closeBehavior}

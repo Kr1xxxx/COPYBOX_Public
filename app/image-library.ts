@@ -55,6 +55,7 @@ export type ImageLibrary = {
   createFolder: (name: string, onError?: (message: string) => void) => Promise<string | null>;
   renameFolder: (from: string, to: string, onError?: (message: string) => void) => Promise<string | null>;
   setFolderColor: (name: string, color: string, onError?: (message: string) => void) => Promise<boolean>;
+  setFolderShortName: (name: string, shortName: string | null, onError?: (message: string) => void) => Promise<boolean>;
   reorderFolder: (source: string, target: string) => Promise<void>;
   deleteFolder: (name: string, onError?: (message: string) => void) => Promise<boolean>;
 };
@@ -235,6 +236,17 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
+  async function setFolderShortName(name: string, shortName: string | null, onError = toast) {
+    try {
+      setFolders(await (await loadStore(deviceKey)).setFolderShortName(name, shortName));
+      toast(shortName?.trim() ? "简称已保存" : "已恢复默认简称");
+      return true;
+    } catch (error) {
+      onError(readableMessage(error, "简称没有保存，请重试"));
+      return false;
+    }
+  }
+
   async function deleteFolder(name: string, onError = toast) {
     try {
       setFolders(await (await loadStore(deviceKey)).deleteFolder(name));
@@ -248,5 +260,5 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  return { ready, loadError, retry, images, trashed, folders, filter, setFilter: setRawFilter, addImage, rename, remove, trash, restore, purgeExpired, getBlob, getThumb, markUsed, moveImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, deleteFolder };
+  return { ready, loadError, retry, images, trashed, folders, filter, setFilter: setRawFilter, addImage, rename, remove, trash, restore, purgeExpired, getBlob, getThumb, markUsed, moveImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, setFolderShortName, deleteFolder };
 }

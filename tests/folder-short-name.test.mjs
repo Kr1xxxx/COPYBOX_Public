@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STANDARD_SNIPPET_FOLDERS } from "../app/snippet-folders.ts";
-import { STANDARD_FOLDER_SHORT_NAMES, folderShortName } from "../app/folder-short-name.ts";
+import { FOLDER_SHORT_NAME_ERROR, STANDARD_FOLDER_SHORT_NAMES, folderShortName, normalizeFolderShortName } from "../app/folder-short-name.ts";
+
+test("a short name the person sets must already be short: two characters or four Latin letters/digits", () => {
+  assert.equal(FOLDER_SHORT_NAME_ERROR, "最多两个字");
+  for (const ok of ["跟单", "新", "AB12", "VIP", "🔑密", "👨‍👩‍👧家"]) assert.equal(normalizeFolderShortName(ok), ok, ok);
+  assert.equal(normalizeFolderShortName("  跟单 "), "跟单", "spaces around are dropped");
+  assert.equal(normalizeFolderShortName(""), "", "empty means the default");
+  assert.equal(normalizeFolderShortName("   "), "");
+  for (const bad of ["跟单员", "未分类", "ABCDE", "A客", "跟 单", 12, null, undefined, {}]) assert.equal(normalizeFolderShortName(bad), null, String(bad));
+  // A valid short name shows exactly as typed, never cut.
+  for (const ok of ["跟单", "AB12", "🔑密"]) assert.equal(folderShortName("很长的目录名字", ok), ok);
+});
 
 test("standard 话术 folders get their fixed short names", () => {
   assert.deepEqual(STANDARD_SNIPPET_FOLDERS.map((folder) => folderShortName(folder)), ["询盘", "产品", "报价", "定制", "跟进", "物流", "售后"]);

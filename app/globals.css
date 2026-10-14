@@ -863,6 +863,15 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-swatches > button:not(.settings-mini-button) { width: 18px; height: 18px; padding: 0; border: 2px solid transparent; border-radius: 50%; background-clip: padding-box; cursor: pointer; }
 .settings-swatches > button.on { box-shadow: 0 0 0 1.5px var(--ink); }
 .settings-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; }
+/* 「⋯」 on an own folder: the short name on the mini window (D-048). Quiet until pointed at; the panel sits under the row like the colours. */
+.settings-mini-button.settings-folder-more-button { padding: 0 5px; color: var(--muted); font-size: 14px; line-height: 1; }
+.settings-mini-button.settings-folder-more-button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent-ink); }
+.settings-folder-more { padding: 2px 0 10px 23px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.settings-folder-more-field { display: inline-flex; align-items: center; gap: 8px; margin-right: 2px; color: var(--ink-2); font-size: 12px; }
+.settings-folder-more-field input { width: 72px; height: 24px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--content); color: var(--ink); font: inherit; font-size: 12.5px; text-align: center; }
+.settings-folder-more-field input:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.settings-folder-more-field input[aria-invalid="true"] { border-color: var(--danger); }
+.settings-folder-more-error { flex-basis: 100%; margin: 0; color: var(--danger); font-size: 12px; }
 .settings-folder-fixed { flex: none; padding: 1px 7px; border-radius: 9px; background: var(--fill); color: var(--muted); font-size: 11px; }
 
 /* With many variables the copy button stays reachable at the bottom of the list. */

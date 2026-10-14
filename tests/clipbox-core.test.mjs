@@ -499,6 +499,86 @@ test("folder colors survive normalization, scoped backups and merges but drop fo
   assert.equal("folderColors" in baseVault(), false);
 });
 
+// D-048: short names for own folders on the mini window.
+const set = (data, kind, folder, value) => {
+  const result = core.setFolderShortName(data, kind, folder, value);
+  assert.equal(result.error, undefined, `${kind}/${folder}=${value}`);
+  return result.data;
+};
+
+test("folder short names: set, clear, rejected when too long, never for standard 话术 folders", () => {
+  const vault = set(set(baseVault(), "snippet", "自定义", " 跟单 "), "secret", "GitHub", "GH");
+  assert.deepEqual(vault.folderShortNames, { snippet: { 自定义: "跟单" }, secret: { GitHub: "GH" } });
+  const tooLong = core.setFolderShortName(vault, "snippet", "自定义", "跟单员");
+  assert.equal(tooLong.error, "最多两个字");
+  assert.equal(tooLong.data, vault, "nothing changes");
+  assert.match(core.setFolderShortName(vault, "snippet", "询盘接待", "新客").error, /固定/);
+  assert.match(core.setFolderShortName(vault, "snippet", "没有", "新客").error, /目录不存在/);
+  const cleared = set(vault, "snippet", "自定义", "");
+  assert.deepEqual(cleared.folderShortNames, { secret: { GitHub: "GH" } }, "a kind without short names is left out");
+  const none = set(cleared, "secret", "GitHub", null);
+  assert.equal("folderShortNames" in none, false, "no field once the last one is cleared");
+});
+
+test("folder short names: invalid stored values are dropped on load; a vault without them is unchanged", () => {
+  const loaded = core.normalizeVaultData({
+    ...baseVault(),
+    folderShortNames: {
+      snippet: { 自定义: "跟单", 询盘接待: "新客", 没有这个目录: "无", 未分类: "未" },
+      secret: { AWS: "云服务器", GitHub: "  ", "": "空" },
+      other: { x: "y" },
+    },
+  });
+  assert.deepEqual(loaded.folderShortNames, { snippet: { 自定义: "跟单" } });
+  assert.equal("folderShortNames" in core.normalizeVaultData({ ...baseVault(), folderShortNames: "跟单" }), false);
+  assert.equal("folderShortNames" in core.normalizeVaultData({ ...baseVault(), folderShortNames: { snippet: { 自定义: 12 } } }), false);
+  // An old vault (no field) saves byte for byte as before.
+  const old = { items: baseVault().items, folders: baseVault().folders, nextSnippetNumber: baseVault().nextSnippetNumber };
+  assert.equal(JSON.stringify(core.normalizeVaultData(old)), JSON.stringify(baseVault()));
+  assert.equal(JSON.stringify(core.synchronizeVaultData(old.items, old.folders, old.nextSnippetNumber)).includes("folderShortNames"), false);
+});
+
+test("folder short names move with a rename and go with a delete", () => {
+  const vault = set(set(baseVault(), "secret", "AWS", "云"), "snippet", "自定义", "跟单");
+  const renamed = core.renameFolder(vault, "secret", "AWS", "云服务").data;
+  assert.deepEqual(renamed.folderShortNames.secret, { 云服务: "云" });
+  assert.deepEqual(renamed.folderShortNames.snippet, { 自定义: "跟单" }, "the other kind is untouched");
+  const deleted = core.deleteFolder(renamed, "snippet", "自定义").data;
+  assert.equal(deleted.folderShortNames.snippet, undefined);
+  assert.deepEqual(core.deleteFolder(deleted, "secret", "云服务").data.folderShortNames, undefined);
+  // A new folder that reuses a deleted name does not inherit the old short name.
+  const again = core.normalizeVaultData({ ...deleted, folders: addFolder(deleted.folders, "snippet", "自定义").folders });
+  assert.equal(again.folderShortNames?.snippet, undefined);
+});
+
+test("folder short names survive scoped backups (JSON round trip), merges and replaces; old backups still import", () => {
+  const vault = set(set(baseVault(), "secret", "GitHub", "GH"), "snippet", "自定义", "跟单");
+  const fileOf = (scope) => JSON.parse(JSON.stringify(core.vaultDataForBackupScope(vault, scope)));
+  assert.deepEqual(fileOf("snippet").folderShortNames, { snippet: { 自定义: "跟单" } });
+  assert.deepEqual(fileOf("secret").folderShortNames, { secret: { GitHub: "GH" } });
+
+  // Restoring into an empty vault brings them back.
+  const empty = core.normalizeVaultData({ items: [], folders: { secret: [], snippet: [] } });
+  const replaced = core.mergeImportedVaultData(empty, core.normalizeVaultData(fileOf("snippet")), "replace", () => "id", "snippet").data;
+  assert.deepEqual(replaced.folderShortNames, { snippet: { 自定义: "跟单" } });
+  const merged = core.mergeImportedVaultData(empty, core.normalizeVaultData(fileOf("secret")), "merge", () => "id", "secret").data;
+  assert.deepEqual(merged.folderShortNames, { secret: { GitHub: "GH" } });
+  const whole = core.mergeImportedVaultData(empty, core.normalizeVaultData(JSON.parse(JSON.stringify(vault))), "replace", () => "id").data;
+  assert.deepEqual(whole.folderShortNames, vault.folderShortNames);
+
+  // Merging: what is here wins over the backup.
+  const here = set(baseVault(), "snippet", "自定义", "客");
+  assert.deepEqual(core.mergeImportedVaultData(here, core.normalizeVaultData(fileOf("snippet")), "merge", () => "id", "snippet").data.folderShortNames, { snippet: { 自定义: "客" } });
+
+  // An old backup has no short names: merge keeps the ones here; replacing one kind keeps the other kind's.
+  const oldBackup = JSON.parse(JSON.stringify(core.vaultDataForBackupScope(baseVault(), "snippet")));
+  assert.equal("folderShortNames" in oldBackup, false);
+  assert.deepEqual(core.mergeImportedVaultData(vault, core.normalizeVaultData(oldBackup), "merge", () => "id", "snippet").data.folderShortNames, vault.folderShortNames);
+  const replacedOld = core.mergeImportedVaultData(vault, core.normalizeVaultData(oldBackup), "replace", () => "id", "snippet").data;
+  assert.deepEqual(replacedOld.folderShortNames, { secret: { GitHub: "GH" } });
+  assert.equal(replacedOld.items.filter((item) => item.kind === "secret").length, 3);
+});
+
 test("bulk helpers move, trash and restore only the chosen active items", () => {
   const items = baseVault().items;
   const moved = core.moveItemsToFolder(items, ["s1", "s2", "n1"], "GitHub", 9);

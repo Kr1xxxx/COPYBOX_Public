@@ -1,4 +1,5 @@
 import { normalizeSnippetNumbers } from "./clipbox-order.ts";
+import { FOLDER_SHORT_NAME_ERROR, normalizeFolderShortName } from "./folder-short-name.ts";
 import { STANDARD_SNIPPET_FOLDERS } from "./snippet-folders.ts";
 
 export type ItemKind = "secret" | "snippet";
@@ -69,9 +70,12 @@ export type SecretItem = {
 
 export type FolderRegistry = Record<ItemKind, string[]>;
 export type FolderColors = Record<ItemKind, Record<string, string>>;
+// Short names the person set for their own folders, shown on the mini window's folder tabs (D-048). Optional and only
+// written when there is at least one, so a vault without them is saved exactly as before.
+export type FolderShortNames = Partial<Record<ItemKind, Record<string, string>>>;
 // `sharedSeen`: ids of company 话术 this vault has already received, so one deleted on purpose is not added again. It sits in the
 // vault (same encrypted save as the 话术, same backups) so a failed save cannot lose one without the other.
-export type VaultData = { items: SecretItem[]; folders: FolderRegistry; nextSnippetNumber: number; folderColors?: FolderColors; sharedSeen?: string[] };
+export type VaultData = { items: SecretItem[]; folders: FolderRegistry; nextSnippetNumber: number; folderColors?: FolderColors; folderShortNames?: FolderShortNames; sharedSeen?: string[] };
 export type ImportStrategy = "merge" | "replace";
 export type BackupScope = ItemKind;
 export type RefreshContext = {
@@ -382,6 +386,10 @@ export function normalizeVaultData(payload: unknown): VaultData {
     ? (payload as Partial<VaultData>).folderColors
     : undefined;
   const folderColors = normalizeFolderColors(suppliedColors, folders);
+  const suppliedShortNames = !Array.isArray(payload) && payload && typeof payload === "object"
+    ? (payload as Partial<VaultData>).folderShortNames
+    : undefined;
+  const folderShortNames = normalizeFolderShortNames(suppliedShortNames, folders);
   const suppliedSeen = !Array.isArray(payload) && payload && typeof payload === "object"
     ? (payload as Partial<VaultData>).sharedSeen
     : undefined;
@@ -391,6 +399,7 @@ export function normalizeVaultData(payload: unknown): VaultData {
     folders,
     nextSnippetNumber: numbered.nextSnippetNumber,
     ...(folderColors ? { folderColors } : {}),
+    ...(folderShortNames ? { folderShortNames } : {}),
     ...(sharedSeen.length ? { sharedSeen } : {}),
   };
 }
@@ -414,6 +423,24 @@ function normalizeFolderColors(value: unknown, folders: FolderRegistry): FolderC
   return any ? result : undefined;
 }
 
+// Keeps a short name only for an existing own folder (never a standard 话术 folder, whose short name is fixed) and only
+// when it is valid; a kind without any is left out, and so is the whole field when nothing is left.
+function normalizeFolderShortNames(value: unknown, folders: FolderRegistry): FolderShortNames | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const result: FolderShortNames = {};
+  for (const kind of ["secret", "snippet"] as const) {
+    const source = (value as FolderShortNames)[kind];
+    if (!source || typeof source !== "object") continue;
+    const kept: Record<string, string> = {};
+    for (const [folder, raw] of Object.entries(source)) {
+      const shortName = normalizeFolderShortName(raw);
+      if (shortName && folders[kind].includes(folder) && !isStandardSnippetFolder(kind, folder)) kept[folder] = shortName;
+    }
+    if (Object.keys(kept).length) result[kind] = kept;
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+
 function isStandardSnippetFolder(kind: ItemKind, folder: string) {
   return kind === "snippet" && (STANDARD_SNIPPET_FOLDERS as readonly string[]).includes(folder);
 }
@@ -433,6 +460,8 @@ export function renameFolder(data: VaultData, kind: ItemKind, from: string, rawT
   const colors = data.folderColors?.[kind] || {};
   const nextColors = { ...colors };
   if (nextColors[from]) { nextColors[to] = nextColors[from]; delete nextColors[from]; }
+  const nextShortNames = { ...(data.folderShortNames?.[kind] || {}) };
+  if (nextShortNames[from]) { nextShortNames[to] = nextShortNames[from]; delete nextShortNames[from]; }
   return {
     data: normalizeVaultData({
       ...data,
@@ -441,6 +470,7 @@ export function renameFolder(data: VaultData, kind: ItemKind, from: string, rawT
         ? { ...item, folder: to, snippetMeta: item.snippetMeta ? { ...item.snippetMeta, stage: to } : item.snippetMeta }
         : item),
       folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors },
+      folderShortNames: { ...data.folderShortNames, [kind]: nextShortNames },
     }),
   };
 }
@@ -455,6 +485,8 @@ export function deleteFolder(data: VaultData, kind: ItemKind, folder: string): {
   if (kind === "snippet" && inFolder.length > 0) return { data, moved: 0, error: `目录里还有 ${inFolder.length} 条话术，请先移走再删除` };
   const nextColors = { ...(data.folderColors?.[kind] || {}) };
   delete nextColors[folder];
+  const nextShortNames = { ...(data.folderShortNames?.[kind] || {}) };
+  delete nextShortNames[folder];
   return {
     moved: inFolder.length,
     data: normalizeVaultData({
@@ -462,6 +494,7 @@ export function deleteFolder(data: VaultData, kind: ItemKind, folder: string): {
       folders: { ...data.folders, [kind]: data.folders[kind].filter((value) => value !== folder) },
       items: data.items.map((item) => (item.kind || "secret") === kind && item.folder === folder ? { ...item, folder: "" } : item),
       folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors },
+      folderShortNames: { ...data.folderShortNames, [kind]: nextShortNames },
     }),
   };
 }
@@ -472,6 +505,18 @@ export function setFolderColor(data: VaultData, kind: ItemKind, folder: string, 
   if (color && HEX_COLOR.test(color)) nextColors[folder] = color.toLowerCase();
   else delete nextColors[folder];
   return normalizeVaultData({ ...data, folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors } });
+}
+
+// "" or null goes back to the default (the first two characters); a value that is too long is refused, never cut.
+export function setFolderShortName(data: VaultData, kind: ItemKind, folder: string, raw: string | null): { data: VaultData; error?: string } {
+  if (!data.folders[kind].includes(folder)) return { data, error: "目录不存在" };
+  if (isStandardSnippetFolder(kind, folder)) return { data, error: "标准话术目录的简称是固定的" };
+  const shortName = normalizeFolderShortName(raw ?? "");
+  if (shortName === null) return { data, error: FOLDER_SHORT_NAME_ERROR };
+  const nextShortNames = { ...(data.folderShortNames?.[kind] || {}) };
+  if (shortName) nextShortNames[folder] = shortName;
+  else delete nextShortNames[folder];
+  return { data: normalizeVaultData({ ...data, folderShortNames: { ...data.folderShortNames, [kind]: nextShortNames } }) };
 }
 
 export function moveItemsToFolder(items: SecretItem[], ids: readonly string[], folder: string, now: number) {
@@ -549,8 +594,8 @@ export function splitSearchHighlight(text: string, query: string): { text: strin
   return pieces;
 }
 
-export function synchronizeVaultData(items: SecretItem[], folders: FolderRegistry, nextSnippetNumber = 1, folderColors?: FolderColors, sharedSeen?: string[]): VaultData {
-  return normalizeVaultData({ items, folders, nextSnippetNumber, folderColors, sharedSeen });
+export function synchronizeVaultData(items: SecretItem[], folders: FolderRegistry, nextSnippetNumber = 1, folderColors?: FolderColors, sharedSeen?: string[], folderShortNames?: FolderShortNames): VaultData {
+  return normalizeVaultData({ items, folders, nextSnippetNumber, folderColors, folderShortNames, sharedSeen });
 }
 
 export function addFolder(registry: FolderRegistry, kind: ItemKind, rawName: string) {
@@ -596,6 +641,7 @@ export function vaultDataForBackupScope(data: VaultData, scope: BackupScope): Va
     ...(normalized.folderColors?.[scope] && Object.keys(normalized.folderColors[scope]).length
       ? { folderColors: { secret: {}, snippet: {}, [scope]: normalized.folderColors[scope] } as FolderColors }
       : {}),
+    ...(normalized.folderShortNames?.[scope] ? { folderShortNames: { [scope]: normalized.folderShortNames[scope] } } : {}),
   };
 }
 
@@ -616,8 +662,9 @@ export function mergeImportedVaultData(
     const nextSnippetNumber = scope === "snippet" ? source.nextSnippetNumber : current.nextSnippetNumber;
     const otherKind = scope === "secret" ? "snippet" : "secret";
     const folderColors: FolderColors = { secret: {}, snippet: {}, [otherKind]: current.folderColors?.[otherKind] || {}, [scope]: source.folderColors?.[scope] || {} };
+    const folderShortNames: FolderShortNames = { [otherKind]: current.folderShortNames?.[otherKind] || {}, [scope]: source.folderShortNames?.[scope] || {} };
     return {
-      data: normalizeVaultData({ items: [...source.items, ...retained], folders, nextSnippetNumber, folderColors, sharedSeen: scope === "snippet" ? [...(current.sharedSeen || []), ...(source.sharedSeen || [])] : current.sharedSeen }),
+      data: normalizeVaultData({ items: [...source.items, ...retained], folders, nextSnippetNumber, folderColors, folderShortNames, sharedSeen: scope === "snippet" ? [...(current.sharedSeen || []), ...(source.sharedSeen || [])] : current.sharedSeen }),
       importedCount: source.items.length,
     };
   }
@@ -666,6 +713,7 @@ export function mergeImportedVaultData(
     folders: mergeFolderRegistries(current.folders, source.folders),
     nextSnippetNumber: Math.max(current.nextSnippetNumber, source.nextSnippetNumber),
     folderColors: mergeFolderColors(current.folderColors, source.folderColors),
+    folderShortNames: mergeFolderShortNames(current.folderShortNames, source.folderShortNames),
     sharedSeen: [...(current.sharedSeen || []), ...(source.sharedSeen || [])],
   });
   return {
@@ -675,6 +723,15 @@ export function mergeImportedVaultData(
 }
 
 function mergeFolderColors(current?: FolderColors, incoming?: FolderColors): FolderColors | undefined {
+  if (!current && !incoming) return undefined;
+  return {
+    secret: { ...(incoming?.secret || {}), ...(current?.secret || {}) },
+    snippet: { ...(incoming?.snippet || {}), ...(current?.snippet || {}) },
+  };
+}
+
+// Like the colours: what is already here wins over the backup.
+function mergeFolderShortNames(current?: FolderShortNames, incoming?: FolderShortNames): FolderShortNames | undefined {
   if (!current && !incoming) return undefined;
   return {
     secret: { ...(incoming?.secret || {}), ...(current?.secret || {}) },

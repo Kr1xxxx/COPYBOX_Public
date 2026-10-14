@@ -1,5 +1,6 @@
 // Encrypted image store for the 图片 section (docs/specs/image-section.md, "Storage").
 // Lives in IndexedDB `clipbox-images`; never touches the vault (`clipbox.vault.v1`).
+import { FOLDER_SHORT_NAME_ERROR, normalizeFolderShortName } from "./folder-short-name.ts";
 
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -36,7 +37,9 @@ export type ImageMeta = {
   deletedAt?: number;
 };
 
-export type ImageFolder = { name: string; color?: string };
+// `shortName`: what the mini window's folder tab shows instead of the first two characters (D-048). Optional, so folder
+// lists saved before it existed need no change; an older app keeps it untouched when it renames or recolours.
+export type ImageFolder = { name: string; color?: string; shortName?: string };
 
 export type ImageStore = {
   list(): Promise<ImageMeta[]>;
@@ -56,6 +59,8 @@ export type ImageStore = {
   createFolder(name: string): Promise<ImageFolder[]>;
   renameFolder(from: string, to: string): Promise<ImageFolder[]>;
   setFolderColor(name: string, color: string): Promise<ImageFolder[]>;
+  // null or "" goes back to the default short name; a value longer than two characters is refused (「最多两个字」).
+  setFolderShortName(name: string, shortName: string | null): Promise<ImageFolder[]>;
   // Moves a folder to another folder's place in the saved order (the folder list is already stored in order).
   reorderFolders(source: string, target: string): Promise<ImageFolder[]>;
   deleteFolder(name: string): Promise<ImageFolder[]>;
@@ -78,7 +83,7 @@ type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 
 // Writes still under way (encrypting or committing), so quitting and restoring a backup can wait for them.
 const pendingWrites = new Set<Promise<void>>();
-const WRITE_METHODS = ["add", "rename", "remove", "trash", "restore", "markUsed", "moveImage", "setPinned", "createFolder", "renameFolder", "reorderFolders", "setFolderColor", "deleteFolder"] as const satisfies readonly (keyof ImageStore)[];
+const WRITE_METHODS = ["add", "rename", "remove", "trash", "restore", "markUsed", "moveImage", "setPinned", "createFolder", "renameFolder", "reorderFolders", "setFolderColor", "setFolderShortName", "deleteFolder"] as const satisfies readonly (keyof ImageStore)[];
 
 function trackWrites(store: ImageStore): ImageStore {
   const tracked: Record<string, unknown> = { ...store };
@@ -305,7 +310,16 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
     const record = (await request(db.transaction("meta").objectStore("meta").get(FOLDERS_ID))) as MetaRecord | undefined;
     if (!record) return [];
     const plaintext = await unseal(key, "meta", { ...record, ciphertext: base64ToBytes(record.ciphertext) });
-    return (JSON.parse(new TextDecoder().decode(plaintext)) as { folders: ImageFolder[] }).folders;
+    const folders = (JSON.parse(new TextDecoder().decode(plaintext)) as { folders: ImageFolder[] }).folders;
+    // A short name that is not valid (empty, too long, not text) is ignored, as if none was set.
+    return folders.map((entry) => {
+      if (!("shortName" in entry)) return entry;
+      const shortName = normalizeFolderShortName(entry.shortName);
+      if (shortName) return shortName === entry.shortName ? entry : { ...entry, shortName };
+      const rest = { ...entry };
+      delete rest.shortName;
+      return rest;
+    });
   }
 
   async function sealFolders(folders: ImageFolder[]): Promise<MetaRecord> {
@@ -523,6 +537,20 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       const folders = await readFolders();
       const target = findFolder(folders, name);
       return updateFolders(folders.map((entry) => (entry === target ? { ...entry, color } : entry)));
+    },
+
+    async setFolderShortName(name, raw) {
+      const shortName = normalizeFolderShortName(raw ?? "");
+      if (shortName === null) throw new Error(FOLDER_SHORT_NAME_ERROR);
+      const folders = await readFolders();
+      const target = findFolder(folders, name);
+      return updateFolders(folders.map((entry) => {
+        if (entry !== target) return entry;
+        const next: ImageFolder = { ...entry };
+        if (shortName) next.shortName = shortName;
+        else delete next.shortName;
+        return next;
+      }));
     },
 
     async deleteFolder(name) {

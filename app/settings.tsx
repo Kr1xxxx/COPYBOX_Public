@@ -28,7 +28,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
@@ -39,6 +39,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
   onFolderRename: (kind: SettingsFolderKind, from: string, to: string) => Promise<string>;
   onFolderDelete: (kind: SettingsFolderKind, folder: string) => Promise<string>;
   onFolderColor: (kind: SettingsFolderKind, folder: string, color: string | null) => void;
+  onFolderShortName: (kind: SettingsFolderKind, folder: string, shortName: string | null) => Promise<string>;
   onFolderMove: (kind: SettingsFolderKind, folder: string, delta: -1 | 1) => void;
   onFolderReorder: (kind: SettingsFolderKind, source: string, target: string) => void;
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
@@ -147,7 +148,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
             </div>
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-folders" hidden={hideSection("folders", "set-folders")}><h3 id="set-folders">目录</h3>
-            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onMove={onFolderMove} onReorder={onFolderReorder} />
+            <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onShortName={onFolderShortName} onMove={onFolderMove} onReorder={onFolderReorder} />
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密，不含图片" : `用独立密码加密，不含${SECRET_WORD}和图片`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}

@@ -300,6 +300,51 @@ test("create, rename, recolour and delete folders with Chinese messages", async 
   }
 });
 
+test("folder short names (D-048): set, kept on rename and recolour, cleared, dropped with the folder, and too long is refused", async () => {
+  const { open } = setup();
+  const store = await open();
+  await store.createFolder("产品图片");
+  await store.createFolder("Logo");
+  assert.deepEqual(await store.setFolderShortName("产品图片", " 产品 "), [{ name: "产品图片", shortName: "产品" }, { name: "Logo" }]);
+  await assert.rejects(store.setFolderShortName("产品图片", "产品图"), { message: "最多两个字" });
+  await assert.rejects(store.setFolderShortName("Logo", "LOGOS"), { message: "最多两个字" });
+  await assert.rejects(store.setFolderShortName("没有", "无"), { message: "找不到这个目录" });
+  assert.equal((await store.listFolders())[0].shortName, "产品", "a refused value changes nothing");
+
+  await store.setFolderColor("产品图片", "#112233");
+  assert.deepEqual((await store.renameFolder("产品图片", "样品图片"))[0], { name: "样品图片", color: "#112233", shortName: "产品" });
+  assert.deepEqual((await (await open()).listFolders())[0], { name: "样品图片", color: "#112233", shortName: "产品" }, "survives a new session");
+
+  assert.deepEqual((await store.setFolderShortName("样品图片", null))[0], { name: "样品图片", color: "#112233" });
+  await store.setFolderShortName("样品图片", "样品");
+  assert.deepEqual((await store.setFolderShortName("样品图片", "  "))[0], { name: "样品图片", color: "#112233" }, "empty goes back to the default");
+
+  await store.setFolderShortName("Logo", "LG");
+  await store.deleteFolder("Logo");
+  await store.createFolder("Logo");
+  assert.deepEqual((await store.listFolders())[1], { name: "Logo" }, "a folder made again with the same name starts without the old short name");
+});
+
+test("folder short names travel in a full backup: the store's records copied as they are open with the short name", async () => {
+  const { encodeValue, decodeValue } = await import("../app/data-transfer.ts");
+  const { open, rows } = setup("device-key-backup");
+  const store = await open();
+  await store.createFolder("产品图片");
+  await store.setFolderShortName("产品图片", "产品");
+  await store.add(pngBlob(), "图", "产品图片");
+  const copied = fakeIndexedDB();
+  const restored = await openImageStore("device-key-backup", { indexedDB: copied });
+  await restored.listFolders();
+  // What a full backup does: every record of the store, written to the file and read back.
+  const file = JSON.parse(JSON.stringify(encodeValue({ meta: [...rows("meta").values()], blobs: [...rows("blobs").values()] })));
+  const tables = decodeValue(file);
+  const target = copied.databases.get("clipbox-images").data;
+  for (const [name, list] of Object.entries(tables)) for (const row of list) target.get(name).set(row.id, row);
+  const reopened = await openImageStore("device-key-backup", { indexedDB: copied });
+  assert.deepEqual(await reopened.listFolders(), [{ name: "产品图片", shortName: "产品" }]);
+  assert.equal((await reopened.list())[0].folder, "产品图片");
+});
+
 test("at most 30 folders", async () => {
   const { open } = setup();
   const store = await open();
