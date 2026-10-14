@@ -53,3 +53,6 @@ yarn-error.log*
 /dist-tauri/
 /src-tauri/target/
 /src-tauri/gen/
+
+# python caches (tools/brand scripts)
+__pycache__/
