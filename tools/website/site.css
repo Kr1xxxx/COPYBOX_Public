@@ -99,8 +99,6 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .nav a:hover { color: var(--ink); text-decoration: none; }
 .nav a[aria-current="page"] { color: var(--ink); font-weight: 600; }
 .header-actions { display: flex; align-items: center; gap: 14px; margin-left: auto; font-size: 14px; font-weight: 500; }
-.header-actions .try { color: var(--ink-2); }
-.header-actions .try:hover { color: var(--ink); text-decoration: none; }
 .icon-btn {
   display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 9999px;
   background: transparent; color: var(--muted); cursor: pointer;
@@ -275,21 +273,12 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 .toc a:active { transform: scale(.97); }
 .note { margin-top: 20px; padding: 16px 20px; border-radius: var(--r-small); background: var(--panel); color: var(--ink-2); font-size: 15px; }
 
-/* Single-card pages: 404 and the preview passphrase */
+/* Single-card page: 404 */
 .solo { display: grid; place-items: center; padding: 96px var(--gutter); min-height: calc(100vh - 56px - 220px); }
 .solo-card { width: 100%; max-width: 440px; padding: 40px 32px; text-align: center; }
 .solo-card h1 { font-size: 28px; }
 .solo-card p { margin-top: 10px; color: var(--muted); }
 .solo-card .pill { margin-top: 28px; }
-.gate-form { display: flex; gap: 8px; margin-top: 28px; }
-.gate-form input {
-  flex: 1 1 0; width: 0; min-width: 0; min-height: 44px; padding: 0 18px; border-radius: 9999px;
-  border: 1px solid var(--border); background: var(--page); color: var(--ink); font: inherit;
-}
-.gate-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.gate-form .pill { margin: 0; min-height: 44px; padding: 0 22px; border: 0; font: inherit; font-weight: 500; cursor: pointer; }
-.solo-card p.msg { margin-top: 14px; color: var(--accent); font-size: 14px; font-weight: 500; }
-.solo-card p.msg:empty { display: none; }
 .solo-card .back { display: inline-block; margin-top: 20px; font-size: 14px; }
 
 /* Footer */
@@ -324,7 +313,6 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   .header-row { gap: 0 12px; padding-top: 8px; }
   .nav { order: 3; width: 100%; gap: 20px; padding: 2px 0 8px; overflow-x: auto; }
   .header-actions { gap: 6px; }
-  .header-actions .try { display: none; }
   .section { padding-block: 48px; }
   .hero { padding-block: 40px 32px; }
   .hero .wrap { gap: 32px; }

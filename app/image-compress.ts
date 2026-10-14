@@ -2,10 +2,8 @@
 // The desktop shell does the network call; here we keep the monthly count and decide what to tell the user.
 import type { ClipboxDesktop } from "./desktop-bridge";
 
-// Shared keys built in on purpose (the owner's decision); up to two own keys can be set in 设置 instead.
-// The built-in keys take turns so one of them is not used up first.
-export const TINIFY_DEFAULT_KEYS = ["NMqwhKbFJBCGnHHPj1FXLNHfbLsN8mjt", "Ycp4Hxb1XgStc5VZjlZrVB1Rt2p0Nhrz"];
-export const TINIFY_DEFAULT_KEY = TINIFY_DEFAULT_KEYS[0];
+// No key is in the repo (owner, 2026-10-14). The installer may carry keys from a CI secret, which the shell keeps and
+// the page names as "builtin:N"; up to two own keys set in 设置 come first. With neither, pictures are stored as they are.
 export const TINIFY_ROTATION_STORAGE = "clipbox.tinify.rotation.v1";
 export const TINIFY_KEY_STORAGE = "clipbox.tinify.key.v1";
 export const TINIFY_KEY2_STORAGE = "clipbox.tinify.key2.v1";
@@ -44,9 +42,6 @@ export function readCustomKeys(storage: KeyValueStorage | undefined): [string, s
   return [readStored(storage, TINIFY_KEY_STORAGE), readStored(storage, TINIFY_KEY2_STORAGE)];
 }
 
-export function readTinifyKey(storage: KeyValueStorage | undefined): string {
-  return readCustomKeys(storage).find(Boolean) || TINIFY_DEFAULT_KEY;
-}
 
 // Own keys: the first is used until it is refused (wrong key or quota used up), then the second, until the month changes.
 type CustomState = { month: string; bad: number[] };
@@ -73,7 +68,7 @@ export function customKeyOrder(storage: KeyValueStorage | undefined, now: Date):
   return usable.length ? usable : set;
 }
 
-// For 设置: which own key the next picture uses (0 = first, 1 = second, null = built-in keys), and which were refused this month.
+// For 设置: which own key the next picture uses (0 = first, 1 = second, null = none set), and which were refused this month.
 export function customKeyStatus(storage: KeyValueStorage | undefined, now: Date): { active: number | null; refused: number[] } {
   const keys = readCustomKeys(storage);
   const order = customKeyOrder(storage, now);
@@ -110,21 +105,11 @@ function writeRotation(storage: KeyValueStorage | undefined, rotation: Rotation)
 
 // The built-in keys to try for the next picture, in order: the one whose turn it is first, then the others.
 // A key that was refused this month (wrong key or quota used up) is left out until the month changes.
-export function builtInKeyOrder(storage: KeyValueStorage | undefined, now: Date): number[] {
+export function builtInKeyOrder(storage: KeyValueStorage | undefined, now: Date, count: number): number[] {
   const { next, bad } = readRotation(storage, now);
-  const order = TINIFY_DEFAULT_KEYS.map((_, i) => (next + i) % TINIFY_DEFAULT_KEYS.length);
+  const order = Array.from({ length: count }, (_, i) => (next + i) % count);
   const usable = order.filter((i) => !bad.includes(i));
   return usable.length ? usable : order;
-}
-
-function advanceRotation(storage: KeyValueStorage | undefined, now: Date, used: number) {
-  const rotation = readRotation(storage, now);
-  writeRotation(storage, { ...rotation, next: (used + 1) % TINIFY_DEFAULT_KEYS.length });
-}
-
-function markKeyBad(storage: KeyValueStorage | undefined, now: Date, index: number) {
-  const rotation = readRotation(storage, now);
-  if (!rotation.bad.includes(index)) writeRotation(storage, { ...rotation, bad: [...rotation.bad, index] });
 }
 
 export function formatBytes(size: number): string {
@@ -132,6 +117,8 @@ export function formatBytes(size: number): string {
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
+
+export const COMPRESS_NO_KEY_NOTICE = "未压缩：请先在 设置 → 数据 → 图片压缩 填写压缩密钥";
 
 export const COMPRESS_LIMIT_MESSAGE = `本月图片压缩次数已用完（${COMPRESS_MONTHLY_LIMIT}/${COMPRESS_MONTHLY_LIMIT}），下个月 1 号恢复`;
 
@@ -152,6 +139,12 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
   const now = deps.now ?? new Date();
   const same: CompressResult = { blob: file, saved: 0, failed: false, notice: "" };
   if (!bridge?.compressImage || !COMPRESSIBLE_TYPES.includes(file.type)) return same;
+  const keys = readCustomKeys(storage);
+  const own = customKeyOrder(storage, now);
+  let builtIn = 0;
+  if (!own.length) { try { builtIn = Math.max(0, Math.floor(Number(await bridge.compressBuiltInCount?.()) || 0)); } catch { builtIn = 0; } }
+  // No key at all: nothing is sent and nothing is counted.
+  if (!own.length && !builtIn) return { ...same, failed: true, notice: COMPRESS_NO_KEY_NOTICE };
   if (readCompressUsage(storage, now) >= COMPRESS_MONTHLY_LIMIT) throw new Error(COMPRESS_LIMIT_MESSAGE);
   type Outcome = Awaited<ReturnType<NonNullable<ClipboxDesktop["compressImage"]>>>;
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -159,8 +152,6 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
     try { return await bridge.compressImage!(bytes, key); } catch { return { ok: false, reason: "service" }; }
   };
   let result: Outcome = { ok: false, reason: "service" };
-  const keys = readCustomKeys(storage);
-  const own = customKeyOrder(storage, now);
   if (own.length) {
     // Own keys: the first one, and on a refusal (key or limit) the second one, which then stays in use for the month.
     for (const index of own) {
@@ -171,12 +162,13 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
       if (!state.bad.includes(index)) writeCustomState(storage, { ...state, bad: [...state.bad, index] });
     }
   } else {
-    // Built-in keys take turns. A key that is refused (key or limit) is retried once on the other key and skipped for the month.
-    for (const index of builtInKeyOrder(storage, now)) {
-      result = await send(TINIFY_DEFAULT_KEYS[index]);
-      if (result.ok) { advanceRotation(storage, now, index); break; }
+    // Built-in keys take turns. A key that is refused (key or limit) is retried on the next one and skipped for the month.
+    for (const index of builtInKeyOrder(storage, now, builtIn)) {
+      result = await send(`builtin:${index}`);
+      if (result.ok) { writeRotation(storage, { ...readRotation(storage, now), next: (index + 1) % builtIn }); break; }
       if (result.reason !== "key" && result.reason !== "limit") break;
-      markKeyBad(storage, now, index);
+      const rotation = readRotation(storage, now);
+      if (!rotation.bad.includes(index)) writeRotation(storage, { ...rotation, bad: [...rotation.bad, index] });
     }
   }
   if (!result.ok) return { ...same, failed: true, notice: `${FAILURE_TEXT[result.reason] || "压缩服务暂时不可用"}，已保存原图` };

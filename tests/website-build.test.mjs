@@ -29,17 +29,12 @@ import { appVersionFrom } from "../scripts/sync-version.mjs";
 const localInstallerVersion = appVersionFrom(readFileSync("tools/preview/VERSION", "utf8"));
 
 const pageKeys = ["index.html", "download/index.html", "help/index.html", "privacy/index.html"];
-const allPageKeys = [...pageKeys, "404.html", "preview-gate.html"];
+const allPageKeys = [...pageKeys, "404.html"];
 
-// Builds into a temp dir with a fake preview and installer. Placeholder icons and screenshots are written unless
+// Builds into a temp dir with a fake installer. Placeholder icons and screenshots are written unless
 // `assets` is false, in which case --icons and --images point at folders that do not exist.
 async function buildSite({ assets = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "clipbox-website-"));
-  const preview = join(dir, "preview");
-  mkdirSync(join(preview, "assets/static"), { recursive: true });
-  writeFileSync(join(preview, "index.html"), "<title>preview</title>");
-  writeFileSync(join(preview, "app-win.html"), "<title>app</title>");
-  writeFileSync(join(preview, "assets/static/x.js"), "console.log(1);");
   const installer = Buffer.concat([Buffer.from("MZ"), Buffer.alloc(4096, 7)]);
   writeFileSync(join(dir, "setup.exe"), installer);
   const icons = join(dir, "icons");
@@ -56,7 +51,7 @@ async function buildSite({ assets = true } = {}) {
   console.log = () => {};
   console.warn = (...args) => warnings.push(args.join(" "));
   try {
-    await main(["--installer", join(dir, "setup.exe"), "--installer-version", localInstallerVersion, "--preview", preview, "--out", out, "--icons", icons, "--images", images]);
+    await main(["--installer", join(dir, "setup.exe"), "--installer-version", localInstallerVersion, "--out", out, "--icons", icons, "--images", images]);
   } finally {
     console.log = log;
     console.warn = warn;
@@ -103,14 +98,13 @@ test("website pages: head, header, body and footer are joined and the current na
   assert.notEqual(cssAssetKey("body{}"), cssAssetKey("body{ }"));
 });
 
-test("website build writes every page, the stylesheet, icons, images, preview, installer and latest.json", () => {
+test("website build writes every page, the stylesheet, icons, images, installer and latest.json, and no web preview", () => {
   const { out, installer, read, warnings } = site;
   assert.deepEqual(warnings, []);
   const home = read("index.html");
   assert.match(home, /href="\/download\/Copyboxx-Setup\.exe"/);
-  assert.match(home, /href="\/preview\/"/);
-  assert.equal(read("preview/assets/static/x.js"), "console.log(1);");
-  assert.equal(read("preview/app-win.html"), "<title>app</title>");
+  assert.ok(!existsSync(join(out, "preview")));
+  for (const key of allPageKeys) assert.doesNotMatch(read(key), /\/preview\/|在线试用|口令/, key);
   assert.deepEqual(readFileSync(join(out, "download/Copyboxx-Setup.exe")), installer);
   for (const name of iconFiles) assert.equal(read(name), `icon ${name}`);
   for (const name of imageFiles) assert.equal(read(`images/${name}`), `image ${name}`);
@@ -143,10 +137,6 @@ test("website build writes every page, the stylesheet, icons, images, preview, i
     "images/app-win-light.png",
     "index.html",
     "og-image.png",
-    "preview-gate.html",
-    "preview/app-win.html",
-    "preview/assets/static/x.js",
-    "preview/index.html",
     "privacy/index.html",
     "robots.txt",
     "site.webmanifest",
@@ -172,7 +162,7 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     const html = site.read(key);
     const page = sitePages.find((entry) => entry.key === key);
     const left = html.match(/__[A-Z_]+__/g) ?? [];
-    assert.deepEqual(left, key === "preview-gate.html" ? ["__MESSAGE__"] : [], key);
+    assert.deepEqual(left, [], key);
     assert.match(html, /^<!doctype html>\n<html lang="zh-CN">/, key);
     assert.ok(html.includes(`<title>${page.title}</title>`), key);
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/, key);
@@ -205,7 +195,6 @@ test("website pages: the current nav item is marked, and only that one", () => {
     "help/index.html": "/help/",
     "privacy/index.html": null,
     "404.html": null,
-    "preview-gate.html": null,
   };
   for (const [key, href] of Object.entries(expected)) {
     const marked = [...site.read(key).matchAll(/<a href="([^"]*)" aria-current="page">/g)].map((m) => m[1]);
@@ -278,7 +267,7 @@ test("website search-engine files: sitemap, robots.txt and the web manifest", ()
   const robots = site.read("robots.txt");
   assert.equal(robots, robotsTxt());
   assert.match(robots, /^User-agent: \*$/m);
-  assert.match(robots, /^Disallow: \/preview\/$/m);
+  assert.doesNotMatch(robots, /Disallow/);
   assert.match(robots, /^Sitemap: https:\/\/copyboxx\.com\/sitemap\.xml$/m);
 
   const manifest = JSON.parse(site.read("site.webmanifest"));
@@ -303,19 +292,7 @@ test("website build only warns when the icons or images folder is missing", asyn
   }
 });
 
-test("website preview gate keeps its form, message slot and noindex", () => {
-  const gate = site.read("preview-gate.html");
-  assert.match(gate, /<title>网页测试版 · Copyboxx<\/title>/);
-  assert.match(gate, /<meta name="robots" content="noindex">/);
-  assert.match(gate, /输入口令/);
-  assert.match(gate, /<form class="gate-form" method="post" action="\/preview\/">/);
-  assert.match(gate, /<input name="key" type="password"[^>]*autocapitalize="none"[^>]*aria-label="口令">/);
-  assert.match(gate, /<p class="msg" role="alert">__MESSAGE__<\/p>/);
-  assert.match(gate, /href="\/"/);
-  assert.match(readFileSync("tools/website/site.css", "utf8"), /p\.msg:empty \{ display: none; \}/);
-  const source = readFileSync("tools/website/preview-gate.html", "utf8");
-  assert.deepEqual(source.match(/__[A-Z]+__/g), ["__MESSAGE__"]);
-  assert.doesNotMatch(source, /<script|https?:\/\//);
+test("website 404 page", () => {
   const notFound = site.read("404.html");
   assert.match(notFound, /找不到这个页面/);
   assert.match(notFound, /<a class="pill" href="\/">回到首页<\/a>/);
@@ -413,10 +390,8 @@ test("website deploy: keys no longer in the build are removed, the key list is r
 test("website build refuses a file that is not a Windows program", async () => {
   const dir = mkdtempSync(join(tmpdir(), "clipbox-website-"));
   try {
-    mkdirSync(join(dir, "preview"));
-    writeFileSync(join(dir, "preview/index.html"), "x");
     writeFileSync(join(dir, "setup.exe"), "not a program");
-    await assert.rejects(main(["--installer", join(dir, "setup.exe"), "--preview", join(dir, "preview"), "--out", join(dir, "out")]), /MZ/);
+    await assert.rejects(main(["--installer", join(dir, "setup.exe"), "--out", join(dir, "out")]), /MZ/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

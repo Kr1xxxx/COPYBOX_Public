@@ -26,3 +26,16 @@
   count is local, a reinstall or cleared data resets it; the real limit is TinyPNG's own monthly allowance on the key.
   Rollback = revert the PR; stored pictures are ordinary pictures.
 - Status: Accepted.
+
+#### Amendment 2026-10-14: no key in the repo
+- Owner (2026-10-14, after the audit): 「tinypng 的密钥给我从公开仓库删掉」. The two built-in keys are removed from
+  `app/image-compress.ts`; nothing in the repo holds a key any more. They stay in the public git history, so they must be
+  revoked at tinypng.com and replaced with new ones.
+- Built-in keys now come only from the repo secret `CLIPBOX_TINIFY_KEYS` (comma-separated), read by
+  `src-tauri/src/tinify.rs` at compile time (`option_env!`) in `.github/workflows/tauri.yml`. The page never sees them:
+  it asks the shell how many there are (`tinify_builtin_count`) and names them `builtin:0`, `builtin:1`, … They take
+  turns as before (`clipbox.tinify.rotation.v1`). Own keys from 设置 still come first.
+- With no own key and no built-in key (a build without the secret, or the browser preview), nothing is sent or counted;
+  the picture is stored as it is and the toast says 「未压缩：请先在 设置 → 数据 → 图片压缩 填写压缩密钥」.
+- Limitation: a key built into the installer can still be dug out of it. Fully hiding it needs a proxy (e.g. a
+  Cloudflare Worker) that holds the key; not done here.

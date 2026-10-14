@@ -1,6 +1,6 @@
 // Builds the public website for copyboxx.com (see README.md):
-//   node tools/website/build.mjs [--installer <file>] [--preview <dir>] [--out <dir>] [--icons <dir>] [--images <dir>]
-// Defaults: --preview dist-preview, --out dist-website (relative to the repo root), --icons tools/website/icons,
+//   node tools/website/build.mjs [--installer <file>] [--out <dir>] [--icons <dir>] [--images <dir>]
+// Defaults: --out dist-website (relative to the repo root), --icons tools/website/icons,
 // --images tools/website/images. Without --installer the newest tauri-test-N Windows installer is downloaded from
 // GitHub Releases (GITHUB_TOKEN or GH_TOKEN is sent when set; the repo is private). In the Claude cloud environment
 // Node's fetch only goes through the proxy with NODE_USE_ENV_PROXY=1.
@@ -32,7 +32,7 @@ const placeholder = /__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/g;
 // Fills __VERSION__, __UPDATED__, __SIZE__ (and __SHA256__ when info.sha256 is given) plus any `values`
 // ({ PAGE_TITLE: "…" } fills __PAGE_TITLE__) in one pass, so filled-in text is never scanned again. A placeholder
 // without a value throws (the template and this build disagree), except the names in `keep`, which stay for the
-// Worker (preview-gate.html keeps __MESSAGE__).
+// Worker to fill in.
 export function renderPage(template, info, values = {}, keep = []) {
   const all = {
     VERSION: String(info.version).trim(),
@@ -61,7 +61,7 @@ export function escapeHtml(value) {
 }
 
 // Every page of the site: body source (relative to tools/website/), published key, canonical path, nav item, head
-// text. 404.html and preview-gate.html are left out of the sitemap and carry noindex.
+// text. 404.html is left out of the sitemap and carries noindex.
 export const sitePages = [
   { source: "pages/index.html", key: "index.html", path: "/", nav: "HOME", title: "Copyboxx · 复制盒",
     description: "Copyboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，断网也能用，内容加密保存。" },
@@ -73,8 +73,6 @@ export const sitePages = [
     description: "Copyboxx（复制盒）不收集你的内容：没有账号，没有服务器，数据加密后只保存在你的电脑上。" },
   { source: "404.html", key: "404.html", path: "/", nav: "", title: "找不到这个页面 · Copyboxx",
     description: "找不到这个页面。", noindex: true },
-  { source: "preview-gate.html", key: "preview-gate.html", path: "/preview/", nav: "", title: "网页测试版 · Copyboxx",
-    description: "Copyboxx 网页测试版，需要口令。", noindex: true, keep: ["MESSAGE"] },
 ];
 const navItems = ["HOME", "DOWNLOAD", "HELP"];
 
@@ -120,7 +118,7 @@ export function webManifest() {
 }
 
 export function robotsTxt() {
-  return `User-agent: *\nDisallow: /preview/\n\nSitemap: ${siteUrl}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml\n`;
 }
 
 // The indexable pages with lastmod = the update date ("YYYY-MM-DD"). The namespace is an identifier, not a link,
@@ -252,18 +250,12 @@ async function downloadInstaller() {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  const preview = resolve(repo, option(argv, "--preview", "dist-preview"));
   const out = resolve(repo, option(argv, "--out", "dist-website"));
   const icons = resolve(repo, option(argv, "--icons", join(here, "icons")));
   const images = resolve(repo, option(argv, "--images", join(here, "images")));
   const installerArg = option(argv, "--installer", "");
   const installerVersionArg = option(argv, "--installer-version", "");
-  if (!existsSync(join(preview, "index.html"))) {
-    console.error('Run "npm run preview:build" first.');
-    process.exit(1);
-  }
-
-  // The preview number of this checkout: the web preview under /preview/ is built from it.
+  // The preview number of this checkout (tools/preview/VERSION): the update date and the fallback version.
   const version = readFileSync(join(previewDir, "VERSION"), "utf8").trim();
   // The installer the site serves, and the version it really carries (D-048): from the release's own
   // release-version.json, or from --installer-version for a local file. Only a local file may fall back to the
@@ -317,7 +309,6 @@ export async function main(argv = process.argv.slice(2)) {
   writeFileSync(join(out, "site.webmanifest"), JSON.stringify(webManifest(), null, 2) + "\n");
   writeFileSync(join(out, "robots.txt"), robotsTxt());
   writeFileSync(join(out, "sitemap.xml"), sitemapXml(updated));
-  cpSync(preview, join(out, "preview"), { recursive: true });
   writeFileSync(join(out, installerPath), installer);
   writeFileSync(join(out, "download/latest.json"), JSON.stringify(latest, null, 2) + "\n");
 
