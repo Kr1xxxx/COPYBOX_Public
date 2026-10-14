@@ -128,7 +128,9 @@ function dataDirListing() {
     if (depth > 4 || !fs.existsSync(current)) return;
     for (const name of fs.readdirSync(current)) {
       const full = path.join(current, name);
-      const stat = fs.statSync(full);
+      // WebView2 creates and deletes its own temp files while the app runs; one that vanished mid-listing is skipped.
+      const stat = fs.statSync(full, { throwIfNoEntry: false });
+      if (!stat) continue;
       lines.push(`${path.relative(dir, full)}\t${stat.isDirectory() ? "dir" : stat.size}`);
       if (stat.isDirectory()) walk(full, depth + 1);
     }
