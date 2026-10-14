@@ -109,6 +109,40 @@ test("目录 groups start folded and open on click; 图片目录 can be created,
   await expect(again.getByRole("button", { name: "新建目录" })).toBeHidden();
 });
 
+test("风格 清爽: switches the colours, is kept after a reload, and 经典 brings the beige back", async ({ page }) => {
+  const dialog = page.locator(".settings-dialog");
+  const styles = dialog.getByRole("radiogroup", { name: "风格" });
+  await expect(styles).toBeVisible();
+  await expect(styles.getByRole("radio", { name: "经典" })).toHaveAttribute("aria-checked", "true");
+  const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await styles.getByRole("radio", { name: "清爽" }).click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.style)).toBe("fresh");
+  await expect.poll(background).toBe("rgb(248, 250, 252)");
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.style"))).toBe("fresh");
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.style)).toBe("fresh");
+  await expect.poll(background).toBe("rgb(248, 250, 252)");
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  const again = page.locator(".settings-dialog").getByRole("radiogroup", { name: "风格" });
+  await expect(again.getByRole("radio", { name: "清爽" })).toHaveAttribute("aria-checked", "true");
+  await again.getByRole("radio", { name: "经典" }).click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-style"))).toBe(false);
+  await expect.poll(background).toBe("rgb(250, 249, 245)");
+});
+
+test("风格 清爽 on a dark system: dark grey when following the system, light grey when 主题 is 浅色", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.locator(".settings-dialog").getByRole("radiogroup", { name: "风格" }).getByRole("radio", { name: "清爽" }).click();
+  await expect.poll(background).toBe("rgb(20, 23, 28)");
+  await page.evaluate(() => localStorage.setItem("clipbox.theme", "light"));
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
+  await expect.poll(background).toBe("rgb(248, 250, 252)");
+});
+
 test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
   await page.locator(".settings-dialog").getByRole("tab", { name: "数据" }).click();
   const radios = page.locator(".settings-dialog").getByRole("radiogroup", { name: "回收站自动清理" });

@@ -75,7 +75,7 @@ import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type StyleChoice, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
@@ -149,6 +149,8 @@ const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
+const STYLE_KEY = "clipbox.style";
+const STYLE_OPTIONS = ["classic", "fresh"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
 // 固定在最上层 for the full window: "1" when on, absent when off.
 const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
@@ -283,6 +285,7 @@ export default function Home() {
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => readStoredChoice<ThemeChoice>(THEME_KEY, THEME_OPTIONS, "system"));
+  const [style, setStyle] = useState<StyleChoice>(() => readStoredChoice<StyleChoice>(STYLE_KEY, STYLE_OPTIONS, "classic"));
   const [lastBackupAt, setLastBackupAt] = useState(() => {
     try { return Number(localStorage.getItem(LAST_BACKUP_KEY)) || 0; } catch { return 0; }
   });
@@ -1417,6 +1420,18 @@ export default function Home() {
     writeStoredChoice(THEME_KEY, next);
   }
 
+  // 风格 only changes the page's colours; the window chrome keeps following 主题.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (style === "classic") delete root.dataset.style;
+    else root.dataset.style = style;
+  }, [style]);
+
+  function chooseStyle(next: StyleChoice) {
+    setStyle(next);
+    writeStoredChoice(STYLE_KEY, next);
+  }
+
   async function openDataFolder() {
     try {
       await window.clipboxDesktop?.openDataFolder?.();
@@ -2208,6 +2223,8 @@ export default function Home() {
         onEmptyTrash={emptyTrash}
         theme={theme}
         onTheme={chooseTheme}
+        style={style}
+        onStyle={chooseStyle}
         lastBackupAt={lastBackupAt}
         onOpenDataFolder={openDataFolder}
         onClose={() => setSettingsOpen(false)}

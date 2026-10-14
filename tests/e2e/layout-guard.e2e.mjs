@@ -34,9 +34,12 @@ const SIZES = {
 
 const cases = [];
 for (const platform of ["win32", "darwin"]) for (const theme of ["light", "dark"]) for (const size of ["normal", "mini"]) cases.push({ platform, theme, size });
+// 风格 清爽 (D-049) changes colours, radii and shadows only; Windows covers it.
+for (const theme of ["light", "dark"]) for (const size of ["normal", "mini"]) cases.push({ platform: "win32", theme, size, style: "fresh" });
 
-for (const { platform, theme, size } of cases) {
-  test(`layout guard: ${platform} ${theme} ${size}`, async ({ browser }) => {
+for (const { platform, theme, size, style } of cases) {
+  const label = `${platform} ${theme} ${size}${style ? ` ${style}` : ""}`;
+  test(`layout guard: ${label}`, async ({ browser }) => {
     test.setTimeout(240_000);
     const ctx = await browser.newContext({ viewport: SIZES.normal, locale: "zh-CN", colorScheme: theme });
     const page = await ctx.newPage();
@@ -44,6 +47,7 @@ for (const { platform, theme, size } of cases) {
     const pageErrors = [];
     page.on("pageerror", (e) => pageErrors.push(e.message));
     await page.addInitScript((t) => { try { localStorage.setItem("clipbox.theme", t); } catch { /* optional */ } }, theme);
+    if (style) await page.addInitScript((s) => { try { localStorage.setItem("clipbox.style", s); } catch { /* optional */ } }, style);
     await asDesktop(page, platform);
     await seedSnippets(page);
     page.setDefaultTimeout(5000);
@@ -184,7 +188,7 @@ for (const { platform, theme, size } of cases) {
       (k ? known : real).push(f);
     }
     const fmt = (f) => `[${f.state}] ${f.type}：${f.el}${f.by ? " ← " + f.by : ""} ${f.detail ?? ""}`;
-    if (known.length) console.log(`已知问题（白名单）${platform} ${theme} ${size}: ${known.length} 个\n` + known.map(fmt).join("\n"));
+    if (known.length) console.log(`已知问题（白名单）${label}: ${known.length} 个\n` + known.map(fmt).join("\n"));
     if (skipped.length) console.log("跳过的步骤:\n" + skipped.join("\n"));
     expect(pageErrors, "页面不应抛出脚本错误").toEqual([]);
     expect(real.map(fmt), "界面排版问题").toEqual([]);

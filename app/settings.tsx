@@ -14,7 +14,7 @@ import { DataMoveDialog } from "./data-move";
 import { AccountLockSettings, RecoveryCloseConfirm, type LockChange } from "./account-lock-ui";
 import type { LockMode } from "./account-lock";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
-import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type StyleChoice, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
@@ -28,7 +28,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, style, onStyle, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
@@ -43,7 +43,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
   onFolderReorder: (kind: SettingsFolderKind, source: string, target: string) => void;
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
-  theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
+  theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; style: StyleChoice; onStyle: (style: StyleChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
   onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
   sharedLibrary: ReactNode;
 }) {
@@ -144,6 +144,10 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
                 options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />
+            </div>
+            <div className="settings-row"><div><strong>风格</strong><small>经典是米色底、橙红点缀；清爽是浅灰底、淡紫点缀。两种都有浅色和深色</small></div>
+              <ArcSegmented className="settings-segment" mode="radio" label="风格" value={style} onSelect={(value) => onStyle(value as StyleChoice)}
+                options={[["classic", "经典"], ["fresh", "清爽"]].map(([value, label]) => ({ value, label }))} />
             </div>
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-folders" hidden={hideSection("folders", "set-folders")}><h3 id="set-folders">目录</h3>

@@ -47,6 +47,22 @@ test("theme follows the system by default and can be forced, with dark tokens de
   assert.match(shellMain, /window_mode::set_theme/);
 });
 
+test("风格 清爽 tokens: light before the dark blocks, dark for 跟随系统 inside the media query, forced dark after", () => {
+  assert.match(page, /STYLE_OPTIONS = \["classic", "fresh"\]/);
+  const light = css.indexOf(':root[data-style="fresh"] {');
+  const media = css.indexOf("@media (prefers-color-scheme: dark) {\n  :root:not([data-theme=\"light\"])");
+  const system = css.indexOf(':root[data-style="fresh"]:not([data-theme="light"]) {');
+  const mediaEnd = css.indexOf("\n}\n", media);
+  const forcedBase = css.indexOf(':root[data-theme="dark"] {');
+  const forced = css.indexOf(':root[data-theme="dark"][data-style="fresh"] {');
+  for (const at of [light, media, system, forcedBase, forced]) assert.ok(at > 0);
+  assert.ok(light < media, "light 清爽 tokens must come before the dark media block");
+  assert.ok(media < system && system < mediaEnd, "跟随系统 dark 清爽 tokens must sit inside the dark media block");
+  assert.ok(forcedBase < forced, "forced dark 清爽 tokens must come after the forced dark tokens");
+  assert.match(css, /:root\[data-style="fresh"\] \{[^}]*--bg: #f8fafc/);
+  assert.equal(css.match(/--bg: #14171c/g)?.length, 2);
+});
+
 test("settings show last backup time and open the data folder on desktop", () => {
   assert.match(page, /还没有导出过/);
   assert.match(page, /clipbox\.last-backup-at/);
