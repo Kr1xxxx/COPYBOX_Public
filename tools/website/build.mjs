@@ -22,6 +22,10 @@ const previewDir = join(repo, "tools/preview");
 export const siteUrl = "https://copyboxx.com";
 export const installerPath = "download/Copyboxx-Setup.exe";
 const releasesApi = "https://api.github.com/repos/Kr1xxxx/Clipbox/releases?per_page=20";
+// The small file the Tauri workflow puts next to the installer in every test release (D-048): the app version the
+// installer carries, the preview number it was built from, the branch and the commit. The site takes the version it
+// advertises from this file, never from the checkout, so latest.json can never name a version the installer is not.
+export const versionAssetName = "release-version.json";
 
 const placeholder = /__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/g;
 
@@ -144,15 +148,36 @@ function copyFolder(from, to, expected, label) {
   for (const name of names) cpSync(join(from, name), join(to, name));
 }
 
-// The newest (by published_at) tauri-test-N release that carries a Windows setup asset; returns { release, asset }.
+// The newest (by published_at) tauri-test-N release that carries a Windows setup asset; returns
+// { release, asset, versionAsset } (versionAsset is the release-version.json asset, undefined on older releases).
 export function pickInstaller(releases) {
   const candidates = (Array.isArray(releases) ? releases : [])
     .filter((release) => String(release?.tag_name ?? "").startsWith("tauri-test-"))
-    .map((release) => ({ release, asset: (release.assets ?? []).find((a) => String(a?.name ?? "").endsWith("-Windows-setup.exe")) }))
+    .map((release) => ({
+      release,
+      asset: (release.assets ?? []).find((a) => String(a?.name ?? "").endsWith("-Windows-setup.exe")),
+      versionAsset: (release.assets ?? []).find((a) => String(a?.name ?? "") === versionAssetName),
+    }))
     .filter((entry) => entry.asset)
     .sort((a, b) => Date.parse(b.release.published_at ?? 0) - Date.parse(a.release.published_at ?? 0));
   if (!candidates.length) throw new Error("No tauri-test release with a Windows installer was found on GitHub.");
   return candidates[0];
+}
+
+const APP_VERSION = /^\d+\.\d+\.\d+$/;
+
+// Reads release-version.json: { version: "1.67.0", preview: "1.67", ref: "main", commit }. Anything else is refused:
+// a build from another branch must never reach staff (D-048), and a missing version would bring back the old guess
+// from the checkout, which made the app offer the same installer again and again.
+export function releaseVersionInfo(json, tag = "the release") {
+  const data = json && typeof json === "object" ? json : {};
+  const version = String(data.version ?? "").trim();
+  if (!APP_VERSION.test(version)) throw new Error(`${tag}: ${versionAssetName} has no app version like 1.67.0 (got "${version}").`);
+  const ref = String(data.ref ?? "").trim();
+  if (ref !== "main") throw new Error(`${tag} was built from "${ref || "?"}", not from main; the website only publishes builds of main (D-048).`);
+  const preview = String(data.preview ?? "").trim() || version.replace(/\.\d+$/, "");
+  if (!/^\d+\.\d+$/.test(preview) || appVersionFrom(preview) !== version) throw new Error(`${tag}: preview ${preview} and app version ${version} do not match.`);
+  return { version, preview, ref, commit: String(data.commit ?? "").trim() };
 }
 
 // 2414270 → "2.3 MB" (one decimal, always MB).
@@ -161,10 +186,13 @@ export function formatSize(bytes) {
 }
 
 // download/latest.json: the { version, notes, url } shape of the desktop update check (D-023), plus size and checksum.
-// info.version is the preview version ("1.65"); the file carries the app version ("1.65.0").
+// info.version is the installer's app version ("1.65.0"); a bare preview number ("1.65") is widened to it.
 export function latestJson(info) {
+  const given = String(info.version ?? "").trim();
+  const version = /^\d+\.\d+$/.test(given) ? appVersionFrom(given) : given;
+  if (!APP_VERSION.test(version)) throw new Error(`latest.json needs an app version like 1.67.0, got "${given}".`);
   return {
-    version: appVersionFrom(info.version),
+    version,
     notes: [...(info.notes ?? [])],
     url: `${siteUrl}/${installerPath}`,
     size: info.size,
@@ -210,11 +238,17 @@ async function downloadInstaller() {
   if (token) headers.Authorization = `Bearer ${token}`;
   const list = await fetch(releasesApi, { headers });
   if (!list.ok) throw new Error(`GitHub releases could not be listed (HTTP ${list.status}). Set GITHUB_TOKEN or pass --installer.`);
-  const { release, asset } = pickInstaller(await list.json());
+  const { release, asset, versionAsset } = pickInstaller(await list.json());
   console.log(`installer ${release.tag_name} ${asset.name}`);
-  const file = await fetch(asset.url, { headers: { ...headers, Accept: "application/octet-stream" } });
+  if (!versionAsset) throw new Error(`${release.tag_name} carries no ${versionAssetName}: publish a new test build from main first (the Tauri workflow writes it, D-048).`);
+  const binary = { ...headers, Accept: "application/octet-stream" };
+  const versionFile = await fetch(versionAsset.url, { headers: binary });
+  if (!versionFile.ok) throw new Error(`${versionAssetName} download failed (HTTP ${versionFile.status}).`);
+  const info = releaseVersionInfo(JSON.parse(await versionFile.text()), release.tag_name);
+  console.log(`installer version ${info.version} (preview ${info.preview}, commit ${info.commit || "?"})`);
+  const file = await fetch(asset.url, { headers: binary });
   if (!file.ok) throw new Error(`Installer download failed (HTTP ${file.status}).`);
-  return Buffer.from(await file.arrayBuffer());
+  return { installer: Buffer.from(await file.arrayBuffer()), info };
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -223,31 +257,52 @@ export async function main(argv = process.argv.slice(2)) {
   const icons = resolve(repo, option(argv, "--icons", join(here, "icons")));
   const images = resolve(repo, option(argv, "--images", join(here, "images")));
   const installerArg = option(argv, "--installer", "");
+  const installerVersionArg = option(argv, "--installer-version", "");
   if (!existsSync(join(preview, "index.html"))) {
     console.error('Run "npm run preview:build" first.');
     process.exit(1);
   }
 
-  const installer = installerArg ? readFileSync(resolve(repo, installerArg)) : await downloadInstaller();
-  if (installer.length < 2 || installer[0] !== 0x4d || installer[1] !== 0x5a) throw new Error("The installer is not a Windows program (it does not start with MZ).");
-
+  // The preview number of this checkout: the web preview under /preview/ is built from it.
   const version = readFileSync(join(previewDir, "VERSION"), "utf8").trim();
+  // The installer the site serves, and the version it really carries (D-048): from the release's own
+  // release-version.json, or from --installer-version for a local file. Only a local file may fall back to the
+  // checkout's number, with a warning, because then nobody can check it.
+  let installer;
+  let installed;
+  if (installerArg) {
+    installer = readFileSync(resolve(repo, installerArg));
+    if (installerVersionArg) {
+      if (!APP_VERSION.test(installerVersionArg)) throw new Error(`--installer-version needs an app version like 1.67.0, got "${installerVersionArg}".`);
+      installed = { version: installerVersionArg, preview: installerVersionArg.replace(/\.\d+$/, "") };
+    } else {
+      installed = { version: appVersionFrom(version), preview: version };
+      console.warn(`warning: --installer without --installer-version: latest.json will say ${installed.version} (tools/preview/VERSION); make sure that is the version inside ${installerArg}.`);
+    }
+  } else {
+    ({ installer, info: installed } = await downloadInstaller());
+  }
+  if (installer.length < 2 || installer[0] !== 0x4d || installer[1] !== 0x5a) throw new Error("The installer is not a Windows program (it does not start with MZ).");
+  if (installed.preview !== version) console.warn(`warning: this checkout is preview ${version} but the installer is ${installed.version}; the pages and latest.json follow the installer.`);
+
   const changelog = JSON.parse(readFileSync(join(previewDir, "changelog.json"), "utf8"));
   const info = previewBuildInfo(changelog, version);
   const updated = new Date(info.updatedAt).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
   const size = installer.length;
   const sha256 = createHash("sha256").update(installer).digest("hex");
+  // The notes of the version the installer carries, not of a newer preview.
+  const notes = (Array.isArray(changelog) ? changelog : []).find((entry) => String(entry?.version) === installed.preview)?.items ?? [];
 
   const css = readFileSync(join(here, "site.css"));
   const cssKey = cssAssetKey(css);
   const parts = Object.fromEntries(["head", "header", "footer"].map((name) => [name, readFileSync(join(here, `partials/${name}.html`), "utf8")]));
-  const pageInfo = { version, updated, size: formatSize(size), sha256 };
+  const pageInfo = { version: installed.preview, updated, size: formatSize(size), sha256 };
   const extra = { CSS: `/${cssKey}` };
   const pages = sitePages.map((page) => ({
     key: page.key,
     html: assemblePage(page, { ...parts, body: readFileSync(join(here, page.source), "utf8") }, pageInfo, extra),
   }));
-  const latest = latestJson({ version, notes: changelog?.[0]?.items ?? [], size, sha256, updatedAt: info.updatedAt });
+  const latest = latestJson({ version: installed.version, notes, size, sha256, updatedAt: info.updatedAt });
 
   rmSync(out, { recursive: true, force: true });
   mkdirSync(join(out, "download"), { recursive: true });

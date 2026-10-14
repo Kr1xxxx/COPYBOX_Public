@@ -19,7 +19,10 @@ Update this file at the end of every session. No keys, passwords or customer dat
   could be lost, corrupted or locked; staff releases; irreversible steps) wait for Kris to write 合并.
 - Web preview: bundle two preview versions per PR to GitHub (earlier for urgent fixes or when he asks).
 - After every merged PR that changes the app, run the `Tauri build` workflow on `main` with `publish_test_build`
-  (a `tauri-test-N` pre-release on GitHub Releases). Do not send him the link unless he asks.
+  (a `tauri-test-N` pre-release on GitHub Releases). Do not send him the link unless he asks. Staff only get it once
+  the website is deployed again (`npm run website:build && npm run website:deploy` from a session with the
+  Cloudflare token, D-047); the site takes the version from the release's `release-version.json`, so the test build
+  must come from `main` (D-048; a dispatch on another branch publishes nothing).
 - Never offer or push a staff release; he dropped it. Do not start "snippets with images" (on hold).
 
 ## Web preview

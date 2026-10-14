@@ -13,8 +13,8 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
 | `/preview/` | Asks for the passphrase first (see below), then the web preview, a copy of `dist-preview/` (its pages use relative paths, so a subfolder works); `/preview` redirects there |
-| `/download/Copyboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`) |
-| `/download/latest.json` | `{ version, notes, url, size, sha256, updatedAt }`, same shape as the desktop update check (D-023); not wired yet |
+| `/download/Copyboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`), built from `main` (D-048) |
+| `/download/latest.json` | `{ version, notes, url, size, sha256, updatedAt }`, same shape as the desktop update check (D-023); the Windows app reads it (D-047). `version` is the installer's own, from the release's `release-version.json` (D-048) |
 | `/assets/site.<hash>.css` | The stylesheet; its name carries the first 8 hex of its sha256, so a changed file gets a new name |
 | `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/og-image.png` | Icons and the share card, copied from `icons/` |
 | `/images/*.png` | App screenshots (`app-win-light.png`, `app-win-dark.png`), copied from `images/` |
@@ -62,7 +62,7 @@ the passphrase can share it, and the preview holds only sample data.
 ```bash
 npm run build && npm run preview:build                     # dist-preview/
 npm run website:build                                      # downloads the newest installer from GitHub Releases
-npm run website:build -- --installer path/to/setup.exe     # or uses a local file
+npm run website:build -- --installer path/to/setup.exe --installer-version 1.69.0   # or uses a local file
 npm run website:deploy                                     # node tools/website/deploy.mjs (add -- --dry-run to only print)
 ```
 
@@ -85,6 +85,11 @@ npm run website:deploy                                     # node tools/website/
 - The first deploy also binds `copyboxx.com` and `www.copyboxx.com` as custom domains; Cloudflare creates the DNS
   records itself.
 - Publishing a newer installer or preview: run the builds again (preview, then website) and deploy again.
+- The version the site advertises is the installer's own (D-048): the build reads `release-version.json` from the
+  release (`{ version, preview, ref, commit }`, written by the Tauri workflow, builds of `main` only) and uses it for
+  `latest.json`, the pages and the changelog notes. A release without that file, or built from another branch, stops
+  the build: publish a new test build from `main` first. With `--installer`, pass `--installer-version` (the app
+  version inside the file); without it the build falls back to `tools/preview/VERSION` and warns.
 - Try it locally:
   ```bash
   npx --yes wrangler@4.150.0 kv bulk put dist-website/kv-bulk.json --binding FILES --local --config tools/website/wrangler.jsonc
