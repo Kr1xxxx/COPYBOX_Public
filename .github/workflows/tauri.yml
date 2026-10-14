@@ -52,6 +52,22 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       # The app version follows tools/preview/VERSION (D-036).
       - run: node scripts/sync-version.mjs
+      # Says in every build whether TinyPNG keys went in (never prints them). A published test build without keys fails.
+      - name: TinyPNG keys
+        shell: bash
+        env:
+          CLIPBOX_TINIFY_KEYS: ${{ secrets.CLIPBOX_TINIFY_KEYS }}
+          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_test_build }}
+        run: |
+          count=$(printf '%s' "$CLIPBOX_TINIFY_KEYS" | tr ',' '\n' | sed 's/[[:space:]]//g' | grep -c . || true)
+          if [ "$count" -gt 0 ]; then
+            echo "TinyPNG keys built in: $count" | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "$PUBLISH" = "true" ]; then
+            echo "::error::CLIPBOX_TINIFY_KEYS is empty; a published test build must carry the TinyPNG keys" && exit 1
+          else
+            echo "::warning::CLIPBOX_TINIFY_KEYS is empty; this installer has no built-in TinyPNG key"
+            echo "⚠️ TinyPNG keys built in: 0 (secret CLIPBOX_TINIFY_KEYS is empty)" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - run: npx tauri build
         env:
           CI: "true"
