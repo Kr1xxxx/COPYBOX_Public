@@ -1,5 +1,7 @@
 // Looks up the newest published version and, on Windows, can download that installer and install it over this app
-// (D-023, D-047). Same version rules as desktop/update-check.cjs.
+// (D-023, D-047). Same version rules as desktop/update-check.cjs. Only an installer signed with the update key is
+// installed (D-053).
+use minisign_verify::{PublicKey, Signature};
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -19,24 +21,32 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(100);
 const MAX_INSTALLER_BYTES: u64 = 200 * 1024 * 1024;
 const PROGRESS_EVENT: &str = "clipbox:update-progress";
 
-/// Where the app looks for the newest version: a small JSON file {"version","notes","url","size","sha256"} (D-047).
+/// Where the app looks for the newest version: a small JSON file {"version","notes","url","size","sha256","signature"}
+/// (D-047, D-053).
 /// Only Windows looks: the website has no Mac installer. CLIPBOX_UPDATE_URL overrides it (for testing).
 const DEFAULT_UPDATE_URL: &str = if cfg!(target_os = "windows") { "https://copyboxx.com/download/latest.json" } else { "" };
 
 /// The only host an installer may come from.
 const DOWNLOAD_HOST: &str = "copyboxx.com";
 
+/// The public half of the update signing key (D-053, tools/update-signing.mjs). The private half lives only in a
+/// GitHub secret and the owner's offline backup, never next to the website, so whoever takes over the website still
+/// cannot make this app install anything.
+const UPDATE_PUBLIC_KEY: &str = include_str!("../update-public-key.txt");
+
 /// NSIS installer switches (Tauri's template, D-047): /P small progress window and no questions, /R start the app
 /// again when done, /UPDATE install over the old version without uninstalling it first (keeps launch at login).
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub const INSTALLER_ARGS: [&str; 3] = ["/P", "/R", "/UPDATE"];
 
-/// What the last check found: where the installer is and what it must look like.
+/// What the last check found: where the installer is, what it must look like and its signature (minisign text whose
+/// key and version were already checked; the bytes are checked while downloading).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Release {
     pub url: String,
     pub size: Option<u64>,
     pub sha256: Option<String>,
+    pub signature: String,
 }
 
 impl Release {
@@ -72,7 +82,7 @@ impl UpdateInfo {
 }
 
 /// The answer to 「立即更新」: installing (the app closes in a moment), busy (already under way) or error with a reason
-/// the page turns into plain Chinese: network, incomplete, disk, start, unavailable.
+/// the page turns into plain Chinese: network, incomplete, disk, start, unavailable, signature.
 #[derive(Serialize, Debug, PartialEq)]
 pub struct InstallResult {
     status: &'static str,
@@ -134,6 +144,22 @@ pub fn sha256_matches(expected: &str, digest: &[u8]) -> bool {
     digest.len() == 32 && parse_sha256(expected).is_some_and(|e| e == to_hex(digest))
 }
 
+/// The update key built into this app; None only if the key file in the build is broken (then nothing is installed).
+pub fn update_public_key() -> Option<PublicKey> {
+    PublicKey::decode(UPDATE_PUBLIC_KEY.trim()).ok()
+}
+
+/// Keeps a manifest's signature only when it is minisign text made with `key`, in the prehashed mode that can be
+/// checked while downloading, and its signed (trusted) comment names exactly `version` — so an older signed
+/// installer cannot be passed off as a newer one. Whether it matches the installer's bytes is checked in the download.
+pub fn accept_signature(text: &str, version: &str, key: &PublicKey) -> Option<String> {
+    let text = text.trim();
+    let signature = Signature::decode(text).ok()?;
+    key.verify_stream(&signature).ok()?;
+    let signed = signature.trusted_comment().split('\t').find_map(|part| part.strip_prefix("version:"))?;
+    (signed == version).then(|| text.to_string())
+}
+
 /// The installer's file name, taken from the link (the product name may change); a safe fallback otherwise.
 pub fn installer_file_name(url: &str) -> String {
     let last = url::Url::parse(url).ok().and_then(|u| u.path_segments().and_then(|mut s| s.next_back().map(str::to_string))).unwrap_or_default();
@@ -175,26 +201,31 @@ fn clean_notes(notes: &serde_json::Value) -> Vec<String> {
     lines.iter().map(|l| l.trim()).filter(|l| !l.is_empty()).take(5).map(|l| l.chars().take(80).collect()).collect()
 }
 
-/// Decides what a downloaded manifest means for the version that is running.
-pub fn evaluate_manifest(manifest: &serde_json::Value, current: &str) -> (UpdateInfo, Option<Release>) {
+/// Decides what a downloaded manifest means for the version that is running. A newer version without a good
+/// signature for `key` is treated like a broken manifest: nothing is offered, not even the browser download, because
+/// such a manifest can only come from someone other than us (D-053).
+pub fn evaluate_manifest(manifest: &serde_json::Value, current: &str, key: Option<&PublicKey>) -> (UpdateInfo, Option<Release>) {
     let version = manifest.get("version").and_then(|v| v.as_str()).unwrap_or("");
     match compare_versions(version, current) {
         None => (UpdateInfo::status("error"), None),
         Some(order) if order <= 0 => (UpdateInfo::status("current"), None),
         Some(_) => {
+            let version = version.trim().trim_start_matches('v');
             let url = manifest.get("url").and_then(|v| v.as_str()).unwrap_or("");
-            if !is_safe_download_url(url) {
+            let signature = key.and_then(|key| accept_signature(manifest.get("signature").and_then(|v| v.as_str()).unwrap_or(""), version, key));
+            let (true, Some(signature)) = (is_safe_download_url(url), signature) else {
                 return (UpdateInfo::status("error"), None);
-            }
+            };
             let release = Release {
                 url: url.to_string(),
                 size: manifest.get("size").and_then(|v| v.as_u64()).filter(|s| *s > 0 && *s <= MAX_INSTALLER_BYTES),
                 sha256: manifest.get("sha256").and_then(|v| v.as_str()).and_then(parse_sha256),
+                signature,
             };
             let notes = clean_notes(manifest.get("notes").unwrap_or(&serde_json::Value::Null));
             let info = UpdateInfo {
                 status: "available",
-                version: Some(version.trim().trim_start_matches('v').to_string()),
+                version: Some(version.to_string()),
                 notes: Some(notes),
                 installable: Some(cfg!(target_os = "windows") && release.installable()),
             };
@@ -220,7 +251,7 @@ pub async fn check_update(app: AppHandle, state: tauri::State<'_, Updates>) -> R
     }
     .await;
     let Some(manifest) = fetched else { return Ok(UpdateInfo::status("error")) };
-    let (info, release) = evaluate_manifest(&manifest, &current);
+    let (info, release) = evaluate_manifest(&manifest, &current, update_public_key().as_ref());
     if let Some(release) = release {
         *state.release.lock().unwrap() = Some(release);
     }
@@ -296,14 +327,18 @@ async fn download(app: &AppHandle, release: &Release) -> Result<PathBuf, &'stati
     std::fs::create_dir_all(&folder).map_err(|_| "disk")?;
     let path = folder.join(installer_file_name(&release.url));
     let _ = std::fs::remove_file(&path);
-    let result = fetch_to_file(app, &release.url, size, sha256, &path).await;
+    let result = fetch_to_file(app, &release.url, size, sha256, &release.signature, &path).await;
     if result.is_err() {
         let _ = std::fs::remove_file(&path);
     }
     result.map(|_| path)
 }
 
-async fn fetch_to_file(app: &AppHandle, url: &str, size: u64, sha256: &str, path: &Path) -> Result<(), &'static str> {
+async fn fetch_to_file(app: &AppHandle, url: &str, size: u64, sha256: &str, signature: &str, path: &Path) -> Result<(), &'static str> {
+    // The signature is checked over exactly the bytes that are written, while they arrive.
+    let key = update_public_key().ok_or("signature")?;
+    let signature = Signature::decode(signature).map_err(|_| "signature")?;
+    let mut signed = key.verify_stream(&signature).map_err(|_| "signature")?;
     let client = reqwest::Client::builder().connect_timeout(CONNECT_TIMEOUT).build().map_err(|_| "network")?;
     let mut response = client.get(url).header("cache-control", "no-store").send().await.map_err(|_| "network")?;
     if !response.status().is_success() {
@@ -332,6 +367,7 @@ async fn fetch_to_file(app: &AppHandle, url: &str, size: u64, sha256: &str, path
         if !hasher.update(&chunk) {
             return Err("incomplete");
         }
+        signed.update(&chunk);
         if throttle.ready(Instant::now()) {
             let _ = app.emit(PROGRESS_EVENT, Progress { received, total: size });
         }
@@ -343,9 +379,11 @@ async fn fetch_to_file(app: &AppHandle, url: &str, size: u64, sha256: &str, path
         return Err("incomplete");
     }
     match hasher.finish() {
-        Some(digest) if sha256_matches(sha256, &digest) => Ok(()),
-        _ => Err("incomplete"),
+        Some(digest) if sha256_matches(sha256, &digest) => {}
+        _ => return Err("incomplete"),
     }
+    // Complete and as the manifest promised, but not made by us: never started.
+    signed.finalize().map_err(|_| "signature")
 }
 
 /// Starts the installer on its own, so it keeps running after this app has exited.
@@ -428,9 +466,35 @@ mod tests {
     const ABC_SHA256: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
     const SITE: &str = "https://copyboxx.com/download/Copyboxx-Setup.exe";
 
+    // A throwaway test key (made with tools/update-signing.mjs; its private half was never kept) and signatures of
+    // TEST_INSTALLER as version 9.9.9: one with that key, one with another key.
+    const TEST_KEY: &str = "untrusted comment: Copyboxx update public key 568D54A943DE8401\nRWRWjVSpQ96EAYGTg9PQGKuRsSfzLzABlTHtLFmB+3TaacRZQUrb3A4G\n";
+    const TEST_INSTALLER: &[u8] = b"Copyboxx test installer";
+    const GOOD_SIG: &str = "untrusted comment: signature from Copyboxx update key 568D54A943DE8401\nRURWjVSpQ96EARW+j1OSaPnD0ApeVDfEwYo8Jr3V8wPLZcASKB4vfRNPNiOI1warKBIwaAMFs3wvT0uIhaaKWlrSbR9fmp2EcwE=\ntrusted comment: version:9.9.9\tfile:Copyboxx-Windows-setup.exe\ttimestamp:1760000000\n2nvUZM6Xle29hOwpgn99p/EA8HL03GQxHTfwwXIKzMmgmt9qYoQWWJXHkAHnfwXXD9y1gbF4OBr3qDjD9b6ZAg==\n";
+    const FOREIGN_SIG: &str = "untrusted comment: signature from Copyboxx update key A5639766ABF89829\nRUSlY5dmq/iYKSNQT/LNIJ64Iz0jrxzDHNCOKpITA/0/g3h9UlzOTxPt0sGlBf1ZhoG3GlJOFvOAfaBsAEjwv9glqMbpLQyzwwA=\ntrusted comment: version:9.9.9\tfile:Copyboxx-Windows-setup.exe\ttimestamp:1760000000\n6sSVI6wZU8fvjIQfJDX213YZA9WFa1qdU3l/sSOpS7JyYOtQg3AOs8CNUBpuXdDM6KDJ530vvEducxHKctphBQ==\n";
+
+    fn test_key() -> PublicKey {
+        PublicKey::decode(TEST_KEY.trim()).unwrap()
+    }
+
+    fn evaluate(manifest: &serde_json::Value, current: &str) -> (UpdateInfo, Option<Release>) {
+        evaluate_manifest(manifest, current, Some(&test_key()))
+    }
+
+    /// The same check the download does, on bytes fed in two chunks.
+    fn bytes_match(signature: &str, bytes: &[u8]) -> bool {
+        let key = test_key();
+        let signature = Signature::decode(signature).unwrap();
+        let mut signed = key.verify_stream(&signature).unwrap();
+        let (a, b) = bytes.split_at(bytes.len() / 2);
+        signed.update(a);
+        signed.update(b);
+        signed.finalize().is_ok()
+    }
+
     #[test]
     fn compares_versions() {
-        assert_eq!(compare_versions("0.3.0", "0.2.24"), Some(1));
+        assert_eq!(compare_versions("9.9.9", "0.2.24"), Some(1));
         assert_eq!(compare_versions("v0.2.24", "0.2.24"), Some(0));
         assert_eq!(compare_versions("0.2.9", "0.2.24"), Some(-1));
         assert_eq!(compare_versions("abc", "0.2.24"), None);
@@ -454,26 +518,26 @@ mod tests {
 
     #[test]
     fn newer_version_is_reported_with_clean_notes_size_and_checksum() {
-        let manifest = json!({"version": "v0.3.0", "url": SITE, "notes": ["  快了  ", "", "稳了"], "size": 2_400_000, "sha256": ABC_SHA256.to_uppercase()});
-        let (info, release) = evaluate_manifest(&manifest, "0.2.24");
+        let manifest = json!({"version": "v9.9.9", "url": SITE, "notes": ["  快了  ", "", "稳了"], "size": 2_400_000, "sha256": ABC_SHA256.to_uppercase(), "signature": GOOD_SIG});
+        let (info, release) = evaluate(&manifest, "0.2.24");
         assert_eq!(info.status, "available");
-        assert_eq!(info.version.as_deref(), Some("0.3.0"));
+        assert_eq!(info.version.as_deref(), Some("9.9.9"));
         assert_eq!(info.notes.unwrap(), vec!["快了", "稳了"]);
         assert_eq!(info.installable, Some(cfg!(target_os = "windows")));
-        assert_eq!(release, Some(Release { url: SITE.to_string(), size: Some(2_400_000), sha256: Some(ABC_SHA256.to_string()) }));
+        assert_eq!(release, Some(Release { url: SITE.to_string(), size: Some(2_400_000), sha256: Some(ABC_SHA256.to_string()), signature: GOOD_SIG.trim().to_string() }));
     }
 
     #[test]
     fn a_manifest_without_size_or_checksum_can_only_be_downloaded_by_hand() {
         for manifest in [
-            json!({"version": "0.3.0", "url": SITE}),
-            json!({"version": "0.3.0", "url": SITE, "size": 10, "sha256": "abc"}),
-            json!({"version": "0.3.0", "url": SITE, "size": 0, "sha256": ABC_SHA256}),
-            json!({"version": "0.3.0", "url": SITE, "size": -5, "sha256": ABC_SHA256}),
-            json!({"version": "0.3.0", "url": SITE, "size": "10", "sha256": ABC_SHA256}),
-            json!({"version": "0.3.0", "url": SITE, "size": MAX_INSTALLER_BYTES + 1, "sha256": ABC_SHA256}),
+            json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG}),
+            json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "size": 10, "sha256": "abc"}),
+            json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "size": 0, "sha256": ABC_SHA256}),
+            json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "size": -5, "sha256": ABC_SHA256}),
+            json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "size": "10", "sha256": ABC_SHA256}),
+            json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "size": MAX_INSTALLER_BYTES + 1, "sha256": ABC_SHA256}),
         ] {
-            let (info, release) = evaluate_manifest(&manifest, "0.2.24");
+            let (info, release) = evaluate(&manifest, "0.2.24");
             assert_eq!(info.status, "available");
             assert_eq!(info.installable, Some(false), "{manifest}");
             assert!(!release.unwrap().installable());
@@ -482,21 +546,69 @@ mod tests {
 
     #[test]
     fn same_or_older_is_current_and_bad_data_is_an_error() {
-        let same = json!({"version": "0.2.24", "url": SITE});
-        assert_eq!(evaluate_manifest(&same, "0.2.24").0.status, "current");
-        let bad_url = json!({"version": "0.3.0", "url": "http://copyboxx.com/c.exe"});
-        assert_eq!(evaluate_manifest(&bad_url, "0.2.24").0.status, "error");
-        let other_host = json!({"version": "0.3.0", "url": "https://example.com/c.exe", "size": 3, "sha256": ABC_SHA256});
-        assert_eq!(evaluate_manifest(&other_host, "0.2.24"), (UpdateInfo::status("error"), None));
-        assert_eq!(evaluate_manifest(&json!({}), "0.2.24").0.status, "error");
+        let same = json!({"version": "0.2.24", "url": SITE, "signature": GOOD_SIG});
+        assert_eq!(evaluate(&same, "0.2.24").0.status, "current");
+        let bad_url = json!({"version": "9.9.9", "url": "http://copyboxx.com/c.exe", "signature": GOOD_SIG});
+        assert_eq!(evaluate(&bad_url, "0.2.24").0.status, "error");
+        let other_host = json!({"version": "9.9.9", "url": "https://example.com/c.exe", "signature": GOOD_SIG, "size": 3, "sha256": ABC_SHA256});
+        assert_eq!(evaluate(&other_host, "0.2.24"), (UpdateInfo::status("error"), None));
+        assert_eq!(evaluate(&json!({}), "0.2.24").0.status, "error");
+    }
+
+    #[test]
+    fn a_good_signature_is_kept_and_matches_only_the_signed_bytes() {
+        let (info, release) = evaluate(&json!({"version": "9.9.9", "url": SITE, "size": 23, "sha256": ABC_SHA256, "signature": GOOD_SIG}), "1.71.0");
+        assert_eq!(info.installable, Some(cfg!(target_os = "windows")));
+        let release = release.unwrap();
+        assert!(bytes_match(&release.signature, TEST_INSTALLER));
+        // A file changed by one byte, cut short or grown is refused.
+        let mut changed = TEST_INSTALLER.to_vec();
+        changed[0] ^= 1;
+        assert!(!bytes_match(&release.signature, &changed));
+        assert!(!bytes_match(&release.signature, &TEST_INSTALLER[..22]));
+        assert!(!bytes_match(&release.signature, &[TEST_INSTALLER, b"!"].concat()));
+    }
+
+    #[test]
+    fn a_wrong_signature_offers_nothing() {
+        let with = |signature: &str| json!({"version": "9.9.9", "url": SITE, "size": 23, "sha256": ABC_SHA256, "signature": signature});
+        // Made with another key.
+        assert_eq!(evaluate(&with(FOREIGN_SIG), "1.71.0"), (UpdateInfo::status("error"), None));
+        // The signed comment (and so the version) edited: the key id matches, so this only fails on the bytes.
+        let edited = GOOD_SIG.replace("timestamp:1760000000", "timestamp:1760000001");
+        assert!(!bytes_match(&evaluate(&with(&edited), "1.71.0").1.unwrap().signature, TEST_INSTALLER));
+        // A real signature of 9.9.9 offered as another version (an old installer passed off as new).
+        let renamed = json!({"version": "10.0.0", "url": SITE, "size": 23, "sha256": ABC_SHA256, "signature": GOOD_SIG});
+        assert_eq!(evaluate(&renamed, "1.71.0"), (UpdateInfo::status("error"), None));
+        // Garbage, and the legacy (not prehashed) minisign mode.
+        assert_eq!(evaluate(&with("nonsense"), "1.71.0").0.status, "error");
+        let legacy = GOOD_SIG.replacen("RURW", "RWRW", 1);
+        assert_eq!(evaluate(&with(&legacy), "1.71.0").0.status, "error");
+    }
+
+    #[test]
+    fn a_missing_signature_offers_nothing() {
+        let unsigned = json!({"version": "9.9.9", "url": SITE, "size": 23, "sha256": ABC_SHA256});
+        assert_eq!(evaluate(&unsigned, "1.71.0"), (UpdateInfo::status("error"), None));
+        assert_eq!(evaluate(&json!({"version": "9.9.9", "url": SITE, "signature": ""}), "1.71.0").0.status, "error");
+        assert_eq!(evaluate(&json!({"version": "9.9.9", "url": SITE, "signature": 5}), "1.71.0").0.status, "error");
+        // Without a usable key built in, nothing is ever offered.
+        assert_eq!(evaluate_manifest(&json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG}), "1.71.0", None).0.status, "error");
+        // Being up to date needs no signature.
+        assert_eq!(evaluate(&json!({"version": "1.71.0"}), "1.71.0").0.status, "current");
+    }
+
+    #[test]
+    fn the_built_in_update_key_is_a_minisign_key() {
+        assert!(update_public_key().is_some());
     }
 
     #[test]
     fn notes_are_capped() {
-        let many = json!({"version": "0.3.0", "url": SITE, "notes": (0..9).map(|i| format!("n{i}")).collect::<Vec<_>>()});
-        assert_eq!(evaluate_manifest(&many, "0.2.24").0.notes.unwrap().len(), 5);
-        let long = json!({"version": "0.3.0", "url": SITE, "notes": ["字".repeat(200)]});
-        assert_eq!(evaluate_manifest(&long, "0.2.24").0.notes.unwrap()[0].chars().count(), 80);
+        let many = json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "notes": (0..9).map(|i| format!("n{i}")).collect::<Vec<_>>()});
+        assert_eq!(evaluate(&many, "0.2.24").0.notes.unwrap().len(), 5);
+        let long = json!({"version": "9.9.9", "url": SITE, "signature": GOOD_SIG, "notes": ["字".repeat(200)]});
+        assert_eq!(evaluate(&long, "0.2.24").0.notes.unwrap()[0].chars().count(), 80);
     }
 
     #[test]
