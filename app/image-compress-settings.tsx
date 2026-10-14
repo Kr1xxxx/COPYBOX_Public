@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { COMPRESS_MONTHLY_LIMIT, customKeyStatus, readCompressUsage, readCustomKeys, saveCustomKeys } from "./image-compress";
 
 const SLOT = ["第一个", "第二个"];
 
 // What the 压缩服务密钥 row says about the keys in use.
-function keyStatusText(keys: [string, string], now: Date): string {
+function keyStatusText(keys: [string, string], now: Date, builtIn: number): string {
   const { active, refused } = customKeyStatus(localStorage, now);
-  if (active === null) return "正在使用内置密钥";
+  if (active === null) return builtIn > 0 ? "正在使用软件自带的密钥，也可以换成你自己的" : "还没有填写密钥，新图片不会压缩。可以去 TinyPNG 官网免费申请";
   const count = keys.filter(Boolean).length;
   if (refused.includes(active)) return "你填写的密钥本月都不能用了，下个月 1 号恢复";
   const using = count === 2 ? `正在使用${SLOT[active]}密钥` : "正在使用你填写的密钥";
@@ -24,6 +24,12 @@ export function ImageCompressSettings() {
   const [keys, setKeys] = useState<[string, string]>(() => readCustomKeys(localStorage));
   const [draft, setDraft] = useState<[string, string]>(["", ""]);
   const [editing, setEditing] = useState(false);
+  const [builtIn, setBuiltIn] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void window.clipboxDesktop?.compressBuiltInCount?.().then((count) => { if (live) setBuiltIn(Number(count) || 0); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
 
   function save() {
     saveCustomKeys(localStorage, draft, now);
@@ -38,13 +44,13 @@ export function ImageCompressSettings() {
       {editing ? (
         <div className="settings-row compress-keys-edit"><div className="compress-keys-fields">
           <label className="settings-ai-field"><span>第一个密钥</span>
-            <input value={draft[0]} onChange={(event) => setDraft([event.target.value, draft[1]])} placeholder="留空则用内置密钥" spellCheck={false} autoComplete="off" /></label>
+            <input value={draft[0]} onChange={(event) => setDraft([event.target.value, draft[1]])} placeholder={builtIn > 0 ? "留空则用软件自带的密钥" : "TinyPNG 密钥"} spellCheck={false} autoComplete="off" /></label>
           <label className="settings-ai-field"><span>第二个密钥（选填）</span>
             <input value={draft[1]} onChange={(event) => setDraft([draft[0], event.target.value])} placeholder="第一个用完后自动换这个" spellCheck={false} autoComplete="off" /></label>
         </div>
           <button type="button" className="secondary-button" onClick={save}>保存</button></div>
       ) : (
-        <div className="settings-row"><div><strong>压缩服务密钥</strong><small>{keyStatusText(keys, now)}</small></div>
+        <div className="settings-row"><div><strong>压缩服务密钥</strong><small>{keyStatusText(keys, now, builtIn)}</small></div>
           <button type="button" className="secondary-button" onClick={() => { setDraft(keys); setEditing(true); }}>更换…</button></div>
       )}
     </>

@@ -55,6 +55,8 @@ jobs:
       - run: npx tauri build
         env:
           CI: "true"
+          # TinyPNG keys built into the installer (D-037); comma-separated, kept only as a repo secret, never in the code.
+          CLIPBOX_TINIFY_KEYS: ${{ secrets.CLIPBOX_TINIFY_KEYS }}
       - name: Installer size
         shell: bash
         run: |

@@ -78,6 +78,7 @@ fn main() {
             shared_library::fetch_shared_library,
             site_icon::fetch_site_icon,
             tinify::compress_image,
+            tinify::tinify_builtin_count,
             site_icon::get_build_time,
             update::check_update,
             update::open_update,
