@@ -108,7 +108,7 @@ import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
-import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
+import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
@@ -2264,6 +2264,7 @@ export default function Home() {
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
         usageItems={items}
         onShowItem={showItemInList}
+        syncCode={<SyncCodeRow onApply={applySharedLibraryText} />}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
         onShowGuide={() => { setSettingsOpen(false); guide.show(); }}

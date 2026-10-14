@@ -74,12 +74,10 @@ test("choosing the company version replaces the edited text", async ({ page }) =
   await expect(page.locator(".native-row.selected:not(.closing-row) .shared-notice")).toHaveCount(0);
 });
 
-test("a wrong file changes nothing and says so; the address field starts empty", async ({ page }) => {
+test("a wrong file changes nothing and says so", async ({ page }) => {
   await page.getByRole("button", { name: /设置/ }).first().click();
   await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "数据" }).click();
   const dialog = page.locator(".settings-dialog");
-  await expect(dialog.locator("#shared-url")).toHaveValue("");
-  await expect(dialog.getByRole("button", { name: "立即同步" })).toBeDisabled();
   const before = await page.locator(".native-row").count();
   const [chooser] = await Promise.all([page.waitForEvent("filechooser"), dialog.getByRole("button", { name: "选公司文件…" }).click()]);
   await chooser.setFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("not json") });
@@ -93,11 +91,10 @@ test("an address syncs on 立即同步 and again by itself on the next start, qu
   await page.route("https://company.example/library.json", (route) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: library }));
   const before = await page.locator(".native-row").count();
   await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "数据" }).click();
   const dialog = page.locator(".settings-dialog");
-  await dialog.locator("#shared-url").fill("https://company.example/library.json");
+  await dialog.getByLabel("企业同步码").fill("https://company.example/library.json");
   await dialog.getByRole("button", { name: "立即同步" }).click();
-  await expect(dialog.locator(".shared-summary")).toContainText("新增 3 条");
+  await expect(dialog.locator(".sync-code-result")).toContainText("新增 3 条");
   await page.keyboard.press("Escape");
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
   // next start: the address is remembered, the sync runs again and finds nothing new (no duplicates)
@@ -121,15 +118,17 @@ test("a 同步码 syncs its group's file, says so when the code is wrong, and sy
   await page.reload();
   await page.waitForSelector(".native-row");
   const before = await page.locator(".native-row").count();
+  // Settings opens on its home page, where 账号与同步 holds the 企业同步码.
   await page.getByRole("button", { name: /设置/ }).first().click();
-  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "数据" }).click();
   const dialog = page.locator(".settings-dialog");
-  await dialog.locator("#shared-url").fill("XS-WRONG000");
+  await dialog.getByLabel("企业同步码").fill("XS-WRONG000");
   await dialog.getByRole("button", { name: "立即同步" }).click();
   await expect(dialog.locator(".shared-error")).toHaveText("找不到这个同步码，请检查一下");
-  await dialog.locator("#shared-url").fill("xs-7kq2m9ab");
+  await dialog.getByLabel("企业同步码").fill("xs-7kq2m9ab");
+  await expect(dialog.locator(".settings-last-sync")).toHaveText("还没有同步过");
   await dialog.getByRole("button", { name: "立即同步" }).click();
-  await expect(dialog.locator(".shared-summary")).toContainText("新增 3 条");
+  await expect(dialog.locator(".sync-code-result")).toContainText("新增 3 条");
+  await expect(dialog.locator(".settings-last-sync")).toContainText("最后同步");
   await page.keyboard.press("Escape");
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
 

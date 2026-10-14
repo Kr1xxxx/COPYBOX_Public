@@ -7,7 +7,6 @@ import { AiSettingsSection } from "./ai-settings";
 import { ImageCompressSettings } from "./image-compress-settings";
 import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, formatTaipeiDate, type SecretItem } from "./clipbox-core";
-import { readSharedSummary } from "./shared-library-client";
 import { UsageSection } from "./usage-section";
 import { AutoBackupRows } from "./auto-backup-ui";
 import { testPreviewText, type TestContentPreview } from "./sample-snippets";
@@ -30,7 +29,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
@@ -50,6 +49,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
   onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; slideUnlock: { on: boolean; onChange: (on: boolean) => void }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
   // Settings home → 账号: close Settings and show the 账号 page.
   onOpenAccount: () => void;
+  syncCode: ReactNode;
   sharedLibrary: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -127,7 +127,6 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
     requestAnimationFrame(() => document.querySelector(`[aria-labelledby="${id}"]`)?.scrollIntoView({ block: "start" }));
   };
   // Read on every render of the home page, so a sync done on the 数据 page shows up when coming back.
-  const lastSyncAt = tab === "look" ? readSharedSummary()?.at : undefined;
   const updatedOn = formatTaipeiDate(buildTime);
   const row = (title: string, hint: string, action: () => void, label: string, disabled = false) => (
     <div className="settings-row"><div><strong>{title}</strong><small>{hint}</small></div><button type="button" className="secondary-button" onClick={action} disabled={disabled}>{label}</button></div>
@@ -163,8 +162,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           <section className="settings-card" aria-labelledby="set-home-account" hidden={hideSection("look", "set-home-account")}><h3 id="set-home-account">账号与同步</h3>
             <div className="settings-row"><div><strong>账号</strong><small>登录、付款、API Key 和验证码 · {accountLock.mode !== "none" ? "已设账号页密码" : slideUnlock.on ? "打开时先滑动解锁" : "打开就能看到"}</small></div>
               <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => goToCard("data", "set-security")}>安全设置</button><button type="button" className="secondary-button" onClick={onOpenAccount}>打开账号页</button></div></div>
-            <div className="settings-row"><div><strong>同步</strong><small>公司话术库 · <span className="settings-last-sync">{lastSyncAt ? `最后同步 ${formatTaipeiDate(lastSyncAt, true)}` : "还没有同步过"}</span></small></div>
-              <button type="button" className="secondary-button" onClick={() => goToCard("data", "set-shared")}>去同步</button></div>
+            {syncCode}
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-folders" hidden={hideSection("folders", "set-folders")}><h3 id="set-folders">目录</h3>
             <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onShortName={onFolderShortName} onMove={onFolderMove} onReorder={onFolderReorder} />
