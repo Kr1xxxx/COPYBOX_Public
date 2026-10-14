@@ -627,6 +627,18 @@ test("formatBuildTime shows date and time to the minute, empty when missing or i
   assert.equal(core.formatBuildTime("not a date"), "");
 });
 
+test("formatTaipeiDate shows the Taipei calendar date (and time), empty when missing or invalid", () => {
+  // 16:30 UTC is already the next day in Taipei (UTC+8).
+  assert.equal(core.formatTaipeiDate("2026-10-13T16:30:00Z"), "2026年10月14日");
+  assert.equal(core.formatTaipeiDate("2026-10-14T17:30:00+08:00"), "2026年10月14日");
+  assert.equal(core.formatTaipeiDate(Date.UTC(2026, 0, 2, 3, 4)), "2026年1月2日");
+  assert.equal(core.formatTaipeiDate(Date.UTC(2026, 0, 2, 3, 4), true), "2026年1月2日 11:04");
+  assert.equal(core.formatTaipeiDate("2026-10-14T00:05:00+08:00", true), "2026年10月14日 00:05");
+  assert.equal(core.formatTaipeiDate(""), "");
+  assert.equal(core.formatTaipeiDate(undefined), "");
+  assert.equal(core.formatTaipeiDate("not a date"), "");
+});
+
 test("snippet folders keep a saved order that has every standard folder (D-035); incomplete lists are rebuilt standard-first as before", () => {
   const standard = ["询盘接待", "产品样品", "报价成交", "定制生产", "客户跟进", "物流清关", "售后争议"];
   const reordered = ["产品样品", "自定义", "询盘接待", "报价成交", "定制生产", "客户跟进", "物流清关", "售后争议"];
