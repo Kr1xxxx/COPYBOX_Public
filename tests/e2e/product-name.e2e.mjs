@@ -16,7 +16,8 @@ for (const platform of ["win32", "darwin"]) {
     const mark = brand.locator("svg.settings-brand-mark");
     await expect(mark).toBeVisible();
     const markBox = await mark.boundingBox();
-    expect(markBox.height).toBeGreaterThanOrEqual(20);
+    // Big enough to read clearly (owner, 2026-10-14: the 22px mark was too small).
+    expect(markBox.height).toBeGreaterThanOrEqual(36);
     expect(markBox.width).toBeGreaterThan(markBox.height * 4);
     await expect(brand.locator("strong")).toHaveText("Copyboxx");
     await expect(brand.locator(".settings-brand-text > span")).toHaveText("复制盒");
