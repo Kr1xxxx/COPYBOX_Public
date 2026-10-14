@@ -38,7 +38,7 @@ export function SyncCodeRow({ onApply }: { onApply: (text: string) => Promise<Sy
           <label htmlFor="shared-url"><strong>企业同步码</strong></label>
           <input id="shared-url" type="text" autoComplete="off" spellCheck={false} placeholder="填公司给你的同步码，没有就先不填" value={code}
             onChange={(event) => { setCode(event.target.value); writeSharedUrl(event.target.value); setError(""); }} />
-          <small>公司话术 · <span className="settings-last-sync">{lastAt ? `最后同步 ${formatTaipeiDate(lastAt, true)}` : "还没有同步过"}</span> · 打开软件时和每 30 分钟自动同步</small>
+          <small>公司话术 · <span className="settings-last-sync">{lastAt ? `最后同步 ${formatTaipeiDate(lastAt, true)}` : "还没有同步过"}</span> · 每 30 分钟自动同步</small>
         </div>
         <button type="button" className="secondary-button" disabled={!code.trim() || busy} onClick={() => void syncNow()}>{busy ? "同步中…" : "立即同步"}</button>
       </div>
