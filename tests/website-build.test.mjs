@@ -176,7 +176,7 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     assert.match(html, /^<!doctype html>\n<html lang="zh-CN">/, key);
     assert.ok(html.includes(`<title>${page.title}</title>`), key);
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/, key);
-    assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg"[^>]*><span class="wordmark" role="img" aria-label="Copyboxx 复制盒"><\/span><\/a>/, key);
+    assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg\?v=2"[^>]*><span class="wordmark" role="img" aria-label="Copyboxx 复制盒"><\/span><\/a>/, key);
     assert.match(html, /<nav class="nav" aria-label="网站导航">/, key);
     const nav = /<nav class="nav" aria-label="网站导航">([\s\S]*?)<\/nav>/.exec(html)[1];
     assert.deepEqual([...nav.matchAll(/<a href="([^"]*)"/g)].map((m) => m[1]), ["/", "/download/", "/help/"], key);
@@ -189,8 +189,8 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     assert.ok(html.includes(`<meta property="og:title" content="${page.title}">`), key);
     assert.match(html, /<meta name="twitter:card" content="summary_large_image">/, key);
     assert.match(html, /<link rel="manifest" href="\/site\.webmanifest">/, key);
-    assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/, key);
-    assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png">/, key);
+    assert.match(html, /<link rel="icon" href="\/favicon\.svg\?v=2" type="image\/svg\+xml">/, key);
+    assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png\?v=2">/, key);
     assert.match(html, /clipboxx-site-theme/, key);
     assert.match(html, /data-theme-toggle aria-label="[^"]+"/, key);
     assert.match(html, /Copyboxx · v\d+\.\d+ · 更新于 \d{4}-\d{2}-\d{2} · 数据只保存在你的电脑上/, key);
@@ -231,7 +231,7 @@ test("website pages: Chinese, fixed security line, no eyebrow labels, no http://
 test("website pages: every link inside the site points at a built file", () => {
   for (const key of allPageKeys) {
     const html = site.read(key);
-    for (const [, link] of html.matchAll(/(?:src|href)="(\/[^"#]*)(?:#[^"]*)?"/g)) {
+    for (const [, link] of html.matchAll(/(?:src|href)="(\/[^"#?]*)(?:[?#][^"]*)?"/g)) {
       const target = link === "/" ? "index.html" : link.endsWith("/") ? `${link.slice(1)}index.html` : link.slice(1);
       assert.ok(existsSync(join(site.out, target)), `${key} → ${link}`);
     }
