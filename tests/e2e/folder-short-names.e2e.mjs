@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { asDesktop, seedSnippets } from "./helpers.mjs";
 
-// D-048: own folders can get a short name for the mini window, set from a quiet 「⋯」 in Settings → 目录.
+// D-049: own folders can get a short name for the mini window, set from a quiet 「⋯」 in Settings → 目录.
 
 async function openFolderSettings(page, groupTitle) {
   await page.getByRole("button", { name: /设置/ }).first().click();

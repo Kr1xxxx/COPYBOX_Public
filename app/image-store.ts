@@ -37,7 +37,7 @@ export type ImageMeta = {
   deletedAt?: number;
 };
 
-// `shortName`: what the mini window's folder tab shows instead of the first two characters (D-048). Optional, so folder
+// `shortName`: what the mini window's folder tab shows instead of the first two characters (D-049). Optional, so folder
 // lists saved before it existed need no change; an older app keeps it untouched when it renames or recolours.
 export type ImageFolder = { name: string; color?: string; shortName?: string };
 

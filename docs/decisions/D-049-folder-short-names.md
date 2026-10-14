@@ -1,4 +1,4 @@
-### D-048 Own folders can have a short name for the mini window, set behind 「⋯」 in 设置 → 目录 (2026-10-14)
+### D-049 Own folders can have a short name for the mini window, set behind 「⋯」 in 设置 → 目录 (2026-10-14)
 - Context (owner, 2026-10-14): 「自建目录自己设简称 ,放到设置目录页的设置里,尽量隐蔽一些,需要点开单独设置,否则默认是两位」.
   The mini window's folder tabs show two characters (`folderShortName` in `app/folder-short-name.ts`, 2026-10-13):
   the seven standard 话术 folders have fixed ones, every other folder shows its first two characters.

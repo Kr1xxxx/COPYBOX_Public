@@ -863,7 +863,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-swatches > button:not(.settings-mini-button) { width: 18px; height: 18px; padding: 0; border: 2px solid transparent; border-radius: 50%; background-clip: padding-box; cursor: pointer; }
 .settings-swatches > button.on { box-shadow: 0 0 0 1.5px var(--ink); }
 .settings-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; }
-/* 「⋯」 on an own folder: the short name on the mini window (D-048). Quiet until pointed at; the panel sits under the row like the colours. */
+/* 「⋯」 on an own folder: the short name on the mini window (D-049). Quiet until pointed at; the panel sits under the row like the colours. */
 .settings-mini-button.settings-folder-more-button { padding: 0 5px; color: var(--muted); font-size: 14px; line-height: 1; }
 .settings-mini-button.settings-folder-more-button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent-ink); }
 .settings-folder-more { padding: 2px 0 10px 23px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

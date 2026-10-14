@@ -70,7 +70,7 @@ export type SecretItem = {
 
 export type FolderRegistry = Record<ItemKind, string[]>;
 export type FolderColors = Record<ItemKind, Record<string, string>>;
-// Short names the person set for their own folders, shown on the mini window's folder tabs (D-048). Optional and only
+// Short names the person set for their own folders, shown on the mini window's folder tabs (D-049). Optional and only
 // written when there is at least one, so a vault without them is saved exactly as before.
 export type FolderShortNames = Partial<Record<ItemKind, Record<string, string>>>;
 // `sharedSeen`: ids of company 话术 this vault has already received, so one deleted on purpose is not added again. It sits in the

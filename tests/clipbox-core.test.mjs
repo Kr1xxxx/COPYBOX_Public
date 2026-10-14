@@ -499,7 +499,7 @@ test("folder colors survive normalization, scoped backups and merges but drop fo
   assert.equal("folderColors" in baseVault(), false);
 });
 
-// D-048: short names for own folders on the mini window.
+// D-049: short names for own folders on the mini window.
 const set = (data, kind, folder, value) => {
   const result = core.setFolderShortName(data, kind, folder, value);
   assert.equal(result.error, undefined, `${kind}/${folder}=${value}`);

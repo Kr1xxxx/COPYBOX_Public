@@ -300,7 +300,7 @@ test("create, rename, recolour and delete folders with Chinese messages", async 
   }
 });
 
-test("folder short names (D-048): set, kept on rename and recolour, cleared, dropped with the folder, and too long is refused", async () => {
+test("folder short names (D-049): set, kept on rename and recolour, cleared, dropped with the folder, and too long is refused", async () => {
   const { open } = setup();
   const store = await open();
   await store.createFolder("产品图片");

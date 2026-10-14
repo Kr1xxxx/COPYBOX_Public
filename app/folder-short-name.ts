@@ -32,7 +32,7 @@ function shorten(value: string): string {
 
 export const FOLDER_SHORT_NAME_ERROR = "最多两个字";
 
-// A short name the person sets for one of their own folders (D-048). Returns the trimmed value ("" = use the default),
+// A short name the person sets for one of their own folders (D-049). Returns the trimmed value ("" = use the default),
 // or null when it is too long to show whole: nothing is cut silently, the person is told 「最多两个字」 instead.
 export function normalizeFolderShortName(raw: unknown): string | null {
   if (typeof raw !== "string") return null;

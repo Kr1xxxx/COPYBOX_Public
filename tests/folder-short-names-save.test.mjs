@@ -1,4 +1,4 @@
-// D-048: the short names set for own folders go through every vault save path and the encrypted backup unharmed.
+// D-049: the short names set for own folders go through every vault save path and the encrypted backup unharmed.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as core from '../app/clipbox-core.ts';
