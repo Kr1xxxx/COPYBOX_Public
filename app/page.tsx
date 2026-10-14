@@ -80,6 +80,7 @@ import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
 import { folderShortName } from "./folder-short-name";
+import { FirstRunGuide, useFirstRunGuide } from "./first-run-guide";
 import { countImagesByFolder, IMAGE_FILTER_ALL, IMAGE_FILTER_PINNED, IMAGE_FILTER_RECENT, IMAGE_FILTER_TRASH, IMAGE_FILTER_UNCATEGORIZED, imageFilterTitle, imageFolderColors, imageFolderFilter } from "./image-folders-core";
 import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
@@ -509,7 +510,10 @@ export default function Home() {
       }).catch(() => undefined);
     }
   }, [closingIds, selectedCardId]);
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
+  // First-run guide: once, when the full window first shows after the data opened (never in the mini window).
+  const guide = useFirstRunGuide(!loading && !startupError && windowMode === "full");
+  const guideShown = guide.open && windowMode === "full";
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || guideShown);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -2218,7 +2222,9 @@ export default function Home() {
         onShowItem={showItemInList}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
+        onShowGuide={() => { setSettingsOpen(false); guide.show(); }}
       />}
+      {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}

@@ -2,6 +2,14 @@ import { fileURLToPath } from "node:url";
 
 export const SAMPLE_CSV = fileURLToPath(new URL("../../docs/samples/clipbox-test-snippets.csv", import.meta.url));
 
+// The first-run guide (app/first-run-guide.tsx) covers the window on a fresh start. playwright.config.mjs starts every
+// test with it already seen (this storage state); a test about the guide uses `test.use({ storageState: GUIDE_UNSEEN })`.
+export const FIRST_RUN_GUIDE_KEY = "clipbox.first-run-guide.v1";
+export function guideSeenState(baseURL) {
+  return { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: FIRST_RUN_GUIDE_KEY, value: "1" }] }] };
+}
+export const GUIDE_UNSEEN = { cookies: [], origins: [] };
+
 // Imports the 37-row sample sheet (2 invalid rows, 1 duplicate) → 34 snippets.
 export async function seedSnippets(page) {
   await page.goto("/");
