@@ -29,6 +29,12 @@ export function useFirstRunGuide(ready: boolean) {
 
 type GuidePage = { title: string; lines: string[]; art: ReactNode };
 
+// Only the desktop app has the 固定在最上层 button (next to the mini button).
+function pinLine() {
+  if (typeof window === "undefined" || !window.clipboxDesktop?.setPinned) return "";
+  return "点右上角迷你按钮左边的图钉，窗口就固定在最前面，再点一下取消。";
+}
+
 function trayLine() {
   const platform = typeof window === "undefined" ? undefined : window.clipboxDesktop?.platform;
   if (platform === "win32") return "点窗口的关闭按钮不会退出，它会收在右下角的托盘里，点托盘图标就能再打开。";
@@ -85,7 +91,7 @@ function MiniArt({ platform }: { platform: string | undefined }) {
         <div className="guide-mock-mini"><Icon name="mini" /><span className="guide-bar w70" /><span className="guide-bar w55" /><span className="guide-bar w65" /></div>
         {platform !== "darwin" && <div className="guide-taskbar"><i className="guide-tray-icon" /></div>}
       </div>
-      <span className="guide-shield"><Icon name="shield" /></span>
+      <span className="guide-shield"><Icon name="pin" /></span>
     </div>
   );
 }
@@ -94,7 +100,7 @@ function guidePages(platform: string | undefined): GuidePage[] {
   return [
     {
       title: "话术：常用回复，一键复制",
-      lines: ["点右边的复制按钮，或双击一行，就复制好了。", "顶部能搜标题和内容，打拼音首字母也行。", "点星标收藏常用的，左边用目录分好类。"],
+      lines: ["点右边的复制按钮，或双击一行，就复制好了。", "顶部能搜标题和内容，中文、英文单词、拼音、拼音首字母都行。", "点星标收藏常用的，左边用目录分好类。"],
       art: <SnippetArt />,
     },
     {
@@ -108,8 +114,8 @@ function guidePages(platform: string | undefined): GuidePage[] {
       art: <AccountArt />,
     },
     {
-      title: "迷你窗口和备份",
-      lines: ["点右上角的迷你按钮换成小窗口，边聊边复制。", trayLine(), "内容不会上传，在「设置 → 数据」里可以导出备份。"].filter(Boolean),
+      title: "迷你窗口和置顶",
+      lines: ["点右上角的迷你按钮换成小窗口，边聊边复制。", pinLine(), trayLine()].filter(Boolean),
       art: <MiniArt platform={platform} />,
     },
   ];
