@@ -2,7 +2,7 @@
 //   node tools/website/make-icons.mjs
 // - apple-touch-icon.png (180), icon-192.png, icon-512.png: the app icon src-tauri/icons/icon.png, scaled down in
 //   Chromium (halving steps with high-quality smoothing, so the edges stay sharp).
-// - favicon.ico (16, 32, 48): drawn from the hand-made icons/favicon.svg, which is designed to stay crisp at 16 px;
+// - favicon.ico (16, 32, 48): drawn from icons/favicon.svg, a copy of the brand icon docs/brand/icon-mark.svg;
 //   the entries are PNGs inside the ICO container.
 // - og-image.png (1200×630): the share card, a screenshot of og-image.html at device scale 1.
 // Needs Playwright's Chromium (installed with the dev dependencies; `npx playwright install chromium` otherwise).
