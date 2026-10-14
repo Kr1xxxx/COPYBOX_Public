@@ -80,7 +80,7 @@ test("mini: hovering a 话术 row shows 复制; it copies the text without openi
   await page.getByRole("button", { name: `复制 ${label}` }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBeTruthy();
   const copied = await page.evaluate(() => window.__copied);
-  // Mini copies the text as written (copyRaw): the row's content, placeholders included.
+  // Mini copies the row's text; highlighted blocks go out filled (see the test below), never with brackets.
   expect(copied.length).toBeGreaterThan(10);
   await expect(row).not.toHaveClass(/\bopen\b/);
   await expect(row.locator(".mini-detail")).toHaveCount(0);
@@ -104,7 +104,9 @@ test("mini: the copied text is the row's text and the copy is counted under 最�
   await page.getByRole("button", { name: `复制 ${label}` }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBeTruthy();
   const copied = await page.evaluate(() => window.__copied);
-  expect(copied.replace(/[{}[\]\s]/g, "")).toBe(text.replace(/[{}[\]\s]/g, ""));
+  expect(copied).not.toMatch(/\[[^\]]+\]/);
+  // Text outside the highlighted blocks is copied as shown.
+  expect(copied.replace(/\s/g, "").slice(0, 6)).toBe(text.replace(/\s/g, "").slice(0, 6));
   await page.locator(".mini-top .mini-tab", { hasText: "最近" }).click();
   await expect(page.locator(".mini-list .snippet-label").first()).toHaveText(label);
 });
@@ -166,4 +168,14 @@ test("macOS mini: an old 账号 row still copies on click and does not open", as
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("secret-value-123");
   await expect(row.locator(".mini-detail")).toHaveCount(0);
   await expect(row.locator(".mini-copied")).toHaveText("已复制");
+});
+
+test("mini: unfilled highlighted blocks go out as their first value (Name → Friend), never as [Name], and a message says so", async ({ page }) => {
+  await openMini(page);
+  const row = page.locator(".mini-list > .mini-row", { hasText: "thanks for reaching out" }).first();
+  const label = (await row.locator(".snippet-label").textContent()).trim();
+  await row.hover();
+  await page.getByRole("button", { name: `复制 ${label}` }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Friend, thanks for reaching out to Company! How can I help you today?");
+  await expect(page.getByText("已复制，Name 用了「Friend」，Company 用了「Company」")).toBeVisible();
 });

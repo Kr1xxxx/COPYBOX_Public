@@ -101,3 +101,19 @@ export function moveOption(memory: ValueMemory, pins: PinnedValues, name: string
   const known = new Set(memory[name] || []);
   return { memory: { ...memory, [name]: next.filter((entry) => known.has(entry)) }, pins: { ...pins, [name]: pinnedList } };
 }
+
+// The mini window has no fields to fill. Each block takes what was typed for it, else the first value it offers
+// (pinned first, then the newest), else its default (Name → Friend), else its own word without the brackets.
+// `used` lists every block that was not typed, so the person can be told what went out.
+export function quickFillValues(names: string[], typed: Record<string, string>, memory: ValueMemory, pins: PinnedValues): { values: Record<string, string>; used: { name: string; value: string }[] } {
+  const values: Record<string, string> = {};
+  const used: { name: string; value: string }[] = [];
+  for (const name of names) {
+    const own = (typed[name] || "").trim();
+    if (own) { values[name] = own; continue; }
+    const value = memoryOptions(memory, pins, name)[0] || DEFAULT_VALUES[name] || fixedOptions(name)[0] || name;
+    values[name] = value;
+    used.push({ name, value });
+  }
+  return { values, used };
+}
