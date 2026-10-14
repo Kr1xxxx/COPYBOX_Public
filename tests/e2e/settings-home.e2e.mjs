@@ -25,13 +25,11 @@ test("Settings home shows the version and update date at the top, plus 账号 an
   await expect(card).toBeVisible();
   await expect(card.locator(".settings-last-sync")).toHaveText("最后同步 2026年10月14日 09:05");
 
-  // 去同步 goes to the company library card on the 数据 page.
-  await card.getByRole("button", { name: "去同步" }).click();
-  await expect(dialog.getByRole("tab", { name: "数据" })).toHaveAttribute("aria-selected", "true");
-  await expect(dialog.locator("#set-shared")).toBeInViewport();
+  // The 企业同步码 sits right here (D-052), empty until someone types the code they were given.
+  await expect(card.getByLabel("企业同步码")).toHaveValue("");
+  await expect(card.getByRole("button", { name: "立即同步" })).toBeDisabled();
 
   // 安全设置 goes to the 安全 card; 打开账号页 closes Settings on the 账号 page.
-  await dialog.getByRole("tab", { name: "概览" }).click();
   await card.getByRole("button", { name: "安全设置" }).click();
   await expect(dialog.locator("#set-security")).toBeInViewport();
   await dialog.getByRole("tab", { name: "概览" }).click();

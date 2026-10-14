@@ -1,7 +1,7 @@
 # Company 话术 library file
 
-A JSON file the app can sync from (Settings → 共享话术): an address, or 选公司文件…. The person who maintains the
-company 话术 can create it from their own app with 导出为公司话术库文件 and put it where the address points.
+A JSON file the app can sync from (Settings → 共享话术): a 同步码, an address, or 选公司文件…. The person who maintains
+the company 话术 creates it from their own app with 导出为公司话术库文件; an agent publishes it (below, D-052).
 
 ```json
 {
@@ -32,3 +32,21 @@ company 话术 can create it from their own app with 导出为公司话术库文
 - Rules and why: D-026 in `docs/decisions/`; code in `app/shared-library.ts`.
 - Published per 同步码 at `https://copyboxx.com/sync/<code>/snippets.json` with `npm run sync:publish` (see
   `tools/website/README.md`, "话术同步").
+
+## 同步码 and publishing (D-052)
+
+- Each group of people gets a 同步码 such as `XS-7KQ2M9AB` (two letters for the group, a dash, 8 random characters).
+  The app turns it into `https://copyboxx.com/sync/<CODE>/snippets.json` (`sharedSourceUrl` in `app/shared-library.ts`),
+  syncs on start and every 30 minutes, and shows nothing unless something changed. No code = no sync.
+- The website Worker serves that file from KV key `sync/<CODE>/snippets.json`; a wrong code and a missing file both give
+  the same 404. `website:deploy` never touches `sync/`. There is no admin page or upload address on purpose.
+- How the owner publishes: export with 导出为公司话术库文件, send the file in the project with the group (code) it is for,
+  and say 发布. The agent (with `npm run sync:publish`, see `tools/website/README.md`, "话术同步"):
+  1. checks the file with the same rules as `parseSharedLibrary` and reports, against the live file for that code, which
+     entries are new, changed and removed (removed ones only become 「公司已停用」 on devices);
+  2. uploads only after the owner writes 发布 / 部署 in that thread, keeping the previous file under
+     `sync/<CODE>/history/` so 退回上一版 restores it;
+  3. confirms by fetching the live address.
+- Never put a live 同步码 in the repo, the public site or a commit message. To remove someone from a group, create a new
+  code for it and give it to the people who stay.
+- Accounts (later step) are sent without passwords: site, user name and note only.
