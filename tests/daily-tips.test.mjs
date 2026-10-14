@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { COMPANY_TIPS } from "../app/company-tips.ts";
+import { parseCompanyTips } from "../tools/company-tips.mjs";
 import { BUILT_IN_TIPS, TIPS_FORMAT, TIPS_KEY, TIPS_URL, mergeServerTips, mergeTips, parseTipsFile, pickTipForDay, readTipsState, tipsLibrary, todayKey, writeTipsState } from "../app/daily-tips.ts";
 
 const fresh = () => ({ version: 1, extra: [], shownId: "", shownDate: "" });
@@ -33,41 +36,63 @@ test("online updates are off until the company address is filled in", () => {
   assert.equal(TIPS_KEY, "clipbox.tips.v1");
 });
 
+// A person who already reached the company tips (companyFirst), so the plain day-by-day rotation applies.
+const settled = () => ({ ...fresh(), companyFirst: true });
+const LIBRARY = tipsLibrary(fresh());
+
+test("the library is the company tips, then the built-in usage tips", () => {
+  assert.deepEqual(LIBRARY.map((entry) => entry.id), [...COMPANY_TIPS, ...BUILT_IN_TIPS].map((entry) => entry.id));
+  assert.equal(new Set(LIBRARY.map((entry) => entry.id)).size, LIBRARY.length);
+});
+
 test("the same day keeps the same tip and the same state", () => {
   const first = pickTipForDay(fresh(), "2026-10-13");
-  assert.equal(first.tip.id, BUILT_IN_TIPS[0].id);
-  assert.equal(first.state.shownId, BUILT_IN_TIPS[0].id);
+  assert.equal(first.tip.id, LIBRARY[0].id);
+  assert.equal(first.state.shownId, LIBRARY[0].id);
   assert.equal(first.state.shownDate, "2026-10-13");
+  assert.equal(first.state.companyFirst, true);
   const again = pickTipForDay(first.state, "2026-10-13");
-  assert.equal(again.tip.id, BUILT_IN_TIPS[0].id);
+  assert.equal(again.tip.id, LIBRARY[0].id);
   assert.equal(again.state, first.state);
 });
 
 test("a new day moves exactly one step, however many days passed", () => {
-  const state = { ...fresh(), shownId: "T-004", shownDate: "2026-10-01" };
+  const state = { ...settled(), shownId: "T-004", shownDate: "2026-10-01" };
   const next = pickTipForDay(state, "2026-10-13");
   assert.equal(next.tip.id, "T-005");
   assert.equal(next.state.shownDate, "2026-10-13");
   assert.equal(pickTipForDay(next.state, "2026-10-14").tip.id, "T-006");
+  assert.equal(pickTipForDay({ ...settled(), shownId: "C-001", shownDate: "2026-10-12" }, "2026-10-13").tip.id, "C-002");
+});
+
+test("someone in the middle of the usage tips jumps to the first company tip once, even on the same day", () => {
+  const before = { ...fresh(), shownId: "T-012", shownDate: "2026-10-14" };
+  const jumped = pickTipForDay(before, "2026-10-14");
+  assert.equal(jumped.tip.id, COMPANY_TIPS[0].id);
+  assert.deepEqual(jumped.state, { ...before, shownId: COMPANY_TIPS[0].id, companyFirst: true });
+  assert.equal(pickTipForDay(jumped.state, "2026-10-15").tip.id, COMPANY_TIPS[1].id);
+  // Once settled, the usage tips after the company tips do not send it back.
+  assert.equal(pickTipForDay({ ...settled(), shownId: "T-012", shownDate: "2026-10-14" }, "2026-10-15").tip.id, "T-013");
 });
 
 test("after the last tip comes the first again", () => {
   const last = BUILT_IN_TIPS.at(-1).id;
-  assert.equal(pickTipForDay({ ...fresh(), shownId: last, shownDate: "2026-10-12" }, "2026-10-13").tip.id, BUILT_IN_TIPS[0].id);
+  assert.equal(pickTipForDay({ ...settled(), shownId: last, shownDate: "2026-10-12" }, "2026-10-13").tip.id, LIBRARY[0].id);
   // A server tip at the end of the library comes after the last built-in one, then the first again.
-  const state = { ...fresh(), extra: [tip("S-1")], shownId: last, shownDate: "2026-10-12" };
+  const state = { ...settled(), extra: [tip("S-1")], shownId: last, shownDate: "2026-10-12" };
   const server = pickTipForDay(state, "2026-10-13");
   assert.equal(server.tip.id, "S-1");
-  assert.equal(pickTipForDay(server.state, "2026-10-14").tip.id, BUILT_IN_TIPS[0].id);
+  assert.equal(pickTipForDay(server.state, "2026-10-14").tip.id, LIBRARY[0].id);
 });
 
 test("an unknown shown tip starts again at the first, even on the same day", () => {
-  const picked = pickTipForDay({ ...fresh(), shownId: "gone", shownDate: "2026-10-13" }, "2026-10-13");
-  assert.equal(picked.tip.id, BUILT_IN_TIPS[0].id);
-  assert.equal(picked.state.shownId, BUILT_IN_TIPS[0].id);
+  const picked = pickTipForDay({ ...settled(), shownId: "gone", shownDate: "2026-10-13" }, "2026-10-13");
+  assert.equal(picked.tip.id, LIBRARY[0].id);
+  assert.equal(picked.state.shownId, LIBRARY[0].id);
 });
 
 test("a library of one tip shows it every day", () => {
+  const company = COMPANY_TIPS.splice(0, COMPANY_TIPS.length);
   const original = BUILT_IN_TIPS.splice(0, BUILT_IN_TIPS.length, tip("only"));
   try {
     let state = fresh();
@@ -78,7 +103,35 @@ test("a library of one tip shows it every day", () => {
     }
   } finally {
     BUILT_IN_TIPS.splice(0, BUILT_IN_TIPS.length, ...original);
+    COMPANY_TIPS.splice(0, 0, ...company);
   }
+});
+
+test("the company tips match the document, one per bold title, with highlight examples and sources", () => {
+  const markdown = readFileSync(new URL("../docs/company-tips.md", import.meta.url), "utf8");
+  assert.deepEqual(parseCompanyTips(markdown), COMPANY_TIPS, "run node tools/company-tips.mjs");
+  assert.equal(COMPANY_TIPS.length, (markdown.match(/^\*\*.+\*\*$/gm) || []).length);
+  COMPANY_TIPS.forEach((entry, index) => {
+    assert.equal(entry.id, `C-${String(index + 1).padStart(3, "0")}`);
+    assert.ok(entry.title && (entry.text || entry.examples?.length), entry.id);
+    for (const words of [entry.title, entry.text, entry.source || "", ...(entry.examples || []).map((example) => example.text)]) {
+      assert.ok(!/[✅❌*]|^来源/.test(words), `${entry.id}: ${words}`);
+    }
+  });
+  const first = COMPANY_TIPS[0];
+  assert.deepEqual(first, { id: "C-001", title: "拿不准就叫 lovely", text: first.text, examples: [{ good: true, text: "Hi lovely 👋" }] });
+  const hiDear = COMPANY_TIPS.find((entry) => entry.title === '别对新客户说 "Hi dear"');
+  assert.deepEqual(hiDear.examples, [{ good: true, text: "Hi lovely 👋" }, { good: false, text: "Hi dear / Dear friend" }]);
+  assert.equal(COMPANY_TIPS.find((entry) => entry.title === "结尾问一个好回答的问题").source, "根据 2026 年阿里对话数据");
+  assert.equal(COMPANY_TIPS.find((entry) => entry.title === "卷度速记").text.split("\n").length, 4);
+});
+
+test("parseCompanyTips: text, examples and source; headings, quotes and lists are skipped", () => {
+  const markdown = "# 标题\n> 说明\n- 列表\n\n## 一, 组\n\n**第一条**\n第一行\n第二行\n✅ Yes!\n❌ No\n来源: 某处\n\n---\n\n**只有例子**\n❌ bad\n✅ good\n";
+  assert.deepEqual(parseCompanyTips(markdown), [
+    { id: "C-001", title: "第一条", text: "第一行\n第二行", examples: [{ good: true, text: "Yes!" }, { good: false, text: "No" }], source: "某处" },
+    { id: "C-002", title: "只有例子", text: "", examples: [{ good: false, text: "bad" }, { good: true, text: "good" }] },
+  ]);
 });
 
 test("mergeTips: known ids change in place, new ids go at the end, nothing is removed", () => {
@@ -141,8 +194,8 @@ test("mergeServerTips adds new tips, can rewrite a built-in tip, and notes the d
   assert.equal(after.shownId, "T-001");
   assert.deepEqual(after.extra.map((entry) => entry.id), ["S-1", "T-002", "S-2"]);
   const library = tipsLibrary(after);
-  assert.equal(library.length, BUILT_IN_TIPS.length + 2);
-  assert.deepEqual(library[1], tip("T-002", "公司版标题", "公司版内容"));
+  assert.equal(library.length, COMPANY_TIPS.length + BUILT_IN_TIPS.length + 2);
+  assert.deepEqual(library[COMPANY_TIPS.length + 1], tip("T-002", "公司版标题", "公司版内容"));
   assert.deepEqual(library.at(-2), tip("S-1", "改过", "改过的内容"));
   assert.throws(() => mergeServerTips(before, "{}", "2026-10-13"));
 });

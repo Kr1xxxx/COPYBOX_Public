@@ -187,7 +187,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .directory-row.dragging { z-index: 5; opacity: .8; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .directory-row.drag-over::after { content: ""; position: absolute; left: 5px; right: 5px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 .nav-footer { flex: 0 0 auto; margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
-/* 每日 Tips: a small card pinned above 回收站 (app/daily-tips-card.tsx); the dialog reuses .backup-dialog. */
+/* 每日小贴士: a small card pinned above 回收站 (app/daily-tips-card.tsx); the dialog reuses .backup-dialog. */
 .daily-tips-slot { flex: 0 0 auto; margin-top: auto; padding: 8px 0 6px; }
 .daily-tips { width: 100%; margin: 0; padding: 7px 8px 8px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink-2); font: inherit; text-align: left; cursor: pointer; transition: background .14s, border-color .14s; }
 .daily-tips-slot + .nav-footer { margin-top: 0; }
@@ -200,6 +200,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .tips-dialog:focus { outline: 0; }
 .tips-dialog .tips-text { max-width: 360px; margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
 .tips-dialog .tips-actions { grid-template-columns: 1fr; }
+/* 每日小贴士 examples: the right way as a highlight block (like a 话术 variable), the wrong way struck through in grey. */
+.tips-dialog .tips-body { display: grid; gap: 10px; }
+.tips-dialog .tips-examples { display: grid; gap: 6px; max-width: 360px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.55; }
+.tips-dialog .tips-good { justify-self: start; padding: 4px 9px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; overflow-wrap: anywhere; }
+.tips-dialog .tips-bad { justify-self: start; padding: 0 9px; color: var(--muted); overflow-wrap: anywhere; }
+.tips-dialog .tips-bad s { text-decoration-thickness: 1px; }
+.tips-dialog .tips-source { max-width: 360px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .menu-wrap { position: relative; }
 .dropdown { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 168px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 16px 40px rgba(31,30,28,.16); }
 .dropdown.folder-menu { animation: menu-in .14s ease-out both; }

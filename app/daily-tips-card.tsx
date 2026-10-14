@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { mergeServerTips, pickTipForDay, readTipsState, TIPS_URL, todayKey, writeTipsState, type Tip } from "./daily-tips";
 import { fetchSharedLibraryText } from "./shared-library-client";
 
-// The 每日 Tips card above 回收站 in the sidebar, and the dialog that shows the whole tip.
+// The 每日小贴士 card above 回收站 in the sidebar, and the dialog that shows the whole tip.
 // Reads the stored state, picks today's tip and, when the day moved on, saves the new choice.
 function pickAndSave(): Tip {
   const before = readTipsState();
@@ -55,7 +55,7 @@ export function DailyTipsCard() {
   return (
     <div className="daily-tips-slot">
       <button ref={cardRef} type="button" className="daily-tips" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
-        <span className="daily-tips-label">每日 Tips</span>
+        <span className="daily-tips-label">每日小贴士</span>
         <span className="daily-tips-title">{tip.title}</span>
       </button>
       {open && createPortal(<DailyTipDialog tip={tip} onClose={close} />, document.body)}
@@ -83,10 +83,20 @@ function DailyTipDialog({ tip, onClose }: { tip: Tip; onClose: () => void }) {
     <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section ref={dialogRef} className="backup-dialog tips-dialog" role="dialog" aria-modal="true" aria-labelledby="daily-tips-title" aria-describedby="daily-tips-text" tabIndex={-1} data-local-esc>
         <header className="backup-head">
-          <div><p>每日 Tips</p><h2 id="daily-tips-title">{tip.title}</h2></div>
+          <div><p>每日小贴士</p><h2 id="daily-tips-title">{tip.title}</h2></div>
         </header>
         <div className="backup-form">
-          <p id="daily-tips-text" className="tips-text">{tip.text}</p>
+          <div id="daily-tips-text" className="tips-body">
+            {tip.text && <p className="tips-text">{tip.text}</p>}
+            {tip.examples?.length ? (
+              <ul className="tips-examples">
+                {tip.examples.map((example, index) => example.good
+                  ? <li key={index} className="tips-good">{example.text}</li>
+                  : <li key={index} className="tips-bad"><span className="sr-only">不要这样写：</span><s>{example.text}</s></li>)}
+              </ul>
+            ) : null}
+            {tip.source && <p className="tips-source">来源: {tip.source}</p>}
+          </div>
           <div className="backup-actions tips-actions"><button type="button" className="primary" onClick={onClose}>知道了</button></div>
         </div>
       </section>
