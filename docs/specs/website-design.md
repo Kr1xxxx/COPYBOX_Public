@@ -55,7 +55,7 @@ only lift on hover) while the structure, sections, copy and purple accent stay o
    page in `--ink`); right: theme toggle (icon button, `aria-label`), text link 在线试用, primary pill 下载 Windows 版.
    On phones the nav wraps under the brand in a second row; no hamburger.
 2. **Hero** (home): two columns (text / visual), stacked on phones. Eyebrow `● v__VERSION__ · __UPDATED__ 更新`
-   (accent dot). h1 over two lines 「常用话术、账号资料、图片，一键复制」. Lead 「装在自己电脑上，不用注册、不用联网就能用。
+   (accent dot). h1 over two lines 「常用话术、账号资料、图片，一键复制」. Lead 「装在自己电脑上，不用注册，断网也能照常复制。
    内容用 AES-256 加密，只保存在这台设备上。」(fixed line). CTAs: primary pill 「下载 Windows 版 →」 + text links
    「使用说明」「在线试用」. Visual: three fanned cards drawn in HTML/CSS (rotations about -8°, 0°, +6°, overlapping,
    `--shadow-float`, on a soft white radial glow): a 话术 card (a title, two lines of sample reply text, a small

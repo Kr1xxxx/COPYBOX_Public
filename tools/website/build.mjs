@@ -64,7 +64,7 @@ export function escapeHtml(value) {
 // text. 404.html and preview-gate.html are left out of the sitemap and carry noindex.
 export const sitePages = [
   { source: "pages/index.html", key: "index.html", path: "/", nav: "HOME", title: "Copyboxx · 复制盒",
-    description: "Copyboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，不用联网，内容加密保存。" },
+    description: "Copyboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，断网也能用，内容加密保存。" },
   { source: "pages/download.html", key: "download/index.html", path: "/download/", nav: "DOWNLOAD", title: "下载 · Copyboxx",
     description: "下载 Copyboxx（复制盒）Windows 版，附安装步骤、安装时的提示和从旧版搬数据的方法。" },
   { source: "pages/help.html", key: "help/index.html", path: "/help/", nav: "HELP", title: "使用说明 · Copyboxx",
