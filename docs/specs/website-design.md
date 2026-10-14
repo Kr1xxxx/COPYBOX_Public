@@ -52,12 +52,12 @@ only lift on hover) while the structure, sections, copy and purple accent stay o
 1. **Header** (sticky, 56px, `--page` at 80% with `backdrop-filter: saturate(1.4) blur(12px)`, no bottom border;
    a hairline appears once the page scrolls, set by the same head script as a `scrolled` class on `<html>`): left the
    mark (`/favicon.svg`, 24px) + `Clipboxx` (600) + `复制盒` (muted); nav 首页 · 下载 · 使用说明 (`--ink-2`, current
-   page in `--ink`); right: theme toggle (icon button, `aria-label`), text link 在线试用, primary pill 下载 Windows 版.
+   page in `--ink`); right: theme toggle (icon button, `aria-label`), primary pill 下载 Windows 版.
    On phones the nav wraps under the brand in a second row; no hamburger.
 2. **Hero** (home): two columns (text / visual), stacked on phones. Eyebrow `● v__VERSION__ · __UPDATED__ 更新`
    (accent dot). h1 over two lines 「常用话术、账号资料、图片，一键复制」. Lead 「装在自己电脑上，不用注册，断网也能照常复制。
    内容用 AES-256 加密，只保存在这台设备上。」(fixed line). CTAs: primary pill 「下载 Windows 版 →」 + text links
-   「使用说明」「在线试用」. Visual: three fanned cards drawn in HTML/CSS (rotations about -8°, 0°, +6°, overlapping,
+   「使用说明」. Visual: three fanned cards drawn in HTML/CSS (rotations about -8°, 0°, +6°, overlapping,
    `--shadow-float`, on a soft white radial glow): a 话术 card (a title, two lines of sample reply text, a small
    「复制」 chip), an 账号 card (a site name, masked dots, 「复制」 chip), an 图片 card (a lavender gradient tile with a
    tiny caption). No carousel.
@@ -79,12 +79,11 @@ only lift on hover) while the structure, sections, copy and purple accent stay o
 
 | Path | Title | Content |
 | --- | --- | --- |
-| `/` | `Clipboxx · 复制盒` | hero; 三个部分 card row (话术 / 账号 / 图片, texts as on the current page); 三步装好 steps (下载安装包 / 双击运行，看到「未知发布者」点「更多信息」→「仍要运行」 / 用过旧版的话先在旧版「设置 → 数据 → 导出到新版」，再在新版「从旧版导入」) beside the app image; 系统要求 cards (Windows 10 / 11，64 位；Mac（Apple 芯片）暂不提供下载；网页测试版：任意浏览器，需要口令); 用起来顺手 feature grid (托盘小窗 / 搜索 / 备份 / AI 润色和整理 / 公司共享话术 / 主题); 常见问题 (5 questions, see /help/); footer |
+| `/` | `Clipboxx · 复制盒` | hero; 三个部分 card row (话术 / 账号 / 图片, texts as on the current page); 三步装好 steps (下载安装包 / 双击运行，看到「未知发布者」点「更多信息」→「仍要运行」 / 用过旧版的话先在旧版「设置 → 数据 → 导出到新版」，再在新版「从旧版导入」) beside the app image; 系统要求 cards (Windows 10 / 11，64 位；Mac（Apple 芯片）暂不提供下载); 用起来顺手 feature grid (托盘小窗 / 搜索 / 备份 / AI 润色和整理 / 公司共享话术 / 主题); 常见问题 (5 questions, see /help/); footer |
 | `/download/` | `下载 · Clipboxx` | one big download card: Windows 版 v__VERSION__ · __SIZE__ · 更新于 __UPDATED__, primary pill 下载, a muted line with the SHA-256 (`__SHA256__`, wrapped, tabular); 安装步骤 (numbered, as above); 安装时的提示 (SmartScreen); 从旧版搬数据; 更新方法 (回到这里下载新版本，直接覆盖安装，数据不会丢); Mac 版 note |
 | `/help/` | `使用说明 · Clipboxx` | a short overview (owner, 2026-10-13: 「现在写的太细了」): one intro line, the in-page list of pills at the top, then eight sections, each an `h2` and two or three plain sentences, no `h3` and no step lists: 话术, 账号, 图片, 托盘小窗, 备份与恢复, 公司共享话术, AI 润色和整理, 设置; then 常见问题 (数据存在哪里 / 忘了账号密码怎么办 / 换电脑怎么搬 / 为什么 Windows 提示未知发布者 / 和旧版 Clipbox 是什么关系) as `<details>`. Only say what the app really does: check `README.md`, `docs/features.json` and the labels in `app/settings.tsx`, `app/page.tsx`; when unsure, leave it out |
-| `/privacy/` | `隐私说明 · Clipboxx` | short: no account, no server, data encrypted on the device; the website collects nothing and sets no analytics; the web preview keeps its data in the visitor's browser; the passphrase cookie is the only cookie |
+| `/privacy/` | `隐私说明 · Clipboxx` | short: no account, no server, data encrypted on the device; the website collects nothing and sets no analytics; the site sets no cookies |
 | `404.html` | `找不到这个页面 · Clipboxx` | same header/footer, short text, link home |
-| `preview-gate.html` | `网页测试版 · Clipboxx` | same look (card on `--page`), unchanged behaviour |
 
 ## Files and build
 
@@ -97,9 +96,9 @@ only lift on hover) while the structure, sections, copy and purple accent stay o
 - `build.mjs` assembles each page (head + header with the current nav item marked + body + footer), fills version /
   date / size / sha256, writes `assets/site.<8-hex-of-sha256>.css` and links it, copies `icons/*` to the
   site root and `images/*` to `/images/`, writes `site.webmanifest` (name Clipboxx, short_name Clipboxx, lang zh-CN,
-  icons 192/512, theme/background colours), `robots.txt` (`User-agent: *`, `Disallow: /preview/`, `Sitemap:`), and
+  icons 192/512, theme/background colours), `robots.txt` (`User-agent: *`, `Allow: /`, `Sitemap:`), and
   `sitemap.xml` (the four pages, `lastmod` = the update date). Output keys: `index.html`, `download/index.html`,
-  `help/index.html`, `privacy/index.html`, `404.html`, `preview-gate.html`, `assets/...`,
-  `images/...`, root icon files, `download/Clipboxx-Setup.exe`, `download/latest.json`, `preview/**`.
+  `help/index.html`, `privacy/index.html`, `404.html`, `assets/...`,
+  `images/...`, root icon files, `download/Clipboxx-Setup.exe`, `download/latest.json`. The web preview is no longer on the site (owner, 2026-10-14).
 - Worker: content types for ico, txt, xml, webmanifest, jpg, webp; `assets/` (any depth) immutable; `images/` and the
   root icon files one day with ETag.

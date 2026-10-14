@@ -1,8 +1,9 @@
 // Cloudflare Worker for copyboxx.com: serves the files of dist-website/ from the KV namespace bound as FILES.
-// Keys are paths relative to dist-website/ ("index.html", "preview/assets/static/…"); the metadata
+// Keys are paths relative to dist-website/ ("index.html", "assets/site.….css"); the metadata
 // { type, sha256, size } is written by build.mjs (kv-bulk.json) and uploaded by deploy.mjs.
-// Everything under /preview/ asks for a passphrase first (env.PREVIEW_SECRET, set in wrangler.jsonc): a light gate
-// for colleagues, not a security boundary. A right answer sets the cookie preview_pass for 30 days.
+// Plain http:// requests are sent to https:// (301), and every https answer carries HSTS, so a first download of the
+// installer cannot be swapped on the way (audit S2, 2026-10-14). The site no longer hosts the web preview (owner,
+// 2026-10-14): /preview/ is an ordinary 404.
 
 const types = {
   html: "text/html; charset=utf-8",
@@ -41,15 +42,13 @@ export function contentTypeFor(key) {
 export function cacheControlFor(key) {
   const ext = extensionOf(key);
   if (ext === "html" || ext === "json") return "no-cache";
-  if (key.startsWith("assets/") || key.startsWith("preview/assets/")) return "public, max-age=31536000, immutable";
+  if (key.startsWith("assets/")) return "public, max-age=31536000, immutable";
   if (key.startsWith("images/") || rootIcons.has(key)) return "public, max-age=86400";
-  // seed.js, image-store.js and the sample sheets have no hash in their names: a new preview must not run with old ones.
-  if (key.startsWith("preview/")) return "no-cache";
   return "public, max-age=3600";
 }
 
 // What to look up for a request path, in order: [{ key, redirect? }]. A hit on an entry with `redirect` answers
-// 308 to that path instead of the file (so "/preview" goes to "/preview/"). null means the path is not allowed.
+// 308 to that path instead of the file (so "/download" goes to "/download/"). null means the path is not allowed.
 export function candidateKeys(pathname) {
   let path;
   try {
@@ -154,113 +153,43 @@ async function syncResponse(request, env, pathname) {
 }
 
 // Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
-const previewCookie = "preview_pass";
-const cookieAttributes = "Path=/preview; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000";
-const gateKey = "preview-gate.html";
-const gateMessages = { closed: "网页测试版暂未开放", wrong: "口令不对，再试一次" };
+// Six months, no preload (the audit thread's advice), so a mistake can still be undone.
+const hsts = "max-age=15552000";
 
-function normalizeSecret(value) {
-  return String(value ?? "").trim().toLowerCase();
+// The https:// address of a plain http:// request, or null when the request is already https.
+export function httpsRedirect(requestUrl) {
+  const url = new URL(requestUrl);
+  if (url.protocol !== "http:") return null;
+  url.protocol = "https:";
+  return url.href;
 }
 
-// Case-insensitive, surrounding spaces ignored; an empty passphrase never matches (so a missing secret fails closed).
-export function secretMatches(input, secret) {
-  const wanted = normalizeSecret(secret);
-  return wanted !== "" && normalizeSecret(input) === wanted;
-}
-
-// The cookie value: hex SHA-256 of "clipboxx-preview:" + the normalized passphrase.
-export async function cookieToken(secret) {
-  const bytes = new TextEncoder().encode(`clipboxx-preview:${normalizeSecret(secret)}`);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export function parseCookies(header) {
-  const cookies = new Map();
-  for (const part of String(header ?? "").split(";")) {
-    const eq = part.indexOf("=");
-    if (eq < 0) continue;
-    const name = part.slice(0, eq).trim();
-    if (name && !cookies.has(name)) cookies.set(name, part.slice(eq + 1).trim());
+async function serve(request, env) {
+  const url = new URL(request.url);
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
-  return cookies;
-}
-
-export function isPreviewKey(key) {
-  return key === "preview" || key.startsWith("preview/");
-}
-
-async function hasPreviewPass(request, env) {
-  if (!normalizeSecret(env.PREVIEW_SECRET)) return false;
-  const value = parseCookies(request.headers.get("Cookie")).get(previewCookie);
-  return Boolean(value) && value === (await cookieToken(env.PREVIEW_SECRET));
-}
-
-const gateFallback = `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>网页测试版 · Copyboxx</title></head><body>
-<h1>输入口令</h1><p>网页测试版只给内部同事看，请输入口令。</p>
-<form method="post" action="/preview/"><input name="key" type="password" autocomplete="off" aria-label="口令"> <button type="submit">进入</button></form>
-<p>__MESSAGE__</p><p><a href="/">回到首页</a></p>
-</body></html>`;
-
-// The passphrase page (KV key preview-gate.html, or the inline fallback), always 401 and never cached or tagged.
-async function gatePage(request, env, message = "") {
-  const closed = !normalizeSecret(env.PREVIEW_SECRET);
-  const page = await env.FILES.getWithMetadata(gateKey, { type: "text" });
-  const template = typeof page?.value === "string" ? page.value : gateFallback;
-  const html = template.replaceAll("__MESSAGE__", closed ? gateMessages.closed : message);
-  const headers = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff" };
-  return new Response(request.method === "HEAD" ? null : html, { status: 401, headers });
-}
-
-function needPass(request) {
-  return new Response(request.method === "HEAD" ? null : "需要口令", {
-    status: 401,
-    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff" },
-  });
-}
-
-async function submitPass(request, env) {
-  let input = "";
-  try {
-    const form = await request.formData();
-    input = form.get("key") ?? "";
-  } catch {
-    input = "";
+  if (isSyncPath(url.pathname)) return syncResponse(request, env, url.pathname);
+  const candidates = candidateKeys(url.pathname);
+  if (!candidates) return notFound(request, env);
+  for (const { key, redirect } of candidates) {
+    const file = await env.FILES.getWithMetadata(key, { type: "stream" });
+    if (file?.value == null) continue;
+    if (redirect) {
+      release(file.value);
+      return new Response(null, { status: 308, headers: { Location: redirect + url.search, "Cache-Control": "no-cache" } });
+    }
+    return fileResponse(request, key, file);
   }
-  if (!secretMatches(input, env.PREVIEW_SECRET)) return gatePage(request, env, gateMessages.wrong);
-  const token = await cookieToken(env.PREVIEW_SECRET);
-  return new Response(null, {
-    status: 303,
-    headers: { Location: "/preview/", "Set-Cookie": `${previewCookie}=${token}; ${cookieAttributes}`, "Cache-Control": "no-cache" },
-  });
+  return notFound(request, env);
 }
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method === "POST" && url.pathname === "/preview/") return submitPass(request, env);
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
-    }
-    if (isSyncPath(url.pathname)) return syncResponse(request, env, url.pathname);
-    const candidates = candidateKeys(url.pathname);
-    if (!candidates) return notFound(request, env);
-    const locked = isPreviewKey(candidates[0].key) && !(await hasPreviewPass(request, env));
-    for (const { key, redirect } of candidates) {
-      // Without the pass only the folder redirect ("/preview" → "/preview/") answers; it reveals nothing.
-      if (locked && !redirect) continue;
-      const file = await env.FILES.getWithMetadata(key, { type: "stream" });
-      if (file?.value == null) continue;
-      if (redirect) {
-        release(file.value);
-        return new Response(null, { status: 308, headers: { Location: redirect + url.search, "Cache-Control": "no-cache" } });
-      }
-      return fileResponse(request, key, file);
-    }
-    if (locked) return extensionOf(candidates[0].key) === "html" ? gatePage(request, env) : needPass(request);
-    return notFound(request, env);
+    const secure = httpsRedirect(request.url);
+    if (secure) return new Response(null, { status: 301, headers: { Location: secure, "Cache-Control": "no-cache" } });
+    const response = await serve(request, env);
+    response.headers.set("Strict-Transport-Security", hsts);
+    return response;
   },
 };
