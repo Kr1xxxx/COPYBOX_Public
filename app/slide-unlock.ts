@@ -1,4 +1,4 @@
-// 账号 page slide-to-unlock (D-050): the setting and the knob maths. The component is app/account-veil.tsx.
+// 账号 page slide-to-unlock (D-051): the setting and the knob maths. The component is app/account-veil.tsx.
 import { readStoredChoice, writeStoredChoice } from "./stored-choice.ts";
 
 // "0" = off; missing (or anything else) = on. Kept in the browser's storage, never in the vault.

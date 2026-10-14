@@ -5,7 +5,7 @@ export const SAMPLE_CSV = fileURLToPath(new URL("../../docs/samples/clipbox-test
 // The first-run guide (app/first-run-guide.tsx) covers the window on a fresh start. playwright.config.mjs starts every
 // test with it already seen (this storage state); a test about the guide uses `test.use({ storageState: GUIDE_UNSEEN })`.
 export const FIRST_RUN_GUIDE_KEY = "clipbox.first-run-guide.v1";
-// The 账号 page is frosted until slid open (D-050, on by default). The shared state turns that off, so tests about the
+// The 账号 page is frosted until slid open (D-051, on by default). The shared state turns that off, so tests about the
 // 账号 content reach it at once; tests about the slide itself use `test.use({ storageState: SLIDE_UNLOCK_ON })`.
 export const SLIDE_UNLOCK_KEY = "clipbox.account-slide-unlock.v1";
 export function guideSeenState(baseURL, { slideUnlock = false } = {}) {
