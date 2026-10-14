@@ -9,7 +9,7 @@ function clock(at: number) {
   return new Date(at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-// Settings → 共享话术: where the company library comes from, a manual sync, and what the last sync did.
+// Settings → 共享话术: the 同步码 (or an address), a manual sync, and what the last sync did.
 export function SharedLibrarySection({ onApply, onExport }: {
   onApply: (text: string) => Promise<SyncSummary>;
   onExport: () => void;
@@ -31,22 +31,22 @@ export function SharedLibrarySection({ onApply, onExport }: {
 
   return (
     <>
-      <p className="settings-note">公司统一维护的话术。同步只会新增和更新没被你改过的，你自己写的和改过的话术不会被覆盖或删除。</p>
+      <p className="settings-note">公司统一维护的话术。填上公司给你的同步码，打开软件时和每 30 分钟会自动同步。同步只会新增和更新没被你改过的，你自己写的和改过的话术不会被覆盖或删除。</p>
       <div className="settings-row shared-url">
         <div>
-          <label htmlFor="shared-url"><strong>公司话术库地址</strong></label>
-          <input id="shared-url" type="url" inputMode="url" autoComplete="off" spellCheck={false} placeholder="还没有地址，先不填也可以" value={url}
+          <label htmlFor="shared-url"><strong>同步码</strong></label>
+          <input id="shared-url" type="url" inputMode="url" autoComplete="off" spellCheck={false} placeholder="填公司给你的同步码，没有就先不填" value={url}
             onChange={(event) => { setUrl(event.target.value); writeSharedUrl(event.target.value); setError(""); }} />
         </div>
         <button type="button" className="secondary-button" disabled={!url.trim() || busy} onClick={() => void run(() => fetchSharedLibraryText(url))}>{busy ? "同步中…" : "立即同步"}</button>
       </div>
       <div className="settings-row">
-        <div><strong>从文件同步</strong><small>没有地址时，用公司发来的 .json 文件，规则一样</small></div>
+        <div><strong>从文件同步</strong><small>没有同步码时，用公司发来的 .json 文件，规则一样</small></div>
         <button type="button" className="secondary-button" disabled={busy} onClick={() => fileRef.current?.click()}>选公司文件…</button>
         <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void run(() => file.text()); }} />
       </div>
       <div className="settings-row">
-        <div><strong>导出为公司话术库文件</strong><small>给负责维护公司话术的人：把现在的话术导出成可以放到地址上的文件</small></div>
+        <div><strong>导出为公司话术库文件</strong><small>给负责维护公司话术的人：把现在的话术导出成文件，交给 AI 发布</small></div>
         <button type="button" className="secondary-button" onClick={onExport}>导出…</button>
       </div>
       {error && <p className="settings-note shared-error" role="alert">{error}</p>}

@@ -107,3 +107,36 @@ test("an address syncs on 立即同步 and again by itself on the next start, qu
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
   await expect(page.getByText("共享话术已同步")).toHaveCount(0);
 });
+
+test("a 同步码 syncs its group's file, says so when the code is wrong, and syncs again by itself every 30 minutes", async ({ page }) => {
+  const fs = await import("node:fs");
+  let body = fs.readFileSync(V1, "utf8");
+  let calls = 0;
+  await page.route("https://copyboxx.com/sync/**", (route) => {
+    if (!route.request().url().endsWith("/sync/XS-7KQ2M9AB/snippets.json")) return route.fulfill({ status: 404, body: "" });
+    calls += 1;
+    return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body });
+  });
+  await page.clock.install();
+  await page.reload();
+  await page.waitForSelector(".native-row");
+  const before = await page.locator(".native-row").count();
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "数据" }).click();
+  const dialog = page.locator(".settings-dialog");
+  await dialog.locator("#shared-url").fill("XS-WRONG000");
+  await dialog.getByRole("button", { name: "立即同步" }).click();
+  await expect(dialog.locator(".shared-error")).toHaveText("找不到这个同步码，请检查一下");
+  await dialog.locator("#shared-url").fill("xs-7kq2m9ab");
+  await dialog.getByRole("button", { name: "立即同步" }).click();
+  await expect(dialog.locator(".shared-summary")).toContainText("新增 3 条");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".native-row")).toHaveCount(before + 3);
+
+  // The company publishes v2 (changes two, drops one, adds one); the app picks it up on its own within 30 minutes.
+  body = fs.readFileSync(V2, "utf8");
+  const seen = calls;
+  await page.clock.runFor(30 * 60 * 1000);
+  await expect.poll(() => calls).toBeGreaterThan(seen);
+  await expect(page.getByText(/共享话术已同步：新增 1 条/)).toBeVisible();
+});

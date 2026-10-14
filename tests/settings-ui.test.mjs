@@ -132,7 +132,7 @@ test("deleted items are cleared after 7 days until another option is picked", ()
 test("the company library section lives in settings, starts without an address and the desktop bridge can fetch the file", () => {
   assert.match(page, /sharedLibrary=\{<SharedLibrarySection onApply=\{applySharedLibraryText\}/);
   const section = fs.readFileSync(new URL("../app/shared-library-ui.tsx", import.meta.url), "utf8");
-  assert.match(section, /placeholder="还没有地址，先不填也可以"/);
+  assert.match(section, /placeholder="填公司给你的同步码，没有就先不填"/);
   const client = fs.readFileSync(new URL("../app/shared-library-client.ts", import.meta.url), "utf8");
   assert.match(client, /readSharedUrl\(\) \{ return \(read\(SHARED_URL_KEY\) \|\| ""\)\.trim\(\); \}/);
   assert.match(fs.readFileSync(new URL("../src-tauri/bridge.js", import.meta.url), "utf8"), /fetchSharedLibrary: function \(url\) \{ return invoke\("fetch_shared_library"/);

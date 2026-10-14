@@ -109,7 +109,7 @@ import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SharedLibrarySection, SharedNotice } from "./shared-library-ui";
-import { acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
+import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
@@ -602,17 +602,23 @@ export default function Home() {
     await persist((current) => ({ ...current, items: current.items.map((item) => item.id === id ? resolve(item, timestampNow()) : item) }));
   }
 
-  // Once per start, if an address is set: stay silent unless something changed, and never complain when offline.
-  const sharedAutoSyncedRef = useRef(false);
+  // On start and every 30 minutes while open, if a 同步码 is set: stay silent unless something changed, and never
+  // complain when offline or when the code finds nothing (the next round tries again).
   useEffect(() => {
-    if (loading || sharedAutoSyncedRef.current) return;
-    sharedAutoSyncedRef.current = true;
-    const url = readSharedUrl();
-    if (!url) return;
-    void fetchSharedLibraryText(url).then(applySharedLibraryText).then((summary) => {
-      if (!summary.added && !summary.updated && !summary.keptMine && !summary.retired) return;
-      showToast(`共享话术已同步：${describeSync(summary)}`, { ms: 3600 });
-    }).catch(() => undefined);
+    if (loading) return;
+    let running = false;
+    const syncNow = () => {
+      const source = readSharedUrl();
+      if (!source || running) return;
+      running = true;
+      void fetchSharedLibraryText(source).then(applySharedLibraryText).then((summary) => {
+        if (!summary.added && !summary.updated && !summary.keptMine && !summary.retired) return;
+        showToast(`共享话术已同步：${describeSync(summary)}`, { ms: 3600 });
+      }).catch(() => undefined).finally(() => { running = false; });
+    };
+    syncNow();
+    const timer = window.setInterval(syncNow, SHARED_SYNC_INTERVAL_MS);
+    return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 

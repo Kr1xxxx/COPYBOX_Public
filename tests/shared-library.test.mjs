@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  acceptSharedUpdate, contentHash, contentOf, describeSync, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary,
+  acceptSharedUpdate, contentHash, contentOf, describeSync, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, sharedSourceUrl, syncSharedLibrary,
 } from "../app/shared-library.ts";
 
 let counter = 0;
@@ -129,4 +129,13 @@ test("exporting writes a library file that another app reads back as the same en
   assert.deepEqual(items.map((item) => item.id).sort(), ["a", "mine"]);
   const a = items.find((item) => item.id === "a");
   assert.equal(contentHash(a), contentHash(contentOf(first.items.find((item) => item.shared?.id === "a"))));
+});
+
+test("a 同步码 picks its group's file on copyboxx.com; a full address is used as typed", () => {
+  assert.equal(sharedSourceUrl(" xs-7kq2m9ab "), "https://copyboxx.com/sync/XS-7KQ2M9AB/snippets.json");
+  assert.equal(sharedSourceUrl("https://company.example/library.json"), "https://company.example/library.json");
+  assert.equal(sharedSourceUrl(""), "");
+  // too short, or anything that could walk out of the folder, is not a code
+  assert.equal(sharedSourceUrl("abc"), "abc");
+  assert.equal(sharedSourceUrl("../admin"), "../admin");
 });

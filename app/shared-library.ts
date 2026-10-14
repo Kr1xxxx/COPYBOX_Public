@@ -235,3 +235,16 @@ export function describeSync(summary: SyncSummary) {
   if (summary.restored) parts.push(`${summary.restored} 条重新启用`);
   return parts.length ? parts.join("，") : "已是最新，没有变化";
 }
+
+// Where the company library comes from (Settings → 同步). People type the 同步码 they were given (e.g. XS-7KQ2M9AB),
+// which picks their group's file on copyboxx.com; a full http(s) address still works for a file hosted elsewhere.
+export const SYNC_BASE_URL = "https://copyboxx.com/sync/";
+export const SHARED_SYNC_INTERVAL_MS = 30 * 60 * 1000;
+const SYNC_CODE = /^[A-Za-z0-9-]{6,40}$/;
+
+export function sharedSourceUrl(value: string): string {
+  const typed = value.trim();
+  if (!typed) return "";
+  if (SYNC_CODE.test(typed)) return `${SYNC_BASE_URL}${typed.toUpperCase()}/snippets.json`;
+  return typed;
+}
