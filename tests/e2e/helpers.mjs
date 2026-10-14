@@ -14,7 +14,7 @@ export function guideSeenState(baseURL, { slideUnlock = false } = {}) {
   return { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage }] };
 }
 // Guide seen, slide unlock left at its default (on), as on a real install.
-export const SLIDE_UNLOCK_ON = async ({ baseURL }, use) => { await use(guideSeenState(baseURL, { slideUnlock: true })); };
+export const SLIDE_UNLOCK_ON = async ({ baseURL }, provide) => { await provide(guideSeenState(baseURL, { slideUnlock: true })); };
 export const GUIDE_UNSEEN = { cookies: [], origins: [] };
 
 // Imports the 37-row sample sheet (2 invalid rows, 1 duplicate) → 34 snippets.
