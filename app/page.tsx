@@ -2261,6 +2261,7 @@ export default function Home() {
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
         onShowGuide={() => { setSettingsOpen(false); guide.show(); }}
+        onOpenAccount={() => { setSettingsOpen(false); switchKind("secret"); }}
       />}
       {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}

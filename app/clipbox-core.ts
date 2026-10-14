@@ -748,6 +748,18 @@ export function formatBuildTime(value: string | undefined): string {
   return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
 }
 
+// "2026年10月14日" (with time: "2026年10月14日 17:30") on the Taipei calendar, whatever the viewer's own time zone;
+// "" when the value is missing or not a date. Settings home shows the update date and the last sync this way.
+export function formatTaipeiDate(value: string | number | undefined, withTime = false): string {
+  if (value === undefined || value === "" || value === 0) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(date).map((part) => [part.type, part.value]));
+  const day = `${parts.year}年${parts.month}月${parts.day}日`;
+  return withTime ? `${day} ${parts.hour}:${parts.minute}` : day;
+}
+
 // Which cards can step up or down in the shown list, worked out once per list instead of once per row (a long list
 // made that slow). Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
 export type CardMoves = { up: boolean; down: boolean };
