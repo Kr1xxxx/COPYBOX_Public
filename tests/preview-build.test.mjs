@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  compileModuleTree,
   ensureTitle,
   patchPreloadHelper,
   previewBuildInfo,
@@ -65,4 +66,15 @@ test("the shim answers getVersion and getBuildTime, and the wrapper shows the up
 test("renderWrapper also hands the update moment to the page, which shows it in the viewer's clock", () => {
   const html = renderWrapper('<span data-at="__UPDATED_ISO__">__UPDATED__</span>', "1.39", "2026-10-11 20:02", "2026-10-11T20:02:00+08:00");
   assert.equal(html, '<span data-at="2026-10-11T20:02:00+08:00">2026-10-11 20:02</span>');
+});
+
+test("compileModuleTree ships the runtime imports of image-store and drops type-only ones", () => {
+  const sources = {
+    "image-store.ts": 'import type { X } from "./types.ts";\nimport { a } from "./helper.ts";\nexport const b: X = a;\n',
+    "helper.ts": "export const a = 1;\n",
+  };
+  const files = new Map(compileModuleTree((file) => sources[file], "image-store.ts"));
+  assert.deepEqual([...files.keys()].sort(), ["helper.js", "image-store.js"]);
+  assert.ok(files.get("image-store.js").includes('from "./helper.js"'));
+  assert.ok(!files.get("image-store.js").includes(".ts"));
 });
