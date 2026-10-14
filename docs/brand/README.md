@@ -8,7 +8,7 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| `icon.svg` | 应用图标源文件（1024，方块外透明）。`src-tauri/icons/` 里的 png / ico / icns 由它导出 |
+| `icon.svg` | 应用图标源文件（1024，方块在 100–924，方块外透明）。`src-tauri/icons/icon.svg` 是它的副本，`node scripts/render-icons.mjs` 由此生成 png / ico / icns 和安装包图片；`icon-16.svg`、`icon-24.svg`、网站 `favicon.svg` 是按像素网格手画的小尺寸版 |
 | `icon-mark.svg` | 同一个图标，画布紧贴方块（928），放在文字旁边或界面里用 |
 | `icon-mono.svg` / `icon-mono-white.svg` | 单色应用图标：方块里把 C 和卡片镂空。单色印刷、系统着色图标、水印用 |
 | `symbol.svg` | 只有 C 和卡片、没有方块的标志，浅色底上用（深灰 C + 紫卡片） |
@@ -47,8 +47,9 @@
 ```bash
 pip install fonttools uharfbuzz pillow
 python3 tools/brand/build-logo.py --inter <InterDisplay-SemiBold.otf> --noto <NotoSansSC-Bold.ttf>
-# 用浏览器把 docs/brand/icon.svg 渲染成 1024×1024 透明 PNG，然后：
-python3 tools/brand/export-icons.py icon-1024.png
+node scripts/render-icons.mjs          # src-tauri/icons: icon.png / .ico / .icns、安装包图片（用 Playwright 的 Chromium 和 tauri icon）
+node tools/website/make-icons.mjs      # 网站 favicon.ico、触摸图标、分享图
+# tools/brand/export-icons.py 是旧的导出脚本，没有 Node 环境时可以用它从 1024 PNG 直接写 ico / icns
 ```
 
 字体不入库：Inter 见 rsms.me/inter，Noto Sans SC 见 fonts.google.com/noto。
