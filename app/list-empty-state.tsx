@@ -4,7 +4,7 @@ import { Icon, VaultMark } from "./ui-atoms";
 
 // The "nothing here" panel of the list: first-run onboarding or a plain empty folder / no search result
 // (moved out of page.tsx unchanged).
-export function ListEmptyState({ firstRun, activeKind, activeFolder, query, searchAllFolders, isMini, onAdd, onImportSheet, onImportBackup }: {
+export function ListEmptyState({ firstRun, activeKind, activeFolder, query, searchAllFolders, isMini, onAdd, onImportSheet, onImportBackup, onSyncCode }: {
   firstRun: boolean;
   activeKind: ItemKind;
   activeFolder: string;
@@ -14,15 +14,18 @@ export function ListEmptyState({ firstRun, activeKind, activeFolder, query, sear
   onAdd: () => void;
   onImportSheet: () => void;
   onImportBackup: () => void;
+  /** Set while no 企业同步码 is filled in: new staff get their company 话术 from it first (D-052). */
+  onSyncCode?: () => void;
 }) {
   if (firstRun) {
     return (
       <div className="native-empty onboarding">
         <VaultMark />
         <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
-        <span>{activeKind === "snippet" ? "把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。" : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
+        <span>{activeKind === "snippet" ? `把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。${onSyncCode ? "公司给了企业同步码的话，先填上，公司话术会自动同步进来。" : ""}` : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
         <div className="onboarding-actions">
-          <button type="button" className="primary-button" onClick={onAdd}><Icon name="plus" />新增第一条</button>
+          {activeKind === "snippet" && onSyncCode && <button type="button" className="primary-button" onClick={onSyncCode}>输入企业同步码</button>}
+          <button type="button" className={activeKind === "snippet" && onSyncCode ? "secondary-button" : "primary-button"} onClick={onAdd}><Icon name="plus" />新增第一条</button>
           {activeKind === "snippet" && <button type="button" className="secondary-button" onClick={onImportSheet}>导入话术表格</button>}
           <button type="button" className="secondary-button" onClick={onImportBackup}>导入备份</button>
         </div>

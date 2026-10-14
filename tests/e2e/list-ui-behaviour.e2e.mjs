@@ -13,6 +13,24 @@ test("first run shows onboarding with its three actions, and 新增第一条 ope
   await expect(page.locator(".inline-editor, [role=dialog]").first()).toBeVisible();
 });
 
+// New staff get their company 话术 from a 企业同步码 first (D-052): it leads the first-run panel until a code is set.
+test("first run leads with 输入企业同步码, which opens Settings with the cursor in the field; with a code set it is gone", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.goto("/");
+  const onboarding = page.locator(".native-empty.onboarding");
+  const button = onboarding.getByRole("button", { name: "输入企业同步码" });
+  await expect(button).toBeVisible();
+  await expect(onboarding.locator(".onboarding-actions button").first()).toHaveText("输入企业同步码");
+  await button.click();
+  const field = page.locator(".settings-dialog").getByLabel("企业同步码");
+  await expect(field).toBeFocused();
+  await field.fill("CB-TEST0000");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".settings-dialog")).toHaveCount(0);
+  await expect(onboarding.getByRole("button", { name: "输入企业同步码" })).toHaveCount(0);
+  await expect(onboarding.getByRole("button", { name: "新增第一条" })).toHaveClass(/primary-button/);
+});
+
 test("an emptied folder or search shows the plain empty message, not onboarding", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);

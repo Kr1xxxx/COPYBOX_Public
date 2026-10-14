@@ -622,6 +622,18 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
+  // 输入企业同步码 on the empty list: Settings opens on its home page, where the field sits; put the cursor in it.
+  function openSyncCode() {
+    setSettingsOpen(true);
+    let tries = 0;
+    const focus = () => {
+      const field = document.getElementById("shared-url");
+      if (field) field.focus();
+      else if ((tries += 1) < 20) window.setTimeout(focus, 50);
+    };
+    window.setTimeout(focus, 50);
+  }
+
   function exportSharedFile() {
     const blob = new Blob([exportSharedLibrary(itemsRef.current, timestampNow())], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1819,6 +1831,7 @@ export default function Home() {
       onAdd={() => openEditor(null)}
       onImportSheet={() => spreadsheetFileRef.current?.click()}
       onImportBackup={() => fileRef.current?.click()}
+      onSyncCode={readSharedUrl() ? undefined : openSyncCode}
     />
   );
   const showFolderChip = searching && (searchWholeVault || activeFolder === "pinned" || activeFolder === "recent");
