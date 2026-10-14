@@ -1,4 +1,4 @@
-### D-049 The app icon is the owner's C mark (2026-10-14)
+### D-050 The app icon is the owner's C mark (2026-10-14)
 - Context: D-046 (2026-10-13) shipped a new icon drawn by an agent — a box holding two overlapping cards. The same
   day the owner sent his own 1024 px icon in the logo thread (「这是图标，你优化一下」): a dark gradient squircle, a
   white sideways U (the C of Copyboxx / an open box) with a tilted purple card in its mouth, and approved the vector
