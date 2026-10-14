@@ -102,10 +102,33 @@ def cn(noto, text, size, dx, dy, color, tracking=CN_TRACK, purple=None):
         x += adv + tracking * size
     return "".join(parts), x - dx - tracking * size
 
+import math
+
+def _rot(px, py, deg, cx, cy):
+    t = math.radians(deg); dx, dy = px - cx, py - cy
+    return cx + dx * math.cos(t) - dy * math.sin(t), cy + dx * math.sin(t) + dy * math.cos(t)
+
+def rrect_path(x, y, w, h, r, deg=0.0, cx=0.0, cy=0.0):
+    """Rounded rectangle as one closed subpath, optionally rotated by deg around (cx, cy). Circular arcs stay
+    circular under rotation, so only the points move."""
+    pts = [(x + r, y), (x + w - r, y), (x + w, y + r), (x + w, y + h - r), (x + w - r, y + h), (x + r, y + h), (x, y + h - r), (x, y + r)]
+    if deg: pts = [_rot(px, py, deg, cx, cy) for px, py in pts]
+    f = lambda q: f"{q[0]:.2f} {q[1]:.2f}"
+    return (f"M{f(pts[0])}L{f(pts[1])}A{r:.2f} {r:.2f} 0 0 1 {f(pts[2])}L{f(pts[3])}A{r:.2f} {r:.2f} 0 0 1 {f(pts[4])}"
+            f"L{f(pts[5])}A{r:.2f} {r:.2f} 0 0 1 {f(pts[6])}L{f(pts[7])}A{r:.2f} {r:.2f} 0 0 1 {f(pts[0])}Z")
+
+# The C as a filled outline (centreline M673 280 H404 A160 V584 A160 H673, stroke 108, round caps), so the mark has
+# no strokes and can be a hole in a one-colour version. Outer radius 214, inner 106, caps 54.
+C_OUTLINE = ("M673 226H404A214 214 0 0 0 190 440V584A214 214 0 0 0 404 798H673A54 54 0 0 0 673 690H404"
+             "A106 106 0 0 1 298 584V440A106 106 0 0 1 404 334H673A54 54 0 0 0 673 226Z")
+CARD = rrect_path(646, 434, 176, 156, 40, -6, 734, 512)     # the copied item, tilted 6 degrees
+DASH = rrect_path(676, 474, 88, 20, 10, -6, 734, 512)        # its text line, knocked out
+SQUIRCLE = rrect_path(48, 48, 928, 928, 230)
+
 def mark(x, y, h, with_tile=False):
     """The icon, traced from the owner's 1024 px original: a dark gradient squircle (928 of 1024, r 230),
-    a white C (sideways U, stroke 108, round caps) and a tilted purple item with a text line in its mouth.
-    h = squircle height. with_tile is accepted for compatibility; the icon has no tile, the outside is transparent."""
+    a white C (sideways U) and a tilted purple card with a knocked-out text line in its mouth.
+    h = squircle height. with_tile is accepted for compatibility; the outside is transparent."""
     k = h / 928.0
     off = 0 if with_tile else -48
     inner = f'''
@@ -113,19 +136,33 @@ def mark(x, y, h, with_tile=False):
 <linearGradient id="sq" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{DARK_A}"/><stop offset="1" stop-color="{DARK_B}"/></linearGradient>
 <linearGradient id="pu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{PURPLE_A}"/><stop offset="1" stop-color="{PURPLE_B}"/></linearGradient>
 </defs>
-<rect x="48" y="48" width="928" height="928" rx="230" fill="url(#sq)"/>
+<path d="{SQUIRCLE}" fill="url(#sq)"/>
 <rect x="49.5" y="49.5" width="925" height="925" rx="228.5" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3"/>
-<path d="M673 280H404A160 160 0 0 0 244 440V584A160 160 0 0 0 404 744H673" fill="none" stroke="{WHITE}" stroke-width="108" stroke-linecap="round" stroke-linejoin="round"/>
-<g transform="rotate(-6 734 512)">
-<rect x="646" y="434" width="176" height="156" rx="40" fill="url(#pu)"/>
-<rect x="676" y="474" width="88" height="20" rx="10" fill="{DASH}"/>
-</g>'''
+<path d="{C_OUTLINE}" fill="{WHITE}"/>
+<path d="{CARD}{DASH}" fill="url(#pu)" fill-rule="evenodd"/>'''
     return f'<g transform="translate({x:.2f} {y:.2f}) scale({k:.5f}) translate({off} {off})">{inner}</g>'
+
+def symbol(color=None):
+    """The C and the card without the squircle, on a 720 canvas centred on the mark. One colour when `color` is
+    given (card and C in that colour, text line knocked out); otherwise dark C + purple card for light backgrounds."""
+    if color:
+        body = f'<path d="{C_OUTLINE}{CARD}{DASH}" fill="{color}" fill-rule="evenodd"/>'
+    else:
+        body = (f'<defs><linearGradient id="pu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{PURPLE_A}"/>'
+                f'<stop offset="1" stop-color="{PURPLE_B}"/></linearGradient></defs>'
+                f'<path d="{C_OUTLINE}" fill="{DARK_B}"/><path d="{CARD}{DASH}" fill="url(#pu)" fill-rule="evenodd"/>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="152 152 720 720" width="720" height="720">'
+            f'<title>Copyboxx</title>{body}</svg>\n')
+
+def icon_mono(color):
+    """One-colour app icon: the squircle with the C and the card cut out (text line stays)."""
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">'
+            f'<title>Copyboxx</title><path d="{SQUIRCLE}{C_OUTLINE}{CARD}{DASH}" fill="{color}" fill-rule="evenodd"/></svg>\n')
 
 def svg(w, h, body, bg=None):
     rect = f'<rect width="{w:.0f}" height="{h:.0f}" fill="{bg}"/>' if bg else ""
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.0f} {h:.0f}" width="{w:.0f}" height="{h:.0f}">'
-            f'{rect}{body}</svg>\n')
+            f'<title>Copyboxx</title>{rect}{body}</svg>\n')
 
 def build(inter, noto, out):
     os.makedirs(out, exist_ok=True)
@@ -134,6 +171,8 @@ def build(inter, noto, out):
     # 1. App icon: 1024 with tile, and the bare mark.
     write("icon.svg", svg(1024, 1024, mark(0, 0, 928, with_tile=True)))
     write("icon-mark.svg", svg(928, 928, mark(0, 0, 928)))
+    write("icon-mono.svg", icon_mono("#000000")); write("icon-mono-white.svg", icon_mono("#ffffff"))
+    write("symbol.svg", symbol()); write("symbol-black.svg", symbol("#000000")); write("symbol-white.svg", symbol("#ffffff"))
 
     for theme, ink, accent, line, muted, bg in (("light", INK, INK, LINE, MUTED, None),        # text: one colour only
                                                ("dark", INK_DARK, INK_DARK, LINE_DARK, MUTED_DARK, None)):

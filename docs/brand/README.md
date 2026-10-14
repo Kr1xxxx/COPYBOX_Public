@@ -10,6 +10,9 @@
 | --- | --- |
 | `icon.svg` | 应用图标源文件（1024，方块外透明）。`src-tauri/icons/` 里的 png / ico / icns 由它导出 |
 | `icon-mark.svg` | 同一个图标，画布紧贴方块（928），放在文字旁边或界面里用 |
+| `icon-mono.svg` / `icon-mono-white.svg` | 单色应用图标：方块里把 C 和卡片镂空。单色印刷、系统着色图标、水印用 |
+| `symbol.svg` | 只有 C 和卡片、没有方块的标志，浅色底上用（深灰 C + 紫卡片） |
+| `symbol-black.svg` / `symbol-white.svg` | 单色标志，纯黑 / 纯白。刺绣、激光刻、单色印刷、头像用 |
 | `wordmark.svg` / `wordmark-dark.svg` | 文字 logo「Copyboxx」，纯黑（浅色底）/ 纯白（深色底） |
 | `wordmark-cn.svg` / `wordmark-cn-dark.svg` | 「Copyboxx 复制盒」一行，页眉、关于页用 |
 | `lockup-horizontal.svg` / `-dark.svg` | 图标 + Copyboxx ｜ 复制盒，横排，官网页眉、文档页眉用 |
@@ -26,7 +29,18 @@
   紫卡片 176×156、圆角 40、逆时针转 6°，渐变 `#c4b9ff`→`#8f7ff6`，文字线 88×20。
 - 相对原图的优化：改成矢量（任何尺寸都清晰）；紫卡片的中心对齐到 C 的中线；圆角、倾斜角度取整；方块加了一圈极淡的边线，
   在深色桌面上不会糊成一块；方块外透明，不再有米色底块（Mac/Windows 都自己加底）。
-- 留白：文字 logo 四周至少留一个「X」的宽度；横排版图标高度不小于 24px。
+- 留白：文字 logo 四周至少留一个「x」的宽度。
+- 最小尺寸（按 logo-design 测试表实测）：图标 16px；横排组合高 24px；「Copyboxx 复制盒」高 20px；竖排组合高 48px，再小中文就糊了。
+- 单色规则：需要单色时用 `symbol-black` / `symbol-white` 或 `icon-mono`，不要把彩色图标直接压成一种颜色（那样只剩一个黑方块）。
+
+## 测试记录（2026-10-14，logo-design skill）
+
+- `svg_audit`：图标 81/100（扣分项是沿用原图的 5 种颜色和渐变，有意保留）；`symbol-black` 和 `icon-mono` 100/100；文字标 98。
+- `preview_sheet`：16/32/48px 像素测试、单色、反白、模糊、镜像、180° 旋转、浏览器标签、应用图标、头像裁切、页眉、名片，
+  以及和 Trello、Airtable、Basecamp、Alfresco、Atlassian、Dropbox 同排的货架测试：深色方块加白 C 在一排蓝色标志里能跳出来。
+- 发现并修掉的问题：原来只有彩色图标，压成单色后整个方块变成一块黑，看不见 C；现在补了 `symbol-*` 和 `icon-mono*`。
+  C 从描边改成填充轮廓，卡片上的文字线改成镂空，图标外观不变（逐像素比对只有 0.2% 像素差异）。
+- `logo-forge` 的 `lf_slop` 反俗套检查：全部通过。
 
 ## 重新生成
 
