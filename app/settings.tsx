@@ -137,7 +137,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
         </div>
         <div className="settings-body" id="settings-panel" data-searching={searching ? "" : undefined} role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
           {/* The first page opens with the product name and its Chinese name (D-044). */}
-          {!searching && tab === "look" && <div className="settings-brand"><strong lang="en">Clipboxx</strong><span>复制盒</span></div>}
+          {!searching && tab === "look" && <div className="settings-brand"><strong lang="en">Copyboxx</strong><span>复制盒</span></div>}
           <h2 className="settings-page-title" aria-hidden="true">{searching ? "搜索结果" : SETTINGS_TABS.find(([id]) => id === tab)?.[1]}</h2>
           {searching && hits.size === 0 && <p className="settings-empty">没有找到「{query.trim()}」相关的设置</p>}
           <section className="settings-card" data-solo="" aria-labelledby="set-look" hidden={hideSection("look", "set-look")}><h3 id="set-look">外观</h3>
@@ -169,7 +169,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
             <AutoBackupRows itemCount={itemCount} />
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
             {isDesktop
-              ? row("数据位置", "在文件夹中打开 Clipboxx 的本机数据", onOpenDataFolder, "打开文件夹")
+              ? row("数据位置", "在文件夹中打开 Copyboxx 的本机数据", onOpenDataFolder, "打开文件夹")
               : <div className="settings-row static"><div><strong>数据位置</strong><small>浏览器版保存在本站点的本地存储里，清除站点数据会一并删除</small></div></div>}
           </section>
           <section className="settings-card" aria-labelledby="set-trash" hidden={hideSection("data", "set-trash")}><h3 id="set-trash">回收站</h3>
@@ -203,7 +203,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
                 onSelect={(value) => { void window.clipboxDesktop?.setLaunchAtLogin?.(value === "on").then(setLaunchAtLogin).catch(() => undefined); }}
                 options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
             </div>}
-            {isDesktop && <div className="settings-row"><div><strong>点击窗口关闭按钮时</strong><small>{closeBehavior === "tray" ? "Clipboxx 继续在托盘里运行，可随时呼出" : closeBehavior === "taskbar" ? "窗口缩到任务栏，点任务栏上的图标就能再打开" : "直接退出 Clipboxx"}</small></div>
+            {isDesktop && <div className="settings-row"><div><strong>点击窗口关闭按钮时</strong><small>{closeBehavior === "tray" ? "Copyboxx 继续在托盘里运行，可随时呼出" : closeBehavior === "taskbar" ? "窗口缩到任务栏，点任务栏上的图标就能再打开" : "直接退出 Copyboxx"}</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="点击窗口关闭按钮时" value={closeBehavior} onSelect={(value) => onCloseBehavior(value as CloseBehavior)}
                 options={[["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]].map(([value, label]) => ({ value, label }))} />
             </div>}
@@ -219,8 +219,8 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
             <AiSettingsSection localAiAvailable={aiAvailable} />
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-about" hidden={hideSection("about", "set-about")}><h3 id="set-about">关于</h3>
-            <div className="settings-row"><div><strong>Clipboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
-              <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Clipboxx ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
+            <div className="settings-row"><div><strong>Copyboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
+              <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Copyboxx ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
             {row("使用说明", "第一次打开时的几步介绍：话术、图片、账号和迷你窗口", onShowGuide, "再看一遍")}
             {builtAt && <div className="settings-row static"><div><strong>更新时间</strong><small className="settings-build-time">{builtAt}</small></div></div>}
           </section>

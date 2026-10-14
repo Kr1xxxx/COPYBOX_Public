@@ -32,7 +32,7 @@ test("merge keeps what is here and adds only what is missing; replace equals the
 test("a block asking for an absurd key-stretching count is refused before any work is done", async () => {
   const box = await encryptVaultBox({ totp: [], items: [] }, "pw-123");
   for (const iterations of [0, 1, 99_999, 5_000_001, 1e12, 310_000.5, Number.NaN, Infinity]) {
-    await assert.rejects(decryptVaultBox({ ...box, iterations }, "pw-123"), /这不是有效的 Clipboxx 加密备份/, String(iterations));
+    await assert.rejects(decryptVaultBox({ ...box, iterations }, "pw-123"), /这不是有效的 Copyboxx 加密备份/, String(iterations));
   }
   assert.equal(isSaneIterationCount(100_000), true);
   assert.equal(isSaneIterationCount(5_000_000), true);

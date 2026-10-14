@@ -1645,7 +1645,7 @@ export default function Home() {
       setBackupMode("import");
       setMenuOpen(false);
     } catch {
-      showToast("这不是有效的 Clipboxx 加密备份", { tone: "error", ms: 3600 });
+      showToast("这不是有效的 Copyboxx 加密备份", { tone: "error", ms: 3600 });
     }
   }
 
@@ -1720,8 +1720,8 @@ export default function Home() {
     showToast(`已导入 ${importedCount} 条话术`, { ms: 2600 });
   }
 
-  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
-  if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipboxx…</span></main>;
+  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Copyboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
+  if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Copyboxx…</span></main>;
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"

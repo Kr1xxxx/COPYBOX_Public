@@ -220,8 +220,8 @@ export async function restoreStashedBackup(storage: Storage = localStorage, fact
 // An automatic backup file (not password-sealed): checks it is one of ours and its contents are well-formed before anything is restored.
 export function parseBackupText(text: string, format: string, versions: readonly number[] = [1]): TransferPayload {
   let file: { format?: unknown; version?: unknown; payload?: unknown };
-  try { file = JSON.parse(text); } catch { throw new TransferError("这不是 Clipboxx 的备份文件"); }
-  if (file?.format !== format || !versions.includes(file.version as number)) throw new TransferError("这不是 Clipboxx 的备份文件");
+  try { file = JSON.parse(text); } catch { throw new TransferError("这不是 Copyboxx 的备份文件"); }
+  if (file?.format !== format || !versions.includes(file.version as number)) throw new TransferError("这不是 Copyboxx 的备份文件");
   return validatePayload(file.payload);
 }
 
@@ -335,7 +335,7 @@ export function parseTransferFile(text: string): TransferFile {
   let file: TransferFile;
   try { file = JSON.parse(text) as TransferFile; } catch { throw new TransferError("这不是完整备份文件"); }
   if (file?.format !== TRANSFER_FORMAT) throw new TransferError("这不是完整备份文件");
-  if (file.version !== TRANSFER_VERSION) throw new TransferError("这份备份的版本太新，请先更新 Clipboxx");
+  if (file.version !== TRANSFER_VERSION) throw new TransferError("这份备份的版本太新，请先更新 Copyboxx");
   if (typeof file.salt !== "string" || typeof file.iv !== "string" || typeof file.ciphertext !== "string" || !Number.isInteger(file.iterations) || file.iterations < 1) {
     throw new TransferError("备份文件已损坏");
   }

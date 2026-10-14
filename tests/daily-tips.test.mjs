@@ -24,7 +24,7 @@ test("no tip advertises a key or shortcut (D-005), and English is limited to the
     const words = `${entry.title} ${entry.text}`;
     for (const banned of ["Enter", "Esc", "Ctrl", "Cmd", "Shift", "Alt", "⌘", "快捷键", "按键", "回车", "方向键"]) assert.ok(!words.includes(banned), `${entry.id} mentions ${banned}`);
     const english = words.match(/[A-Za-z]{2,}/g) || [];
-    for (const word of english) assert.ok(["Clipboxx", "TinyPNG", "AI", "tk"].includes(word), `${entry.id} uses ${word}`);
+    for (const word of english) assert.ok(["Copyboxx", "TinyPNG", "AI", "tk"].includes(word), `${entry.id} uses ${word}`);
   }
 });
 

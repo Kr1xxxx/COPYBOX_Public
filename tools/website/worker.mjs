@@ -84,7 +84,7 @@ function fileResponse(request, key, file, status = 200) {
     "Cache-Control": status === 200 ? cacheControlFor(key) : "no-cache",
     "X-Content-Type-Options": "nosniff",
   });
-  if (extensionOf(key) === "exe") headers.set("Content-Disposition", 'attachment; filename="Clipboxx-Setup.exe"');
+  if (extensionOf(key) === "exe") headers.set("Content-Disposition", 'attachment; filename="Copyboxx-Setup.exe"');
   if (status === 200 && meta.sha256) {
     const etag = `"${meta.sha256}"`;
     headers.set("ETag", etag);
@@ -157,7 +157,7 @@ async function hasPreviewPass(request, env) {
 
 const gateFallback = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>网页测试版 · Clipboxx</title></head><body>
+<title>网页测试版 · Copyboxx</title></head><body>
 <h1>输入口令</h1><p>网页测试版只给内部同事看，请输入口令。</p>
 <form method="post" action="/preview/"><input name="key" type="password" autocomplete="off" aria-label="口令"> <button type="submit">进入</button></form>
 <p>__MESSAGE__</p><p><a href="/">回到首页</a></p>

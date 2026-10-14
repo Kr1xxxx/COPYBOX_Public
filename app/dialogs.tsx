@@ -128,7 +128,7 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
           {exporting && <label className="backup-field"><span>再次输入</span><input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认备份密码" autoComplete="off" /></label>}
           {mode === "import" && <fieldset className="backup-strategy"><legend>导入方式</legend><div><button type="button" className={strategy === "merge" ? "active" : ""} onClick={() => setStrategy("merge")}><strong>合并</strong><small>保留现有内容并去重</small></button><button type="button" className={strategy === "replace" ? "active danger" : ""} onClick={() => setStrategy("replace")}><strong>覆盖</strong><small>用备份替换当前内容</small></button></div></fieldset>}
           {error && <p className="backup-error">{error}</p>}
-          <p className="backup-note">{exporting ? "请妥善保存密码；Clipboxx 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
+          <p className="backup-note">{exporting ? "请妥善保存密码；Copyboxx 无法找回备份密码。" : strategy === "merge" ? "同类型、同标题且内容相同的条目不会重复导入。" : "覆盖会清空当前条目，仅保留备份中的内容。"}</p>
           <div className="backup-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button className={mode === "import" && strategy === "replace" ? "danger" : "primary"} disabled={busy}>{busy ? (exporting ? "正在加密…" : "正在验证…") : exporting ? "加密并导出" : strategy === "merge" ? "验证并合并" : "验证并覆盖"}</button></div>
         </form>
       </section>

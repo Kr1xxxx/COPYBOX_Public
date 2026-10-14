@@ -61,5 +61,5 @@ const html = await fetchServerHtml();
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 cpSync(join(repo, "dist/client/_next"), join(out, "_next"), { recursive: true });
-writeFileSync(join(out, "index.html"), html.includes("<title>") ? html : html.replace("<head>", "<head><title>Clipboxx</title>"));
+writeFileSync(join(out, "index.html"), html.includes("<title>") ? html : html.replace("<head>", "<head><title>Copyboxx</title>"));
 console.log("wrote dist-tauri/");
