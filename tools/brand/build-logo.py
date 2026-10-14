@@ -4,8 +4,8 @@
 Text is converted to outlines, so the SVG files need no fonts. To rebuild:
 
     pip install fonttools uharfbuzz
-    python3 tools/brand/build-logo.py --inter /usr/share/fonts/opentype/inter/InterDisplay-SemiBold.otf \
-        --noto NotoSansSC-700.ttf   # Noto Sans SC Bold (fonts.google.com/noto)
+    python3 tools/brand/build-logo.py --inter InterDisplay-Bold.otf   # Inter Display Bold (rsms.me/inter, OFL) \
+        --noto MiSans-Bold.ttf          # MiSans Bold (hyperos.mi.com/font, free for commercial use)
 
 Only the outputs in docs/brand/ are committed; the fonts are not.
 """
@@ -23,8 +23,9 @@ LINE = "#d9d5c9"; LINE_DARK = "#3f3d37"
 MUTED = "#55534d"; MUTED_DARK = "#b3b0a4"
 
 CAP = 1490 / 2048          # Inter Display cap height (em)
-CN_MID = 0.385             # visual centre of 复制盒 above baseline (em), measured
-CN_TRACK = 0.08
+CN_MID = 0.391             # visual centre of 复制盒 above baseline (em), MiSans Bold, measured
+CN_VIS = 0.962             # visual height of 复制盒 (em), MiSans Bold: the Chinese is set as tall as the Latin caps
+CN_TRACK = 0.05
 
 class Face:
     def __init__(self, path):
@@ -46,7 +47,7 @@ class Face:
 def paths(glyphs, dx, dy, color, cls=None):
     return "".join(f'<path fill="{color}" transform="translate({dx + x:.2f} {dy:.2f})" d="{d}"/>' for d, x, _ in glyphs if d)
 
-NAME = "Copyboxx"; TRACK = -0.025   # mixed case, tight
+NAME = "Copyboxx"; TRACK = -0.035   # Inter Display Bold, tight (owner, 2026-10-14)
 DESC = 494 / 2048                  # Inter descender (p, y)
 
 def wordmark(inter, size, dx, dy, ink, accent):
@@ -206,9 +207,9 @@ def build(inter, noto, out):
         write(f"wordmark{sfx}.svg", svg(w + 2 * pad, H, wm))
 
         # 3. Wordmark with Chinese: Copyboxx 复制盒 (one line, for a page header).
-        cn_size = 56; gap = 22
+        cn_size = cap / CN_VIS; gap = 0.18 * size
         cn_base = pad + cap - cap / 2 + CN_MID * cn_size
-        c, cw = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink, purple=accent)
+        c, cw = cn(noto, "复制盒", cn_size, pad + w + gap, cn_base, ink)
         write(f"wordmark-cn{sfx}.svg", svg(w + gap + cw + 2 * pad, H, wm + c))
 
         # 4. Horizontal lockup: mark + Copyboxx | 复制盒.
@@ -219,7 +220,8 @@ def build(inter, noto, out):
         x += w + 26
         body += f'<rect x="{x:.2f}" y="{mid - 30:.2f}" width="2" height="60" rx="1" fill="{line}"/>'
         x += 2 + 24
-        c, cw = cn(noto, "复制盒", 50, x, mid + CN_MID * 50, ink, purple=accent); body += c
+        cn_size = cap / CN_VIS
+        c, cw = cn(noto, "复制盒", cn_size, x, mid + CN_MID * cn_size, ink); body += c
         write(f"lockup-horizontal{sfx}.svg", svg(x + cw + pad, max(mh + 2 * pad, mid + cap / 2 + desc + pad), body))
 
         # 5. Stacked lockup: mark above, Copyboxx, 复制盒 letter-spaced.
@@ -230,8 +232,8 @@ def build(inter, noto, out):
         y = pad + mh + 40 + cap
         body += paths(g[:-1], (W - w) / 2, y, ink) + paths(g[-1:], (W - w) / 2, y, accent)
         cn_size = 40; y += desc + 36 + cn_size * 0.85
-        c2, w2 = cn(noto, "复制盒", cn_size, 0, 0, ink, tracking=0.3, purple=accent)
-        c2, _ = cn(noto, "复制盒", cn_size, (W - w2) / 2, y, ink, tracking=0.3, purple=accent)
+        c2, w2 = cn(noto, "复制盒", cn_size, 0, 0, ink, tracking=0.3)
+        c2, _ = cn(noto, "复制盒", cn_size, (W - w2) / 2, y, ink, tracking=0.3)
         body += c2
         write(f"lockup-stacked{sfx}.svg", svg(W, y + cn_size * 0.15 + pad, body))
 

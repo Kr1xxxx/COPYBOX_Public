@@ -1,8 +1,8 @@
 # Copyboxx 品牌文件
 
 图标：按老板给的 1024px 原图描成矢量——深色渐变圆角方块，白色侧着的 U（既是 Copyboxx 的 C，也是一个开口的盒子），
-开口里一块略微倾斜的紫色小卡片（复制出来的那一条，上面一道文字线）。文字 logo「Copyboxx」和「复制盒」是新设计：
-「盒」字里的「口」换成了图标里那张斜卡片，中文和图标讲的是同一件事——盒子里装着复制出来的内容。所有 SVG 都已转成轮廓，不依赖字体。
+开口里一块略微倾斜的紫色小卡片（复制出来的那一条，上面一道文字线）。文字 logo 单独成立、不依赖图标，走互联网主流审美：「Copyboxx」Inter Display Bold，「复制盒」MiSans Bold，
+中文和英文大写等高。所有 SVG 都已转成轮廓，不依赖字体。
 
 ## 文件
 
@@ -21,9 +21,10 @@
 
 ## 设计说明
 
-- 字体：Latin 用 Inter Display SemiBold 大小写「Copyboxx」，字距 −2.5%；中文用 Noto Sans SC Bold，字距 +8%。文字已转轮廓，改字要重新生成。
-- 中文的设计：「盒」字中间的「口」删掉，换成图标里那张卡片的形状（圆角、逆时针 6°、一道镂空的文字线），大小正好填在「口」的位置，
-  22px 以下仍能认出是「盒」。
+- 字体（老板定稿 2026-10-14）：Latin 用 **Inter Display Bold**「Copyboxx」，字距 −3.5%；中文用 **MiSans Bold**「复制盒」，字距 +5%，
+  字号取英文大写高 ÷ 0.962（MiSans 汉字的视觉高度），所以中文和英文大写一样高，中文中线对齐大写中线。文字已转轮廓，改字要重新生成。
+- 字体授权：Inter 是 SIL OFL 1.1，可免费商用、可做 logo；MiSans 是小米授权，个人和商业免费，可做 logo，不得修改后再分发。
+  苹方（PingFang）只能在苹果设备上显示，不能用在 logo 和 Windows 素材里，所以没用。
 - 颜色：文字只用纯黑 `#000000`（深色底上纯白 `#ffffff`），没有第二种颜色；紫色只出现在图标里。卡片上的文字线是镂空的，放在任何底色上都对。
 - 图标（1024 画布）：方块 48–976、圆角 230，渐变 `#2d2b33`→`#16151b`，边上一圈 7% 白色细线；C 线宽 108、端头圆，外圆角 214；
   紫卡片 176×156、圆角 40、逆时针转 6°，渐变 `#c4b9ff`→`#8f7ff6`，文字线 88×20。
@@ -46,10 +47,10 @@
 
 ```bash
 pip install fonttools uharfbuzz pillow
-python3 tools/brand/build-logo.py --inter <InterDisplay-SemiBold.otf> --noto <NotoSansSC-Bold.ttf>
+python3 tools/brand/build-logo.py --inter <InterDisplay-Bold.otf> --noto <MiSans-Bold.ttf>
 node scripts/render-icons.mjs          # src-tauri/icons: icon.png / .ico / .icns、安装包图片（用 Playwright 的 Chromium 和 tauri icon）
 node tools/website/make-icons.mjs      # 网站 favicon.ico、触摸图标、分享图
 # tools/brand/export-icons.py 是旧的导出脚本，没有 Node 环境时可以用它从 1024 PNG 直接写 ico / icns
 ```
 
-字体不入库：Inter 见 rsms.me/inter，Noto Sans SC 见 fonts.google.com/noto。
+字体不入库：Inter 见 rsms.me/inter，MiSans 见 hyperos.mi.com/font。
