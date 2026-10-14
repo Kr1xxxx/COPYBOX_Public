@@ -28,7 +28,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
@@ -44,7 +44,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
-  onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void;
+  onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
   sharedLibrary: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -221,6 +221,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           <section className="settings-card" data-solo="" aria-labelledby="set-about" hidden={hideSection("about", "set-about")}><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong>Copyboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Copyboxx ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
+            {row("使用说明", "第一次打开时的几步介绍：话术、图片、账号和迷你窗口", onShowGuide, "再看一遍")}
             {builtAt && <div className="settings-row static"><div><strong>更新时间</strong><small className="settings-build-time">{builtAt}</small></div></div>}
           </section>
         </div>
