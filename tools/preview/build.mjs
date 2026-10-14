@@ -60,9 +60,11 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
     onAutomationCommand: function () { return function () {}; },
     respondAutomationCommand: function () {},
     automationReady: function () {},
-    checkUpdate: function () { return Promise.resolve({ status: "available", version: "9.9.9", notes: ["这是演示：真实版本会在这里列出新版本的改动"] }); },
+    checkUpdate: function () { return Promise.resolve({ status: "current" }); },
     openUpdate: function () { return Promise.resolve(true); },
     aiStatus: function () { return Promise.resolve({ hasKey: false, origin: "" }); },
+    // A browser tab cannot stay above other windows; the button is there so it can be seen and tried.
+    setPinned: function () {},
     setWindowMode: function (mode) { try { parent.postMessage({ clipbox: "window-mode", mode: mode }, "*"); } catch (e) {} },
     relaunch: function () { location.reload(); }
   };
@@ -77,7 +79,7 @@ export function renderWrapper(template, version, updated = "", updatedIso = "") 
 }
 
 export function ensureTitle(html) {
-  return html.includes("<title>") ? html : html.replace("<head>", "<head><title>Clipboxx</title>");
+  return html.includes("<title>") ? html : html.replace("<head>", "<head><title>Copyboxx</title>");
 }
 
 function walk(dir) {

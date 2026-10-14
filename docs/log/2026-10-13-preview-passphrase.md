@@ -1,0 +1,7 @@
+# Website: passphrase gate for the web preview; domains bound
+
+- Date: 2026-10-13 · Thread/agent: coordinator + worker (website gate)
+- What changed: The Cloudflare Worker `copyboxx-site` (`tools/website/worker.mjs`) now asks for a 口令 before anything under `/preview/` is served: a small Chinese gate page (`tools/website/preview-gate.html`, KV key `preview-gate.html`) takes the word from a form, compares it case-insensitively and with spaces trimmed against the Worker var `PREVIEW_SECRET` (`tools/website/wrangler.jsonc`, owner's choice: `comely`), and sets a 30-day cookie `preview_pass` (HttpOnly, Path=/preview). Without the cookie, preview pages get the gate (401) and preview assets get a plain 401. The landing page and the download are unchanged. Also recorded here: the owner allowed the deploy on 2026-10-13, so `copyboxx.com` and `www.copyboxx.com` are bound to the Worker (Cloudflare created two proxied AAAA records); the site is live.
+- User-visible change (plain Chinese, for the preview changelog): 无（软件本身没有改动）。网站 copyboxx.com 已上线；打开网页测试版前要先输入口令
+- Not done / risks: The 口令 is a light gate for colleagues (the word is in the repo config, the cookie is a fixed hash), not a security boundary; the preview itself holds only sample data. The installer on the site is still the pre-rename `tauri-test-92` build (v1.65.0).
+- Next step: redesign the landing page after the owner's reference (Cardart.cc) can be looked at; after #121 merges, rebuild and deploy so the installer and the preview carry the Clipboxx name.

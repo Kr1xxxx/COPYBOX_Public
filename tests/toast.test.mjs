@@ -1,7 +1,7 @@
 // One toast, one timer: a newer message cancels the older one's timer, so it is never cut short.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createToastController, DEFAULT_TOAST_MS, EMPTY_TOAST, toastToneFor } from "../app/use-toast.ts";
+import { createToastController, DEFAULT_TOAST_MS, EMPTY_TOAST, TOAST_RESUME_MIN_MS, toastFadeMs, toastToneFor } from "../app/use-toast.ts";
 
 function fakeClock() {
   let now = 0, nextId = 1;
@@ -10,12 +10,19 @@ function fakeClock() {
     timers: {
       set: (callback, ms) => { const id = nextId++; pending.set(id, { at: now + ms, callback }); return id; },
       clear: (id) => { pending.delete(id); },
+      now: () => now,
     },
+    // Runs every timer that falls due, in order, including timers set by those callbacks.
     advance(ms) {
-      now += ms;
-      for (const [id, timer] of [...pending].sort((a, b) => a[1].at - b[1].at)) {
-        if (timer.at <= now && pending.has(id)) { pending.delete(id); timer.callback(); }
+      const target = now + ms;
+      for (;;) {
+        const due = [...pending].filter(([, timer]) => timer.at <= target).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!due) break;
+        now = Math.max(now, due[1].at);
+        pending.delete(due[0]);
+        due[1].callback();
       }
+      now = target;
     },
     get pending() { return pending.size; },
   };
@@ -89,4 +96,108 @@ test("error words are recognised; text the person typed inside 「」 does not c
   for (const message of ["已复制", "图片已加密保存", "目录已创建", "已移到「失败案例」", "已删除目录「无法联系」", "验证码已复制", "已恢复"]) {
     assert.equal(toastToneFor(message), "ok", message);
   }
+});
+
+test("a toast stays fully visible, then fades during the last part of its time", () => {
+  const { clock, toast, current } = controller();
+  toast.show("条目已更新", { ms: 2200 });
+  const fade = toastFadeMs(2200);
+  assert.ok(fade >= 600 && fade <= 1200);
+  assert.equal(current().fading, false);
+  assert.equal(current().fadeMs, fade);
+  clock.advance(2200 - fade - 1);
+  assert.equal(current().fading, false, "still fully visible");
+  clock.advance(1);
+  assert.equal(current().fading, true, "the fade has started");
+  assert.equal(current().message, "条目已更新");
+  clock.advance(fade);
+  assert.deepEqual(current(), EMPTY_TOAST);
+  assert.equal(clock.pending, 0);
+});
+
+test("pause stops the time and brings it back to full; resume runs what was left", () => {
+  const { clock, toast, current } = controller();
+  toast.show("条目已加密保存", { ms: 5000 });
+  clock.advance(1000);
+  toast.pause();
+  assert.equal(clock.pending, 0, "no timer while held");
+  clock.advance(60_000);
+  assert.equal(current().message, "条目已加密保存");
+  assert.equal(current().fading, false);
+  toast.resume();
+  clock.advance(3999);
+  assert.equal(current().message, "条目已加密保存", "the 4 s that were left");
+  clock.advance(1);
+  assert.deepEqual(current(), EMPTY_TOAST);
+});
+
+test("pausing while it fades makes it fully visible again; resume never ends sooner than the floor", () => {
+  const { clock, toast, current } = controller();
+  toast.show("已复制");
+  clock.advance(DEFAULT_TOAST_MS - 100);
+  assert.equal(current().fading, true);
+  toast.pause();
+  assert.equal(current().fading, false, "back to full strength at once");
+  clock.advance(5000);
+  toast.resume();
+  assert.equal(current().fading, false);
+  clock.advance(TOAST_RESUME_MIN_MS - 1);
+  assert.equal(current().message, "已复制", "only 0.1 s was left, but it stays for the floor");
+  clock.advance(1);
+  assert.deepEqual(current(), EMPTY_TOAST);
+});
+
+test("pause and resume are idempotent and do nothing without a message", () => {
+  const { clock, toast, current } = controller();
+  toast.pause();
+  toast.resume();
+  toast.show("已导出", { ms: 2000 });
+  toast.pause();
+  toast.pause();
+  clock.advance(500);
+  toast.resume();
+  toast.resume();
+  assert.equal(clock.pending, 1, "one timer, not two");
+  clock.advance(TOAST_RESUME_MIN_MS);
+  assert.equal(current().message, "已导出");
+  clock.advance(500);
+  assert.equal(current().message, "", "it ended after the 2 s it still had");
+});
+
+test("a new message replaces a paused one and waits while the toast is still held", () => {
+  const { clock, toast, current } = controller();
+  const action = { label: "撤销", onClick: () => {} };
+  toast.show("已移入回收站", { ms: 6000, actions: [action] });
+  toast.pause();
+  toast.show("已撤销", { ms: 1800 });
+  assert.equal(current().message, "已撤销");
+  assert.equal(current().actions, undefined, "the old buttons go with the old message");
+  clock.advance(10_000);
+  assert.equal(current().message, "已撤销", "still held");
+  toast.resume();
+  clock.advance(1799);
+  assert.equal(current().message, "已撤销");
+  clock.advance(1);
+  assert.deepEqual(current(), EMPTY_TOAST);
+});
+
+test("clearing ends the hold, so the next message runs its time", () => {
+  const { clock, toast, current } = controller();
+  toast.show("条目已更新", { ms: 5000, actions: [{ label: "编辑", variant: "primary", onClick: () => {} }] });
+  assert.equal(current().actions.length, 1);
+  toast.pause();
+  toast.clear(); // 编辑 was clicked: the toast goes while the pointer is still on it
+  toast.show("已刷新", { ms: 1800 });
+  clock.advance(1800);
+  assert.deepEqual(current(), EMPTY_TOAST);
+});
+
+test("a message that stays (ms 0) is not timed by pause and resume", () => {
+  const { clock, toast, current } = controller();
+  toast.show("正在重新加载…", { ms: 0 });
+  toast.pause();
+  toast.resume();
+  clock.advance(60_000);
+  assert.equal(current().message, "正在重新加载…");
+  assert.equal(clock.pending, 0);
 });

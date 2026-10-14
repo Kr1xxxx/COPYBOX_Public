@@ -4,6 +4,9 @@ mod ai;
 mod automation;
 mod backup;
 mod flush;
+// Windows only; elsewhere just the pure decision logic and its tests (D-046).
+#[cfg_attr(not(windows), allow(dead_code))]
+mod old_autostart;
 mod power;
 mod shared_library;
 mod site_icon;
@@ -50,6 +53,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             window_mode::set_window_mode,
             window_mode::get_window_mode,
+            window_mode::set_pinned,
             window_mode::set_theme,
             window_mode::page_ready,
             shell::set_close_behavior,
@@ -77,13 +81,17 @@ fn main() {
             site_icon::get_build_time,
             update::check_update,
             update::open_update,
+            update::install_update,
             automation::automation_ready,
             automation::automation_response,
         ])
         .setup(|app| {
+            // An older product name's launch-at-login entry would start the old copy at login (D-046).
+            #[cfg(windows)]
+            old_autostart::migrate(app.handle());
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Clipboxx")
+                .title("Copyboxx")
                 .min_inner_size(window_state::MIN_WIDTH, window_state::MIN_HEIGHT)
                 .visible(false)
                 .initialization_script(&bridge);

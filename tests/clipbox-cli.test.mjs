@@ -160,7 +160,7 @@ test("prints human and JSON responses from a live socket", async () => {
   try {
     const status = await runCli(["status"], { socketPath: temporary.target });
     const get = await runCli(["get", "CB-0003", "--json"], { socketPath: temporary.target });
-    assert.deepEqual(status, { code: 0, stdout: "Clipboxx 已连接，1 条话术", stderr: "" });
+    assert.deepEqual(status, { code: 0, stdout: "Copyboxx 已连接，1 条话术", stderr: "" });
     assert.equal(JSON.parse(get.stdout).item.content, "Hello");
     assert.deepEqual(requests, [{ action: "status" }, { action: "get", number: "CB-0003" }]);
   } finally {
@@ -264,6 +264,6 @@ test("uses nonzero exits for server errors and a closed application", async () =
   }
   const closed = await runCli(["status"], { socketPath: temporary.target });
   assert.equal(closed.code, 2);
-  assert.equal(closed.stderr, "Clipboxx 未打开，请先打开应用。");
+  assert.equal(closed.stderr, "Copyboxx 未打开，请先打开应用。");
   fs.rmSync(temporary.directory, { recursive: true, force: true });
 });

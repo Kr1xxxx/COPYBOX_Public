@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- The 16 px entry of icon.ico: icon.svg redrawn on the pixel grid so its edges stay sharp (D-046). -->
+  <rect width="16" height="16" rx="3.5" fill="#262628"/>
+  <rect x="3" y="2" width="7" height="8" rx="1" fill="#7B72B8"/>
+  <rect x="5" y="4" width="8" height="6" rx="1" fill="#F8F7FF"/>
+  <rect x="2" y="9" width="12" height="5" rx="1.5" fill="#DCD6FF" stroke="#262628" stroke-width="2" paint-order="stroke"/>
+  <rect x="6" y="11" width="4" height="1" rx="0.5" fill="#7B72B8"/>
+</svg>

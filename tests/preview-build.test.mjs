@@ -43,7 +43,7 @@ test("renderWrapper replaces the version", () => {
 });
 
 test("ensureTitle adds a title only when missing", () => {
-  assert.equal(ensureTitle("<head></head>"), "<head><title>Clipboxx</title></head>");
+  assert.equal(ensureTitle("<head></head>"), "<head><title>Copyboxx</title></head>");
   const has = "<head><title>X</title></head>";
   assert.equal(ensureTitle(has), has);
 });

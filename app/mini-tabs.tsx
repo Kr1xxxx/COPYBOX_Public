@@ -6,7 +6,8 @@
 import { useEffect, useRef } from "react";
 
 // `placeholder`: keeps the tab's space but shows nothing, so rows do not change width when a section lacks that tab.
-export type MiniTab = { id: string; label: string; placeholder?: boolean };
+// `fullName`: the whole name when `label` is a shortened one (the folder row); it becomes the tooltip and accessible name.
+export type MiniTab = { id: string; label: string; fullName?: string; placeholder?: boolean };
 
 const DRAG_START_PX = 4;
 
@@ -86,7 +87,7 @@ export function MiniTabs({ tabs, active, onSelect, label, className = "" }: { ta
       {tabs.map((tab) => tab.placeholder ? (
         <button key={tab.id} type="button" className="mini-tab placeholder" disabled tabIndex={-1} aria-hidden="true">{tab.label}</button>
       ) : (
-        <button key={tab.id} type="button" className={`mini-tab ${tab.id === active ? "active" : ""}`} aria-pressed={tab.id === active} onClick={() => onSelect(tab.id)}>{tab.label}</button>
+        <button key={tab.id} type="button" className={`mini-tab ${tab.id === active ? "active" : ""}`} aria-pressed={tab.id === active} title={tab.fullName} aria-label={tab.fullName} onClick={() => onSelect(tab.id)}>{tab.label}</button>
       ))}
     </div>
   );

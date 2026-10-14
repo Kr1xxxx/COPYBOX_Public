@@ -35,7 +35,7 @@ pub struct Shell {
 
 impl Default for Shell {
     fn default() -> Self {
-        Shell { settings: Arc::new(Mutex::new(Settings { close: CloseBehavior::Tray, mini_hide: MiniHidePolicy::Hotkey, quitting: false })) }
+        Shell { settings: Arc::new(Mutex::new(Settings { close: CloseBehavior::Tray, mini_hide: MiniHidePolicy::Never, quitting: false })) }
     }
 }
 
@@ -65,12 +65,22 @@ pub fn hides_after_copy(policy: MiniHidePolicy, is_mini: bool, auto_hide: bool) 
 
 impl Shell {
     pub fn quit(&self, app: &AppHandle, mode: &WindowMode) {
+        self.begin_quit(app, mode);
+        // The exit request makes the page save first (see flush.rs).
+        app.exit(0);
+    }
+
+    /// Marks a quit as under way and keeps the window's place; the caller then asks the page to save and exits.
+    pub fn begin_quit(&self, app: &AppHandle, mode: &WindowMode) {
         self.settings.lock().unwrap().quitting = true;
         if let Some(window) = app.get_webview_window("main") {
             mode.save_now(&window);
         }
-        // The exit request makes the page save first (see flush.rs).
-        app.exit(0);
+    }
+
+    /// A quit that could not finish (the update installer did not start): the app carries on as before.
+    pub fn cancel_quit(&self) {
+        self.settings.lock().unwrap().quitting = false;
     }
 
     /// Returns true when the close should go ahead: only while a quit is already under way (the page was asked to save
@@ -121,11 +131,11 @@ pub fn show_window(app: &AppHandle, as_quick_search: bool) {
 
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let quick = MenuItem::with_id(app, "quick", "快速搜索", true, None::<&str>)?;
-    let open = MenuItem::with_id(app, "open", "打开 Clipboxx", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "打开 Copyboxx", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quick, &open, &PredefinedMenuItem::separator(app)?, &quit])?;
     let mut tray = TrayIconBuilder::with_id("clipbox")
-        .tooltip("Clipboxx")
+        .tooltip("Copyboxx")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {

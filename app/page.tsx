@@ -2,7 +2,7 @@
 
 import { ArcToast } from "./arc/arc-toast";
 import { useToast } from "./use-toast";
-import { buildCardMoveMap, countItemsByFolder } from "./clipbox-core";
+import { buildCardMoveMap, countItemsByFolder, undoItemSave, type ItemSaveRecord } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
@@ -79,6 +79,8 @@ import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHid
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
+import { folderShortName } from "./folder-short-name";
+import { FirstRunGuide, useFirstRunGuide } from "./first-run-guide";
 import { countImagesByFolder, IMAGE_FILTER_ALL, IMAGE_FILTER_PINNED, IMAGE_FILTER_RECENT, IMAGE_FILTER_TRASH, IMAGE_FILTER_UNCATEGORIZED, imageFilterTitle, imageFolderColors, imageFolderFilter } from "./image-folders-core";
 import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
 import { useImageLibrary } from "./image-library";
@@ -116,6 +118,7 @@ import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { onRowAnimationEnd } from "./row-entrance";
 import { ListScrollFrame } from "./list-scroll-rail";
+import { DailyTipsCard } from "./daily-tips-card";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
 
 type VaultEnvelope = {
@@ -147,6 +150,8 @@ const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
+// 固定在最上层 for the full window: "1" when on, absent when off.
+const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
 const VALUES_COLLAPSED_KEY = "clipbox.values-collapsed";
 // The 话术 card that was open last (only its id), so the list comes back the way it was; empty = all folded.
@@ -258,9 +263,12 @@ export default function Home() {
     setOpenIdState(id);
     try { if (id) localStorage.setItem(OPEN_CARD_KEY, id); else localStorage.removeItem(OPEN_CARD_KEY); } catch { /* the open card is only remembered for this session */ }
   }
+  // Mini window: the one 话术 row opened in place, and the one folding away (kept mounted for its close animation).
+  const [miniOpenId, setMiniOpenId] = useState("");
+  const [miniClosingId, setMiniClosingId] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SecretItem | null>(null);
-  const { toast, toastTone, showToast } = useToast();
+  const { toastState, showToast, clearToast, pauseToast, resumeToast } = useToast();
   const [copiedId, setCopiedId] = useState("");
   const [copiedReferenceId, setCopiedReferenceId] = useState("");
   const [, setMenuOpen] = useState(false);
@@ -295,9 +303,8 @@ export default function Home() {
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
-  const [undoTrash, setUndoTrash] = useState<SecretItem[] | null>(null);
-  const [undoImage, setUndoImage] = useState<ImageMeta | null>(null);
-  const undoTimerRef = useRef<number | null>(null);
+  // 编辑 in the toast after a save: the entry to open once it is in the list shown.
+  const pendingSavedEdit = useRef("");
   const [productFilter, setProductFilter] = useState("全部产品");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -503,7 +510,10 @@ export default function Home() {
       }).catch(() => undefined);
     }
   }, [closingIds, selectedCardId]);
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen);
+  // First-run guide: once, when the full window first shows after the data opened (never in the mini window).
+  const guide = useFirstRunGuide(!loading && !startupError && windowMode === "full");
+  const guideShown = guide.open && windowMode === "full";
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || guideShown);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -644,8 +654,6 @@ export default function Home() {
 
   // For the image section and the 账号 panels, which pass only text: the tone follows the words (use-toast.ts).
   function flashToast(message: string, ms = 2200) {
-    // The newest message wins over a pending 撤销 for a picture.
-    setUndoImage(null);
     showToast(message, { ms });
   }
 
@@ -1000,6 +1008,16 @@ export default function Home() {
     await finishCopy(item, source);
   }
 
+  // Mini window: a click on a 话术 row opens it in place (one at a time); a second click closes it.
+  function toggleMiniRow(item: SecretItem, index: number) {
+    setSelected(index);
+    const leaving = miniOpenId;
+    setMiniOpenId(leaving === item.id ? "" : item.id);
+    if (!leaving) return;
+    setMiniClosingId(leaving);
+    window.setTimeout(() => setMiniClosingId((id) => id === leaving ? "" : id), DETAIL_CLOSE_MS + 40);
+  }
+
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (imageView) {
       if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
@@ -1012,17 +1030,74 @@ export default function Home() {
     if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
   }
 
+  // The toast after a save offers 编辑 (open this entry again) and 撤销 (put it back as it was before this save).
   async function saveItem(data: Omit<SecretItem, "id" | "createdAt" | "updatedAt">) {
     const now = timestampNow();
     const wasEditing = Boolean(editing);
-    if (editing) {
-      await persist((current) => ({ ...current, items: current.items.map((item) => item.id === editing.id ? { ...item, ...data, updatedAt: now } : item) }));
-    } else {
-      await persist((current) => ({ ...current, items: [{ ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now }, ...current.items] }));
-    }
+    const id = editing ? editing.id : crypto.randomUUID();
+    let before = null as SecretItem | null;
+    let nextBefore = 0;
+    await persist((current) => {
+      nextBefore = current.nextSnippetNumber;
+      before = editing ? current.items.find((item) => item.id === id) ?? null : null;
+      return editing
+        ? { ...current, items: current.items.map((item) => item.id === id ? { ...item, ...data, updatedAt: now } : item) }
+        : { ...current, items: [{ ...data, id, createdAt: now, updatedAt: now }, ...current.items] };
+    });
     closeEditor();
-    showToast(wasEditing ? "条目已更新" : "条目已加密保存");
+    const after = itemsRef.current.find((item) => item.id === id);
+    const record: ItemSaveRecord | null = after && (before || !wasEditing) ? { before, after, nextBefore, nextAfter: nextSnippetNumberRef.current } : null;
+    showToast(wasEditing ? "条目已更新" : "条目已加密保存", record ? {
+      ms: 5000,
+      actions: [
+        { label: "编辑", variant: "primary", onClick: () => editSavedItem(id) },
+        { label: "撤销", variant: "secondary", onClick: () => void undoSave(record) },
+      ],
+    } : undefined);
   }
+
+  // 撤销 in the save toast. It refuses when the entry changed again after the save, so nothing newer is lost.
+  async function undoSave(record: ItemSaveRecord) {
+    clearToast();
+    let refused = false as boolean;
+    try {
+      await persist((current) => {
+        const undone = undoItemSave(current, record);
+        if (!undone) { refused = true; return current; }
+        return undone;
+      });
+    } catch {
+      showToast("撤销失败，内容保持现在的样子", { tone: "error", ms: 2800 });
+      return;
+    }
+    if (refused) { showToast("这条保存后又改过，没有撤销", { tone: "error", ms: 2800 }); return; }
+    if (modalOpen && editing?.id === record.after.id) closeEditor();
+    showToast("已撤销", { ms: 1800 });
+  }
+
+  // 编辑 in the save toast: the same inline editor as a card's 编辑 button. When the entry is not in the list shown
+  // (another section, folder or search), the list switches to where it is first.
+  function editSavedItem(id: string) {
+    clearToast();
+    const item = itemsRef.current.find((entry) => entry.id === id);
+    if (!item || isTrashedItem(item)) { showToast("这条已经不在了", { tone: "error" }); return; }
+    const kind = item.kind || "secret";
+    if (imageView || kind !== activeKind) switchKind(kind);
+    else if (!filtered.some((entry) => entry.id === id)) { selectFolder("all"); setQuery(""); }
+    if (kind === "secret" && accountMode) setVaultCat("other");
+    pendingSavedEdit.current = id;
+  }
+
+  useEffect(() => {
+    const id = pendingSavedEdit.current;
+    if (!id) return;
+    const index = filtered.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    pendingSavedEdit.current = "";
+    selectRow(index);
+    openEditor(filtered[index]);
+    window.requestAnimationFrame(() => document.querySelector(".native-row.editing")?.scrollIntoView({ block: "nearest" }));
+  });
 
   function startNewFolder() {
     setNewFolder({ name: "", error: "" });
@@ -1190,17 +1265,11 @@ export default function Home() {
     }
     setSelected(0);
     setRevealedId("");
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoImage(null);
-    setUndoTrash(list);
-    undoTimerRef.current = window.setTimeout(() => setUndoTrash(null), 6000);
+    showToast(list.length > 1 ? `已移入回收站 ${list.length} 条` : "已移入回收站", { tone: "ok", ms: 6000, actions: [{ label: "撤销", onClick: () => void undoTrashNow(list) }] });
   }
 
-  async function undoTrashNow() {
-    const list = undoTrash;
-    if (!list) return;
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoTrash(null);
+  async function undoTrashNow(list: SecretItem[]) {
+    clearToast();
     try {
       await persist((current) => ({ ...current, items: restoreTrashedItems(current.items, list.map((item) => item.id)) }));
       setSelected(0);
@@ -1212,17 +1281,11 @@ export default function Home() {
 
   // A picture went to the 回收站: the same 6-second 撤销 as for 话术.
   function offerImageUndo(meta: ImageMeta) {
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoTrash(null);
-    setUndoImage(meta);
-    undoTimerRef.current = window.setTimeout(() => setUndoImage(null), 6000);
+    showToast("图片已移入回收站", { tone: "ok", ms: 6000, actions: [{ label: "撤销", onClick: () => void undoImageTrash(meta) }] });
   }
 
-  async function undoImageTrash() {
-    const meta = undoImage;
-    if (!meta) return;
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoImage(null);
+  async function undoImageTrash(meta: ImageMeta) {
+    clearToast();
     if (await imageLibrary.restore(meta.id)) flashToast("已恢复");
   }
 
@@ -1268,7 +1331,8 @@ export default function Home() {
     showToast(deleteRequest.permanent ? "已永久删除" : "已移入回收站");
   }
 
-  const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "hotkey"));
+  // The mini window stays after a copy unless the person picks otherwise (owner, 2026-10-13: it vanished after a copy on Windows).
+  const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "never"));
   const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
   useAutoBackup(!loading && !startupError);
   useEffect(() => {
@@ -1276,6 +1340,20 @@ export default function Home() {
     // Only tell the desktop shell about the stored choice once on start; later changes go through chooseMiniHidePolicy.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const [pinOnTop, setPinOnTop] = useState(() => readStoredChoice(PIN_ON_TOP_KEY, ["1"], "") === "1");
+  useEffect(() => {
+    window.clipboxDesktop?.setPinned?.(pinOnTop);
+    // Sent once on start; later changes go through togglePinOnTop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function togglePinOnTop() {
+    const next = !pinOnTop;
+    setPinOnTop(next);
+    try { if (next) localStorage.setItem(PIN_ON_TOP_KEY, "1"); else localStorage.removeItem(PIN_ON_TOP_KEY); } catch { /* keep the in-memory choice for this session */ }
+    window.clipboxDesktop?.setPinned?.(next);
+  }
 
   const [closeBehavior, setCloseBehavior] = useState<CloseBehavior>(() => readStoredChoice<CloseBehavior>(CLOSE_BEHAVIOR_KEY, ["tray", "taskbar", "quit"], "tray"));
   useEffect(() => {
@@ -1349,8 +1427,7 @@ export default function Home() {
 
   async function emptyTrash() {
     const count = items.filter((item) => isTrashedItem(item)).length;
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setUndoTrash(null);
+    clearToast();
     try {
       // Nothing is changed in memory until the encrypted save succeeded (writeVault), so a failure leaves the trash as it was.
       await persist((current) => ({ ...current, items: current.items.filter((item) => !isTrashedItem(item)) }));
@@ -1568,7 +1645,7 @@ export default function Home() {
       setBackupMode("import");
       setMenuOpen(false);
     } catch {
-      showToast("这不是有效的 Clipboxx 加密备份", { tone: "error", ms: 3600 });
+      showToast("这不是有效的 Copyboxx 加密备份", { tone: "error", ms: 3600 });
     }
   }
 
@@ -1643,8 +1720,8 @@ export default function Home() {
     showToast(`已导入 ${importedCount} 条话术`, { ms: 2600 });
   }
 
-  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Clipboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
-  if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Clipboxx…</span></main>;
+  if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Copyboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
+  if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Copyboxx…</span></main>;
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
@@ -1665,9 +1742,11 @@ export default function Home() {
       label="内容板块"
       value={imageView ? "image" : activeKind}
       onSelect={(next) => { if (next === "image") showImages(); else switchKind(next as ItemKind); }}
+      // Order fixed by the owner (2026-10-13): 话术 | 图片 | 账号.
       options={[
-        ...(["snippet", "secret"] as const).map((kind) => ({ value: kind, label: kind === "snippet" ? "话术" : SECRET_WORD })),
+        { value: "snippet", label: "话术" },
         { value: "image", label: "图片" },
+        { value: "secret", label: SECRET_WORD },
       ]}
     />
   );
@@ -1675,9 +1754,14 @@ export default function Home() {
   const miniTopTabs: MiniTab[] = imageView
     ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, { id: IMAGE_FILTER_RECENT, label: "最近" }]
     : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }];
+  // Folder tabs show a two-character name (folder-short-name.ts); the whole name is the tooltip.
+  const miniFolderTab = (id: string, name: string): MiniTab => {
+    const label = folderShortName(name);
+    return label === name.trim() ? { id, label } : { id, label, fullName: name };
+  };
   const miniFolderTabs: MiniTab[] = imageView
-    ? [...imageLibrary.folders.map((folder) => ({ id: imageFolderFilter(folder.name), label: folder.name })), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
-    : [...activeFolders.map((folder) => ({ id: `folder:${folder}`, label: folder })), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
+    ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
+    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder)), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
@@ -1874,13 +1958,40 @@ export default function Home() {
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch" onAnimationEnd={onRowAnimationEnd}>
             {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
               const isSelected = safeSelected === index;
+              if (activeKind === "snippet") {
+                if (modalOpen && editing?.id === item.id) return <article key={item.id} data-row-index={index} className="native-row selected editing snippet-row mini-editing">{editorNode}</article>;
+                const open = miniOpenId === item.id;
+                const closing = !open && miniClosingId === item.id;
+                const copied = copiedId === item.id;
+                return (
+                  <article key={item.id} data-row-index={index} className={`native-row mini-row snippet-row ${isSelected ? "selected" : ""} ${open ? "open" : ""} ${copied ? "copied" : ""}`}>
+                    <button type="button" className="row-main" onClick={() => toggleMiniRow(item, index)} aria-expanded={open} aria-label={`${open ? "收起" : "展开"} ${item.label}`}>
+                      <i className="row-dot" aria-hidden="true" style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} />
+                      <span className="row-copy">
+                        <strong className="snippet-label"><SnippetTitle label={item.label} query={query} /></strong>
+                        {!open && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
+                      </span>
+                      {item.pinned && <Icon name="star" filled className="row-star" />}
+                    </button>
+                    <button type="button" className="mini-copy" data-copied={copied ? "" : undefined} onClick={() => { setSelected(index); void copyRaw(item); }} aria-label={copied ? `已复制 ${item.label}` : `复制 ${item.label}`}>
+                      <span className="mini-copy-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span>
+                      <span className="mini-copy-label" aria-hidden="true"><span>复制</span><span>已复制</span></span>
+                    </button>
+                    {(open || closing) && <div className={`row-detail mini-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
+                      <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>
+                      <div className="mini-actions"><button type="button" className="ghost-button" onClick={() => openEditor(item)} aria-label={`修改 ${item.label}`}>修改</button></div>
+                    </div></div>}
+                    {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
+                  </article>
+                );
+              }
+              // 账号 rows copy on click, as before: opening one would show its contents in the small window.
               return (
-                <article key={item.id} data-row-index={index} className={`native-row mini-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""}`}>
+                <article key={item.id} data-row-index={index} className={`native-row mini-row secret-row ${isSelected ? "selected" : ""} ${copiedId === item.id ? "copied" : ""}`}>
                   <button type="button" className="row-main" onClick={() => { setSelected(index); void copyRaw(item); }} aria-label={copiedId === item.id ? `已复制 ${item.label}` : `复制 ${item.label}`}>
                     <i className="row-dot" aria-hidden="true" style={{ background: categoryColors[item.folder || ""] || UNCATEGORIZED_COLOR }} />
                     <span className="row-copy">
-                      <strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
-                      {activeKind === "snippet" && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
+                      <strong><Highlight text={item.label} query={query} /></strong>
                     </span>
                     {item.pinned && <Icon name="star" filled className="row-star" />}
                     {copiedId === item.id && <span className="mini-copied">已复制</span>}
@@ -1932,6 +2043,7 @@ export default function Home() {
               {activeKind === "secret" && <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>}
             </div></>}
             </>}
+            <DailyTipsCard />
             <div className="nav-footer">
               {!imageView && <button type="button" className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length + (accountMode ? account.trashed.length : 0) > 0 && <b>{trashedKindItems.length + (accountMode ? account.trashed.length : 0)}</b>}</button>}
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
@@ -1977,6 +2089,8 @@ export default function Home() {
                     </span>
                     : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
                 </>}
+              {/* Only a desktop shell (or the web preview's stand-in) can keep the window on top; a plain browser tab gets no button. */}
+              {typeof window !== "undefined" && window.clipboxDesktop?.setPinned && <button type="button" className={`icon-button pin-on-top${pinOnTop ? " active" : ""}`} onClick={togglePinOnTop} aria-pressed={pinOnTop} aria-label={pinOnTop ? "取消固定" : "固定在最上层"} title={pinOnTop ? "取消固定" : "固定在最上层"}><Icon name="pin" filled={pinOnTop} /></button>}
               <button type="button" className="icon-button" onClick={() => requestWindowMode("mini")} aria-label="迷你模式" title="迷你模式"><Icon name="mini" /></button>
             </header>
             {lockedHere ? <AccountLockScreen deviceKey={deviceKey} onUnlock={(key) => { setAccountSecret(key ?? deviceKey); setAccountUnlocked(true); }} /> : <>
@@ -2108,7 +2222,9 @@ export default function Home() {
         onShowItem={showItemInList}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
+        onShowGuide={() => { setSettingsOpen(false); guide.show(); }}
       />}
+      {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}
@@ -2120,10 +2236,13 @@ export default function Home() {
       />}
       {snippetImport && <SnippetImportDialog preview={snippetImport} fileName={snippetImportName} secretWord={PLAIN_NOTES ? "" : SECRET_WORD} onClose={() => { setSnippetImport(null); setSnippetImportName(""); }} onImport={applySnippetImport} />}
       <ArcToast
-        message={undoImage ? "图片已移入回收站" : undoTrash ? (undoTrash.length > 1 ? `已移入回收站 ${undoTrash.length} 条` : "已移入回收站") : toast}
-        className={undoTrash || undoImage ? "undo-toast" : undefined}
-        tone={undoTrash || undoImage ? "ok" : toastTone}
-        action={undoImage ? { label: "撤销", onClick: () => void undoImageTrash() } : undoTrash ? { label: "撤销", onClick: () => void undoTrashNow() } : undefined}
+        message={toastState.message}
+        className={toastState.actions?.length === 1 ? "undo-toast" : undefined}
+        tone={toastState.tone}
+        actions={toastState.actions}
+        fading={toastState.fading}
+        fadeMs={toastState.fadeMs}
+        onHold={(held) => { if (held) pauseToast(); else resumeToast(); }}
       />
     </main>
   );

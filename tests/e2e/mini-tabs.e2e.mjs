@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, settle } from "./helpers.mjs";
 
 async function openMini(page) {
   await asDesktop(page, "win32");
@@ -17,7 +17,7 @@ test("mini top: 话术/图片 switch first, then 全部 收藏 最近; the folde
   expect(tabsBox.x).toBeGreaterThanOrEqual(switchBox.x + switchBox.width - 1);
   expect(Math.abs(tabsBox.y + tabsBox.height / 2 - (switchBox.y + switchBox.height / 2))).toBeLessThan(6);
   await expect(top.locator(".mini-tab")).toHaveText(["全部", "收藏", "最近"]);
-  await page.waitForTimeout(500);
+  await settle(page); // the row has not been scrolled once everything has come to rest
   expect(await page.locator(".mini-top .mini-tabs").evaluate((el) => el.scrollLeft)).toBe(0);
   const first = await top.locator(".mini-tab").first().boundingBox();
   expect(first.x).toBeGreaterThanOrEqual(tabsBox.x - 1);
@@ -36,7 +36,7 @@ test("mini top: dragging the tab row scrolls it, keeps the switch in place, and 
   const tabs = page.locator(".mini-folders .mini-tabs");
   const overflow = await tabs.evaluate((el) => el.scrollWidth - el.clientWidth);
   test.skip(overflow <= 0, "the sample folders fit in one row");
-  await page.waitForTimeout(300);
+  await settle(page);
   const switchBefore = await page.locator(".kind-switch").boundingBox();
   const box = await tabs.boundingBox();
   const y = box.y + box.height / 2;
@@ -74,13 +74,15 @@ test("mini top: switching 话术 ↔ 图片 does not move anything", async ({ pa
     const r = (s) => { const b = document.querySelector(s)?.getBoundingClientRect(); return b ? [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)] : null; };
     return { sw: r(".mini-top .kind-switch"), all: r(".mini-top .mini-tab"), search: r(".mini-search"), folders: r(".mini-folders"), restore: r(".mini-top .icon-button") };
   });
-  await page.waitForTimeout(1500);
+  await settle(page);
   const before = await spots();
   await page.locator(".kind-switch.compact").getByRole("button", { name: "图片" }).click();
   await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
-  await page.waitForTimeout(400);
+  await expect(page.locator(".image-section")).toBeVisible();
+  await settle(page);
   expect(await spots()).toEqual(before);
   await page.locator(".kind-switch.compact").getByRole("button", { name: "话术" }).click();
-  await page.waitForTimeout(400);
+  await expect(page.locator(".native-row").first()).toBeVisible();
+  await settle(page);
   expect(await spots()).toEqual(before);
 });

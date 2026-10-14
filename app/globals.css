@@ -187,6 +187,19 @@ button { -webkit-tap-highlight-color: transparent; }
 .directory-row.dragging { z-index: 5; opacity: .8; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .directory-row.drag-over::after { content: ""; position: absolute; left: 5px; right: 5px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 .nav-footer { flex: 0 0 auto; margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
+/* 每日 Tips: a small card pinned above 回收站 (app/daily-tips-card.tsx); the dialog reuses .backup-dialog. */
+.daily-tips-slot { flex: 0 0 auto; margin-top: auto; padding: 8px 0 6px; }
+.daily-tips { width: 100%; margin: 0; padding: 7px 8px 8px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink-2); font: inherit; text-align: left; cursor: pointer; transition: background .14s, border-color .14s; }
+.daily-tips-slot + .nav-footer { margin-top: 0; }
+.daily-tips:hover { background: var(--hover); }
+.daily-tips:active { background: var(--fill); }
+.daily-tips:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.daily-tips-label { color: var(--muted); font-size: 11px; font-weight: 650; line-height: 1.2; letter-spacing: .02em; }
+.daily-tips-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.tips-dialog { width: min(420px, 100%); }
+.tips-dialog:focus { outline: 0; }
+.tips-dialog .tips-text { max-width: 360px; margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.tips-dialog .tips-actions { grid-template-columns: 1fr; }
 .menu-wrap { position: relative; }
 .dropdown { position: absolute; right: 0; top: 36px; z-index: 30; min-width: 168px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 16px 40px rgba(31,30,28,.16); }
 .dropdown.folder-menu { animation: menu-in .14s ease-out both; }
@@ -214,6 +227,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .add-button { height: 34px; padding: 0 13px 0 10px; border-radius: 9px; font-size: 13px; }
 .toolbar .icon-button { width: 34px; height: 34px; border-radius: 9px; color: var(--ink-2); }
 .toolbar .icon-button .icon { width: 17px; height: 17px; }
+/* 固定在最上层: the on state is tinted with the accent so it reads as switched on at a glance. */
+.toolbar .icon-button.pin-on-top.active { background: var(--accent-tint); color: var(--accent); }
+.toolbar .icon-button.pin-on-top.active:hover { background: var(--accent-soft); color: var(--accent); }
 .section-head { position: relative; z-index: 3; height: 40px; flex: 0 0 auto; padding: 0 12px 4px 18px; display: flex; align-items: center; gap: 8px; }
 .section-head h1 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-serif); font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--ink); }
 .section-count { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
@@ -382,6 +398,39 @@ button { -webkit-tap-highlight-color: transparent; }
 .mini-row.selected .row-dot { margin-top: 6px; }
 .mini-row.selected .row-copy small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; color: #4a3f38; line-height: 1.5; }
 .mini-copied { flex: 0 0 auto; color: #1c6f43; font-size: 12px; font-weight: 600; }
+/* Mini 话术 rows: a click opens the row in place (one at a time, the full window's fold animation); a floating
+   复制 button shows on hover or keyboard focus and copies without opening. After a copy it turns into ✓ 已复制
+   with a short pop, and the row glows softly until the feedback ends (~1.2 s). */
+.mini-row.snippet-row .row-main { width: 100%; height: auto; }
+.mini-row.snippet-row.open { background: var(--accent-tint); }
+/* The open row's title stops before the 复制 button instead of running under it. */
+.mini-row.snippet-row.open .row-main { align-items: center; min-height: 46px; padding-top: 0; padding-bottom: 0; padding-right: 88px; }
+.mini-row.snippet-row.open .row-dot { margin-top: 0; }
+.mini-row.snippet-row.copied { background: color-mix(in oklab, var(--ok-bg) 80%, transparent); transition: background .3s ease-out; }
+.mini-detail .row-detail-inner { padding: 0 10px 10px 30px; gap: 6px; }
+.mini-detail .row-content { max-height: 150px; padding: 8px 10px; font-size: 13px; line-height: 1.6; background: var(--card); }
+.mini-actions { display: flex; }
+.mini-actions .ghost-button { height: 28px; margin-left: -8px; color: var(--accent-ink); font-weight: 600; }
+.mini-actions .ghost-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mini-copy { position: absolute; top: 9px; right: 8px; z-index: 1; height: 28px; padding: 0 10px 0 8px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 999px; background: var(--card); color: var(--ink-2); font-size: 12px; font-weight: 500; box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(31,30,28,.12); cursor: pointer; opacity: 0; transition: opacity .14s ease-out, background-color .14s ease-out, color .14s ease-out, transform .12s ease-out; }
+.mini-row:hover .mini-copy, .mini-row:has(:focus-visible) .mini-copy, .mini-copy[data-copied] { opacity: 1; }
+/* While the button shows, the text fades out just before it instead of running into its edge. */
+.mini-row.snippet-row:not(.open):is(:hover, :has(:focus-visible), .copied) .row-copy { mask-image: linear-gradient(to left, transparent 0 74px, #000 104px); }
+.mini-copy:hover { color: var(--ink); }
+.mini-copy:active { transform: scale(.96); }
+.mini-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mini-copy-icon, .mini-copy-label { display: grid; }
+.mini-copy-icon > *, .mini-copy-label > * { grid-area: 1 / 1; }
+.mini-copy-label > span { text-align: center; transition: opacity .14s cubic-bezier(.2,0,0,1); }
+.mini-copy-icon .icon { width: 13px; height: 13px; transition: opacity .14s cubic-bezier(.2,0,0,1), scale .14s cubic-bezier(.2,0,0,1); }
+.mini-copy .copy-tick, .mini-copy[data-copied] .icon:not(.copy-tick) { opacity: 0; scale: .25; }
+.mini-copy[data-copied] .copy-tick { opacity: 1; scale: 1; }
+.mini-copy-label > span:last-child, .mini-copy[data-copied] .mini-copy-label > span:first-child { opacity: 0; }
+.mini-copy[data-copied] .mini-copy-label > span:last-child { opacity: 1; }
+.mini-copy[data-copied] { background: var(--ok-bg); color: var(--ok); font-weight: 600; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok) 32%, transparent), 0 1px 3px rgba(31,30,28,.12); animation: mini-copy-pop .22s ease-out; }
+@keyframes mini-copy-pop { from { transform: scale(.9); } to { transform: none; } }
+@media (hover: none) { .mini-copy { opacity: .85; } }
+@media (prefers-reduced-motion: reduce) { .mini-copy, .mini-copy-icon .icon, .mini-copy-label > span, .mini-row.snippet-row.copied { transition: none; } .mini-copy[data-copied] { animation: none; } .mini-copy:active { transform: none; } }
 .app-shell.mini .status-bar { height: 30px; padding: 0 12px; }
 
 /* Toast (app/arc/arc-toast.tsx, arc-library motion): the host only positions; the toast itself is moved by motion. */
@@ -393,9 +442,27 @@ button { -webkit-tap-highlight-color: transparent; }
 /* Errors: a red circle with an exclamation mark, and the whole message shows (it wraps instead of being cut off). */
 .toast.error .toast-icon { border-color: color-mix(in oklab, var(--danger) 30%, var(--line)); background: var(--danger-bg); color: var(--danger); }
 .toast.error .toast-line { white-space: normal; overflow-wrap: anywhere; }
-.undo-toast button { margin-left: 2px; padding: 3px 10px; border: 0; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, transform .15s; }
-.undo-toast button:hover { background: var(--accent-soft); }
-.undo-toast button:active { transform: scale(.96); }
+/* The slow fade at the end of a toast's time (data-fading, length in --toast-fade) eases in, so the words stay readable
+   at first. Pointer or keyboard focus on it brings it back to full strength within 150 ms (use-toast.ts pause). Only
+   opacity changes, so it also suits reduced motion. */
+.toast-motion { max-width: 100%; display: flex; justify-content: center; }
+.toast { transition: opacity .15s cubic-bezier(.2, 0, 0, 1); }
+.toast[data-fading] { opacity: 0; transition: opacity var(--toast-fade, 900ms) cubic-bezier(.55, 0, 1, .45); }
+.toast-body { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.toast.has-actions { padding-right: 8px; }
+/* 编辑 is filled with the accent like a primary button; 撤销 is a quiet text button next to it. The single 撤销 after
+   moving to the 回收站 keeps its tinted look (undo-toast). */
+.toast-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; }
+.toast-action { position: relative; height: 26px; padding: 0 11px; border: 0; border-radius: 10px; font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; transition-property: background-color, color, scale; transition-duration: .15s; transition-timing-function: cubic-bezier(.2, 0, 0, 1); }
+.toast-action::after { content: ""; position: absolute; inset: -7px -2px; }
+.toast-action:active { scale: .96; }
+.toast-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toast-action.primary { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgba(31,30,28,.15); }
+.toast-action.primary:hover { background: var(--accent-hover); }
+.toast-action.secondary { background: transparent; color: var(--ink-3); font-weight: 500; }
+.toast-action.secondary:hover { background: var(--hover); color: var(--ink); }
+.undo-toast .toast-action.secondary { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.undo-toast .toast-action.secondary:hover { background: var(--accent-soft); }
 
 /* Editor and dialogs */
 /* Editor */
@@ -935,8 +1002,17 @@ button { -webkit-tap-highlight-color: transparent; }
 .update-text span { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .update-banner .primary-button, .update-banner .ghost-button { height: 28px; border-radius: 7px; }
 .update-banner .primary-button:active, .update-banner .ghost-button:active { transform: scale(.96); }
+/* 立即更新 (D-047): a slim bar with percent and megabytes while the installer downloads, then 正在安装. */
+.update-progress { display: flex; align-items: center; gap: 8px; height: 1lh; min-width: 0; }
+.update-bar { flex: 1; min-width: 60px; height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.update-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transform-origin: left center; transition: transform .2s cubic-bezier(.2,0,0,1); }
+.update-text .update-figures { flex: none; color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.update-banner-progress { padding-right: 12px; }
+.update-banner[data-phase="installing"] .update-bar i { animation: update-pulse 1.4s ease-in-out infinite; }
+.update-banner-error strong { color: var(--danger); }
 @keyframes update-in { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
-@media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } }
+@keyframes update-pulse { 50%{opacity:.55} }
+@media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } .update-bar i { transition: none; } .update-banner[data-phase="installing"] .update-bar i { animation: none; } }
 
 /* Segmented controls (app/arc/segmented.tsx): the highlight is one pill that glides between options. The active button keeps its
    `active` class but no longer paints its own background; the pill paints it, in the colours each control had before. */
@@ -1248,3 +1324,92 @@ button { -webkit-tap-highlight-color: transparent; }
 .account-lock-recover input { width: 100%; }
 .recovery-code-text { display: block; margin: 8px 0; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--card); font-size: 15px; letter-spacing: .06em; user-select: all; }
 .recovery-saved { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; }
+
+/* First-run guide (app/first-run-guide.tsx): four short pages, each with a small drawing made of the app's own parts. */
+.guide-backdrop { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; padding: 16px; overflow-y: auto; background: rgba(20, 19, 17, .46); backdrop-filter: blur(6px); animation: backdrop-in .2s ease-out both; }
+:root[data-theme="dark"] .guide-backdrop { background: rgba(0, 0, 0, .6); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .guide-backdrop { background: rgba(0, 0, 0, .6); } }
+.guide-dialog { position: relative; width: min(420px, 100%); padding: 10px; border-radius: 22px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 1px rgba(0, 0, 0, .06), 0 2px 6px rgba(0, 0, 0, .06), 0 28px 70px rgba(0, 0, 0, .28); animation: dialog-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+:root[data-theme="dark"] .guide-dialog { box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 28px 70px rgba(0, 0, 0, .6); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .guide-dialog { box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 28px 70px rgba(0, 0, 0, .6); } }
+.guide-close { position: absolute; top: 18px; right: 18px; z-index: 1; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--card); color: var(--ink-3); font-size: 19px; line-height: 1; cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, .1); transition: background .15s, color .15s, transform .15s; }
+.guide-close::before { content: ""; position: absolute; inset: -6px; }
+.guide-close:hover { background: var(--hover); color: var(--ink); }
+.guide-close:active { transform: scale(.96); }
+.guide-close span { margin-top: -2px; }
+.guide-close:focus-visible, .guide-dots button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.guide-art { height: 150px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; background: var(--content); box-shadow: inset 0 0 0 1px var(--line-soft); animation: guide-art-in .32s cubic-bezier(.2, .8, .2, 1) both; }
+.guide-text { min-height: 158px; padding: 16px 14px 4px; animation: guide-text-in .3s cubic-bezier(.2, .8, .2, 1) .04s both; }
+.guide-text[data-direction="back"] { animation-name: guide-text-back; }
+.guide-count { margin: 0 0 6px; color: var(--accent); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.guide-text h2 { margin: 0 0 8px; color: var(--ink); font-size: 18px; font-weight: 650; line-height: 1.3; text-wrap: balance; }
+.guide-text ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.guide-text li { position: relative; padding-left: 13px; color: var(--ink-3); font-size: 13px; line-height: 1.55; text-wrap: pretty; }
+.guide-text li::before { content: ""; position: absolute; left: 1px; top: .68em; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+.guide-actions { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 14px 4px 4px; }
+.guide-skip { justify-self: start; color: var(--muted); }
+.guide-skip:hover { color: var(--ink-2); }
+.guide-dots { display: flex; align-items: center; }
+.guide-dots button { position: relative; width: 18px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.guide-dots button::after { content: ""; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 38%, transparent); transform: translate(-50%, -50%); transition: width .2s cubic-bezier(.2, 0, 0, 1), background-color .2s; }
+.guide-dots button:hover::after { background: var(--muted); }
+.guide-dots button.active::after { width: 14px; background: var(--accent); }
+.guide-nav { justify-self: end; display: flex; gap: 6px; }
+.guide-nav .primary-button { padding: 0 14px; }
+.guide-nav button:active { transform: scale(.96); }
+@keyframes guide-art-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes guide-text-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@keyframes guide-text-back { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@media (max-height: 520px) { .guide-art { height: 112px; } .guide-art > * { scale: .74; } .guide-text { min-height: 0; padding-top: 12px; } }
+
+/* The drawings: plain blocks in the app's colours, so they follow the light and dark themes. */
+.guide-art .icon { width: 13px; height: 13px; }
+.guide-bar { display: block; height: 6px; border-radius: 3px; background: var(--fill); }
+.guide-bar.w30 { width: 30px; } .guide-bar.w40 { width: 40%; } .guide-bar.w45 { width: 46px; } .guide-bar.w50 { width: 50%; } .guide-bar.w55 { width: 55%; } .guide-bar.w60 { width: 60%; } .guide-bar.w65 { width: 65%; } .guide-bar.w70 { width: 70%; }
+.guide-art-snippet { width: 230px; display: grid; gap: 7px; }
+.guide-mock-search { height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 8px; background: var(--card); color: var(--muted); font-size: 12px; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .04); }
+.guide-mock-search span { color: var(--ink); font-weight: 600; }
+.guide-caret { width: 1px; height: 13px; margin-left: -4px; background: var(--accent); animation: guide-blink 1.1s steps(1) infinite; }
+@keyframes guide-blink { 50% { opacity: 0; } }
+.guide-mock-row { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 5px 0 10px; border-radius: 8px; background: var(--card); color: var(--muted); box-shadow: 0 0 0 1px var(--line-soft); }
+.guide-mock-row .guide-bar { flex: 0 1 auto; }
+.guide-mock-row.hit { box-shadow: 0 0 0 1px var(--accent-soft), 0 2px 8px rgba(0, 0, 0, .05); }
+.guide-mock-row.hit > .icon { color: var(--star); }
+.guide-mock-row.hit .guide-bar { background: var(--accent-soft); }
+.guide-mock-copy { margin-left: auto; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--fill); color: var(--ink-3); }
+.guide-mock-row.hit .guide-mock-copy { background: var(--accent); color: #fff; }
+.guide-mock-chips { display: flex; gap: 5px; }
+.guide-mock-chips span { padding: 2px 8px; border-radius: 999px; background: var(--card); color: var(--ink-3); font-size: 10.5px; line-height: 1.5; box-shadow: 0 0 0 1px var(--line-soft); }
+.guide-mock-chips span:first-child { background: var(--accent-soft); color: var(--accent-ink, var(--accent)); box-shadow: none; }
+.guide-art-image { display: flex; align-items: center; gap: 14px; }
+.guide-mock-grid { display: grid; grid-template-columns: repeat(2, 64px); gap: 6px; }
+.guide-tile { position: relative; height: 50px; display: grid; place-items: end stretch; overflow: hidden; border-radius: 8px; outline: 1px solid rgba(0, 0, 0, .1); outline-offset: -1px; }
+:root[data-theme="dark"] .guide-tile { outline-color: rgba(255, 255, 255, .1); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .guide-tile { outline-color: rgba(255, 255, 255, .1); } }
+.guide-tile svg { width: 100%; height: auto; fill: rgba(255, 255, 255, .55); }
+.guide-tile.t0 { background: #c99a7c; } .guide-tile.t1 { background: #7f9e8c; } .guide-tile.t2 { background: #8a9bb8; } .guide-tile.t3 { background: #c4ae78; }
+.guide-tile-done { position: absolute; top: 50%; left: 50%; display: flex; align-items: center; gap: 3px; padding: 2px 7px 2px 5px; border-radius: 999px; background: #2b2a26; color: #fff; font-size: 10.5px; font-weight: 600; white-space: nowrap; transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgba(0, 0, 0, .2); }
+.guide-tile-done .icon { width: 11px; height: 11px; }
+.guide-mock-drop { width: 74px; height: 106px; display: grid; place-content: center; justify-items: center; gap: 6px; border: 1.5px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 11px; }
+.guide-mock-drop .icon { width: 16px; height: 16px; color: var(--accent); }
+.guide-art-account { position: relative; }
+.guide-mock-card { width: 210px; display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--card); box-shadow: 0 0 0 1px var(--line-soft), 0 2px 8px rgba(0, 0, 0, .05); }
+.guide-mock-site { display: flex; align-items: center; gap: 8px; }
+.guide-site-dot { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: #4a7a68; color: #fff; font-size: 11px; font-weight: 600; }
+.guide-mock-field { height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; border-radius: 6px; background: var(--content); color: var(--muted); font-size: 11px; }
+.guide-mask { color: var(--ink-3); font-size: 12px; letter-spacing: .1em; }
+.guide-code { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.guide-lock { position: absolute; top: -12px; right: -12px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .15); }
+.guide-lock .icon, .guide-shield .icon { width: 15px; height: 15px; }
+.guide-art-mini { position: relative; }
+.guide-mock-screen { position: relative; width: 230px; height: 118px; overflow: hidden; border-radius: 9px; background: var(--card); box-shadow: 0 0 0 1px var(--line-soft); }
+.guide-mock-chat { position: absolute; top: 16px; left: 14px; width: 110px; display: grid; gap: 9px; }
+.guide-art-mini.mac .guide-mock-chat { top: 28px; }
+.guide-mock-chat .me { justify-self: end; background: var(--accent-soft); }
+.guide-mock-mini { position: absolute; top: 12px; right: 12px; width: 78px; height: 80px; display: grid; align-content: start; gap: 7px; padding: 8px; border-radius: 8px; background: var(--card); color: var(--accent); box-shadow: 0 0 0 1px var(--line), 0 6px 16px rgba(0, 0, 0, .12); }
+.guide-art-mini.mac .guide-mock-mini { top: 24px; }
+.guide-taskbar, .guide-menubar { position: absolute; left: 0; right: 0; height: 14px; display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; background: var(--fill); }
+.guide-taskbar { bottom: 0; }
+.guide-menubar { top: 0; }
+.guide-tray-icon { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.guide-shield { position: absolute; bottom: -8px; left: -12px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--ok-bg); color: var(--ok); box-shadow: 0 0 0 2px var(--content); }

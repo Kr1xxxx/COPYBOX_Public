@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { makePng } from "../helpers/png.mjs";
-import { asDesktop } from "./helpers.mjs";
+import { asDesktop, settle } from "./helpers.mjs";
 
 // The 图片 folders (docs/specs/image-folders.md). Every picture is generated here, so no binary fixtures are needed.
 const png = (name, width = 40, height = 40, color = [90, 140, 220]) => ({ name: `${name}.png`, mimeType: "image/png", buffer: makePng(width, height, color) });
@@ -418,7 +418,7 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
     await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth), { message: name }).toBe(width);
     await expect.poll(() => image.evaluate((element) => element.naturalHeight)).toBe(height);
     await expect(image).toHaveCSS("object-fit", "contain");
-    await page.waitForTimeout(350); // Let the row finish opening.
+    await settle(page); // Let the row finish opening.
 
     const panel = await page.locator(".content-panel").boundingBox();
     const box = await preview.boundingBox();
@@ -463,17 +463,19 @@ test("the mini window has folder tabs in the top row", async ({ browser }) => {
   await page.setViewportSize({ width: 360, height: 440 });
   const tab = (name) => page.locator(".mini-top .mini-tab, .mini-folders .mini-tab", { hasText: name });
   await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
-  await expect(page.locator(".mini-folders .mini-tab")).toHaveText(["收款码", "价目表", "未分类"]);
+  // Folder tabs show two-character names (folder-short-name.ts); the full name is the tooltip and accessible name.
+  await expect(page.locator(".mini-folders .mini-tab")).toHaveText(["收款", "价目", "未分类"]);
+  await expect(page.locator(".mini-folders .mini-tab").first()).toHaveAttribute("title", "收款码");
   await expect(page.locator(".mini-row")).toHaveCount(4);
   await expect(page.locator(".status-bar")).toContainText("4 张");
 
-  await tab("收款码").click();
+  await tab("收款").click();
   await expect(page.locator(".mini-row")).toHaveCount(2);
   await expect(page.locator(".status-bar")).toContainText("2 张");
   await tab("未分类").click();
   await expect(page.locator(".mini-row")).toHaveCount(1);
   await expect(page.locator(".mini-row").first()).toContainText("散图");
-  await tab("价目表").click();
+  await tab("价目").click();
   await page.getByPlaceholder("搜索图片").fill("码一");
   await expect(page.locator(".mini-row")).toHaveCount(0);
   await page.getByPlaceholder("搜索图片").fill("");
@@ -512,7 +514,7 @@ test("the 话术 mini window keeps its own folder tabs", async ({ page }) => {
 
 test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs", async ({ page }) => {
   await openImages(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await expect(navCount(page, "全部图片")).toHaveText("0");
   await expect(sidebar(page).locator(".nav-item", { hasText: "未分类" })).toBeVisible();
   await createFolder(page, "收款码");
@@ -557,6 +559,7 @@ test("图片 folders can be dragged by the three-bar handle in the sidebar, and 
   await row("甲").hover();
   const handle = row("甲").locator(".folder-drag-handle");
   await expect(handle).toHaveCSS("opacity", "1");
+  await settle(page); // measure the handle and the target once the new rows have stopped moving
   const h = await handle.boundingBox();
   const target = await row("丙").boundingBox();
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);

@@ -13,7 +13,7 @@ async function tapVersion(page) {
 
 test("Mac: the 账号 page is the 保险箱, accounts are kept and copy works", async ({ page }) => {
   await open(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await tapVersion(page);
   const dialog = page.getByRole("region", { name: "保险箱" });
   await expect(dialog).toBeVisible();
@@ -36,7 +36,7 @@ test("Mac: the 账号 page is the 保险箱, accounts are kept and copy works", 
   expect(stored).not.toContain("JBSWY3DPEHPK3PXP");
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await openAccountCategory(page, "验证码");
   await expect(page.getByRole("region", { name: "保险箱" }).getByRole("button", { name: "复制验证码 公司邮箱" })).toBeVisible();
@@ -44,14 +44,14 @@ test("Mac: the 账号 page is the 保险箱, accounts are kept and copy works", 
 
 test("Mac: only three sections; the 保险箱 sits inside 账号, no hidden unlock", async ({ page }) => {
   await open(page, "darwin");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
 });
 
 test("Windows: has the 账号 page too, with 保险箱 inside", async ({ page }) => {
   await open(page, "win32");
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
 });
@@ -61,10 +61,10 @@ test("关于 shows the version and when it was updated; tapping the version open
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
   await settings.getByRole("tab", { name: "关于" }).click();
-  await expect(settings.getByText("Clipboxx v0.0.0-test")).toBeVisible();
+  await expect(settings.getByText("Copyboxx v0.0.0-test")).toBeVisible();
   const row = settings.locator(".settings-row", { hasText: "更新时间" });
   await expect(row).toContainText("2026-10-10 21:37");
-  for (let i = 0; i < 5; i += 1) await settings.getByText(/^Clipboxx v/).click();
+  for (let i = 0; i < 5; i += 1) await settings.getByText(/^Copyboxx v/).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
 });
 

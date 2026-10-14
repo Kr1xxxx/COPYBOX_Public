@@ -40,7 +40,7 @@ Update this file at the end of every session. No keys, passwords or customer dat
 - Use the `make-interfaces-feel-better` skill for UI work; animations from github.com/kuratlielia/arc-library.
 - Never move elements or change layout on your own; ask first. Obvious typos: just fix.
 - No "AI look": no English caps labels, badges or filler subtitles; Chinese only (`tests/no-english-labels.test.mjs`).
-- Fixed layout: 常用 highlight block right of 编辑; header 收起 left of 选择 (话术, 图片, 账号); 回收站 at the
+- Fixed layout: section switch order 话术 | 图片 | 账号 (2026-10-13); 常用 highlight block right of 编辑; header 收起 left of 选择 (话术, 图片, 账号); 回收站 at the
   bottom of the sidebar above 设置 (话术, 账号).
 - Pinned values never enter 常用; right-click-pinned values stay first in the row, with a border.
 - 话术 cards start collapsed and remember the last open card (`clipbox.open-card`); 收起 clears it; search opens the

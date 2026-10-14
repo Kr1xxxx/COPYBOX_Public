@@ -5,7 +5,7 @@ test("Windows: the sections are 话术, 账号 and 图片, and there is no empty
   await asDesktop(page, "win32");
   await seedSnippets(page);
   expect(await page.locator(".sidebar-top").evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(20);
-  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "账号", "图片"]);
+  await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await page.getByRole("button", { name: "图片" }).first().click();
   await expect(page.getByRole("button", { name: "新增图片" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("备注");
@@ -33,6 +33,25 @@ async function closeOptions(page, platform) {
   await group.scrollIntoViewIfNeeded();
   return group;
 }
+
+test("Windows: the mini window stays after a copy unless the person picks otherwise", async ({ page }) => {
+  await page.addInitScript(() => { window.__miniHide = []; });
+  await asDesktop(page, "win32");
+  await page.addInitScript(() => { window.clipboxDesktop.setMiniHidePolicy = (policy) => window.__miniHide.push(policy); });
+  await seedSnippets(page);
+  expect(await page.evaluate(() => window.__miniHide[0])).toBe("never");
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  await page.getByRole("dialog", { name: "设置" }).getByRole("tab", { name: "窗口" }).click();
+  const group = page.getByRole("radiogroup", { name: "迷你窗口复制后" });
+  await group.scrollIntoViewIfNeeded();
+  await expect(group.getByRole("radio", { name: "不收起" })).toHaveAttribute("aria-checked", "true");
+  // A choice made earlier is kept.
+  await group.getByRole("radio", { name: "从托盘呼出时收起" }).click();
+  await expect.poll(() => page.evaluate(() => window.__miniHide.at(-1))).toBe("hotkey");
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  expect(await page.evaluate(() => window.__miniHide[0])).toBe("hotkey");
+});
 
 test("Windows: closing can shrink to the taskbar", async ({ page }) => {
   const group = await closeOptions(page, "win32");

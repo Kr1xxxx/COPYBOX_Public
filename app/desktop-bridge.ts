@@ -1,6 +1,13 @@
 import type { CloseBehavior, MiniHidePolicy, ThemeChoice } from "./preferences";
 
-export type UpdateInfo = { status: "disabled" | "current" | "error" } | { status: "available"; version: string; notes: string[] };
+// `installable` is false when 立即更新 cannot work here (no checksum in the manifest, or not Windows); older shells omit it.
+export type UpdateInfo = { status: "disabled" | "current" | "error" } | { status: "available"; version: string; notes: string[]; installable?: boolean };
+
+export type UpdateInstallResult =
+  | { status: "installing" | "busy" }
+  | { status: "error"; reason: "network" | "incomplete" | "disk" | "start" | "unavailable" | string };
+
+export type UpdateProgress = { received: number; total: number };
 
 export type WindowMode = "full" | "mini";
 
@@ -32,6 +39,9 @@ export type ClipboxDesktop = {
   getBuildTime?: () => Promise<string>;
   checkUpdate?: () => Promise<UpdateInfo>;
   openUpdate?: () => Promise<boolean>;
+  // Downloads, checks and installs the version the last check found; the app then closes and opens the new one.
+  installUpdate?: () => Promise<UpdateInstallResult>;
+  onUpdateProgress?: (callback: (progress: UpdateProgress) => void) => () => void;
   aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
@@ -47,6 +57,8 @@ export type ClipboxDesktop = {
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;
   setWindowMode?: (mode: WindowMode) => void;
+  // 固定在最上层: keeps the full window above other windows (the mini window always is).
+  setPinned?: (pinned: boolean) => void;
   onWindowMode?: (callback: (mode: WindowMode) => void) => () => void;
 };
 

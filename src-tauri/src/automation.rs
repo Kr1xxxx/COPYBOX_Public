@@ -70,7 +70,7 @@ where
     let response = match reply {
         Err(body) => body,
         Ok(command) => match tokio::time::timeout(TIMEOUT, forward(command)).await {
-            Err(_) => error_body("RENDERER_TIMEOUT", "Clipboxx 窗口响应超时"),
+            Err(_) => error_body("RENDERER_TIMEOUT", "Copyboxx 窗口响应超时"),
             Ok(Err(failure)) => failure_body(&failure),
             Ok(Ok(value)) => value,
         },
@@ -188,14 +188,14 @@ impl Bridge {
         drop(entry);
         match answer {
             Ok(Ok(value)) => Ok(value),
-            _ => Err(("RENDERER_TIMEOUT".into(), "Clipboxx 窗口响应超时".into())),
+            _ => Err(("RENDERER_TIMEOUT".into(), "Copyboxx 窗口响应超时".into())),
         }
     }
 
     pub async fn forward(&self, app: &AppHandle, command: Value) -> Result<Value, Failure> {
         let window = app.get_webview_window("main");
         let Some(window) = window.filter(|_| self.ready.load(Ordering::SeqCst)) else {
-            return Err(("WINDOW_UNAVAILABLE".into(), "Clipboxx 窗口尚未就绪".into()));
+            return Err(("WINDOW_UNAVAILABLE".into(), "Copyboxx 窗口尚未就绪".into()));
         };
         let (entry, rx) = self.register();
         if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command })).is_err() {

@@ -39,6 +39,15 @@
     relaunch: function () { fireAndForget("relaunch"); },
     checkUpdate: function () { return invoke("check_update"); },
     openUpdate: function () { return invoke("open_update"); },
+    // Downloads the new installer, checks it and installs it over this app (Windows, D-047); progress comes as events.
+    installUpdate: function () { return invoke("install_update"); },
+    onUpdateProgress: function (callback) {
+      var stopped = false;
+      var unlisten = null;
+      tauri.event.listen("clipbox:update-progress", function (event) { if (!stopped) callback(event.payload); })
+        .then(function (off) { if (stopped) off(); else unlisten = off; });
+      return function () { stopped = true; if (unlisten) unlisten(); };
+    },
     aiStatus: function () { return invoke("ai_status"); },
     aiSave: function (settings) { return invoke("ai_save", { settings: settings }); },
     aiClear: function () { return invoke("ai_clear"); },
@@ -72,6 +81,7 @@
       fireAndForget("automation_response", { requestId: requestId, response: response });
     },
     automationReady: function () { fireAndForget("automation_ready"); },
+    setPinned: function (pinned) { fireAndForget("set_pinned", { pinned: Boolean(pinned) }); },
     setWindowMode: function (mode) { fireAndForget("set_window_mode", { mode: mode === "mini" ? "mini" : "full" }); },
     onWindowMode: function (callback) {
       var stopped = false;

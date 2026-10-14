@@ -41,6 +41,7 @@ test("全部数据可以导出成加密文件，清空后再导入回来", async
   // Throw the data away, as a fresh install would have it.
   await page.evaluate(async () => {
     localStorage.clear();
+    localStorage.setItem("clipbox.first-run-guide.v1", "1"); // the guide was seen on this machine; it is not what this test is about
     for (const name of ["clipbox-images", "clipbox-image-thumbs"]) indexedDB.deleteDatabase(name);
   });
   await page.reload();
