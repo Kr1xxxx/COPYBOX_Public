@@ -28,3 +28,14 @@
 - Tests: `tests/slide-unlock.test.mjs`, `tests/e2e/account-slide-unlock.e2e.mjs`. The shared e2e storage state
   (`guideSeenState` in `tests/e2e/helpers.mjs`) starts with the slide off, so tests about the 账号 content reach it at
   once; the slide's own tests use `SLIDE_UNLOCK_ON`.
+- Motion update (owner, 2026-10-14: 「这个感觉 动效哈,不是一样的」 — the feel of arc-library's Swipe actions, not that
+  component). The knob's motion now ports Swipe actions' mechanics (MIT, D-021) with `motion/react` and
+  `motionTokens`, replacing the CSS transitions described above: the knob is a motion value that follows the pointer
+  1:1 on the track and rubber-bands past either end (`rubberBand`, .55, bounded by the knob width); past 88 % it
+  arms (20 px hysteresis to disarm) and an accent fill, which grows out from behind the knob, springs over the whole
+  track (`spring.morph`; 8 ms vibration on touch); on release it opens when armed and not flicked back, or when flung
+  (> 900 px/s and the position projected 0.1 s ahead passes 88 %), else springs home (`spring.smooth`, release
+  velocity capped so it cannot pass the start). Opening: the knob springs to the end (`spring.snappy`), then the
+  frost and tint clear with `spring.smooth` before the veil leaves the page. While sliding the blur lightens from
+  16 px to 12 px (still unreadable). Keys, `aria-valuenow`, reduced motion (everything jumps, no shimmer) and
+  everything else above are unchanged.
