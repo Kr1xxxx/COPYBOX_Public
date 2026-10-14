@@ -78,6 +78,26 @@ export function renderWrapper(template, version, updated = "", updatedIso = "") 
   return template.replaceAll("__VERSION__", String(version).trim()).replaceAll("__UPDATED_ISO__", updatedIso).replaceAll("__UPDATED__", updated);
 }
 
+// seed.js imports image-store.js; that module's own runtime imports (e.g. folder-short-name.ts) must ship too,
+// or the browser gets a 404 and the 补齐 10 张测试图 button fails. Returns [["image-store.js", code], ...].
+export function compileModuleTree(read, entry) {
+  const out = new Map();
+  const pending = [entry];
+  while (pending.length) {
+    const file = pending.pop();
+    const name = file.replace(/\.ts$/, ".js");
+    if (out.has(name)) continue;
+    const { outputText } = ts.transpileModule(read(file), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, rewriteRelativeImportExtensions: true },
+    });
+    out.set(name, outputText);
+    for (const match of outputText.matchAll(/(?:^|\n)\s*(?:import|export)[^"'\n]*?from\s*["']\.\/([^"']+)\.js["']/g)) {
+      pending.push(`${match[1]}.ts`);
+    }
+  }
+  return [...out];
+}
+
 export function ensureTitle(html) {
   return html.includes("<title>") ? html : html.replace("<head>", "<head><title>Copyboxx</title>");
 }
@@ -170,11 +190,9 @@ export async function main(argv = process.argv.slice(2)) {
   cpSync(join(here, "changelog.json"), join(out, "changelog.json"));
   cpSync(join(repo, "docs/samples/clipbox-test-snippets.csv"), join(out, "samples/4-full-test-sheet.csv"));
 
-  const source = readFileSync(join(repo, "app/image-store.ts"), "utf8");
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
-  });
-  writeFileSync(join(out, "image-store.js"), compiled.outputText);
+  for (const [name, js] of compileModuleTree((file) => readFileSync(join(repo, "app", file), "utf8"), "image-store.ts")) {
+    writeFileSync(join(out, name), js);
+  }
 
   const files = walk(out)
     .map((p) => relative(out, p).replaceAll("\\", "/"))
