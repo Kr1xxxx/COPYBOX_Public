@@ -4,6 +4,7 @@
 // re-encrypted or interpreted here; the file as a whole is sealed with a password on top.
 
 import { quiesceWrites, reopenWrites } from "./write-gate.ts";
+import { isSaneIterationCount } from "./pbkdf2-limits.ts";
 
 export class TransferError extends Error {}
 
@@ -331,14 +332,22 @@ export function transferFileParts(file: TransferFile): string[] {
   return [JSON.stringify(head).slice(0, -1), ',"ciphertext":"', ciphertext, '"}'];
 }
 
+// Bytes a base64 text decodes to, or -1 when it is not base64.
+function decodedLength(text: string): number {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(text) || text.length % 4 !== 0) return -1;
+  return (text.length / 4) * 3 - (text.endsWith("==") ? 2 : text.endsWith("=") ? 1 : 0);
+}
+
 export function parseTransferFile(text: string): TransferFile {
   let file: TransferFile;
   try { file = JSON.parse(text) as TransferFile; } catch { throw new TransferError("这不是完整备份文件"); }
   if (file?.format !== TRANSFER_FORMAT) throw new TransferError("这不是完整备份文件");
   if (file.version !== TRANSFER_VERSION) throw new TransferError("这份备份的版本太新，请先更新 Copyboxx");
-  if (typeof file.salt !== "string" || typeof file.iv !== "string" || typeof file.ciphertext !== "string" || !Number.isInteger(file.iterations) || file.iterations < 1) {
+  // The password check runs PBKDF2 with the file's own count, so a count outside what Copyboxx writes is refused first.
+  if (typeof file.salt !== "string" || typeof file.iv !== "string" || typeof file.ciphertext !== "string" || !isSaneIterationCount(file.iterations)) {
     throw new TransferError("备份文件已损坏");
   }
+  if (decodedLength(file.salt) < 16 || decodedLength(file.iv) !== 12 || decodedLength(file.ciphertext) < 16) throw new TransferError("备份文件已损坏");
   return file;
 }
 

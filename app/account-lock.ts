@@ -1,6 +1,8 @@
 // A password for opening the 账号 page, on both platforms. It only decides whether the page is shown: the data itself stays
 // encrypted exactly as before (storage keys and backups are untouched), so the password is a door, not a second key.
 // What is stored is a salted PBKDF2 hash, never the password.
+import { assertIterationCap } from "./pbkdf2-limits.ts";
+
 export const ACCOUNT_LOCK_KEY = "clipbox.account-lock.v1";
 export const ACCOUNT_LOCK_MIN = 4;
 // A password that encrypts the data must be harder to guess than one that only guards the door.
@@ -28,6 +30,7 @@ function fromBase64(value: string) {
 }
 
 async function hashOf(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number) {
+  assertIterationCap(iterations);
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, material, 256));
 }
@@ -164,6 +167,7 @@ async function wrapKey(secret: string, passphrase: string): Promise<Wrapped> {
 // null = wrong passphrase (AES-GCM refuses to open it).
 async function unwrapKey(wrapped: Wrapped, passphrase: string): Promise<string | null> {
   try {
+    assertIterationCap(wrapped.iterations);
     const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
     const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: fromBase64(wrapped.salt) as Uint8Array<ArrayBuffer>, iterations: wrapped.iterations, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(wrapped.iv) as Uint8Array<ArrayBuffer>, additionalData: WRAP_LABEL }, key, fromBase64(wrapped.ct) as Uint8Array<ArrayBuffer>);

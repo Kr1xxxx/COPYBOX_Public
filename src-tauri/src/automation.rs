@@ -17,6 +17,16 @@ use tokio::net::{UnixListener, UnixStream};
 
 const MAX_BYTES: usize = 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(10);
+/// A command that hands out a 秘密 waits for the person at the app to allow it (the page gives up after 45 s).
+const SECRET_TIMEOUT: Duration = Duration::from_secs(60);
+
+pub fn is_secret_command(command: &Value) -> bool {
+    matches!(command["action"].as_str(), Some("secret-get" | "secret-verify" | "secret-export"))
+}
+
+fn timeout_for(command: &Value) -> Duration {
+    if is_secret_command(command) { SECRET_TIMEOUT } else { TIMEOUT }
+}
 /// The command line script the app installs next to the user's other tools.
 #[cfg(unix)]
 const CLI_SCRIPT: &str = include_str!("../../tools/clipbox-cli.cjs");
@@ -69,7 +79,7 @@ where
     };
     let response = match reply {
         Err(body) => body,
-        Ok(command) => match tokio::time::timeout(TIMEOUT, forward(command)).await {
+        Ok(command) => match tokio::time::timeout(timeout_for(&command), forward(command)).await {
             Err(_) => error_body("RENDERER_TIMEOUT", "Copyboxx 窗口响应超时"),
             Ok(Err(failure)) => failure_body(&failure),
             Ok(Ok(value)) => value,
@@ -183,8 +193,8 @@ impl Bridge {
         (PendingEntry { pending: self.pending.clone(), id }, rx)
     }
 
-    async fn wait_for(entry: PendingEntry, rx: oneshot::Receiver<Value>) -> Result<Value, Failure> {
-        let answer = tokio::time::timeout(TIMEOUT, rx).await;
+    async fn wait_for(entry: PendingEntry, rx: oneshot::Receiver<Value>, limit: Duration) -> Result<Value, Failure> {
+        let answer = tokio::time::timeout(limit, rx).await;
         drop(entry);
         match answer {
             Ok(Ok(value)) => Ok(value),
@@ -197,11 +207,18 @@ impl Bridge {
         let Some(window) = window.filter(|_| self.ready.load(Ordering::SeqCst)) else {
             return Err(("WINDOW_UNAVAILABLE".into(), "Copyboxx 窗口尚未就绪".into()));
         };
+        let limit = timeout_for(&command);
+        if is_secret_command(&command) {
+            // The page asks 允许 / 拒绝; bring the window forward so the person sees the question.
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
         let (entry, rx) = self.register();
         if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command })).is_err() {
             return Err(("COMMAND_FAILED".into(), "命令执行失败".into()));
         }
-        Self::wait_for(entry, rx).await
+        Self::wait_for(entry, rx, limit).await
     }
 
     pub fn respond(&self, request_id: &str, response: Value) -> bool {
@@ -338,6 +355,18 @@ mod tests {
         let mut answer = String::new();
         stream.read_to_string(&mut answer).await.unwrap();
         serde_json::from_str(answer.trim()).unwrap()
+    }
+
+    #[test]
+    fn secret_commands_wait_longer_for_the_person_to_answer() {
+        for action in ["secret-get", "secret-verify", "secret-export"] {
+            assert!(is_secret_command(&json!({ "action": action })), "{action}");
+            assert_eq!(timeout_for(&json!({ "action": action })), SECRET_TIMEOUT);
+        }
+        for action in ["status", "list", "get", "add", "secret"] {
+            assert!(!is_secret_command(&json!({ "action": action })), "{action}");
+            assert_eq!(timeout_for(&json!({ "action": action })), TIMEOUT);
+        }
     }
 
     #[test]
@@ -508,13 +537,13 @@ mod tests {
             // The socket side stops waiting first and drops the wait.
             let (entry, rx) = bridge.register();
             assert_eq!(bridge.pending.lock().unwrap().len(), 1);
-            assert!(tokio::time::timeout(Duration::from_millis(20), Bridge::wait_for(entry, rx)).await.is_err());
+            assert!(tokio::time::timeout(Duration::from_millis(20), Bridge::wait_for(entry, rx, TIMEOUT)).await.is_err());
             assert!(bridge.pending.lock().unwrap().is_empty());
             // An answered command is gone as well.
             let (entry, rx) = bridge.register();
             let id = entry.id.clone();
             assert!(bridge.respond(&id, json!({ "ok": true })));
-            assert_eq!(Bridge::wait_for(entry, rx).await.unwrap()["ok"], true);
+            assert_eq!(Bridge::wait_for(entry, rx, TIMEOUT).await.unwrap()["ok"], true);
             assert!(bridge.pending.lock().unwrap().is_empty());
         });
     }

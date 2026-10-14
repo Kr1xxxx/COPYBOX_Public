@@ -363,3 +363,15 @@ test("does not report success when encrypted persistence fails", async () => {
     /disk full/,
   );
 });
+
+test("秘密 commands are recognised and refused unless the person at the app allows them", () => {
+  for (const action of ["secret-get", "secret-verify", "secret-export"]) assert.equal(automation.secretAutomationAction({ action }), action);
+  for (const command of [{ action: "get" }, { action: "list" }, { action: "status" }, null, "secret-get", {}]) {
+    assert.equal(automation.secretAutomationAction(command), null);
+  }
+  assert.equal(automation.secretGateRefusal({ accountLocked: true, allowed: true }).code, "ACCOUNT_LOCKED");
+  assert.equal(automation.secretGateRefusal({ accountLocked: false, allowed: false }).code, "NOT_ALLOWED");
+  assert.equal(automation.secretGateRefusal({ accountLocked: false, allowed: true }), null);
+  assert.match(automation.secretConsentQuestion("secret-export"), /导出全部秘密/);
+  assert.ok(automation.SECRET_CONSENT_MS < 60_000, "the app refuses before the shell stops waiting (automation.rs SECRET_TIMEOUT)");
+});

@@ -2,6 +2,8 @@
 // salt that stays the same between saves, so the result is the same key every time: it is worked out once and kept
 // in memory (never stored). Nothing about what is written changes: same salt, same rounds, a fresh IV per write.
 
+import { assertIterationCap } from "./pbkdf2-limits.ts";
+
 const MAX_KEYS = 16;
 const derived = new Map<string, Promise<CryptoKey>>();
 
@@ -13,6 +15,7 @@ function saltText(salt: Uint8Array) {
 
 /** AES-GCM 256 key (encrypt + decrypt, not extractable) from PBKDF2-SHA-256, the same key as a fresh derivation. */
 export function derivePbkdf2AesKey(secret: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<CryptoKey> {
+  try { assertIterationCap(iterations); } catch (error) { return Promise.reject(error); }
   const id = `${iterations}:${saltText(salt)}:${secret}`;
   const known = derived.get(id);
   if (known) {

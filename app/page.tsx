@@ -98,7 +98,7 @@ import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
 import { useAutoBackup } from "./auto-backup-ui";
 import { applyImportSampleSnippets, planClearSampleSnippets, planImportSampleSnippets } from "./sample-snippets";
-import { decryptVaultBox, encryptVaultBox, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
+import { decryptVaultBox, encryptVaultBox, isSaneIterationCount, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
 import { ArcMenu } from "./arc/menu";
@@ -123,7 +123,8 @@ import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { onRowAnimationEnd } from "./row-entrance";
 import { ListScrollFrame } from "./list-scroll-rail";
 import { DailyTipsCard } from "./daily-tips-card";
-import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand } from "./clipbox-automation";
+import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand, secretAutomationAction, secretGateRefusal } from "./clipbox-automation";
+import { useAutomationConsent } from "./automation-consent";
 
 type VaultEnvelope = {
   version: 1;
@@ -435,6 +436,11 @@ export default function Home() {
   const [acctFolded, setAcctFolded] = useState(false);
   const accountLocked = lockSet && !(accountMode && accountUnlocked);
   const lockedHere = accountMode && lockSet && !accountUnlocked;
+  // Read by the command line door when it asks for a 秘密 (a locked 账号 page refuses it at once).
+  const accountLockedRef = useRef(accountLocked);
+  accountLockedRef.current = accountLocked;
+  const automationConsent = useAutomationConsent();
+  const askAutomationConsent = automationConsent.ask;
   // 账号 slide-to-unlock (D-051): frosted until slid open; closes again on leaving the section or when the window hides.
   // The 账号页密码 screen, when set, is the only gate. The mini window is left as it was.
   const [slideUnlockOn, setSlideUnlockOn] = useState(() => typeof window === "undefined" || readSlideUnlockOn());
@@ -926,11 +932,25 @@ export default function Home() {
           showToast("外部修改失败", { tone: "error", ms: 2400 });
         }
       };
-      void enqueueVaultTask(execute);
+      const secretAction = secretAutomationAction(command);
+      if (!secretAction) {
+        void enqueueVaultTask(execute);
+        return;
+      }
+      // A 秘密 only leaves the app after the person here says yes; the question waits outside the save queue.
+      void (async () => {
+        const allowed = !accountLockedRef.current && await askAutomationConsent(secretAction);
+        const refusal = secretGateRefusal({ accountLocked: accountLockedRef.current, allowed });
+        if (refusal) {
+          window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: false, error: refusal });
+          return;
+        }
+        void enqueueVaultTask(execute);
+      })();
     });
     window.clipboxDesktop.automationReady();
     return remove;
-  }, [deviceKey, enqueueVaultTask, loading, writeVault, showToast]);
+  }, [deviceKey, enqueueVaultTask, loading, writeVault, showToast, askAutomationConsent]);
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
@@ -1677,7 +1697,7 @@ export default function Home() {
       const text = await file.text();
       const parsed = JSON.parse(text) as SecureBackup | LegacyDeviceBackup | VaultEnvelope;
       if ("format" in parsed && parsed.format === "clipbox-secure-backup") {
-        if (!parsed.envelope?.ciphertext || !parsed.envelope?.salt) throw new Error();
+        if (!parsed.envelope?.ciphertext || !parsed.envelope?.salt || !isSaneIterationCount(parsed.envelope.iterations)) throw new Error();
         if (parsed.version === 3) {
           if (parsed.scope !== "snippet" && parsed.scope !== "secret") throw new Error();
           setPendingImport({ envelope: parsed.envelope, scope: parsed.scope, ...(looksLikeVaultBox(parsed.vaultBox) ? { vaultBox: parsed.vaultBox } : {}) });
@@ -1687,11 +1707,12 @@ export default function Home() {
           throw new Error();
         }
       } else if ("format" in parsed && parsed.format === "clipbox-device-backup") {
+        if (!isSaneIterationCount(parsed.envelope?.iterations)) throw new Error();
         const opened = await decryptVault(parsed.envelope, parsed.deviceKey);
         setPendingImport({ legacyData: opened });
       } else {
         const envelope = parsed as VaultEnvelope;
-        if (envelope.version !== 1 || !envelope.ciphertext || !envelope.salt) throw new Error();
+        if (envelope.version !== 1 || !envelope.ciphertext || !envelope.salt || !isSaneIterationCount(envelope.iterations)) throw new Error();
         setPendingImport({ envelope });
       }
       setBackupMode("import");
@@ -2284,6 +2305,7 @@ export default function Home() {
         onOpenAccount={() => { setSettingsOpen(false); switchKind("secret"); }}
       />}
       {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
+      {automationConsent.dialog}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}

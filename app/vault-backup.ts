@@ -3,14 +3,13 @@
 // Backups without the block (all older ones) restore exactly as before.
 import type { TotpAccount } from "./totp-core.ts";
 import type { VaultItem } from "./secret-items-store.ts";
+import { isSaneIterationCount } from "./pbkdf2-limits.ts";
+export { isSaneIterationCount, MAX_ITERATIONS, MIN_ITERATIONS } from "./pbkdf2-limits.ts";
 
 export type VaultBoxPayload = { totp: TotpAccount[]; items: VaultItem[] };
 export type VaultBoxEnvelope = { version: 1; salt: string; iv: string; ciphertext: string; iterations: number };
 
 const ITERATIONS = 310_000;
-// A file may ask for its own PBKDF2 count; outside this range it is refused, so a made-up file cannot freeze the app.
-export const MIN_ITERATIONS = 100_000;
-export const MAX_ITERATIONS = 5_000_000;
 const LABEL = new TextEncoder().encode("clipbox-vault-box:backup");
 
 function toBase64(bytes: Uint8Array) {
@@ -43,10 +42,6 @@ export async function encryptVaultBox(payload: VaultBoxPayload, password: string
 export function looksLikeVaultBox(value: unknown): value is VaultBoxEnvelope {
   const box = value as Partial<VaultBoxEnvelope> | null;
   return !!box && box.version === 1 && typeof box.salt === "string" && typeof box.iv === "string" && typeof box.ciphertext === "string" && typeof box.iterations === "number";
-}
-
-export function isSaneIterationCount(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= MIN_ITERATIONS && value <= MAX_ITERATIONS;
 }
 
 export async function decryptVaultBox(envelope: VaultBoxEnvelope, password: string): Promise<VaultBoxPayload> {
