@@ -177,5 +177,5 @@ test("mini: unfilled highlighted blocks go out as their first value (Name → Fr
   await row.hover();
   await page.getByRole("button", { name: `复制 ${label}` }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Friend, thanks for reaching out to Company! How can I help you today?");
-  await expect(page.getByText("已复制，Name 用了「Friend」，Company 用了「Company」")).toBeVisible();
+  await expect(page.getByText("已复制，2 处没填，用了第一个值")).toBeVisible();
 });

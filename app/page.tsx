@@ -1060,7 +1060,9 @@ export default function Home() {
     const typed = fill?.itemId === item.id ? fill.values : {};
     const { values, used } = quickFillValues(names, typed, valueMemory, pinnedValues);
     await finishCopy(item, fillSnippetTemplate(source, values).text);
-    if (used.length > 0) showToast(`已复制，${used.map((entry) => `${entry.name} 用了「${entry.value}」`).join("，")}`, { ms: 2600 });
+    // Short enough for the 360px window: one block is named, several are counted.
+    if (used.length === 1) showToast(`已复制，${used[0].name} 用了「${used[0].value.length > 12 ? `${used[0].value.slice(0, 12)}…` : used[0].value}」`, { ms: 2600 });
+    else if (used.length > 1) showToast(`已复制，${used.length} 处没填，用了第一个值`, { ms: 2600 });
   }
 
   // Mini window: a click on a 话术 row opens it in place (one at a time); a second click closes it.
