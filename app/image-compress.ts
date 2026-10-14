@@ -2,12 +2,14 @@
 // The desktop shell does the network call; here we keep the monthly count and decide what to tell the user.
 import type { ClipboxDesktop } from "./desktop-bridge";
 
-// Shared keys built in on purpose (the owner's decision); a different key can be set in 设置.
+// Shared keys built in on purpose (the owner's decision); up to two own keys can be set in 设置 instead.
 // The built-in keys take turns so one of them is not used up first.
 export const TINIFY_DEFAULT_KEYS = ["NMqwhKbFJBCGnHHPj1FXLNHfbLsN8mjt", "Ycp4Hxb1XgStc5VZjlZrVB1Rt2p0Nhrz"];
 export const TINIFY_DEFAULT_KEY = TINIFY_DEFAULT_KEYS[0];
 export const TINIFY_ROTATION_STORAGE = "clipbox.tinify.rotation.v1";
 export const TINIFY_KEY_STORAGE = "clipbox.tinify.key.v1";
+export const TINIFY_KEY2_STORAGE = "clipbox.tinify.key2.v1";
+export const TINIFY_CUSTOM_STATE_STORAGE = "clipbox.tinify.custom.v1";
 export const TINIFY_USAGE_STORAGE = "clipbox.tinify.usage.v1";
 export const COMPRESS_MONTHLY_LIMIT = 100;
 export const COMPRESSIBLE_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -33,12 +35,61 @@ export function addCompressUsage(storage: KeyValueStorage | undefined, now: Date
   return count;
 }
 
-function readCustomKey(storage: KeyValueStorage | undefined): string {
-  try { return (storage?.getItem(TINIFY_KEY_STORAGE) || "").trim(); } catch { return ""; }
+function readStored(storage: KeyValueStorage | undefined, name: string): string {
+  try { return (storage?.getItem(name) || "").trim(); } catch { return ""; }
+}
+
+// The two keys set in 设置, first and second; an empty one is "".
+export function readCustomKeys(storage: KeyValueStorage | undefined): [string, string] {
+  return [readStored(storage, TINIFY_KEY_STORAGE), readStored(storage, TINIFY_KEY2_STORAGE)];
 }
 
 export function readTinifyKey(storage: KeyValueStorage | undefined): string {
-  return readCustomKey(storage) || TINIFY_DEFAULT_KEY;
+  return readCustomKeys(storage).find(Boolean) || TINIFY_DEFAULT_KEY;
+}
+
+// Own keys: the first is used until it is refused (wrong key or quota used up), then the second, until the month changes.
+type CustomState = { month: string; bad: number[] };
+
+function readCustomState(storage: KeyValueStorage | undefined, now: Date): CustomState {
+  try {
+    const stored = JSON.parse(storage?.getItem(TINIFY_CUSTOM_STATE_STORAGE) || "null");
+    if (stored && stored.month === monthKey(now) && Array.isArray(stored.bad)) {
+      return { month: stored.month, bad: stored.bad.filter((i: unknown) => i === 0 || i === 1) };
+    }
+  } catch { /* unreadable: start fresh */ }
+  return { month: monthKey(now), bad: [] };
+}
+
+function writeCustomState(storage: KeyValueStorage | undefined, state: CustomState) {
+  try { storage?.setItem(TINIFY_CUSTOM_STATE_STORAGE, JSON.stringify(state)); } catch { /* optional */ }
+}
+
+export function customKeyOrder(storage: KeyValueStorage | undefined, now: Date): number[] {
+  const keys = readCustomKeys(storage);
+  const set = [0, 1].filter((i) => keys[i]);
+  const { bad } = readCustomState(storage, now);
+  const usable = set.filter((i) => !bad.includes(i));
+  return usable.length ? usable : set;
+}
+
+// For 设置: which own key the next picture uses (0 = first, 1 = second, null = built-in keys), and which were refused this month.
+export function customKeyStatus(storage: KeyValueStorage | undefined, now: Date): { active: number | null; refused: number[] } {
+  const keys = readCustomKeys(storage);
+  const order = customKeyOrder(storage, now);
+  const refused = readCustomState(storage, now).bad.filter((i) => keys[i]);
+  return { active: order.length ? order[0] : null, refused };
+}
+
+// Saves both own keys; a changed key gets a fresh start this month.
+export function saveCustomKeys(storage: KeyValueStorage | undefined, keys: [string, string], now: Date) {
+  const before = readCustomKeys(storage);
+  const clean = keys.map((key) => key.trim());
+  try {
+    [TINIFY_KEY_STORAGE, TINIFY_KEY2_STORAGE].forEach((name, i) => { if (clean[i]) storage?.setItem(name, clean[i]); else storage?.removeItem(name); });
+  } catch { /* optional */ }
+  const state = readCustomState(storage, now);
+  writeCustomState(storage, { ...state, bad: state.bad.filter((i) => clean[i] === before[i]) });
 }
 
 type Rotation = { month: string; next: number; bad: number[] };
@@ -107,13 +158,20 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
   const send = async (key: string): Promise<Outcome> => {
     try { return await bridge.compressImage!(bytes, key); } catch { return { ok: false, reason: "service" }; }
   };
-  let result: Outcome;
-  const custom = readCustomKey(storage);
-  if (custom) {
-    result = await send(custom);
+  let result: Outcome = { ok: false, reason: "service" };
+  const keys = readCustomKeys(storage);
+  const own = customKeyOrder(storage, now);
+  if (own.length) {
+    // Own keys: the first one, and on a refusal (key or limit) the second one, which then stays in use for the month.
+    for (const index of own) {
+      result = await send(keys[index]);
+      if (result.ok) break;
+      if (result.reason !== "key" && result.reason !== "limit") break;
+      const state = readCustomState(storage, now);
+      if (!state.bad.includes(index)) writeCustomState(storage, { ...state, bad: [...state.bad, index] });
+    }
   } else {
     // Built-in keys take turns. A key that is refused (key or limit) is retried once on the other key and skipped for the month.
-    result = { ok: false, reason: "service" };
     for (const index of builtInKeyOrder(storage, now)) {
       result = await send(TINIFY_DEFAULT_KEYS[index]);
       if (result.ok) { advanceRotation(storage, now, index); break; }

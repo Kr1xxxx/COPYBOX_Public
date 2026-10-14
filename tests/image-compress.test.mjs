@@ -5,9 +5,12 @@ import {
   COMPRESS_MONTHLY_LIMIT,
   TINIFY_DEFAULT_KEY,
   TINIFY_DEFAULT_KEYS,
+  TINIFY_KEY2_STORAGE,
   TINIFY_KEY_STORAGE,
   TINIFY_USAGE_STORAGE,
   compressForUpload,
+  customKeyStatus,
+  saveCustomKeys,
   readCompressUsage,
   readTinifyKey,
 } from "../app/image-compress.ts";
@@ -135,4 +138,55 @@ test("a key set in 设置 is the only key used", async () => {
   const sent = [];
   await compressForUpload(png(100), { bridge: okBridge(sent, { mine: "limit" }), storage, now: october });
   assert.deepEqual(sent, ["mine"]);
+});
+
+test("with two own keys the first is used, and once it is refused the second takes over for the month", async () => {
+  const storage = memoryStorage({ [TINIFY_KEY_STORAGE]: "one", [TINIFY_KEY2_STORAGE]: "two" });
+  const sent = [];
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: october });
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: october });
+  assert.deepEqual(sent, ["one", "one"]);
+  assert.deepEqual(customKeyStatus(storage, october), { active: 0, refused: [] });
+  sent.length = 0;
+  const result = await compressForUpload(png(100), { bridge: okBridge(sent, { one: "limit" }), storage, now: october });
+  assert.equal(result.failed, false);
+  assert.deepEqual(sent, ["one", "two"]);
+  assert.deepEqual(customKeyStatus(storage, october), { active: 1, refused: [0] });
+  sent.length = 0;
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: october });
+  assert.deepEqual(sent, ["two"]);
+  // a new month starts with the first key again
+  sent.length = 0;
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: new Date(2026, 10, 2) });
+  assert.deepEqual(sent, ["one"]);
+});
+
+test("own keys never fall back to the built-in ones, and a network error does not switch keys", async () => {
+  const storage = memoryStorage({ [TINIFY_KEY_STORAGE]: "one", [TINIFY_KEY2_STORAGE]: "two" });
+  const sent = [];
+  const refused = await compressForUpload(png(100), { bridge: okBridge(sent, { one: "key", two: "limit" }), storage, now: october });
+  assert.equal(refused.failed, true);
+  assert.deepEqual(sent, ["one", "two"]);
+  sent.length = 0;
+  const offline = memoryStorage({ [TINIFY_KEY_STORAGE]: "one", [TINIFY_KEY2_STORAGE]: "two" });
+  await compressForUpload(png(100), { bridge: okBridge(sent, { one: "network" }), storage: offline, now: october });
+  assert.deepEqual(sent, ["one"]);
+  assert.deepEqual(customKeyStatus(offline, october), { active: 0, refused: [] });
+});
+
+test("only a second key set still works, and saving a new key clears its refusal", async () => {
+  const storage = memoryStorage({ [TINIFY_KEY2_STORAGE]: "two" });
+  const sent = [];
+  await compressForUpload(png(100), { bridge: okBridge(sent), storage, now: october });
+  assert.deepEqual(sent, ["two"]);
+  saveCustomKeys(storage, ["one", "two"], october);
+  sent.length = 0;
+  await compressForUpload(png(100), { bridge: okBridge(sent, { one: "limit" }), storage, now: october });
+  assert.deepEqual(customKeyStatus(storage, october).refused, [0]);
+  saveCustomKeys(storage, [" fresh ", "two"], october);
+  assert.equal(storage.getItem(TINIFY_KEY_STORAGE), "fresh");
+  assert.deepEqual(customKeyStatus(storage, october), { active: 0, refused: [] });
+  saveCustomKeys(storage, ["", ""], october);
+  assert.equal(storage.getItem(TINIFY_KEY_STORAGE), null);
+  assert.deepEqual(customKeyStatus(storage, october), { active: null, refused: [] });
 });

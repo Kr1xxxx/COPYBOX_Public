@@ -473,3 +473,42 @@ test("in the list view 选择 shows a tick box on each row and 删除 moves the 
   await expect(rows(page)).toHaveCount(1);
   await expect(page.locator(".toast")).toContainText("图片已移入回收站");
 });
+
+test("two own compression keys can be set; when the first is used up the second takes over and 设置 says so", async ({ page }) => {
+  await asDesktop(page, "win32", { imageView: "list" });
+  await page.addInitScript(() => {
+    window.__compressKeys = [];
+    document.addEventListener("DOMContentLoaded", () => {
+      window.clipboxDesktop.compressImage = async (bytes, key) => {
+        window.__compressKeys.push(key);
+        if (key === "key-one") return { ok: false, reason: "limit" };
+        return { ok: true, bytes: Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0)) };
+      };
+    });
+  });
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  const openCompress = async () => {
+    await page.getByRole("button", { name: /设置/ }).first().click();
+    const dialog = page.locator(".settings-dialog");
+    await dialog.getByRole("tab", { name: "数据" }).click();
+    return dialog.locator("section[aria-labelledby=set-compress]");
+  };
+  let card = await openCompress();
+  await expect(card).toContainText("正在使用内置密钥");
+  await card.getByRole("button", { name: "更换…" }).click();
+  await card.getByLabel("第一个密钥").fill("key-one");
+  await card.getByLabel("第二个密钥（选填）").fill(" key-two ");
+  await card.getByRole("button", { name: "保存" }).click();
+  await expect(card).toContainText("正在使用第一个密钥，用完后自动换第二个");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".settings-dialog")).toHaveCount(0);
+
+  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+  await addImages(page, PNG_FILE);
+  await expect(page.locator(".toast")).toContainText(/已压缩 .* → /);
+  expect(await page.evaluate(() => window.__compressKeys)).toEqual(["key-one", "key-two"]);
+
+  card = await openCompress();
+  await expect(card).toContainText("第一个密钥本月不能用了（额度用完或密钥不对），正在使用第二个密钥");
+});

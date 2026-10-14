@@ -886,6 +886,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-ai-field input { height: 32px; padding-block: 0; }
 .settings-ai-field input:focus, .settings-ai-field textarea:focus { outline: 0; border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px var(--ring); }
 .settings-ai-field textarea[aria-invalid="true"] { border-color: var(--danger); }
+.compress-keys-fields { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.settings-row.compress-keys-edit { align-items: end; }
 .settings-ai-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .settings-ai-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .settings-ai-actions .primary-button, .settings-ai-actions .secondary-button { height: 30px; padding: 0 12px; font-size: 12.5px; }
