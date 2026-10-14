@@ -24,7 +24,8 @@ test("the page may only load its own files; network access goes through Rust com
 
 test("the Tauri bridge offers every method the page expects from window.clipboxDesktop", () => {
   const type = read("app/desktop-bridge.ts").match(/export type ClipboxDesktop = \{([\s\S]*?)\n\};/)[1];
-  const wanted = [...type.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1]).filter((name) => name !== "platform");
+  const wanted = [...type.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1])// platform and testTools are plain values, not methods; the real bridge never sets testTools (web preview only).
+    .filter((name) => name !== "platform" && name !== "testTools");
   assert.ok(wanted.length > 20);
   const bridge = read("src-tauri/bridge.js");
   const missing = wanted.filter((name) => !new RegExp(`^\\s{4}${name}: function`, "m").test(bridge));

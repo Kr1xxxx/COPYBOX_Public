@@ -97,3 +97,14 @@ test("fixed options are a general rule: any block listed in FIXED_OPTIONS keeps 
     assert.equal(isFixedOption("Company", "Hello"), false);
   } finally { delete FIXED_OPTIONS.Greeting; }
 });
+
+test("mini window: an unfilled block copies its pinned value, then its default, then its own word; never a recent one", async () => {
+  const { quickFillValues } = await import("../app/variable-memory.ts");
+  const pins = { Carrier: ["DHL", "UPS"] };
+  const result = quickFillValues(["Name", "Carrier", "Product", "Date"], { Date: " Monday " }, pins);
+  assert.deepEqual(result.values, { Name: "Friend", Carrier: "DHL", Product: "Product", Date: "Monday" });
+  assert.deepEqual(result.used.map((entry) => entry.name), ["Name", "Carrier", "Product"]);
+  // A pinned name wins over Friend; what was typed wins over everything.
+  assert.deepEqual(quickFillValues(["Name"], {}, { Name: ["Lovely"] }).values, { Name: "Lovely" });
+  assert.deepEqual(quickFillValues(["Name"], { Name: "Anna" }, { Name: ["Lovely"] }), { values: { Name: "Anna" }, used: [] });
+});

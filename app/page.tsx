@@ -115,7 +115,7 @@ import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLang
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
 import { useDropdownDismiss, useRowMenuPlacement } from "./dropdown-menus";
 import { useValueOptionDrag } from "./value-option-drag";
-import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
+import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, quickFillValues, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { usePointerReorder } from "./use-pointer-reorder";
@@ -1064,11 +1064,25 @@ export default function Home() {
     await copyRaw(item, language);
   }
 
-  // The mini window has no place to fill variables, so it copies the text as written.
+  // Copies the text as written (notes, accounts, 话术 without highlighted blocks).
   async function copyRaw(item: SecretItem, language: CopyLanguage = "en") {
     const source = resolveSnippetCopySource(item, language);
     if (!source) return;
     await finishCopy(item, source);
+  }
+
+  // The mini window has no place to fill highlighted blocks: an unfilled block goes out as its pinned value, its default
+  // or its own word (owner, 2026-10-14), never as 「[Name]」 with brackets, and a short message says what was used.
+  async function copyMini(item: SecretItem) {
+    const source = resolveSnippetCopySource(item, "en");
+    const names = item.kind === "snippet" ? extractPlaceholders(source) : [];
+    if (!source || names.length === 0) { await copyRaw(item); return; }
+    // What was typed in the main window is not reused: it cannot be seen here and is often the last customer's name.
+    const { values, used } = quickFillValues(names, {}, pinnedValues);
+    await finishCopy(item, fillSnippetTemplate(source, values).text);
+    // Short enough for the 360px window: one block is named, several are counted.
+    if (used.length === 1) showToast(`已复制，${used[0].name} 用了「${used[0].value.length > 12 ? `${used[0].value.slice(0, 12)}…` : used[0].value}」`, { ms: 2600 });
+    else if (used.length > 1) showToast(`已复制，${used.length} 处没填，用了默认值`, { ms: 2600 });
   }
 
   // Mini window: a click on a 话术 row opens it in place (one at a time); a second click closes it.
@@ -1090,7 +1104,7 @@ export default function Home() {
     if (accountVeiled && event.key === "Enter") return;
     if (event.key === "ArrowDown") { event.preventDefault(); moveSelection((value) => Math.min(Math.max(0, filtered.length - 1), value + 1)); }
     if (event.key === "ArrowUp") { event.preventDefault(); moveSelection((value) => Math.max(0, value - 1)); }
-    if (event.key === "Enter" && activeFolder !== "trash" && !(accountMode && activeFolder === "all" && vaultCat !== "other") && filtered[safeSelected]) { event.preventDefault(); void copy(filtered[safeSelected]); }
+    if (event.key === "Enter" && activeFolder !== "trash" && !(accountMode && activeFolder === "all" && vaultCat !== "other") && filtered[safeSelected]) { event.preventDefault(); void (windowMode === "mini" ? copyMini : copy)(filtered[safeSelected]); }
     if (event.key === "Escape") { setQuery(""); searchRef.current?.blur(); }
   }
 
@@ -2049,7 +2063,7 @@ export default function Home() {
                       </span>
                       {item.pinned && <Icon name="star" filled className="row-star" />}
                     </button>
-                    <button type="button" className="mini-copy" data-copied={copied ? "" : undefined} onClick={() => { setSelected(index); void copyRaw(item); }} aria-label={copied ? `已复制 ${item.label}` : `复制 ${item.label}`}>
+                    <button type="button" className="mini-copy" data-copied={copied ? "" : undefined} onClick={() => { setSelected(index); void copyMini(item); }} aria-label={copied ? `已复制 ${item.label}` : `复制 ${item.label}`}>
                       <span className="mini-copy-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span>
                       <span className="mini-copy-label" aria-hidden="true"><span>复制</span><span>已复制</span></span>
                     </button>
@@ -2230,6 +2244,7 @@ export default function Home() {
         </>}
       </section>
       {settingsOpen && <SettingsDialog
+        testTools={!window.clipboxDesktop || Boolean(window.clipboxDesktop.testTools)}
         onPreviewTest={async () => {
           const snippets = planClearSampleSnippets(itemsRef.current);
           const accountPart = accountLocked || PLAIN_NOTES ? null : await previewClearSamples(accountKey);

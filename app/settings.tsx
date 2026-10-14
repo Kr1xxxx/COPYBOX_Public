@@ -29,9 +29,10 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
-  onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
+  // Shown only with testTools (the browser and the web preview), never in the installed app: employees don't need them.
+  testTools?: boolean; onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
@@ -170,8 +171,8 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           <section className="settings-card" data-solo="" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">数据</h3>
             {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密，不含图片" : `用独立密码加密，不含${SECRET_WORD}和图片`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
             {row(`导出${SECRET_WORD}备份`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…", accountLocked)}
-            {onImportTest && row("导入测试内容", `放入一批带「范例」标记的假内容（话术${PLAIN_NOTES ? "" : `、${SECRET_WORD}`}），重复导入不会重复`, () => void onImportTest(), "导入")}
-            {onClearTest && (
+            {testTools && onImportTest && row("导入测试内容", `放入一批带「范例」标记的假内容（话术${PLAIN_NOTES ? "" : `、${SECRET_WORD}`}），重复导入不会重复`, () => void onImportTest(), "导入")}
+            {testTools && onClearTest && (
               <div className="settings-row"><div><strong>清除测试内容</strong><small>只清带「范例」标记、你没改过的内容，其他内容不动；话术会先进回收站</small>
                 {confirmClearTest && <small className="settings-sample-list" role="status">{testPreviewText(confirmClearTest)}</small>}</div>
                 {confirmClearTest
