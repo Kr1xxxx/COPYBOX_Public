@@ -185,7 +185,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
           </section>
           <section className="settings-card" aria-labelledby="set-security" hidden={hideSection("data", "set-security")}><h3 id="set-security">安全</h3>
             <AccountLockSettings mode={accountLock.mode} deviceKey={accountLock.deviceKey} onChanged={accountLock.onChanged} onCodeShowing={(showing) => { codeShowingRef.current = showing; }} />
-            <p className="settings-note">所有内容加密后只保存在这台电脑上，不会上传。</p>
+            <p className="settings-note">内容用 AES-256 加密，只保存在这台设备上，不会上传。</p>
             <p className="settings-note">密钥也放在这台电脑里，请不要把整个数据文件夹拷给别人。自动备份和数据放在一起，保护程度一样；要带走备份，请用带密码的「完整备份」。{PLAIN_NOTES ? "" : `复制${SECRET_WORD}默认只给出引用。`}</p>
             <p className="settings-note">只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
