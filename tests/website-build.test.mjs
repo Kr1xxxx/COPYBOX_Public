@@ -14,12 +14,19 @@ import {
   latestJson,
   main,
   pickInstaller,
+  releaseVersionInfo,
   renderPage,
   robotsTxt,
   sitemapXml,
   sitePages,
+  versionAssetName,
 } from "../tools/website/build.mjs";
 import { parseKeyList, staleKeys } from "../tools/website/deploy.mjs";
+import { appVersionFrom } from "../scripts/sync-version.mjs";
+
+// The app version a local installer is declared to carry (D-048): the checkout's preview number, so the fake
+// installer below matches the changelog entry the build looks up.
+const localInstallerVersion = appVersionFrom(readFileSync("tools/preview/VERSION", "utf8"));
 
 const pageKeys = ["index.html", "download/index.html", "help/index.html", "privacy/index.html"];
 const allPageKeys = [...pageKeys, "404.html", "preview-gate.html"];
@@ -49,7 +56,7 @@ async function buildSite({ assets = true } = {}) {
   console.log = () => {};
   console.warn = (...args) => warnings.push(args.join(" "));
   try {
-    await main(["--installer", join(dir, "setup.exe"), "--preview", preview, "--out", out, "--icons", icons, "--images", images]);
+    await main(["--installer", join(dir, "setup.exe"), "--installer-version", localInstallerVersion, "--preview", preview, "--out", out, "--icons", icons, "--images", images]);
   } finally {
     console.log = log;
     console.warn = warn;
@@ -320,14 +327,31 @@ test("website installer: the newest tauri-test release with a Windows asset wins
     { tag_name: "tauri-test-91", published_at: "2026-10-11T09:00:00Z", assets: [win("Clipbox-Tauri-test-Windows-setup.exe")] },
     { tag_name: "tauri-test-92", published_at: "2026-10-12T09:00:00Z", assets: [win("Clipboxx-Tauri-test-Windows-setup.exe")] },
   ];
-  const { release, asset } = pickInstaller(releases);
+  const { release, asset, versionAsset } = pickInstaller(releases);
   assert.equal(release.tag_name, "tauri-test-92");
   assert.equal(asset.name, "Clipboxx-Tauri-test-Windows-setup.exe");
+  assert.equal(versionAsset, undefined, "older releases carry no version file");
   // D-046: release assets are now Copyboxx-Windows-setup.exe; the newest release still wins whatever its name.
-  const renamed = { tag_name: "tauri-test-94", published_at: "2026-10-14T09:00:00Z", assets: [win("Copyboxx-macOS-arm64.zip"), win("Copyboxx-Windows-setup.exe")] };
-  assert.equal(pickInstaller([...releases, renamed]).asset.name, "Copyboxx-Windows-setup.exe");
+  // D-048: it also carries release-version.json, which the build reads for the version it advertises.
+  const renamed = { tag_name: "tauri-test-94", published_at: "2026-10-14T09:00:00Z", assets: [win("Copyboxx-macOS-arm64.zip"), win("Copyboxx-Windows-setup.exe"), win(versionAssetName)] };
+  const newest = pickInstaller([...releases, renamed]);
+  assert.equal(newest.asset.name, "Copyboxx-Windows-setup.exe");
+  assert.equal(newest.versionAsset.name, "release-version.json");
   assert.throws(() => pickInstaller([releases[0], releases[1]]), /No tauri-test release/);
   assert.throws(() => pickInstaller([]), /No tauri-test release/);
+});
+
+test("website release-version.json: the installer's own version, built from main, or the build stops (D-048)", () => {
+  const good = { version: "1.67.0", preview: "1.67", ref: "main", commit: "abc123" };
+  assert.deepEqual(releaseVersionInfo(good, "tauri-test-120"), good);
+  // The preview number can be left out: it is the app version without the last part.
+  assert.deepEqual(releaseVersionInfo({ version: "1.70.0", ref: "main" }), { version: "1.70.0", preview: "1.70", ref: "main", commit: "" });
+  assert.throws(() => releaseVersionInfo({ version: "1.67", ref: "main" }, "tauri-test-120"), /tauri-test-120: release-version\.json has no app version like 1\.67\.0/);
+  assert.throws(() => releaseVersionInfo({ ref: "main" }), /no app version/);
+  assert.throws(() => releaseVersionInfo(null), /no app version/);
+  assert.throws(() => releaseVersionInfo({ version: "1.67.0", ref: "auto-update" }, "tauri-test-121"), /tauri-test-121 was built from "auto-update", not from main/);
+  assert.throws(() => releaseVersionInfo({ version: "1.67.0" }), /was built from "\?", not from main/);
+  assert.throws(() => releaseVersionInfo({ version: "1.67.0", preview: "1.68", ref: "main" }), /preview 1\.68 and app version 1\.67\.0 do not match/);
 });
 
 test("website installer size is shown in MB with one decimal", () => {
@@ -346,6 +370,9 @@ test("website latest.json has the update-check shape plus size and checksum", ()
     sha256: "ab",
     updatedAt: "2026-10-13T19:56:00+08:00",
   });
+  // The installer's own app version is taken as it is (D-048); anything that is not a version stops the build.
+  assert.equal(latestJson({ version: "1.70.0", size: 1, sha256: "a", updatedAt: "x" }).version, "1.70.0");
+  assert.throws(() => latestJson({ version: "latest", size: 1, sha256: "a", updatedAt: "x" }), /needs an app version like 1\.67\.0/);
 });
 
 test("website KV entries: sorted, base64 values, type, checksum and size", () => {
