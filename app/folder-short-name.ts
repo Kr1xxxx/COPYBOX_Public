@@ -30,7 +30,18 @@ function shorten(value: string): string {
   return graphemes(value).slice(0, SHORT_LENGTH).join("");
 }
 
-// `override`: a short name the person set for the folder. Nothing stores one yet; it is the hook for a later change.
+export const FOLDER_SHORT_NAME_ERROR = "最多两个字";
+
+// A short name the person sets for one of their own folders (D-049). Returns the trimmed value ("" = use the default),
+// or null when it is too long to show whole: nothing is cut silently, the person is told 「最多两个字」 instead.
+export function normalizeFolderShortName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (!value) return "";
+  return shorten(value) === value ? value : null;
+}
+
+// `override`: the short name the person set for the folder (vault `folderShortNames`, image folder `shortName`).
 export function folderShortName(name: string, override?: string): string {
   const custom = override?.trim();
   if (custom) return shorten(custom);

@@ -361,14 +361,14 @@ export function applySnippetAutomationCommand(
       createdAt: now,
       updatedAt: now,
     };
-    const data = synchronizeVaultData([item, ...vault.items], vault.folders, vault.nextSnippetNumber, vault.folderColors);
+    const data = synchronizeVaultData([item, ...vault.items], vault.folders, vault.nextSnippetNumber, vault.folderColors, vault.sharedSeen, vault.folderShortNames);
     const added = data.items.find((candidate) => candidate.id === id)!;
     return { data, changed: true, result: { action: "add", item: publicItem(added, true) } };
   }
 
   const target = targetSnippet(vault, command.number);
   if (command.action === "delete") {
-    const data = synchronizeVaultData(moveItemToTrash(vault.items, target.id, now), vault.folders, vault.nextSnippetNumber, vault.folderColors);
+    const data = synchronizeVaultData(moveItemToTrash(vault.items, target.id, now), vault.folders, vault.nextSnippetNumber, vault.folderColors, vault.sharedSeen, vault.folderShortNames);
     return { data, changed: true, result: { action: "delete", number: command.number } };
   }
 
@@ -395,6 +395,8 @@ export function applySnippetAutomationCommand(
     vault.folders,
     vault.nextSnippetNumber,
     vault.folderColors,
+    vault.sharedSeen,
+    vault.folderShortNames,
   );
   const saved = data.items.find((item) => item.id === target.id)!;
   return { data, changed: true, result: { action: command.action, item: publicItem(saved, true) } };
