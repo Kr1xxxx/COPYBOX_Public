@@ -17,6 +17,11 @@
     same picture is retried once on the other key and the refused key is skipped until next month (`clipbox.tinify.rotation.v1`,
     one new storage key; nothing existing changes). Network and service errors do not retry or mark a key. A key set in 设置 is
     the only key used. The 100-a-month cap per installation is unchanged.
+  - Two own keys (2026-10-14, owner: "压缩密钥可以设置两个"). 设置 → 数据 → 图片压缩 takes a 第一个密钥 and an optional 第二个密钥
+    (`clipbox.tinify.key.v1` as before, new `clipbox.tinify.key2.v1`). Own keys do not take turns: the first is used until it is
+    refused (key error or monthly limit), then the same picture is retried on the second, which stays in use until the month
+    changes (`clipbox.tinify.custom.v1`, one new storage key; nothing existing changes). Saving a changed key clears its refusal.
+    The row says which key is in use. Own keys never fall back to the built-in ones; with none set, the built-in keys rotate as before.
 - Consequences: picture bytes (not names or any text) go to TinyPNG when a picture is added; nothing else is sent. Because the
   count is local, a reinstall or cleared data resets it; the real limit is TinyPNG's own monthly allowance on the key.
   Rollback = revert the PR; stored pictures are ordinary pictures.
