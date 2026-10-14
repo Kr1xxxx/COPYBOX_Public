@@ -98,14 +98,13 @@ test("fixed options are a general rule: any block listed in FIXED_OPTIONS keeps 
   } finally { delete FIXED_OPTIONS.Greeting; }
 });
 
-test("mini window: an unfilled block copies its first value, then its default, then its own word", async () => {
+test("mini window: an unfilled block copies its pinned value, then its default, then its own word; never a recent one", async () => {
   const { quickFillValues } = await import("../app/variable-memory.ts");
-  const memory = rememberValues(rememberValues({}, { Product: "Mink lashes" }), { Product: "Silk lashes" });
-  const pins = { Carrier: ["DHL"] };
-  const result = quickFillValues(["Name", "Product", "Carrier", "Date"], { Date: " Monday " }, memory, pins);
-  assert.deepEqual(result.values, { Name: "Friend", Product: "Silk lashes", Carrier: "DHL", Date: "Monday" });
-  assert.deepEqual(result.used.map((entry) => entry.name), ["Name", "Product", "Carrier"]);
-  // A pinned value comes before a newer recent one; a block with nothing at all keeps its word.
-  const pinnedFirst = quickFillValues(["Product", "Order no"], {}, memory, { Product: ["Mink lashes"] });
-  assert.deepEqual(pinnedFirst.values, { Product: "Mink lashes", "Order no": "Order no" });
+  const pins = { Carrier: ["DHL", "UPS"] };
+  const result = quickFillValues(["Name", "Carrier", "Product", "Date"], { Date: " Monday " }, pins);
+  assert.deepEqual(result.values, { Name: "Friend", Carrier: "DHL", Product: "Product", Date: "Monday" });
+  assert.deepEqual(result.used.map((entry) => entry.name), ["Name", "Carrier", "Product"]);
+  // A pinned name wins over Friend; what was typed wins over everything.
+  assert.deepEqual(quickFillValues(["Name"], {}, { Name: ["Lovely"] }).values, { Name: "Lovely" });
+  assert.deepEqual(quickFillValues(["Name"], { Name: "Anna" }, { Name: ["Lovely"] }), { values: { Name: "Anna" }, used: [] });
 });

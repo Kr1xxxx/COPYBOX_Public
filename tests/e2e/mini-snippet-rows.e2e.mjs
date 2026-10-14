@@ -170,12 +170,38 @@ test("macOS mini: an old 账号 row still copies on click and does not open", as
   await expect(row.locator(".mini-copied")).toHaveText("已复制");
 });
 
-test("mini: unfilled highlighted blocks go out as their first value (Name → Friend), never as [Name], and a message says so", async ({ page }) => {
+test("mini: unfilled highlighted blocks go out as their default (Name → Friend), never as [Name], and a message says so", async ({ page }) => {
   await openMini(page);
   const row = page.locator(".mini-list > .mini-row", { hasText: "thanks for reaching out" }).first();
   const label = (await row.locator(".snippet-label").textContent()).trim();
   await row.hover();
   await page.getByRole("button", { name: `复制 ${label}` }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Friend, thanks for reaching out to Company! How can I help you today?");
-  await expect(page.getByText("已复制，2 处没填，用了第一个值")).toBeVisible();
+  await expect(page.getByText("已复制，2 处没填，用了默认值")).toBeVisible();
+});
+
+test("mini: a block uses its pinned value, but never what was typed in the main window for the last customer", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("clipbox.pinned-values.v1", JSON.stringify({ Company: ["Comely"] })));
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  // Main window: this customer is Amanda.
+  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  const open = page.locator(".native-row.selected");
+  await open.locator("input[data-var=Name]").click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("Amanda");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Acme");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda, thanks for reaching out to Acme! How can I help you today?");
+  // Mini window, next customer: Name goes out as Friend, Company as the pinned Comely, not as Amanda / Acme.
+  await page.getByRole("button", { name: "迷你模式" }).click();
+  await page.setViewportSize({ width: 360, height: 440 });
+  const row = page.locator(".mini-list > .mini-row", { hasText: "thanks for reaching out" }).first();
+  await expect(row).toBeVisible();
+  const label = (await row.locator(".snippet-label").textContent()).trim();
+  await row.hover();
+  await page.getByRole("button", { name: `复制 ${label}` }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Friend, thanks for reaching out to Comely! How can I help you today?");
+  await expect(page.getByText("已复制，2 处没填，用了默认值")).toBeVisible();
 });

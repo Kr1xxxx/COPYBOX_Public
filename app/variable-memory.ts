@@ -102,16 +102,17 @@ export function moveOption(memory: ValueMemory, pins: PinnedValues, name: string
   return { memory: { ...memory, [name]: next.filter((entry) => known.has(entry)) }, pins: { ...pins, [name]: pinnedList } };
 }
 
-// The mini window has no fields to fill. Each block takes what was typed for it, else the first value it offers
-// (pinned first, then the newest), else its default (Name → Friend), else its own word without the brackets.
+// The mini window has no fields to fill. Each block takes what was typed for it, else its first pinned value, else its
+// default (Name → Friend), else its own word without the brackets (owner, 2026-10-14). Recent values that are not pinned
+// are skipped on purpose: they are often the last customer's name, which the main window only sends after a second look (D-028).
 // `used` lists every block that was not typed, so the person can be told what went out.
-export function quickFillValues(names: string[], typed: Record<string, string>, memory: ValueMemory, pins: PinnedValues): { values: Record<string, string>; used: { name: string; value: string }[] } {
+export function quickFillValues(names: string[], typed: Record<string, string>, pins: PinnedValues): { values: Record<string, string>; used: { name: string; value: string }[] } {
   const values: Record<string, string> = {};
   const used: { name: string; value: string }[] = [];
   for (const name of names) {
     const own = (typed[name] || "").trim();
     if (own) { values[name] = own; continue; }
-    const value = memoryOptions(memory, pins, name)[0] || DEFAULT_VALUES[name] || fixedOptions(name)[0] || name;
+    const value = (pins[name] || [])[0] || DEFAULT_VALUES[name] || fixedOptions(name)[0] || name;
     values[name] = value;
     used.push({ name, value });
   }

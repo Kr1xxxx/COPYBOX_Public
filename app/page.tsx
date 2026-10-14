@@ -1051,18 +1051,18 @@ export default function Home() {
     await finishCopy(item, source);
   }
 
-  // The mini window has no place to fill highlighted blocks: an unfilled block goes out as its first value
-  // (owner, 2026-10-14), never as 「[Name]」 with brackets, and a short message says what was used.
+  // The mini window has no place to fill highlighted blocks: an unfilled block goes out as its pinned value, its default
+  // or its own word (owner, 2026-10-14), never as 「[Name]」 with brackets, and a short message says what was used.
   async function copyMini(item: SecretItem) {
     const source = resolveSnippetCopySource(item, "en");
     const names = item.kind === "snippet" ? extractPlaceholders(source) : [];
     if (!source || names.length === 0) { await copyRaw(item); return; }
-    const typed = fill?.itemId === item.id ? fill.values : {};
-    const { values, used } = quickFillValues(names, typed, valueMemory, pinnedValues);
+    // What was typed in the main window is not reused: it cannot be seen here and is often the last customer's name.
+    const { values, used } = quickFillValues(names, {}, pinnedValues);
     await finishCopy(item, fillSnippetTemplate(source, values).text);
     // Short enough for the 360px window: one block is named, several are counted.
     if (used.length === 1) showToast(`已复制，${used[0].name} 用了「${used[0].value.length > 12 ? `${used[0].value.slice(0, 12)}…` : used[0].value}」`, { ms: 2600 });
-    else if (used.length > 1) showToast(`已复制，${used.length} 处没填，用了第一个值`, { ms: 2600 });
+    else if (used.length > 1) showToast(`已复制，${used.length} 处没填，用了默认值`, { ms: 2600 });
   }
 
   // Mini window: a click on a 话术 row opens it in place (one at a time); a second click closes it.
