@@ -1,0 +1,45 @@
+name: Prune merged branches
+
+# Owner's request (2026-10-14, 「清分支」): delete branches that are already fully merged into main. Run by hand only.
+# A branch is kept when it has commits main does not have, when an open pull request uses it, or when it is main.
+# A deleted branch can be restored from its merged pull request on GitHub.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would be deleted"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prune:
+    name: prune merged branches
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Delete branches fully merged into main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json headRefName --jq '.[].headRefName')
+          deleted=0; kept=0
+          for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin/); do
+            branch=${ref#origin/}
+            [ "$branch" = "main" ] || [ "$branch" = "HEAD" ] || [ "$branch" = "origin" ] && continue
+            if printf '%s\n' "$open" | grep -qx -- "$branch"; then echo "keep (open PR): $branch"; kept=$((kept+1)); continue; fi
+            if [ -n "$(git rev-list --max-count=1 "origin/main..$ref")" ]; then echo "keep (not merged): $branch"; kept=$((kept+1)); continue; fi
+            if [ "$DRY_RUN" = "true" ]; then echo "would delete: $branch"; else git push origin --delete "$branch"; echo "deleted: $branch"; fi
+            deleted=$((deleted+1))
+          done
+          echo "merged: $deleted, kept: $kept, dry run: $DRY_RUN" | tee -a "$GITHUB_STEP_SUMMARY"
