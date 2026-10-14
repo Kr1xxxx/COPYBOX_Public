@@ -95,6 +95,12 @@ test("built-in TinyPNG keys come only from the CLIPBOX_TINIFY_KEYS secret at bui
   assert.match(read(".github/workflows/tauri.yml"), /CLIPBOX_TINIFY_KEYS: \$\{\{ secrets\.CLIPBOX_TINIFY_KEYS \}\}/);
 });
 
+test("a published build without TinyPNG keys is blocked unless the owner opts in for that run", () => {
+  const workflow = read(".github/workflows/tauri.yml");
+  assert.match(workflow, /allow_missing_tinify_keys:\n(?:.*\n){1,2}\s+type: boolean\n\s+default: false/);
+  assert.match(workflow, /elif \[ "\$PUBLISH" = "true" \] && \[ "\$ALLOW_MISSING" != "true" \]; then\n.*exit 1/);
+});
+
 test("the top band moves the window: the bridge starts a drag and the capability allows it", () => {
   const bridge = read("src-tauri/bridge.js");
   assert.match(bridge, /plugin:window\|start_dragging/);

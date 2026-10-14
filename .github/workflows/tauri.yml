@@ -15,6 +15,10 @@ on:
         description: "Also publish both installers as a GitHub pre-release (a test build, not the update staff are offered)"
         type: boolean
         default: false
+      allow_missing_tinify_keys:
+        description: "Publish even when CLIPBOX_TINIFY_KEYS is empty (owner's call; images are then saved uncompressed unless a key is set in the app)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -52,17 +56,19 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       # The app version follows tools/preview/VERSION (D-036).
       - run: node scripts/sync-version.mjs
-      # Says in every build whether TinyPNG keys went in (never prints them). A published test build without keys fails.
+      # Says in every build whether TinyPNG keys went in (never prints them). A published test build without keys fails,
+      # unless the owner asked to ship it anyway with allow_missing_tinify_keys (2026-10-14).
       - name: TinyPNG keys
         shell: bash
         env:
           CLIPBOX_TINIFY_KEYS: ${{ secrets.CLIPBOX_TINIFY_KEYS }}
           PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_test_build }}
+          ALLOW_MISSING: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_missing_tinify_keys }}
         run: |
           count=$(printf '%s' "$CLIPBOX_TINIFY_KEYS" | tr ',' '\n' | sed 's/[[:space:]]//g' | grep -c . || true)
           if [ "$count" -gt 0 ]; then
             echo "TinyPNG keys built in: $count" | tee -a "$GITHUB_STEP_SUMMARY"
-          elif [ "$PUBLISH" = "true" ]; then
+          elif [ "$PUBLISH" = "true" ] && [ "$ALLOW_MISSING" != "true" ]; then
             echo "::error::CLIPBOX_TINIFY_KEYS is empty; a published test build must carry the TinyPNG keys" && exit 1
           else
             echo "::warning::CLIPBOX_TINIFY_KEYS is empty; this installer has no built-in TinyPNG key"
