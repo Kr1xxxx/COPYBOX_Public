@@ -213,6 +213,15 @@ async function main() {
   });
   if (!page) return;
 
+  // A fresh install opens with the first-run guide over the app; 跳过 closes it for good.
+  await step("the first-run guide shows on a fresh install and 跳过 closes it", async () => {
+    const guide = page.locator(".guide-dialog");
+    await guide.waitFor({ state: "visible", timeout: 20000 });
+    await guide.getByRole("button", { name: "跳过" }).click();
+    await guide.waitFor({ state: "detached", timeout: 10000 });
+    return "closed";
+  });
+
   await step("imports the made-up snippet sheet", async () => {
     const [chooser] = await Promise.all([
       page.waitForEvent("filechooser", { timeout: 20000 }),
