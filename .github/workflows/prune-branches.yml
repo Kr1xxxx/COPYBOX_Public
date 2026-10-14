@@ -2,6 +2,7 @@ name: Prune merged branches
 
 # Owner's request (2026-10-14, 「清分支」): delete branches that are already fully merged into main. Run by hand only.
 # A branch is kept when it has commits main does not have, when an open pull request uses it, or when it is main.
+# electron-last is kept on purpose: D-034 points to it as the way back to the last Electron version.
 # A deleted branch can be restored from its merged pull request on GitHub.
 on:
   workflow_dispatch:
@@ -37,9 +38,10 @@ jobs:
           for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin/); do
             branch=${ref#origin/}
             [ "$branch" = "main" ] || [ "$branch" = "HEAD" ] || [ "$branch" = "origin" ] && continue
+            if [ "$branch" = "electron-last" ]; then echo "keep (bookmark, D-034): $branch"; kept=$((kept+1)); continue; fi
             if printf '%s\n' "$open" | grep -qx -- "$branch"; then echo "keep (open PR): $branch"; kept=$((kept+1)); continue; fi
             if [ -n "$(git rev-list --max-count=1 "origin/main..$ref")" ]; then echo "keep (not merged): $branch"; kept=$((kept+1)); continue; fi
-            if [ "$DRY_RUN" = "true" ]; then echo "would delete: $branch"; else git push origin --delete "$branch"; echo "deleted: $branch"; fi
+            if [ "$DRY_RUN" = "true" ]; then echo "would delete: $branch"; else git push origin --delete "refs/heads/$branch"; echo "deleted: $branch"; fi
             deleted=$((deleted+1))
           done
           echo "merged: $deleted, kept: $kept, dry run: $DRY_RUN" | tee -a "$GITHUB_STEP_SUMMARY"
