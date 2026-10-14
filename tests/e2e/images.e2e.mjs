@@ -496,6 +496,9 @@ test("two own compression keys can be set; when the first is used up the second 
   };
   let card = await openCompress();
   await expect(card).toContainText("正在使用内置密钥");
+  // The key row is folded under 高级 until a key of one's own is saved.
+  await expect(card.getByRole("button", { name: "更换…" })).toBeHidden();
+  await card.getByText("高级", { exact: true }).click();
   await card.getByRole("button", { name: "更换…" }).click();
   await card.getByLabel("第一个密钥").fill("key-one");
   await card.getByLabel("第二个密钥（选填）").fill(" key-two ");
@@ -510,5 +513,6 @@ test("two own compression keys can be set; when the first is used up the second 
   expect(await page.evaluate(() => window.__compressKeys)).toEqual(["key-one", "key-two"]);
 
   card = await openCompress();
+  await expect(card.getByRole("button", { name: "更换…" })).toBeVisible();
   await expect(card).toContainText("第一个密钥本月不能用了（额度用完或密钥不对），正在使用第二个密钥");
 });
