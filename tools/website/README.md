@@ -44,6 +44,33 @@ sha256, 304 on a match), `no-cache` for `.html` and `.json` and for the other fi
 names), a one-year immutable cache for `preview/assets/` (hashed names), one hour for the installer, and the installer
 as a download named `Copyboxx-Setup.exe`.
 
+## 话术同步 (company 话术 by 同步码)
+
+`GET`/`HEAD /sync/<code>/snippets.json` serves the KV key `sync/<CODE>/snippets.json`: a company 话术 library
+(`docs/shared-library.md`) that the app downloads for employees who entered that 同步码. `<code>` must match
+`[A-Za-z0-9-]{6,40}` and is upper-cased before the lookup. The answer is JSON with `Cache-Control: no-cache`, an
+`ETag` (sha256 of the file, 304 on a match) and `Access-Control-Allow-Origin: *`; no passphrase. A malformed code, a
+code that does not exist and every other path under `/sync/` (history copies included) get the same plain-text 404,
+so nothing tells which codes exist. `website:deploy` never deletes keys under `sync/`.
+
+Codes look like `XS-7KQ2M9AB`: two letters as a group hint, a dash, eight Crockford base32 characters from the crypto
+RNG. They are not secret but must not be guessable, so **never commit a real code** or put one on the site.
+
+```bash
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --new-code XS [--dry-run]                  # new code, empty library
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json --dry-run # check + list added/changed/removed ids
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json           # upload
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --rollback                     # put the previous version back
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --list-codes                               # agents only
+```
+
+The file is checked with the app's own `parseSharedLibrary` and refused if the app would skip any entry. Before an
+upload, the version online is copied to `sync/<CODE>/history/snippets-<UTC ISO>.json`. `--rollback` restores the newest
+of those, keeps the version it replaced as `history/replaced-<UTC ISO>.json` and drops the copy it restored, so a
+second rollback goes one step further back. The script calls the Cloudflare API directly (the cloud session's proxy
+adds the token; elsewhere set `CLOUDFLARE_API_TOKEN`, and optionally `CLOUDFLARE_ACCOUNT_ID`). Agents upload only
+after the owner says 发布 or 部署 in the website thread.
+
 ## 网页测试版口令 (preview passphrase)
 
 Everything under `/preview/` asks for a passphrase first; `/`, `/download/*` and the 404 page do not. The passphrase is

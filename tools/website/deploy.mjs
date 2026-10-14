@@ -15,10 +15,11 @@ const config = relative(repo, join(here, "wrangler.jsonc")).replaceAll("\\", "/"
 const wrangler = ["--yes", "wrangler@4.150.0"];
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 
-// Keys in the namespace that the current build no longer has.
+// Keys in the namespace that the current build no longer has. Keys under sync/ (the company 话术 libraries and their
+// history, written by sync.mjs) are never part of a build and are never removed here.
 export function staleKeys(existingKeys, manifestKeys) {
   const keep = new Set(manifestKeys);
-  return [...new Set(existingKeys)].filter((key) => !keep.has(key)).sort();
+  return [...new Set(existingKeys)].filter((key) => !keep.has(key) && !key.startsWith("sync/")).sort();
 }
 
 // `wrangler kv key list` prints a JSON array of { name, … }; anything before it is skipped, including warning

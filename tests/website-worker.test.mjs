@@ -9,6 +9,7 @@ import worker, {
   isPreviewKey,
   parseCookies,
   secretMatches,
+  syncKeyFor,
 } from "../tools/website/worker.mjs";
 
 const files = {
@@ -367,4 +368,42 @@ test("worker: the passphrase page has an inline fallback when its KV key is miss
   assert.doesNotMatch(html, /__MESSAGE__/);
   const wrong = await postKey("nope", env);
   assert.match(await wrong.text(), /口令不对，再试一次/);
+});
+
+test("worker: company 话术 sync at /sync/<code>/snippets.json, every miss the same plain 404", async () => {
+  const library = '{"format":"clipbox-shared-library","version":1,"items":[]}';
+  const env = fakeEnv({ ...files, "sync/XS-7KQ2M9AB/snippets.json": library, "sync/XS-7KQ2M9AB/history/snippets-1.json": "old" });
+  assert.equal(syncKeyFor("/sync/xs-7kq2m9ab/snippets.json"), "sync/XS-7KQ2M9AB/snippets.json");
+  assert.equal(syncKeyFor("/sync/abc/snippets.json"), null);
+  assert.equal(syncKeyFor("/sync/XS_7KQ2M9AB/snippets.json"), null);
+  assert.equal(syncKeyFor(`/sync/${"A".repeat(41)}/snippets.json`), null);
+
+  for (const path of ["/sync/XS-7KQ2M9AB/snippets.json", "/sync/xs-7kq2m9ab/snippets.json"]) {
+    const response = await get(path, {}, env);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Content-Type"), "application/json; charset=utf-8");
+    assert.equal(response.headers.get("Cache-Control"), "no-cache");
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(response.headers.get("ETag"), `"${createHash("sha256").update(library).digest("hex")}"`);
+    assert.equal(await response.text(), library);
+  }
+  const etag = `"${createHash("sha256").update(library).digest("hex")}"`;
+  const cached = await get("/sync/XS-7KQ2M9AB/snippets.json", { headers: { "If-None-Match": etag } }, env);
+  assert.equal(cached.status, 304);
+  assert.equal(await cached.text(), "");
+  const head = await get("/sync/XS-7KQ2M9AB/snippets.json", { method: "HEAD" }, env);
+  assert.equal(head.status, 200);
+  assert.equal(head.headers.get("Content-Length"), String(library.length));
+
+  const misses = ["/sync/AB-NOPE0000/snippets.json", "/sync/ab/snippets.json", "/sync/XS-7KQ2M9AB/history/snippets-1.json", "/sync/", "/sync", "/sync/XS-7KQ2M9AB/"];
+  const bodies = new Set();
+  for (const path of misses) {
+    const response = await get(path, {}, env);
+    assert.equal(response.status, 404, path);
+    assert.equal(response.headers.get("Content-Type"), "text/plain; charset=utf-8", path);
+    assert.equal(response.headers.get("ETag"), null, path);
+    bodies.add(await response.text());
+  }
+  assert.deepEqual([...bodies], ["404 Not Found"]);
+  assert.ok(!env.reads.includes("sync/XS-7KQ2M9AB/history/snippets-1.json"));
 });
