@@ -13,6 +13,8 @@ export type WindowMode = "full" | "mini";
 
 export type ClipboxDesktop = {
   platform?: string;
+  // Only the web preview sets this: it shows 导入测试内容 / 清除测试内容 in 设置 → 数据. The real app never does.
+  testTools?: boolean;
   copyText: (text: string) => Promise<void>;
   copyImage?: (png: Uint8Array) => Promise<void>;
   // TinyPNG compression done by the desktop shell; resolves with the smaller picture or the reason it failed.

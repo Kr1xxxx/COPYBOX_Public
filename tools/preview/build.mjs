@@ -41,6 +41,7 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
 (function () {
   window.clipboxDesktop = {
     platform: "${platform}",
+    testTools: true,
     copyText: function (text) { return navigator.clipboard.writeText(text); },
     copyImage: function (png) { return navigator.clipboard.write([new ClipboardItem({ "image/png": new Blob([png], { type: "image/png" }) })]); },
     // The real app compresses through TinyPNG; a browser cannot call it, so here a picture is re-encoded to look the same way.

@@ -17,7 +17,7 @@ const expectShown = (page, text) => expect.poll(() => page.evaluate(() => window
 
 async function open(page) {
   await recordShown(page);
-  await asDesktop(page, "darwin");
+  await asDesktop(page, "darwin", { testTools: true });
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
@@ -138,8 +138,8 @@ test("设置 → 清除测试内容 / 导入测试内容 only touch the examples
   await expect(restored).toContainText("我的店铺");
 });
 
-test("导入测试内容 and 清除测试内容 are offered on Windows too", async ({ page }) => {
-  await asDesktop(page, "win32");
+test("导入测试内容 and 清除测试内容 are offered on Windows too (web preview)", async ({ page }) => {
+  await asDesktop(page, "win32", { testTools: true });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.getByRole("button", { name: /设置/ }).first().click();

@@ -2221,6 +2221,7 @@ export default function Home() {
         </>}
       </section>
       {settingsOpen && <SettingsDialog
+        testTools={!window.clipboxDesktop || Boolean(window.clipboxDesktop.testTools)}
         onPreviewTest={async () => {
           const snippets = planClearSampleSnippets(itemsRef.current);
           const accountPart = accountLocked || PLAIN_NOTES ? null : await previewClearSamples(accountKey);

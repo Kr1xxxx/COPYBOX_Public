@@ -49,13 +49,15 @@ export async function settle(page) {
 
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").
 // `imageView: "list"` starts the 图片 section in the list view (the default is the grid), for tests about list rows.
-export async function asDesktop(page, platform, { imageView } = {}) {
+// testTools: act as the web preview, which shows 导入测试内容 / 清除测试内容 (the installed app never does).
+export async function asDesktop(page, platform, { imageView, testTools = false } = {}) {
   if (imageView) await page.addInitScript((view) => { try { localStorage.setItem("clipbox.image-view", view); } catch { /* optional */ } }, imageView);
-  await page.addInitScript((pl) => {
+  await page.addInitScript(([pl, tools]) => {
     // The 保险箱 examples go in on first open; tests start without them unless they clear this.
     try { localStorage.setItem("clipbox.vault.samples.v2", "1"); } catch { /* optional */ }
     window.clipboxDesktop = {
       platform: pl,
+      ...(tools ? { testTools: true } : {}),
       copyText: async (text) => { window.__copied = text; },
       copyImage: async (png) => { window.__copiedImage = Array.from(png.slice(0, 8)); window.__copiedImageLength = png.length; },
       didCopy() {},
@@ -70,7 +72,7 @@ export async function asDesktop(page, platform, { imageView } = {}) {
       setPinned(pinned) { (window.__pinCalls ??= []).push(pinned); },
     };
     document.addEventListener("DOMContentLoaded", () => document.documentElement.classList.add("desktop-app", `platform-${pl}`));
-  }, platform);
+  }, [platform, testTools]);
 }
 
 // 账号 page (Mac): the sidebar 分类 list and the toolbar 新增 button.

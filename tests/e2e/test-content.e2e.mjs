@@ -10,7 +10,7 @@ async function openData(page) {
 
 for (const platform of ["win32", "darwin"]) {
   test(`${platform}: 导入测试内容 adds the test 话术 once, 清除测试内容 sends only those to the trash`, async ({ page }) => {
-    await asDesktop(page, platform);
+    await asDesktop(page, platform, { testTools: true });
     await page.goto("/");
     await page.waitForSelector(".app-shell");
     // The user's own 话术 first.
@@ -62,4 +62,14 @@ test("a 话术 sheet the user already imported is not duplicated by 导入测试
   await expect(page.getByText(/测试内容都在/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator(".native-row")).toHaveCount(before);
+});
+
+test("the installed app (no preview flag) has no 导入测试内容 / 清除测试内容 in 设置 → 数据", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  const s = await openData(page);
+  await expect(s.getByText("导出话术备份")).toBeVisible();
+  await expect(s.getByText("导入测试内容")).toHaveCount(0);
+  await expect(s.getByText("清除测试内容")).toHaveCount(0);
 });
