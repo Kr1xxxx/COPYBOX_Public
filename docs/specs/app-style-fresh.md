@@ -74,6 +74,8 @@ white looks yellowish on cool dark grey).
 - Shadows: `.arc-seg-pill` `0 1px 2px rgba(31,39,51,.08), 0 0 0 .5px rgba(31,39,51,.05)`; `.dropdown`,
   `.product-filter-menu`, `.toast` `0 12px 32px rgba(31,39,51,.12), 0 0 0 1px rgba(31,39,51,.05)`; settings dialog
   `0 24px 64px rgba(31,39,51,.18), …`; settings backdrop cool `rgba(31,39,51,.32)` (dark: black as before).
+- Dark only: text on accent fills (primary buttons, 保存, dialog primaries, ticks) is `#17152b`, because white on the light
+  lavender `#a39cf0` is too faint (about 2.4:1).
 - Headings at 650 → 600: settings page title, settings card `h3`, settings `h2`, guide `h2`, vault group `h3`.
 - Old dialog / editor styles that hard-code the warm accent (`#b5593a`, `#8a3f26`, `#f6e6dc`, …) are pointed back at
   the tokens: dialog primary buttons, 保存, chips (`.editor-kind span`, `.editor-reference`, `.import-folder-list span`,
