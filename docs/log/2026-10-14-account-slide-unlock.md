@@ -1,0 +1,7 @@
+# 账号 page: frosted until slid open (D-050)
+
+- Date: 2026-10-14 · Thread/agent: worker (coordinator's spec, owner's request 「账号页面默认滑动解锁」)
+- What changed: New `app/account-veil.tsx` (frost + classic 「slide to unlock」 control) and `app/slide-unlock.ts` (setting `clipbox.account-slide-unlock.v1`, knob maths), one commented CSS block in `app/globals.css`, a 开/关 row 「打开账号页先滑动解锁」 in 设置 → 数据 → 安全 (`app/settings.tsx`). `app/page.tsx`: state next to the 账号页密码 block (~line 438), `wrapAccountVeil` around the full-window content under the toolbar, 账号 新增/选择/收起 hidden while frosted, Enter in search does not copy while frosted, settings props. Shared e2e storage state turns the slide off (`tests/e2e/helpers.mjs`, `playwright.config.mjs`, `layout-guard.e2e.mjs`); new `tests/e2e/account-slide-unlock.e2e.mjs`, `tests/slide-unlock.test.mjs`.
+- User-visible change (plain Chinese, for the preview changelog): 打开账号页时内容先是模糊的，向右滑动解锁后才显示；离开账号页或窗口收起后会重新模糊。设置 → 数据 → 安全 里可以关掉。设了账号页密码时只需输入密码。
+- Not done / risks: Not tried in the real Windows/macOS WebView (smoothness checked in headless Chromium only). `tests/windows-smoke/smoke.mjs` does not visit 账号, so it needed no change. Whether a minimised window reports `visibilityState = hidden` in WebView2/WKWebView is expected but not verified on the desktop builds.
+- Next step: try the slide on Windows and on a Mac (drag feel, the fade), then set `windows`/`mac` in `docs/features.json`.

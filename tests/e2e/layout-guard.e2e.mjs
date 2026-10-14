@@ -5,7 +5,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { accountAddButton, asDesktop, openAccountCategory, seedSnippets, settle } from "./helpers.mjs";
+import { accountAddButton, asDesktop, openAccountCategory, seedSnippets, settle, SLIDE_UNLOCK_KEY } from "./helpers.mjs";
 
 const DETECT = readFileSync(new URL("./layout-detect.js", import.meta.url), "utf8");
 const PNG = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
@@ -44,6 +44,8 @@ for (const { platform, theme, size } of cases) {
     const pageErrors = [];
     page.on("pageerror", (e) => pageErrors.push(e.message));
     await page.addInitScript((t) => { try { localStorage.setItem("clipbox.theme", t); } catch { /* optional */ } }, theme);
+    // The 账号 states below check the page's own layout, not the slide-unlock veil (account-slide-unlock.e2e.mjs does).
+    await page.addInitScript((key) => { try { localStorage.setItem(key, "0"); } catch { /* optional */ } }, SLIDE_UNLOCK_KEY);
     await asDesktop(page, platform);
     await seedSnippets(page);
     page.setDefaultTimeout(5000);
