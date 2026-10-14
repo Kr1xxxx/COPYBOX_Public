@@ -122,7 +122,7 @@ jobs:
     steps:
       - run: echo "::warning::Test builds are published from main only (D-048); nothing was published from ${{ github.ref_name }}. The installers are still in this run's artifacts."
 
-  # D-053: the Windows installer is signed here, in a job of its own, so the key never reaches the build machines or
+  # D-054: the Windows installer is signed here, in a job of its own, so the key never reaches the build machines or
   # a pull request. The secrets UPDATE_SIGNING_KEY and UPDATE_SIGNING_PASSWORD live only in the environment
   # `update-signing`, which only main may use (its deployment branch rule); a run without them fails and publishes
   # nothing. The signature is checked against src-tauri/update-public-key.txt, the key the app is built with.
@@ -146,7 +146,7 @@ jobs:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
           UPDATE_SIGNING_PASSWORD: ${{ secrets.UPDATE_SIGNING_PASSWORD }}
         run: |
-          if [ -z "$UPDATE_SIGNING_KEY" ]; then echo "::error::UPDATE_SIGNING_KEY is not set in the update-signing environment (D-053)."; exit 1; fi
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then echo "::error::UPDATE_SIGNING_KEY is not set in the update-signing environment (D-054)."; exit 1; fi
           version=$(node -p "JSON.parse(require('fs').readFileSync('release-files/release-version.json', 'utf8')).version")
           node tools/update-signing.mjs sign --version "$version" release-files/Copyboxx-Windows-setup.exe
       - uses: actions/upload-artifact@v4

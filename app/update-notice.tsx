@@ -118,7 +118,7 @@ export function UpdateNotice() {
     );
   }
 
-  // A file that is not ours (D-053): no retry and no website link, since the website may be what was tampered with.
+  // A file that is not ours (D-054): no retry and no website link, since the website may be what was tampered with.
   if (phase.kind === "error" && phase.reason === "signature") {
     return (
       <div className="update-banner update-banner-error" role="status" data-phase="error">

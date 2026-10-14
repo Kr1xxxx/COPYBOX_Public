@@ -1,6 +1,6 @@
 // Looks up the newest published version and, on Windows, can download that installer and install it over this app
 // (D-023, D-047). Same version rules as desktop/update-check.cjs. Only an installer signed with the update key is
-// installed (D-053).
+// installed (D-054).
 use minisign_verify::{PublicKey, Signature};
 use serde::Serialize;
 use std::io::Write;
@@ -22,14 +22,14 @@ const MAX_INSTALLER_BYTES: u64 = 200 * 1024 * 1024;
 const PROGRESS_EVENT: &str = "clipbox:update-progress";
 
 /// Where the app looks for the newest version: a small JSON file {"version","notes","url","size","sha256","signature"}
-/// (D-047, D-053).
+/// (D-047, D-054).
 /// Only Windows looks: the website has no Mac installer. CLIPBOX_UPDATE_URL overrides it (for testing).
 const DEFAULT_UPDATE_URL: &str = if cfg!(target_os = "windows") { "https://copyboxx.com/download/latest.json" } else { "" };
 
 /// The only host an installer may come from.
 const DOWNLOAD_HOST: &str = "copyboxx.com";
 
-/// The public half of the update signing key (D-053, tools/update-signing.mjs). The private half lives only in a
+/// The public half of the update signing key (D-054, tools/update-signing.mjs). The private half lives only in a
 /// GitHub secret and the owner's offline backup, never next to the website, so whoever takes over the website still
 /// cannot make this app install anything.
 const UPDATE_PUBLIC_KEY: &str = include_str!("../update-public-key.txt");
@@ -203,7 +203,7 @@ fn clean_notes(notes: &serde_json::Value) -> Vec<String> {
 
 /// Decides what a downloaded manifest means for the version that is running. A newer version without a good
 /// signature for `key` is treated like a broken manifest: nothing is offered, not even the browser download, because
-/// such a manifest can only come from someone other than us (D-053).
+/// such a manifest can only come from someone other than us (D-054).
 pub fn evaluate_manifest(manifest: &serde_json::Value, current: &str, key: Option<&PublicKey>) -> (UpdateInfo, Option<Release>) {
     let version = manifest.get("version").and_then(|v| v.as_str()).unwrap_or("");
     match compare_versions(version, current) {

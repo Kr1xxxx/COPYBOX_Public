@@ -32,7 +32,7 @@ const localInstallerVersion = appVersionFrom(readFileSync("tools/preview/VERSION
 const pageKeys = ["index.html", "download/index.html", "help/index.html", "privacy/index.html"];
 const allPageKeys = [...pageKeys, "404.html"];
 
-// A throwaway signing key for the fake installer (D-053); the build checks it against --public-key.
+// A throwaway signing key for the fake installer (D-054); the build checks it against --public-key.
 const testKey = generateKey("website-test-password");
 const testSecret = parseSecretKey(testKey.secret, "website-test-password");
 
@@ -311,7 +311,7 @@ test("website 404 page", () => {
   assert.match(notFound, /<a class="pill" href="\/">回到首页<\/a>/);
 });
 
-test("website build: the installer's signature is checked and copied into latest.json (D-053)", async () => {
+test("website build: the installer's signature is checked and copied into latest.json (D-054)", async () => {
   // No signature: built with a warning, and latest.json carries none (apps that check offer nothing).
   const unsigned = await buildSite({ signature: false });
   try {
@@ -349,7 +349,7 @@ test("website installer: the newest tauri-test release with a Windows asset wins
   assert.equal(newest.asset.name, "Copyboxx-Windows-setup.exe");
   assert.equal(newest.versionAsset.name, "release-version.json");
   assert.equal(newest.signatureAsset, undefined);
-  // D-053: signed releases also carry Copyboxx-Windows-setup.exe.sig, which goes into latest.json.
+  // D-054: signed releases also carry Copyboxx-Windows-setup.exe.sig, which goes into latest.json.
   const signed = { ...renamed, tag_name: "tauri-test-95", published_at: "2026-10-15T09:00:00Z", assets: [...renamed.assets, win("Copyboxx-macOS-arm64.zip.sig"), win("Copyboxx-Windows-setup.exe.sig")] };
   assert.equal(pickInstaller([...releases, renamed, signed]).signatureAsset.name, "Copyboxx-Windows-setup.exe.sig");
   assert.throws(() => pickInstaller([releases[0], releases[1]]), /No tauri-test release/);

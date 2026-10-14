@@ -15,7 +15,7 @@ import {
   verifyBytes,
 } from "../tools/update-signing.mjs";
 
-// D-053: installers are signed in minisign format; the app checks them with the minisign-verify crate.
+// D-054: installers are signed in minisign format; the app checks them with the minisign-verify crate.
 const password = "only-for-these-tests";
 const pair = generateKey(password);
 const secret = parseSecretKey(pair.secret, password);

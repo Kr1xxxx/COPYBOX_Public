@@ -1,4 +1,4 @@
-// Signs the Windows installer so the app only installs updates made by us (D-053). Minisign format (Ed25519 over the
+// Signs the Windows installer so the app only installs updates made by us (D-054). Minisign format (Ed25519 over the
 // BLAKE2b-512 of the file, "prehashed"), written with Node's own crypto: no new dependency. The app checks it with the
 // `minisign-verify` crate against src-tauri/update-public-key.txt; any `minisign -V` can check it too.
 //

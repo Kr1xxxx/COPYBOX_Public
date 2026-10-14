@@ -8,7 +8,7 @@
 // Every page is partials/head.html + partials/header.html (current nav item marked) + its body + partials/footer.html;
 // the stylesheet becomes assets/site.<hash>.css. Besides the site files it writes kv-bulk.json and manifest.json,
 // which deploy.mjs uploads to KV for worker.mjs.
-// D-053: the release's <installer>.sig (or --signature) is checked against the app's public key
+// D-054: the release's <installer>.sig (or --signature) is checked against the app's public key
 // (src-tauri/update-public-key.txt, or --public-key) and copied into latest.json; a bad signature stops the build.
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -152,7 +152,7 @@ function copyFolder(from, to, expected, label) {
 
 // The newest (by published_at) tauri-test-N release that carries a Windows setup asset; returns
 // { release, asset, versionAsset, signatureAsset } (versionAsset is the release-version.json asset, signatureAsset the
-// installer's .sig (D-053); each is undefined on older releases).
+// installer's .sig (D-054); each is undefined on older releases).
 export function pickInstaller(releases) {
   const candidates = (Array.isArray(releases) ? releases : [])
     .filter((release) => String(release?.tag_name ?? "").startsWith("tauri-test-"))
@@ -190,7 +190,7 @@ export function formatSize(bytes) {
 }
 
 // download/latest.json: the { version, notes, url } shape of the desktop update check (D-023), plus size and checksum,
-// and the installer's minisign signature when there is one (D-053; apps from then on offer nothing without it).
+// and the installer's minisign signature when there is one (D-054; apps from then on offer nothing without it).
 // info.version is the installer's app version ("1.65.0"); a bare preview number ("1.65") is widened to it.
 export function latestJson(info) {
   const given = String(info.version ?? "").trim();
@@ -293,12 +293,12 @@ export async function main(argv = process.argv.slice(2)) {
     ({ installer, info: installed, signature } = await downloadInstaller());
   }
   if (installer.length < 2 || installer[0] !== 0x4d || installer[1] !== 0x5a) throw new Error("The installer is not a Windows program (it does not start with MZ).");
-  // D-053: a signature that does not fit this installer and version stops the build; none at all only warns, because
+  // D-054: a signature that does not fit this installer and version stops the build; none at all only warns, because
   // installers published before signing still have to be served to the apps that do not check yet.
   if (signature) {
     checkInstallerSignature(installer, signature, installed.version, readFileSync(publicKeyArg, "utf8"));
   } else {
-    console.warn(`warning: the installer ${installed.version} has no signature: apps that check signatures (D-053) will not offer it.`);
+    console.warn(`warning: the installer ${installed.version} has no signature: apps that check signatures (D-054) will not offer it.`);
   }
   if (installed.preview !== version) console.warn(`warning: this checkout is preview ${version} but the installer is ${installed.version}; the pages and latest.json follow the installer.`);
 

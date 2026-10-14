@@ -1,4 +1,4 @@
-### D-053 Windows updates are signed; the app installs only installers signed with our key (2026-10-14)
+### D-054 Windows updates are signed; the app installs only installers signed with our key (2026-10-14)
 - Context (owner, 2026-10-14, audit 「審計 · 網站與 App 現況審查」 severe item 1, decision card 「加签名」): D-047 checks size and
   SHA-256, but both come from the same `latest.json` on copyboxx.com as the installer. Whoever controls the website or
   its Cloudflare token could make every Windows app silently install their program. The owner chose a free signature
