@@ -1002,8 +1002,17 @@ button { -webkit-tap-highlight-color: transparent; }
 .update-text span { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .update-banner .primary-button, .update-banner .ghost-button { height: 28px; border-radius: 7px; }
 .update-banner .primary-button:active, .update-banner .ghost-button:active { transform: scale(.96); }
+/* 立即更新 (D-047): a slim bar with percent and megabytes while the installer downloads, then 正在安装. */
+.update-progress { display: flex; align-items: center; gap: 8px; height: 1lh; min-width: 0; }
+.update-bar { flex: 1; min-width: 60px; height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.update-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transform-origin: left center; transition: transform .2s cubic-bezier(.2,0,0,1); }
+.update-text .update-figures { flex: none; color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.update-banner-progress { padding-right: 12px; }
+.update-banner[data-phase="installing"] .update-bar i { animation: update-pulse 1.4s ease-in-out infinite; }
+.update-banner-error strong { color: var(--danger); }
 @keyframes update-in { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
-@media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } }
+@keyframes update-pulse { 50%{opacity:.55} }
+@media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } .update-bar i { transition: none; } .update-banner[data-phase="installing"] .update-bar i { animation: none; } }
 
 /* Segmented controls (app/arc/segmented.tsx): the highlight is one pill that glides between options. The active button keeps its
    `active` class but no longer paints its own background; the pill paints it, in the colours each control had before. */

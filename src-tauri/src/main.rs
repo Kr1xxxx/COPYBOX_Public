@@ -81,6 +81,7 @@ fn main() {
             site_icon::get_build_time,
             update::check_update,
             update::open_update,
+            update::install_update,
             automation::automation_ready,
             automation::automation_response,
         ])
