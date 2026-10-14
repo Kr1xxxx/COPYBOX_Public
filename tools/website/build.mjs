@@ -100,7 +100,7 @@ export function cssAssetKey(css) {
 }
 
 // Made by hand with make-icons.mjs and make-screenshots.mjs; the build only warns when one is missing.
-export const iconFiles = ["favicon.ico", "favicon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "og-image.png"];
+export const iconFiles = ["favicon.ico", "favicon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "og-image.png", "wordmark-cn.svg", "wordmark.svg"];
 export const imageFiles = ["app-win-light.png", "app-win-dark.png"];
 
 export function webManifest() {

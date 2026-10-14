@@ -151,6 +151,8 @@ test("website build writes every page, the stylesheet, icons, images, preview, i
     "robots.txt",
     "site.webmanifest",
     "sitemap.xml",
+    "wordmark-cn.svg",
+    "wordmark.svg",
   ]);
   for (const entry of bulk) {
     const bytes = readFileSync(join(out, entry.key));
@@ -174,7 +176,7 @@ test("website pages: no placeholder left, brand, nav, hashed stylesheet, canonic
     assert.match(html, /^<!doctype html>\n<html lang="zh-CN">/, key);
     assert.ok(html.includes(`<title>${page.title}</title>`), key);
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/, key);
-    assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg"[^>]*><b>Copyboxx<\/b><span>复制盒<\/span><\/a>/, key);
+    assert.match(html, /<a class="brand" href="\/"[^>]*><img src="\/favicon\.svg"[^>]*><span class="wordmark" role="img" aria-label="Copyboxx 复制盒"><\/span><\/a>/, key);
     assert.match(html, /<nav class="nav" aria-label="网站导航">/, key);
     const nav = /<nav class="nav" aria-label="网站导航">([\s\S]*?)<\/nav>/.exec(html)[1];
     assert.deepEqual([...nav.matchAll(/<a href="([^"]*)"/g)].map((m) => m[1]), ["/", "/download/", "/help/"], key);

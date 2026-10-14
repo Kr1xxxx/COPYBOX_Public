@@ -13,7 +13,8 @@ node tools/website/make-icons.mjs
 | `favicon.ico` | 16, 32, 48 | `favicon.svg`, rasterized in Chromium (PNG entries in an ICO container) |
 | `apple-touch-icon.png` | 180 | `src-tauri/icons/icon.png`, scaled down in Chromium |
 | `icon-192.png`, `icon-512.png` | 192, 512 | `src-tauri/icons/icon.png` (used by `site.webmanifest`) |
-| `og-image.png` | 1200×630 | `tools/website/og-image.html`, screenshot at device scale 1 (share card) |
+| `og-image.png` | 1200×630 | `tools/website/og-image.html` (brand lockup `docs/brand/lockup-horizontal.svg`), screenshot at device scale 1 (share card) |
+| `wordmark-cn.svg`, `wordmark.svg` | tight viewBox | copies of `docs/brand/wordmark-cn.svg` / `wordmark.svg` cropped to the letters; the header and footer paint them through a CSS mask in the text colour (Latin only below 370 px) |
 
 The ICO is drawn from the SVG rather than the app icon: the app icon has a transparent margin and small
 details that blur at 16 px, while the SVG's edges sit on the pixel grid (same drawing as `src-tauri/icons/icon-16.svg`). The share card uses whatever Chinese font the
