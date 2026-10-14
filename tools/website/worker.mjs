@@ -111,6 +111,48 @@ async function notFound(request, env) {
   });
 }
 
+// Company 话术 sync (docs/shared-library.md): GET /sync/<code>/snippets.json reads the KV key
+// sync/<CODE>/snippets.json, written by tools/website/sync.mjs. Codes are upper case (typed lower case works too).
+// A malformed code, a missing key and every other path under /sync/ get the same plain 404, so the answer never
+// tells which codes exist; history copies under sync/<code>/history/ are never served.
+export function syncKeyFor(pathname) {
+  const match = /^\/sync\/([A-Za-z0-9-]{6,40})\/snippets\.json$/.exec(pathname);
+  return match ? `sync/${match[1].toUpperCase()}/snippets.json` : null;
+}
+
+export function isSyncPath(pathname) {
+  return pathname === "/sync" || pathname.startsWith("/sync/");
+}
+
+function syncHeaders() {
+  return { "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff" };
+}
+
+function syncNotFound(request) {
+  return new Response(request.method === "HEAD" ? null : "404 Not Found", {
+    status: 404,
+    headers: { ...syncHeaders(), "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function syncResponse(request, env, pathname) {
+  const key = syncKeyFor(pathname);
+  if (!key) return syncNotFound(request);
+  const file = await env.FILES.getWithMetadata(key, { type: "text" });
+  if (typeof file?.value !== "string") return syncNotFound(request);
+  const etag = `"${await sha256Hex(file.value)}"`;
+  const headers = new Headers({ ...syncHeaders(), ETag: etag });
+  if (matchesEtag(request.headers.get("If-None-Match"), etag)) return new Response(null, { status: 304, headers });
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Content-Length", String(new TextEncoder().encode(file.value).length));
+  return new Response(request.method === "HEAD" ? null : file.value, { status: 200, headers });
+}
+
 // Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
 const previewCookie = "preview_pass";
 const cookieAttributes = "Path=/preview; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000";
@@ -203,6 +245,7 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
     }
+    if (isSyncPath(url.pathname)) return syncResponse(request, env, url.pathname);
     const candidates = candidateKeys(url.pathname);
     if (!candidates) return notFound(request, env);
     const locked = isPreviewKey(candidates[0].key) && !(await hasPreviewPass(request, env));

@@ -19,6 +19,7 @@
     "preview:serve": "node tools/preview/serve.mjs",
     "website:build": "node tools/website/build.mjs",
     "website:deploy": "node tools/website/deploy.mjs",
+    "sync:publish": "node tools/website/sync.mjs",
     "tauri:frontend": "node scripts/tauri-frontend.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "node scripts/sync-version.mjs && tauri build"
