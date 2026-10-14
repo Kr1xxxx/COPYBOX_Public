@@ -31,7 +31,7 @@ for (const platform of ["win32", "darwin"]) {
     await expect(brand).toHaveCount(0);
     await expect(settings.getByText(/^Copyboxx v/)).toBeVisible();
     await expect(settings.getByText(/Clipbox /)).toHaveCount(0);
-    await settings.getByRole("tab", { name: "外观" }).click();
+    await settings.getByRole("tab", { name: "概览" }).click();
     await expect(brand).toBeVisible();
     await settings.getByRole("searchbox", { name: "搜索设置" }).fill("主题");
     await expect(brand).toHaveCount(0);

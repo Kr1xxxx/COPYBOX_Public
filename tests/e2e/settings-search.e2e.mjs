@@ -11,5 +11,5 @@ test("Settings search finds a setting on another page and says when nothing matc
   await search.fill("没有这个设置xyz");
   await expect(dialog.getByText(/没有找到/)).toBeVisible();
   await search.fill("");
-  await expect(dialog.getByRole("tab", { name: "外观" })).toHaveAttribute("aria-selected", "true");
+  await expect(dialog.getByRole("tab", { name: "概览" })).toHaveAttribute("aria-selected", "true");
 });
