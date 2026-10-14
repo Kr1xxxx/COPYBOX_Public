@@ -1,5 +1,5 @@
 // 账号 page slide-to-unlock (D-051): the setting and the knob maths. The component is app/account-veil.tsx.
-// The gesture maths (rubber band, release velocity, flick, arming with hysteresis) follow arc-library's Swipe actions
+// The gesture maths (release velocity, flick, arming with hysteresis) follow arc-library's Swipe actions
 // (https://uiarc.dev, MIT, see app/arc/LICENSE-arc-library.txt), adapted to a track that only goes one way.
 import { readStoredChoice, writeStoredChoice } from "./stored-choice.ts";
 
@@ -28,18 +28,11 @@ const VELOCITY_WINDOW = 80;
 // Samples kept while dragging.
 export const SLIDE_SAMPLES = 12;
 
-// Past an end the knob still follows, but every pixel costs more, like pulling against elastic. Never more than `dimension`.
-export function rubberBand(overshoot: number, dimension: number): number {
-  if (!(overshoot > 0) || !(dimension > 0)) return 0;
-  return (1 - 1 / ((overshoot * 0.55) / dimension + 1)) * dimension;
-}
-
-// Where the knob sits for a pointer that would put it at `raw`: 1:1 along the track, rubber-banded past either end.
-export function knobPosition(raw: number, max: number, dimension: number): number {
+// Where the knob sits for a pointer that would put it at `raw`: 1:1 along the track, stopped at either end. It never
+// leaves the track (owner, 2026-10-14: the rubber band past the end looked like the knob sliding out of the track).
+export function knobPosition(raw: number, max: number): number {
   if (!(max > 0) || !Number.isFinite(raw)) return 0;
-  if (raw < 0) return -rubberBand(-raw, dimension);
-  if (raw > max) return max + rubberBand(raw - max, dimension);
-  return raw;
+  return Math.min(max, Math.max(0, raw));
 }
 
 // px/s from timestamped [ms, x] pointer samples, over the last 80 ms.

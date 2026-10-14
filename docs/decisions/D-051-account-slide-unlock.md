@@ -31,7 +31,8 @@
 - Motion update (owner, 2026-10-14: 「这个感觉 动效哈,不是一样的」 — the feel of arc-library's Swipe actions, not that
   component). The knob's motion now ports Swipe actions' mechanics (MIT, D-021) with `motion/react` and
   `motionTokens`, replacing the CSS transitions described above: the knob is a motion value that follows the pointer
-  1:1 on the track and rubber-bands past either end (`rubberBand`, .55, bounded by the knob width); past 88 % it
+  1:1 on the track and stops at either end (owner, 2026-10-14: 「怎么按钮还能滑出轨道去?」 — the earlier rubber band
+  past the ends is gone; `knobPosition` clamps, and the drawn knob is clamped too); past 88 % it
   arms (20 px hysteresis to disarm) and an accent fill, which grows out from behind the knob, springs over the whole
   track (`spring.morph`; 8 ms vibration on touch); on release it opens when armed and not flicked back, or when flung
   (> 900 px/s and the position projected 0.1 s ahead passes 88 %), else springs home (`spring.smooth`, release
