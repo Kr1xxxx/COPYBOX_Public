@@ -1269,7 +1269,7 @@ button { -webkit-tap-highlight-color: transparent; }
 /* The wordmark「Copyboxx 复制盒」as outlines (app/brand-wordmark.tsx, from docs/brand/). Brand rule: pure black, pure white on dark;
    22px tall (the brand minimum is 20px). The real text underneath is only for screen readers and tests. */
 .settings-brand { display: flex; align-items: center; padding: 4px 2px 14px; border-bottom: 1px solid var(--line-soft); color: #000; }
-.settings-brand-mark { display: block; height: 22px; width: auto; margin-left: -3px; } /* the SVG has a 24-unit margin; align its ink with the page title */
+.settings-brand-mark { display: block; height: 40px; width: auto; margin: -6px 0 -4px -7px; } /* vector, so it stays sharp at any size; the SVG has a ~24-unit margin, trimmed so its ink lines up with the page title */
 .settings-brand-version { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .settings-brand-text { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .settings-page-title { margin: 0; padding: 4px 2px 0; color: var(--ink); font-size: 18px; font-weight: 650; text-wrap: balance; }

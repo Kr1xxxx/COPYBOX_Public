@@ -20,7 +20,7 @@ import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } fr
 import { BrandWordmark } from "./brand-wordmark";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
-const SETTINGS_TABS = [["look", "外观"], ["folders", "目录"], ["data", "数据"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
+const SETTINGS_TABS = [["look", "概览"], ["folders", "目录"], ["data", "数据"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number][0];
 
 function backupAgeLabel(at: number) {
@@ -154,7 +154,7 @@ export function SettingsDialog({ onPreviewTest, onImportTest, onClearTest, versi
             <span className="settings-brand-version">{version ? `v${version}` : "开发版本"}{updatedOn && <span> · {updatedOn}更新</span>}</span></div>}
           <h2 className="settings-page-title" aria-hidden="true">{searching ? "搜索结果" : SETTINGS_TABS.find(([id]) => id === tab)?.[1]}</h2>
           {searching && hits.size === 0 && <p className="settings-empty">没有找到「{query.trim()}」相关的设置</p>}
-          <section className="settings-card" data-solo="" aria-labelledby="set-look" hidden={hideSection("look", "set-look")}><h3 id="set-look">外观</h3>
+          <section className="settings-card" aria-labelledby="set-look" hidden={hideSection("look", "set-look")}><h3 id="set-look">外观</h3>
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="主题" value={theme} onSelect={(value) => onTheme(value as ThemeChoice)}
                 options={[["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]].map(([value, label]) => ({ value, label }))} />

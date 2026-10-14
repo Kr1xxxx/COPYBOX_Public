@@ -115,10 +115,10 @@ test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
   await expect(radios.getByRole("radio", { name: "7 天" })).toHaveAttribute("aria-checked", "true");
 });
 
-test("Settings has two columns: groups on the left, the chosen group on the right, 外观 first", async ({ page }) => {
+test("Settings has two columns: groups on the left, the chosen group on the right, 概览 first", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   const tabs = dialog.getByRole("tab");
-  await expect(tabs).toHaveText(["外观", "目录", "数据", "使用排行", "窗口", "AI", "关于"]);
+  await expect(tabs).toHaveText(["概览", "目录", "数据", "使用排行", "窗口", "AI", "关于"]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   // Only the chosen group is shown.
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeVisible();

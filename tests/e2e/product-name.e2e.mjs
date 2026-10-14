@@ -16,7 +16,8 @@ for (const platform of ["win32", "darwin"]) {
     const mark = brand.locator("svg.settings-brand-mark");
     await expect(mark).toBeVisible();
     const markBox = await mark.boundingBox();
-    expect(markBox.height).toBeGreaterThanOrEqual(20);
+    // Big enough to read clearly (owner, 2026-10-14: the 22px mark was too small).
+    expect(markBox.height).toBeGreaterThanOrEqual(36);
     expect(markBox.width).toBeGreaterThan(markBox.height * 4);
     await expect(brand.locator("strong")).toHaveText("Copyboxx");
     await expect(brand.locator(".settings-brand-text > span")).toHaveText("复制盒");
@@ -30,7 +31,7 @@ for (const platform of ["win32", "darwin"]) {
     await expect(brand).toHaveCount(0);
     await expect(settings.getByText(/^Copyboxx v/)).toBeVisible();
     await expect(settings.getByText(/Clipbox /)).toHaveCount(0);
-    await settings.getByRole("tab", { name: "外观" }).click();
+    await settings.getByRole("tab", { name: "概览" }).click();
     await expect(brand).toBeVisible();
     await settings.getByRole("searchbox", { name: "搜索设置" }).fill("主题");
     await expect(brand).toHaveCount(0);
