@@ -218,8 +218,8 @@ test("with reduced motion the page opens at once, without the shimmer", async ({
   await expectOpen(page);
 });
 
-// The swipe-actions feel (arc-library): a fast flick opens even short of the end, the knob rubber-bands past either
-// end, past the threshold the fill covers the track, and a slow release just short of the threshold springs home.
+// The swipe-actions feel (arc-library): a fast flick opens even short of the end, the knob stops at either end of the
+// track (owner, 2026-10-14), past the threshold the fill covers the track, and a slow release just short of the threshold springs home.
 test("a fast flick that does not reach the threshold still opens the page", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);
@@ -261,7 +261,7 @@ test("a slow release just short of the threshold springs home and stays frosted"
   await expectVeiled(page);
 });
 
-test("past either end the knob rubber-bands; armed, the fill covers the track, and backing off a little keeps it armed", async ({ page }) => {
+test("past either end the knob stays on the track; armed, the fill covers the track, and backing off a little keeps it armed", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);
   await openAccounts(page);
@@ -269,13 +269,12 @@ test("past either end the knob rubber-bands; armed, the fill covers the track, a
   const bounds = await track.boundingBox();
   const home = await knob(page).boundingBox();
 
-  // Pulled well past the start: it follows a little to the left, then springs home.
+  // Pulled well past the start: it stays at the start.
   await page.mouse.move(home.x + home.width / 2, home.y + home.height / 2);
   await page.mouse.down();
   await page.mouse.move(home.x + home.width / 2 - 120, home.y + home.height / 2, { steps: 8 });
   const left = await knob(page).boundingBox();
-  expect(left.x).toBeLessThan(home.x - 5);
-  expect(left.x).toBeGreaterThan(home.x - home.width);
+  expect(Math.abs(left.x - home.x)).toBeLessThan(1);
   await expect(knob(page)).toHaveAttribute("aria-valuenow", "0");
   await page.waitForTimeout(150);
   await page.mouse.up();
@@ -283,13 +282,13 @@ test("past either end the knob rubber-bands; armed, the fill covers the track, a
   expect(Math.abs((await knob(page).boundingBox()).x - home.x)).toBeLessThan(1);
   await expectVeiled(page);
 
-  // Pulled twice the track's length: the knob passes the end (the inside of the track ends 5 px before its outer
-  // edge: 1 px border, 4 px padding), but only by a small overshoot, less than the knob's own width.
+  // Pulled twice the track's length: the knob stops at the end and never leaves the track (the inside of the track
+  // ends 5 px before its outer edge: 1 px border, 4 px padding).
   const pull = await slide(page, 2, { steps: 24 });
   const far = await knob(page).boundingBox();
   const end = bounds.x + bounds.width - 5;
-  expect(far.x + far.width).toBeGreaterThan(end + 4);
-  expect(far.x + far.width).toBeLessThan(end + home.width);
+  expect(far.x + far.width).toBeGreaterThan(end - 1);
+  expect(far.x + far.width).toBeLessThanOrEqual(end + 0.5);
   await expect(knob(page)).toHaveAttribute("aria-valuenow", "100");
   await expect(track).toHaveAttribute("data-armed", "");
   // The fill springs over the whole inside of the track.

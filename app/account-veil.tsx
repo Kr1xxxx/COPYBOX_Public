@@ -3,7 +3,7 @@
 // 账号 page veil (D-051): until the person slides it open, the 账号 content is drawn but frosted, unreachable and hidden
 // from screen readers. The control is a phone-style 「slide to unlock」 track whose gesture follows arc-library's Swipe
 // actions (https://uiarc.dev, MIT, see app/arc/LICENSE-arc-library.txt): the knob is a motion value that follows the
-// pointer, rubber-bands past either end, arms past the threshold (a fill springs over the track), opens on release when
+// pointer and stops at either end of the track, arms past the threshold (a fill springs over the track), opens on release when
 // armed or when flung, springs home otherwise, and the frost then clears with a spring. The maths is in slide-unlock.ts.
 // The knob is a focusable slider: →, End, Enter or Space on it slides it open (a control's own keys, not a shortcut).
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
@@ -36,7 +36,6 @@ function SlideToUnlock({ onDone, reduced, content, veil }: { onDone: () => void;
   const cover = useMotionValue(0);
   const reveal = useMotionValue(0);
   const max = useRef(0);
-  const knobSize = useRef(44);
   const drag = useRef<Drag | null>(null);
   const travel = useRef<AnimationPlaybackControls | null>(null);
   const stretch = useRef<AnimationPlaybackControls | null>(null);
@@ -46,16 +45,17 @@ function SlideToUnlock({ onDone, reduced, content, veil }: { onDone: () => void;
   const opened = useRef(false);
   const [settled, setSettled] = useState(false);
 
+  // What is drawn stays on the track even while a spring carrying release velocity overshoots its target.
+  const knobX = useTransform(x, (value) => knobPosition(value, max.current));
   const labelOpacity = useTransform(x, (value) => slideLabelOpacity(slideProgress(value, max.current)));
   // The fill's right edge rides the knob's right edge; armed, it springs on to the end of the track.
-  const fillX = useTransform([x, cover], ([value = 0, progress = 0]: number[]) => value + progress * (Math.max(max.current, value) - value));
+  const fillX = useTransform([x, cover], ([raw = 0, progress = 0]: number[]) => { const value = knobPosition(raw, max.current); return value + progress * (max.current - value); });
 
   function measure() {
     const track = trackRef.current;
     const knob = knobRef.current;
     if (!track || !knob) return;
     const pad = parseFloat(getComputedStyle(track).paddingLeft) || 0;
-    knobSize.current = knob.offsetWidth || knobSize.current;
     max.current = Math.max(0, track.clientWidth - knob.offsetWidth - pad * 2);
   }
 
@@ -169,7 +169,7 @@ function SlideToUnlock({ onDone, reduced, content, veil }: { onDone: () => void;
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const current = drag.current;
     if (!current || current.pointer !== event.pointerId) return;
-    const value = knobPosition(current.origin + event.clientX - current.startX, max.current, knobSize.current);
+    const value = knobPosition(current.origin + event.clientX - current.startX, max.current);
     x.set(value);
     current.samples.push([event.timeStamp, event.clientX]);
     if (current.samples.length > SLIDE_SAMPLES) current.samples.shift();
@@ -196,7 +196,7 @@ function SlideToUnlock({ onDone, reduced, content, veil }: { onDone: () => void;
     <div ref={trackRef} className={`slide-unlock${settled ? " settled" : ""}`}>
       <div className="slide-unlock-fill-clip" aria-hidden="true"><motion.div className="slide-unlock-fill" style={{ x: fillX }} /></div>
       <motion.span className="slide-unlock-label" aria-hidden="true" style={{ opacity: labelOpacity }}>向右滑动解锁</motion.span>
-      <motion.div ref={knobRef} className="slide-unlock-knob" role="slider" tabIndex={0} aria-label="滑动解锁" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} style={{ x }}
+      <motion.div ref={knobRef} className="slide-unlock-knob" role="slider" tabIndex={0} aria-label="滑动解锁" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} style={{ x: knobX }}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} onKeyDown={onKeyDown}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
       </motion.div>

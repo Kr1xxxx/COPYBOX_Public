@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SLIDE_ARM_HYSTERESIS, SLIDE_FLICK, SLIDE_PROJECTION, SLIDE_UNLOCK_KEY, SLIDE_UNLOCK_THRESHOLD, frostBlur, homeLaunchVelocity, knobPosition,
-  readSlideUnlockOn, rubberBand, slideArmed, slideLabelOpacity, slideProgress, slideReachedEnd, slideReleaseUnlocks, velocityOf, writeSlideUnlockOn,
+  readSlideUnlockOn, slideArmed, slideLabelOpacity, slideProgress, slideReachedEnd, slideReleaseUnlocks, velocityOf, writeSlideUnlockOn,
 } from "../app/slide-unlock.ts";
 
 function withStorage(store, run) {
@@ -43,34 +43,16 @@ test("the setting is on unless it was turned off; its own key, never the vault",
   });
 });
 
-// Was "never leaves the track" (knobOffset clamped at both ends). Since the swipe-actions motion (2026-10-14) the knob
-// rubber-bands past either end instead; inside the track it still follows the pointer 1:1.
-test("the knob follows the pointer 1:1 along the track and rubber-bands past either end", () => {
-  assert.equal(knobPosition(37, 200, 44), 37);
-  assert.equal(knobPosition(30, 200, 44), 30);
-  assert.equal(knobPosition(200, 200, 44), 200);
-  assert.equal(knobPosition(0, 200, 44), 0);
-  assert.equal(knobPosition(10, 0, 44), 0, "no track to move along");
-  assert.equal(knobPosition(Number.NaN, 200, 44), 0);
-  // Past the end: it still moves, by less than the pointer, and never more than the band's dimension.
-  const past = knobPosition(260, 200, 44);
-  assert.ok(past > 200 && past < 260, `past the end: ${past}`);
-  assert.ok(knobPosition(10000, 200, 44) < 244);
-  assert.ok(knobPosition(300, 200, 44) > knobPosition(260, 200, 44), "more pull, a little more travel");
-  // Past the start, the same to the left.
-  const before = knobPosition(-60, 200, 44);
-  assert.ok(before < 0 && before > -44, `past the start: ${before}`);
-  assert.ok(Math.abs(knobPosition(-60, 200, 44) + (knobPosition(260, 200, 44) - 200)) < 1e-9, "same band at both ends");
-});
-
-test("rubber band: .55 of the pull at first, then each pixel costs more, bounded by the dimension", () => {
-  assert.equal(rubberBand(0, 44), 0);
-  assert.equal(rubberBand(-5, 44), 0);
-  assert.equal(rubberBand(10, 0), 0);
-  assert.ok(Math.abs(rubberBand(1, 1000) - 0.55) < 0.01);
-  assert.ok(Math.abs(rubberBand(100, 320) - (1 - 1 / (55 / 320 + 1)) * 320) < 1e-9, "same formula as arc-library");
-  assert.ok(rubberBand(1e9, 44) < 44);
-  assert.ok(rubberBand(40, 44) - rubberBand(20, 44) < rubberBand(20, 44) - rubberBand(0, 44));
+// The owner (2026-10-14) did not want the knob to slide out of the track: the rubber band past either end is gone.
+test("the knob follows the pointer 1:1 along the track and stops at either end", () => {
+  assert.equal(knobPosition(37, 200), 37);
+  assert.equal(knobPosition(200, 200), 200);
+  assert.equal(knobPosition(0, 200), 0);
+  assert.equal(knobPosition(10, 0), 0, "no track to move along");
+  assert.equal(knobPosition(Number.NaN, 200), 0);
+  assert.equal(knobPosition(260, 200), 200, "pulled past the end, it stays at the end");
+  assert.equal(knobPosition(10000, 200), 200);
+  assert.equal(knobPosition(-60, 200), 0, "pulled past the start, it stays at the start");
 });
 
 test("release velocity comes from the last 80 ms of pointer samples", () => {
@@ -90,7 +72,7 @@ test("arming past the threshold, with 20 px of hysteresis on the way back", () =
   const max = 200, at = SLIDE_UNLOCK_THRESHOLD * max;
   assert.equal(slideArmed(at - 1, max, false), false);
   assert.equal(slideArmed(at, max, false), true);
-  assert.equal(slideArmed(230, max, false), true, "rubber-banded past the end is armed");
+  assert.equal(slideArmed(230, max, false), true, "past the end is armed");
   assert.equal(slideArmed(at - 10, max, true), true, "stays armed just below the threshold");
   assert.equal(slideArmed(at - 19, max, true), true);
   assert.equal(slideArmed(at - 21, max, true), false, "disarms 20 px below");
