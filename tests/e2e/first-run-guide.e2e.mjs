@@ -16,6 +16,7 @@ async function freshStart(page) {
 test("a fresh start shows the guide; 下一步, 上一步 and the dots move between pages", async ({ page }) => {
   await freshStart(page);
   await expect(guide(page).getByRole("heading")).toHaveText("话术：常用回复，一键复制");
+  await expect(guide(page)).toContainText("中文、英文单词、拼音、拼音首字母都行");
   await expect(guide(page)).toContainText("1 / 4");
   await expect(dots(page)).toHaveCount(4);
   await expect(dots(page).nth(0)).toHaveAttribute("aria-current", "step");
@@ -59,7 +60,7 @@ test("跳过 closes the guide and it does not come back after a reload", async (
 test("开始使用 on the last page closes it; the close button too", async ({ page }) => {
   await freshStart(page);
   for (let i = 0; i < 3; i += 1) await guide(page).getByRole("button", { name: "下一步" }).click();
-  await expect(guide(page).getByRole("heading")).toHaveText("迷你窗口和备份");
+  await expect(guide(page).getByRole("heading")).toHaveText("迷你窗口和置顶");
   await expect(guide(page).getByRole("button", { name: "下一步" })).toHaveCount(0);
   await guide(page).getByRole("button", { name: "开始使用" }).click();
   await expect(guide(page)).toHaveCount(0);
@@ -94,6 +95,9 @@ test("Windows: the last page says where the window goes when closed", async ({ p
   await freshStart(page);
   await dots(page).nth(3).click();
   await expect(guide(page)).toContainText("右下角的托盘");
+  // The pin button (固定在最上层) replaced the old "内容不会上传 … 导出备份" line (owner, 2026-10-14).
+  await expect(guide(page)).toContainText("图钉，窗口就固定在最前面");
+  await expect(guide(page)).not.toContainText("导出备份");
 });
 
 test("macOS: the last page names the menu bar instead", async ({ page }) => {
@@ -102,6 +106,7 @@ test("macOS: the last page names the menu bar instead", async ({ page }) => {
   await dots(page).nth(3).click();
   await expect(guide(page)).toContainText("菜单栏");
   await expect(guide(page)).not.toContainText("托盘");
+  await expect(guide(page)).toContainText("图钉，窗口就固定在最前面");
 });
 
 test("not shown in the mini window; it waits until the full window opens", async ({ page }) => {
