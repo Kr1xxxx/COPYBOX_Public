@@ -155,5 +155,5 @@ We will provide the first two. Please send me your tax ID.","[Country] 清关需
 这是一个特别特别特别长的具体场景名称用来测试标题过长时列表是否会正确截断而不会撑破布局｜长标题测试,客户跟进,这是一个特别特别特别长的具体场景名称用来测试标题过长时列表是否会正确截断而不会撑破布局,长标题测试,通用,Title overflow test message for [Name].,标题过长测试。,,
 带特殊变量｜变量带空格和符号,物流清关,带特殊变量,变量带空格和符号,物流/清关,"Dear [Customer Name], invoice [INV-2024/001] for [Order #12] is attached. Contact: [E-mail] / [Tel (WhatsApp)].",亲爱的 [Customer Name]，发票 [INV-2024/001]（订单 [Order #12]）见附件。联系方式：[E-mail] / [Tel (WhatsApp)]。,,
 缺少英文｜空内容测试,询盘接待,缺少英文,空内容测试,通用,,这一行英文为空，应该被拒绝,,
-阶段错误｜非法目录测试,未知阶段,阶段错误,非法目录测试,通用,This row has an unknown stage.,这一行沟通阶段不在标准目录里，应该被拒绝,,
+阶段为空｜空目录测试,,阶段为空,空目录测试,通用,This row has no stage.,这一行没有沟通阶段，应该被拒绝,,
 首次问候｜自我介绍,询盘接待,首次问候,自我介绍,通用,"Hi [Name], thanks for reaching out to [Company]! How can I help you today?",你好 [Name]，感谢联系 [Company]！今天有什么可以帮您？,,

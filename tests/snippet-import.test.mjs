@@ -94,10 +94,12 @@ test("builds folder preview in fixed customer-flow order", () => {
   assert.deepEqual(buildSnippetImportPreview(rows, [], () => "id", 1).folders, ["报价成交", "售后争议"]);
 });
 
-test("reports an unknown spreadsheet directory instead of creating it", () => {
+test("an unknown 沟通阶段 becomes a folder of that name, listed after the standard ones (D-068)", () => {
   const result = normalizeSnippetRow({ ...baseRow, 沟通阶段: "客服" }, 9);
-  assert.equal(result.item, null);
-  assert.equal(result.error, "第 9 行：沟通阶段“客服”不是标准目录");
+  assert.equal(result.error, "");
+  assert.equal(result.item.folder, "客服");
+  const rows = [{ ...baseRow, 沟通阶段: "客服", 具体场景: "问候" }, { ...baseRow, 沟通阶段: "报价", 具体场景: "首次报价" }];
+  assert.deepEqual(buildSnippetImportPreview(rows, [], () => "id", 1).folders, ["报价成交", "客服"]);
 });
 
 test("includes structured Chinese and product metadata in search text", () => {

@@ -7,38 +7,15 @@
 // Ids follow document order (C-001, …), so new tips go at the end of the document, as its header says.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseTipsDocument } from "../app/tips-doc.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const SOURCE = `${root}docs/company-tips.md`;
 const TARGET = `${root}app/company-tips.ts`;
 
+// The same parser the app uses for 导入 Tips (D-068), so the shipped tips and imported ones read a document alike.
 export function parseCompanyTips(markdown) {
-  const tips = [];
-  let tip = null;
-  const finish = () => {
-    if (!tip) return;
-    tips.push({
-      id: `C-${String(tips.length + 1).padStart(3, "0")}`,
-      title: tip.title,
-      text: tip.lines.join("\n"),
-      ...(tip.examples.length ? { examples: tip.examples } : {}),
-      ...(tip.source ? { source: tip.source } : {}),
-    });
-    tip = null;
-  };
-  for (const raw of markdown.split(/\r?\n/)) {
-    const line = raw.trim();
-    const title = line.match(/^\*\*(.+)\*\*$/);
-    if (title) { finish(); tip = { title: title[1].trim(), lines: [], examples: [] }; continue; }
-    if (line.startsWith("#") || line === "---") { finish(); continue; }
-    if (!tip || !line || line.startsWith(">") || line.startsWith("- ")) continue;
-    if (line.startsWith("✅")) tip.examples.push({ good: true, text: line.slice(1).trim() });
-    else if (line.startsWith("❌")) tip.examples.push({ good: false, text: line.slice(1).trim() });
-    else if (/^来源[:：]/.test(line)) tip.source = line.replace(/^来源[:：]\s*/, "");
-    else tip.lines.push(line);
-  }
-  finish();
-  return tips;
+  return parseTipsDocument(markdown);
 }
 
 export function renderCompanyTips(tips) {

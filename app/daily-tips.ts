@@ -53,7 +53,9 @@ export const TIPS_KEY = "clipbox.tips.v1";
 
 // companyFirst: the company tips were reached once, so a person who was in the middle of the usage tips when they
 // arrived jumps to the first company tip once and then moves on normally.
-export type TipsState = { version: 1; extra: Tip[]; shownId: string; shownDate: string; fetchedDate?: string; companyFirst?: true };
+// imported: tips the person imported from a Tips document or table (D-068), with their examples and source; an imported
+// tip with the id of a built-in one replaces it.
+export type TipsState = { version: 1; extra: Tip[]; shownId: string; shownDate: string; fetchedDate?: string; companyFirst?: true; imported?: Tip[] };
 
 const ID_MAX = 40;
 const TITLE_MAX = 12;
@@ -74,6 +76,44 @@ function cleanTip(value: unknown): Tip | null {
   if (!tip.title || [...tip.title].length > TITLE_MAX) return null;
   if (!tip.text || [...tip.text].length > TEXT_MAX) return null;
   return tip;
+}
+
+// Imported tips (D-068) are written by the company like the built-in company tips, so they may be longer and keep their
+// ✅ / ❌ examples and source.
+const IMPORTED_TITLE_MAX = 40;
+const IMPORTED_TEXT_MAX = 1000;
+const IMPORTED_EXAMPLES_MAX = 12;
+const IMPORTED_EXAMPLE_MAX = 300;
+const IMPORTED_SOURCE_MAX = 200;
+export const IMPORTED_TIPS_MAX = 500;
+
+export function cleanImportedTip(value: unknown): Tip | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const id = typeof raw.id === "string" ? raw.id.trim() : "";
+  const title = typeof raw.title === "string" ? raw.title.trim() : "";
+  const text = typeof raw.text === "string" ? raw.text.trim() : "";
+  if (!id || id.length > ID_MAX || !title || [...title].length > IMPORTED_TITLE_MAX || [...text].length > IMPORTED_TEXT_MAX) return null;
+  const examples = (Array.isArray(raw.examples) ? raw.examples : [])
+    .filter((example): example is { good: unknown; text: string } => Boolean(example) && typeof (example as { text?: unknown }).text === "string")
+    .map((example) => ({ good: example.good !== false, text: example.text.trim() }))
+    .filter((example) => example.text && [...example.text].length <= IMPORTED_EXAMPLE_MAX)
+    .slice(0, IMPORTED_EXAMPLES_MAX);
+  if (!text && !examples.length) return null;
+  const source = typeof raw.source === "string" ? raw.source.trim() : "";
+  return { id, title, text, ...(examples.length ? { examples } : {}), ...(source && [...source].length <= IMPORTED_SOURCE_MAX ? { source } : {}) };
+}
+
+function cleanImportedList(values: unknown[]): Tip[] {
+  const seen = new Set<string>();
+  const tips: Tip[] = [];
+  for (const value of values) {
+    const tip = cleanImportedTip(value);
+    if (!tip || seen.has(tip.id) || tips.length >= IMPORTED_TIPS_MAX) continue;
+    seen.add(tip.id);
+    tips.push(tip);
+  }
+  return tips;
 }
 
 function cleanList(values: unknown[]): Tip[] {
@@ -117,7 +157,13 @@ export function mergeTips(current: Tip[], incoming: Tip[]): Tip[] {
 }
 
 export function tipsLibrary(state: TipsState): Tip[] {
-  return mergeTips([...COMPANY_TIPS, ...BUILT_IN_TIPS], state.extra);
+  const library = mergeTips([...COMPANY_TIPS, ...BUILT_IN_TIPS], state.extra);
+  if (!state.imported?.length) return library;
+  // An imported tip replaces the tip with its id whole (examples and source included); new ones go at the end.
+  const byId = new Map(state.imported.map((tip) => [tip.id, tip]));
+  const replaced = library.map((tip) => byId.get(tip.id) ?? tip);
+  const have = new Set(library.map((tip) => tip.id));
+  return [...replaced, ...state.imported.filter((tip) => !have.has(tip.id))];
 }
 
 const isCompanyTip = (id: string) => COMPANY_TIPS.some((tip) => tip.id === id);
@@ -173,6 +219,8 @@ export function readTipsState(storage?: Pick<Storage, "getItem">): TipsState {
     };
     if (typeof data.fetchedDate === "string" && DAY.test(data.fetchedDate)) state.fetchedDate = data.fetchedDate;
     if (data.companyFirst === true) state.companyFirst = true;
+    const imported = Array.isArray(data.imported) ? cleanImportedList(data.imported) : [];
+    if (imported.length) state.imported = imported;
     return state;
   } catch {
     return freshTipsState();
@@ -187,4 +235,27 @@ export function writeTipsState(state: TipsState, storage?: Pick<Storage, "setIte
 export function mergeServerTips(state: TipsState, text: string, today: string): TipsState {
   const incoming = parseTipsFile(text);
   return { ...state, extra: mergeTips(state.extra, incoming), fetchedDate: today };
+}
+
+// Adds imported tips (D-068): a tip with a known id is replaced, a new one goes at the end. Nothing is removed.
+export function importTips(state: TipsState, incoming: Tip[]): { state: TipsState; added: number; updated: number; unchanged: number } {
+  const current = state.imported ?? [];
+  const known = new Set([...COMPANY_TIPS, ...BUILT_IN_TIPS, ...state.extra, ...current].map((tip) => tip.id));
+  const before = new Map(tipsLibrary(state).map((tip) => [tip.id, JSON.stringify(tip)]));
+  const next = [...current];
+  const at = new Map(next.map((tip, index) => [tip.id, index]));
+  let added = 0;
+  let updated = 0;
+  let unchanged = 0;
+  for (const raw of incoming) {
+    const tip = cleanImportedTip(raw);
+    if (!tip) continue;
+    if (!known.has(tip.id)) added += 1;
+    else if (before.get(tip.id) === JSON.stringify(tip)) unchanged += 1;
+    else updated += 1;
+    known.add(tip.id);
+    const index = at.get(tip.id);
+    if (index === undefined) { at.set(tip.id, next.length); next.push(tip); } else next[index] = tip;
+  }
+  return { state: { ...state, imported: cleanImportedList(next) }, added, updated, unchanged };
 }
