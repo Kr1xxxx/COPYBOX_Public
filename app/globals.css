@@ -1548,16 +1548,30 @@ button { -webkit-tap-highlight-color: transparent; }
 .note-api-fields>.secondary-button{justify-self:start}
 @media (max-width:520px){.note-api-field{grid-template-columns:1fr 1fr}}
 
+/* The brand fonts ship with the app (owner 2026-10-15 picked 装品牌字体): Latin letters only, so Chinese still uses the
+   system font. Files from Fontsource, SIL Open Font License (app/fonts/OFL-*.txt). */
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/poppins-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 500; font-display: swap; src: url("./fonts/poppins-latin-500.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 600; font-display: swap; src: url("./fonts/poppins-latin-600.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Lora"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/lora-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Lora"; font-style: normal; font-weight: 600; font-display: swap; src: url("./fonts/lora-latin-600.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* Chinese in Settings and the popups: MiSans (Xiaomi), owner's pick 2026-10-15, Windows and the browser; the Mac keeps
+   PingFang. Xiaomi's licence (app/fonts/MiSans-License.pdf) allows shipping it inside an app if the files stay unchanged
+   (no subsetting) and the app says it uses MiSans (设置 → 关于). Two weights only, to keep the installer small. */
+@font-face { font-family: "MiSans"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/MiSans-Regular.woff2") format("woff2"); }
+@font-face { font-family: "MiSans"; font-style: normal; font-weight: 600; font-display: swap; src: url("./fonts/MiSans-Semibold.woff2") format("woff2"); }
+:root { --brand-cjk: "MiSans"; }
+:root.platform-darwin { --brand-cjk: "PingFang SC"; }
 /* Brand dialogs (D-071; owner 2026-10-15: every popup follows the brand-guidelines skill). Palette: dark #141413,
    light #faf9f5, mid gray #b0aea5, light gray #e8e6dc; accents orange #d97757, blue #6a9bcc, green #788c5d. Titles in
-   Poppins, text in Lora, each falling back to the system Chinese font. Only colour and type change, never the layout.
+   Poppins, text in Lora (both bundled, Latin only), each with the system Chinese font behind it. Only colour and type change, never the layout.
    Dark theme swaps surface and ink. `:root:not(.brand-off)` only lifts these rules over the older dark-theme dialog
    rules above (same specificity, later in the file); nothing sets .brand-off. */
 :root {
   --brand-dark: #141413; --brand-light: #faf9f5; --brand-mid: #b0aea5; --brand-subtle: #e8e6dc;
   --brand-orange: #d97757; --brand-blue: #6a9bcc; --brand-green: #788c5d;
-  --brand-font-heading: "Poppins", Arial, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --brand-font-body: "Lora", var(--font-sans);
+  --brand-font-heading: "Poppins", var(--brand-cjk), Arial, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --brand-font-body: "Lora", var(--brand-cjk), var(--font-sans);
   --dlg-surface: var(--brand-light); --dlg-well: #f1efe8; --dlg-line: var(--brand-subtle); --dlg-ink: var(--brand-dark);
   --dlg-soft: #5e5d59; --dlg-edge: var(--brand-mid); --dlg-primary: var(--brand-dark); --dlg-primary-hover: #3d3d3a; --dlg-on-primary: var(--brand-light);
   --dlg-backdrop: rgba(20, 20, 19, .5);
@@ -1610,7 +1624,7 @@ button { -webkit-tap-highlight-color: transparent; }
 /* 设置 in the brand look (owner 2026-10-15: redesign the Settings window with the brand-guidelines skill, like the
    D-071 popups). Visual only: every setting keeps its tab, place and behaviour. The app's colour tokens are redefined
    inside the window, so every part in it (folders, AI, sync, backups) takes the brand palette without its own rule.
-   Headings and controls in Poppins (falls back to Arial), text in Lora (falls back to the system Chinese font). Accent
+   Headings and controls in Poppins, text in Lora (both bundled above; Chinese in the system font). Accent
    colour only marks state: the selected tab, focus, links. Dark theme swaps surface and ink. */
 .settings-dialog {
   --bg: var(--brand-light); --card: #ffffff; --content: #ffffff; --fill: var(--brand-subtle); --hover: #f0eee6;

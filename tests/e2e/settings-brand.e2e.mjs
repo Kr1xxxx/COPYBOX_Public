@@ -24,6 +24,31 @@ for (const [scheme, surface, ink] of [["light", "rgb(250, 249, 245)", "rgb(20, 2
   });
 }
 
+test("the brand fonts ship with the app: Poppins and Lora load from its own files, not from the computer", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await openSettings(page);
+  const loaded = await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all([document.fonts.load('600 16px "Poppins"', "Settings"), document.fonts.load('400 13px "Lora"', "API Key")]);
+    return [...document.fonts].filter((face) => face.status === "loaded").map((face) => `${face.family.replaceAll('"', "")} ${face.weight}`).sort();
+  });
+  expect(loaded).toEqual(expect.arrayContaining(["Lora 400", "Poppins 600"]));
+  // Chinese uses MiSans on Windows, and 关于 says so, as its licence asks.
+  const cjk = await page.evaluate(async () => { await document.fonts.load('600 16px "MiSans"', "设置"); return [...document.fonts].some((face) => face.family.replaceAll('"', "") === "MiSans" && face.status === "loaded"); });
+  expect(cjk).toBe(true);
+  expect(await page.locator(".settings-dialog .settings-page-title, .settings-dialog .settings-row strong").first().evaluate((el) => getComputedStyle(el).fontFamily)).toContain("MiSans");
+  await page.getByRole("tab", { name: "关于" }).click();
+  await expect(page.locator(".settings-dialog")).toContainText("MiSans");
+});
+
+test("on the Mac, Chinese in Settings stays in PingFang, not MiSans", async ({ page }) => {
+  await asDesktop(page, "darwin");
+  await openSettings(page);
+  const family = await page.locator(".settings-dialog .settings-row strong").first().evaluate((el) => getComputedStyle(el).fontFamily);
+  expect(family).toContain("PingFang SC");
+  expect(family).not.toContain("MiSans");
+});
+
 test("Settings rows are split by a single hairline, never a doubled one", async ({ page }) => {
   await asDesktop(page, "darwin");
   await openSettings(page);

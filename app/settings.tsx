@@ -158,7 +158,8 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
           {/* The first page opens with the product name and its Chinese name (D-044). */}
           {!searching && tab === "look" && <div className="settings-brand"><BrandWordmark className="settings-brand-mark" /><span className="settings-brand-text"><strong lang="en">Copyboxx</strong><span>复制盒</span></span>
             <span className="settings-brand-version">{version ? `v${version}` : "开发版本"}{updatedOn && <span> · {updatedOn}更新</span>}</span></div>}
-          <h2 className="settings-page-title" aria-hidden="true">{searching ? "搜索结果" : SETTINGS_TABS.find(([id]) => id === tab)?.[1]}</h2>
+          {/* 概览 opens with the wordmark alone, no page title under it (owner, 2026-10-15). */}
+          {(searching || tab !== "look") && <h2 className="settings-page-title" aria-hidden="true">{searching ? "搜索结果" : SETTINGS_TABS.find(([id]) => id === tab)?.[1]}</h2>}
           {searching && hits.size === 0 && <p className="settings-empty">没有找到「{query.trim()}」相关的设置</p>}
           <section className="settings-card" aria-labelledby="set-look" hidden={hideSection("look", "set-look")}><h3 id="set-look">外观</h3>
             <div className="settings-row"><div><strong>主题</strong><small>跟随系统会随系统的深浅色设置自动切换</small></div>
@@ -262,6 +263,8 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
             <div className="settings-row"><div><strong>Copyboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Copyboxx ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
             {row("使用说明", "第一次打开时的几步介绍：话术、图片、账号和迷你窗口", onShowGuide, "再看一遍")}
+            {/* The MiSans licence asks the app to say it uses MiSans (app/fonts/MiSans-License.pdf). */}
+            <div className="settings-row static"><div><strong>字体</strong><small>设置和弹窗使用 MiSans（小米）、Poppins 和 Lora 字体</small></div></div>
             {builtAt && <div className="settings-row static"><div><strong>更新时间</strong><small className="settings-build-time">{builtAt}</small></div></div>}
           </section>
         </div>

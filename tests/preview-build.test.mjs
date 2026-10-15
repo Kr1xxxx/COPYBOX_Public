@@ -7,6 +7,7 @@ import {
   patchPreloadHelper,
   previewBuildInfo,
   relativizeAssets,
+  relativizeCssUrls,
   renderWrapper,
   withDesktopShim,
 } from "../tools/preview/build.mjs";
@@ -83,4 +84,9 @@ test("compileModuleTree ships the runtime imports of image-store and drops type-
   assert.deepEqual([...files.keys()].sort(), ["helper.js", "image-store.js"]);
   assert.ok(files.get("image-store.js").includes('from "./helper.js"'));
   assert.ok(!files.get("image-store.js").includes(".ts"));
+});
+
+test("relativizeCssUrls points stylesheet urls (the bundled fonts) at the folder next to css/", () => {
+  const css = '@font-face{src:url(/_next/static/media/poppins-latin-400.abc.woff2) format("woff2")}a{background:url("/_next/static/media/x.png")}';
+  assert.equal(relativizeCssUrls(css), '@font-face{src:url(../media/poppins-latin-400.abc.woff2) format("woff2")}a{background:url("../media/x.png")}');
 });
