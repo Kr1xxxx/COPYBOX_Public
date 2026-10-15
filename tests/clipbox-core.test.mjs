@@ -341,7 +341,10 @@ test("keeps favorites after refresh and hides add controls in virtual directorie
   assert.equal(typeof resolveRefreshedActiveFolder, "function");
   assert.equal(resolveRefreshedActiveFolder("snippet", standardSnippetFolders, "pinned"), "pinned");
   assert.equal(resolveRefreshedActiveFolder("snippet", standardSnippetFolders, "uncategorized"), "all");
-  assert.equal(resolveRefreshedActiveFolder("secret", [], "uncategorized"), "uncategorized");
+  // 账号 has no 目录 and no 未分类 since 2026-10-15: an old view of one opens 全部.
+  assert.equal(resolveRefreshedActiveFolder("secret", [], "uncategorized"), "all");
+  assert.equal(resolveRefreshedActiveFolder("secret", ["工作"], "folder:工作"), "all");
+  assert.equal(resolveRefreshedActiveFolder("secret", ["工作"], "recent"), "recent");
   assert.equal(canAddItemInFolder("all"), true);
   assert.equal(canAddItemInFolder("folder:团队专用"), true);
   assert.equal(canAddItemInFolder("pinned"), false);

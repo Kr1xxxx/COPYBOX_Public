@@ -233,28 +233,17 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
       </header>
       <form ref={formRef} onSubmit={submit}>
           <div className="editor-body">
-            <div className="editor-meta-grid">
+            <div className={`editor-meta-grid ${kind === "snippet" ? "" : "single"}`}>
               <label className="native-field"><span>{structured ? "具体场景" : "标题"}</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? (PLAIN_NOTES ? "例如 常用地址" : "例如 prod-ssh") : "例如 售后夸赞"} maxLength={60} /></div></label>
-              <label className="native-field folder-field">
-                <span>目录 <small>{kind === "secret" ? "可选择或手写" : "必选"}</small></span>
+              {/* 账号 has no 目录 (sorted by 分类 only); an old entry keeps the folder it was saved with. */}
+              {kind === "snippet" && <label className="native-field folder-field">
+                <span>目录 <small>必选</small></span>
                 <div className="folder-select">
-                  {kind === "secret" ? <>
-                    <input
-                      list="secret-folder-options"
-                      value={folder}
-                      onChange={(event) => setFolder(event.target.value)}
-                      placeholder="未分类"
-                      maxLength={30}
-                      autoComplete="off"
-                    />
-                    <datalist id="secret-folder-options">
-                      {folders.map((value) => <option key={value} value={value} />)}
-                    </datalist>
-                  </> : <select value={folder} onChange={(event) => setFolder(event.target.value)} required>
+                  <select value={folder} onChange={(event) => setFolder(event.target.value)} required>
                     {folders.map((value) => <option key={value} value={value}>{value}</option>)}
-                  </select>}
+                  </select>
                 </div>
-              </label>
+              </label>}
             </div>
 
             {kind === "secret" && !PLAIN_NOTES && <label className="native-field reference-note-field"><span>被什么引用 <small>可选</small></span><div className="soft-input"><input value={referenceNote} onChange={(event) => setReferenceNote(event.target.value)} placeholder="例如 Shopify API、订单同步任务" maxLength={120} /></div></label>}

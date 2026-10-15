@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test("folders can be drag-sorted in Settings; standard folders cannot", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
-  // The first group is 话术; the second one (备注/账号) is only on macOS, so the browser and Windows have one group.
+  // The first group is 话术; 账号 has no 目录 on any platform (sorted by 分类 only).
   await dialog.getByRole("tab", { name: "目录" }).click();
   const group = dialog.locator(".settings-folder-group").nth(0);
   await group.getByRole("button", { name: /话术目录/ }).click();

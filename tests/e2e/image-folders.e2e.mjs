@@ -512,7 +512,7 @@ test("the 话术 mini window keeps its own folder tabs", async ({ page }) => {
   await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
 });
 
-test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs", async ({ page }) => {
+test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep theirs (账号: 分类 only)", async ({ page }) => {
   await openImages(page, "darwin");
   await expect(page.locator(".kind-switch button")).toHaveText(["话术", "图片", "账号"]);
   await expect(navCount(page, "全部图片")).toHaveText("0");
@@ -530,8 +530,10 @@ test("macOS: 图片 has the same folder sidebar while 话术 and 账号 keep the
   await expect(sidebar(page)).not.toContainText("全部图片");
   await expect(sidebar(page)).not.toContainText("收款码");
 
+  // 账号 is sorted by 分类 only since 2026-10-15: no 目录 and no 未分类 there.
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await expect(sidebar(page)).toContainText("未分类");
+  await expect(sidebar(page)).toContainText("分类");
+  await expect(sidebar(page)).not.toContainText("未分类");
   await expect(sidebar(page)).toContainText("回收站");
   await expect(sidebar(page)).not.toContainText("全部图片");
   await expect(sidebar(page)).not.toContainText("收款码");
