@@ -119,6 +119,7 @@ import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
 import { isSyncedSnippet, mergeAccounts, mergeSnippets, syncPolicy, tooManyRemovals } from "./cloud-sync-core";
 import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, presetLibraryText, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
+import { domainLibraryActive, readDomainLibrary, settleDomainMark, shouldApplyPreset, shouldFetchDomainLibrary, syncChangedSomething, takeDomainAnswer } from "./domain-library";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
 import { useDropdownDismiss, useRowMenuPlacement } from "./dropdown-menus";
@@ -658,12 +659,13 @@ export default function Home() {
 
   // On start and every 30 minutes while open, if a 同步码 is set: stay silent unless something changed, and never
   // complain when offline or when the code finds nothing (the next round tries again).
-  // Without a 同步码, a build that ships the company's 话术 (D-066) adds and updates them once on start instead.
+  // Without a 同步码, a build that ships the company's 话术 (D-066) adds and updates them once on start instead, unless
+  // this computer gets its company's 话术 by the signed-in email's domain (domain-library.ts, below).
   useEffect(() => {
     if (loading) return;
     let running = false;
     const preset = presetLibraryText();
-    if (preset && !readSharedUrl()) {
+    if (shouldApplyPreset({ preset, syncCode: readSharedUrl(), mark: readDomainLibrary() })) {
       void applySharedLibraryText(preset).then((summary) => {
         if (!summary.added && !summary.updated && !summary.keptMine && !summary.retired) return;
         showToast(`公司话术已装好：${describeSync(summary)}`, { ms: 3600 });
@@ -716,6 +718,36 @@ export default function Home() {
       } : null,
     },
   });
+
+  // Company 话术 by the signed-in email's domain: on start, every 30 minutes and right after signing in, unless a 同步码
+  // is typed (it always wins). Applied like a 同步码 library; quiet unless something changed, silent on any failure.
+  const cloudEmail = cloudSync.account?.email ?? "";
+  const getCompanyLibrary = cloudSync.getLibrary;
+  const [domainLibrary, setDomainLibrary] = useState(() => (typeof window === "undefined" ? "" : readDomainLibrary()?.domain ?? ""));
+  useEffect(() => {
+    if (loading) return;
+    settleDomainMark(cloudEmail);
+    if (!cloudEmail) return;
+    let running = false;
+    let stopped = false;
+    const syncNow = () => {
+      if (running || !shouldFetchDomainLibrary({ syncCode: readSharedUrl(), email: cloudEmail })) return;
+      running = true;
+      void (async () => {
+        const answer = await getCompanyLibrary();
+        if (!answer || stopped) return;
+        const library = takeDomainAnswer(answer, Date.now());
+        setDomainLibrary(library?.domain ?? "");
+        if (!library) return;
+        const summary = await applySharedLibraryText(library.text);
+        if (syncChangedSomething(summary)) showToast(`公司话术已同步：${describeSync(summary)}`, { ms: 3600 });
+      })().catch(() => undefined).finally(() => { running = false; });
+    };
+    syncNow();
+    const timer = window.setInterval(syncNow, SHARED_SYNC_INTERVAL_MS);
+    return () => { stopped = true; window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, cloudEmail]);
 
   // 输入企业同步码 on the empty list: Settings opens on its home page, where the field sits; put the cursor in it.
   function openSyncCode() {
@@ -2414,7 +2446,7 @@ export default function Home() {
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
         usageItems={items}
         onShowItem={showItemInList}
-        syncCode={<><CloudAccountRows cloud={cloudSync} platform={cloudPlatform} accountsLocked={!accountKey} /><SyncCodeRow onApply={applySharedLibraryText} /></>}
+        syncCode={<><CloudAccountRows cloud={cloudSync} platform={cloudPlatform} accountsLocked={!accountKey} companyDomain={domainLibraryActive(domainLibrary, cloudEmail, readSharedUrl())} /><SyncCodeRow onApply={applySharedLibraryText} /></>}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
         onShowGuide={() => { setSettingsOpen(false); guide.show(); }}

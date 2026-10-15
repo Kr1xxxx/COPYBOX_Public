@@ -16,9 +16,10 @@ const wrangler = ["--yes", "wrangler@4.150.0"];
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 
 // Keys in the namespace that the current build no longer has. Keys under sync/ (the company 话术 libraries and their
-// history, written by sync.mjs) and download/private-<token>/ (the private builds' installer and latest.json, uploaded
-// by hand) are never part of a build and are never removed here.
-const kept = ["sync/", "download/private-"];
+// history, written by sync.mjs), domains/ (email domains bound to a 同步码, written by sync.mjs --link-domain) and
+// download/private-<token>/ (the private builds' installer and latest.json, uploaded by hand) are never part of a
+// build and are never removed here.
+const kept = ["sync/", "domains/", "download/private-"];
 
 export function staleKeys(existingKeys, manifestKeys) {
   const keep = new Set(manifestKeys);

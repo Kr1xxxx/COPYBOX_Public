@@ -270,3 +270,14 @@ test("worker: company 话术 sync at /sync/<code>/snippets.json, every miss the 
   assert.deepEqual([...bodies], ["404 Not Found"]);
   assert.ok(!env.reads.includes("sync/XS-7KQ2M9AB/history/snippets-1.json"));
 });
+
+test("worker: domain bindings (domains/<domain> → 同步码) are never served as files", async () => {
+  const env = fakeEnv({ ...files, "domains/company.com": "XS-7KQ2M9AB", "domains/index.html": "x" });
+  for (const path of ["/domains", "/domains/", "/domains/company.com", "//domains/company.com", "/%64omains/company.com", "/domains%2Fcompany.com"]) {
+    assert.equal(candidateKeys(path), null, path);
+    const response = await get(path, {}, env);
+    assert.equal(response.status, 404, path);
+    assert.ok(!(await response.text()).includes("XS-7KQ2M9AB"), path);
+  }
+  assert.ok(!env.reads.some((key) => key.startsWith("domains")), env.reads.join(", "));
+});

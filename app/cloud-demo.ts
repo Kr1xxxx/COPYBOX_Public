@@ -7,6 +7,18 @@ import type { CloudRequest, CloudResponse } from "./cloud-client.ts";
 export const DEMO_CODE = "123456";
 export const CLOUD_DEMO_KEY = "clipbox.cloud-demo.v1";
 
+// Company 话术 by email domain: the pretend server binds example.com to this small library; every other domain has none.
+export const DEMO_DOMAIN = "example.com";
+export const DEMO_DOMAIN_LIBRARY = {
+  format: "clipbox-shared-library",
+  version: 1,
+  items: [
+    { id: "DEMO-DOMAIN-1", folder: "询盘接待", label: "公司欢迎语", secret: "您好，感谢联系我们！请问有什么可以帮您？" },
+    { id: "DEMO-DOMAIN-2", folder: "报价成交", label: "公司报价说明", secret: "报价含包装，不含运费，有效期 7 天。" },
+    { id: "DEMO-DOMAIN-3", folder: "物流清关", label: "公司发货时间", secret: "下单后 3 个工作日内发货，发货后会发您单号。" },
+  ],
+};
+
 type DemoState = {
   vaults: Record<string, { version: number; data: unknown }>;
   sessions: Record<string, string>;
@@ -73,6 +85,10 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
     state.vaults[owner] = { version: current + 1, data: body.data };
     save(state);
     return reply(200, { version: current + 1 });
+  }
+  if (request.path === "/api/library" && request.method === "GET") {
+    const domain = owner.slice(owner.lastIndexOf("@") + 1).toLowerCase();
+    return reply(200, domain === DEMO_DOMAIN ? { domain, library: DEMO_DOMAIN_LIBRARY } : { domain: null, library: null });
   }
   if (request.path === "/api/auth/logout" && request.method === "POST") {
     delete state.sessions[request.token!];

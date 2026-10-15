@@ -62,6 +62,8 @@ export function candidateKeys(pathname) {
   }
   if (path.includes("..") || path.includes("\\") || path.includes("\0")) return null;
   const key = path.replace(/^\/+/, "");
+  // domains/<domain> holds the 同步码 bound to an email domain (sync.mjs --link-domain): never served as a file.
+  if (key === "domains" || key.startsWith("domains/")) return null;
   if (key === "" || key.endsWith("/")) return [{ key: `${key}index.html` }];
   const candidates = [{ key }];
   if (!extensionOf(key)) candidates.push({ key: `${key}/index.html`, redirect: `${pathname}/` });

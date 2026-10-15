@@ -7,6 +7,7 @@ import { maskEmail } from "./account-lock";
 import { CloudError, MAX_DEVICES, clearSessionToken, cloudTransport, createCloudApi, deviceName, looksLikeEmail, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeSessionToken, type CloudAccount } from "./cloud-client";
 import { DEMO_CODE } from "./cloud-demo";
 import { describeCounts } from "./cloud-sync-core";
+import { domainLibraryLine } from "./domain-library";
 import { clearSyncBase, readSyncBase, syncOnce, writeSyncBase, type SyncSteps } from "./cloud-sync";
 import { formatTaipeiDate } from "./clipbox-core";
 import { VAULT_CHANGED_EVENT } from "./secret-items-store";
@@ -136,6 +137,13 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     await sync(true);
   }
 
+  // The company 话术 bound to this email's domain (domain-library.ts); null when signed out here.
+  async function getLibrary() {
+    const session = await token();
+    if (!api.current || !accountRef.current || !session) return null;
+    return api.current.getLibrary(session);
+  }
+
   async function signOut() {
     const session = await token();
     if (api.current && session) { try { await api.current.logout(session); } catch { /* signed out here either way */ } }
@@ -153,7 +161,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     setNotice("");
   }
 
-  return { available: Boolean(transport), demo: Boolean(transport && typeof window !== "undefined" && window.clipboxDesktop?.cloudDemo), account, busy, error, notice, sendCode, signIn, syncNow: () => sync(true), signOut, deleteAccount };
+  return { available: Boolean(transport), demo: Boolean(transport && typeof window !== "undefined" && window.clipboxDesktop?.cloudDemo), account, busy, error, notice, sendCode, signIn, syncNow: () => sync(true), getLibrary, signOut, deleteAccount };
 }
 
 export type CloudSync = ReturnType<typeof useCloudSync>;
@@ -168,7 +176,7 @@ function errorText(failure: unknown) {
   return failure instanceof Error ? failure.message : "没有成功，请再试一次";
 }
 
-export function CloudAccountRows({ cloud, platform, accountsLocked }: { cloud: CloudSync; platform: string | undefined; accountsLocked: boolean }) {
+export function CloudAccountRows({ cloud, platform, accountsLocked, companyDomain = "" }: { cloud: CloudSync; platform: string | undefined; accountsLocked: boolean; companyDomain?: string }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -263,6 +271,7 @@ export function CloudAccountRows({ cloud, platform, accountsLocked }: { cloud: C
           <button type="button" className="secondary-button" disabled={cloud.busy} onClick={() => void cloud.syncNow()}>{cloud.busy ? "同步中…" : "立即同步"}</button>
           <button type="button" className="secondary-button" onClick={() => void cloud.signOut()}>退出登录</button>
         </div></div>
+      {companyDomain && <p className="settings-note cloud-domain-library">{domainLibraryLine(companyDomain)}</p>}
       <p className="settings-note">{scope}。{limit}{accountsLocked ? "账号页上了锁，打开账号页解锁后才会同步账号。" : ""}退出登录后，这台电脑上的内容不变。</p>
       {cloud.notice && <p className="settings-note cloud-notice" role="status">{cloud.notice}</p>}
       {cloud.error && <p className="settings-note shared-error" role="alert">{cloud.error}</p>}

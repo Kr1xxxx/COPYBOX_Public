@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { asDesktop, seedSnippets } from "./helpers.mjs";
 
 // 登录同步 (D-064) against the pretend server the web preview uses (app/cloud-demo.ts): code 123456.
-const EMAIL = "staff@example.com";
+// Not example.com: the pretend server binds that domain to a company 话术 library (domain-library.e2e.mjs).
+const EMAIL = "staff@example.org";
 
 async function openHome(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
