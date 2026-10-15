@@ -2,6 +2,9 @@
 
 mod ai;
 mod automation;
+// Only the command line door (macOS and Linux) uses it; its tests run everywhere.
+#[cfg_attr(not(unix), allow(dead_code))]
+mod caller;
 mod backup;
 mod device_key;
 mod flush;

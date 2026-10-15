@@ -195,18 +195,27 @@ export function DeleteConfirmDialog({ request, onClose, onConfirm }: {
 }
 
 // Asked when the command line wants a 秘密 (clipbox-automation.ts). 拒绝 has focus, so Enter or Escape refuses.
-export function AutomationConsentDialog({ question, onAnswer }: { question: string; onAnswer: (allowed: boolean) => void }) {
+// 「始终允许」 (D-059) is offered only when the shell could tell which program asked, and never for an export of all 秘密.
+export function AutomationConsentDialog({ question, callerName, canAlways = false, onAnswer }: {
+  question: string; callerName?: string; canAlways?: boolean;
+  onAnswer: (answer: "denied" | "once" | "always") => void;
+}) {
   const dialogRef = useRef<HTMLElement>(null);
-  const deny = useCallback(() => onAnswer(false), [onAnswer]);
+  const deny = useCallback(() => onAnswer("denied"), [onAnswer]);
   useDialogKeyboard(dialogRef, deny);
   useEffect(() => { dialogRef.current?.querySelector<HTMLElement>("[data-deny]")?.focus(); }, []);
   return (
     <div className="delete-confirm-backdrop" role="presentation">
       <section ref={dialogRef} className="delete-confirm-dialog consent-dialog" role="alertdialog" aria-modal="true" aria-labelledby="automation-consent-title" aria-describedby="automation-consent-text">
-        <header><h2 id="automation-consent-title">允许读取秘密吗？</h2><p id="automation-consent-text">{question}</p></header>
+        <header><h2 id="automation-consent-title">允许读取秘密吗？</h2><p id="automation-consent-text">{question}</p>
+          {callerName && <p className="automation-consent-caller">来自：<strong>{callerName}</strong></p>}</header>
         <div className="consent-body">
-          <p className="consent-note">如果不是你自己刚刚运行的命令，请点「拒绝」。</p>
-          <div className="delete-confirm-actions consent-actions"><button type="button" data-deny onClick={deny}>拒绝</button><button type="button" className="primary" onClick={() => onAnswer(true)}>允许</button></div>
+          <p className="consent-note">如果不是你自己刚刚运行的命令，请点「拒绝」。{canAlways && `选「始终允许」后，${callerName}以后读取秘密不再询问，可在 设置 → 数据 → 始终允许的程序 里取消。`}</p>
+          <div className="delete-confirm-actions consent-actions">
+            <button type="button" data-deny onClick={deny}>拒绝</button>
+            {canAlways && <button type="button" onClick={() => onAnswer("always")}>始终允许</button>}
+            <button type="button" className="primary" onClick={() => onAnswer("once")}>允许</button>
+          </div>
         </div>
       </section>
     </div>
