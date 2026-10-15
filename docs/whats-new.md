@@ -1,4 +1,4 @@
-# 更新通知 (D-069)
+# 更新通知 (D-070)
 
 Staff see one small card after an update reaches them. The owner approves every text before it ships.
 

@@ -1,4 +1,4 @@
-### D-069 更新通知 after every push; every popup in the brand style (2026-10-15)
+### D-070 更新通知 after every push; every popup in the brand style (2026-10-15)
 - Context (owner, 2026-10-15): 「每次从我下发到账号里的更新，你都要做一个通知，简单说下有什么变动」 — only notable
   additions (a new feature such as 话术分享, 新增多少话术 / 多少 Tips), no button or design tweaks, no notice for old changes;
   he approves each text and it ships with the change. 话术 arrive without a software update, so the notice must come with

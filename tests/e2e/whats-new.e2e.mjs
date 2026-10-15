@@ -3,9 +3,9 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets } from "./helpers.mjs";
 
-// 更新通知 (D-069): a notice that comes with a 同步码 push shows once as a small card; a sample can be shown by event.
+// 更新通知 (D-070): a notice that comes with a 同步码 push shows once as a small card; a sample can be shown by event.
 const V1 = fileURLToPath(new URL("../../docs/samples/shared-library-v1.json", import.meta.url));
 const V2 = fileURLToPath(new URL("../../docs/samples/shared-library-v2.json", import.meta.url));
 
@@ -80,7 +80,8 @@ test("the web preview can show a sample app notice", async ({ page }) => {
 });
 
 test("the installed app remembers its version; a version without lines shows nothing", async ({ page }) => {
-  await page.addInitScript(() => { window.clipboxDesktop = { platform: "win32", getVersion: async () => "1.99.0", aiStatus: async () => ({ hasKey: false, origin: "" }) }; });
+  await asDesktop(page, "win32");
+  await page.addInitScript(() => { window.clipboxDesktop.getVersion = async () => "1.99.0"; });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.whats-new.v1") || "{}").version)).toBe("1.99.0");

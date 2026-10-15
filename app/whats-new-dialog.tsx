@@ -9,7 +9,7 @@ export const WHATS_NEW_PREVIEW_EVENT = "clipbox:whats-new";
 
 type Queued = { notice: WhatsNewNotice; preview?: boolean };
 
-// Holds the notices waiting to be shown (D-069): the app's own after an update, then any that came with a 同步码 sync.
+// Holds the notices waiting to be shown (D-070): the app's own after an update, then any that came with a 同步码 sync.
 // `ready`: the data is open, the full window shows and no first-run guide is up; until then they wait.
 export function useWhatsNew({ ready, version, firstRun, previewTools }: { ready: boolean; version: string; firstRun: boolean; previewTools: boolean }) {
   const [queue, setQueue] = useState<Queued[]>([]);

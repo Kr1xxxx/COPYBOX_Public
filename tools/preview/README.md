@@ -3,7 +3,7 @@
 A browser build of Clipbox for looking at a branch without installing anything. `index.html` shows the real app
 in a frame with a Windows / Mac switch; the desktop shell is faked by a small script. Nothing is added on open (owner, 2026-10-14):
 the 补齐 10 张测试图 button adds simulated test images through the app's own image store (`seed.js`), and the update
-notice never shows. 看更新通知 shows the app's 更新通知 card (D-069) with sample lines, for both kinds. The 导入测试话术 menu opens the app's real import
+notice never shows. 看更新通知 shows the app's 更新通知 card (D-070) with sample lines, for both kinds. The 导入测试话术 menu opens the app's real import
 dialog with one of four sample sheets: three short groups in `samples/` and the full test sheet from `docs/samples/`. It is a snapshot of the branch being reviewed,
 built from that branch's code.
 

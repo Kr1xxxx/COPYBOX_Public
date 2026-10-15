@@ -1548,7 +1548,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .note-api-fields>.secondary-button{justify-self:start}
 @media (max-width:520px){.note-api-field{grid-template-columns:1fr 1fr}}
 
-/* Brand dialogs (D-069; owner 2026-10-15: every popup follows the brand-guidelines skill). Palette: dark #141413,
+/* Brand dialogs (D-070; owner 2026-10-15: every popup follows the brand-guidelines skill). Palette: dark #141413,
    light #faf9f5, mid gray #b0aea5, light gray #e8e6dc; accents orange #d97757, blue #6a9bcc, green #788c5d. Titles in
    Poppins, text in Lora, each falling back to the system Chinese font. Only colour and type change, never the layout.
    Dark theme swaps surface and ink. `:root:not(.brand-off)` only lifts these rules over the older dark-theme dialog
