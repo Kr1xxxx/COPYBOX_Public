@@ -1,4 +1,4 @@
-### D-058 A local MCP server so Codex and other AI tools can reach Copyboxx (2026-10-15)
+### D-060 A local MCP server so Codex and other AI tools can reach Copyboxx (2026-10-15; D-058 and D-059 went to parallel PRs)
 - Context (owner, 2026-10-15): 「能不能加一个本机接口，codex 什么的可以连接上？」. Until now the only local door was the
   `clipbox` command line over a unix socket, macOS/Linux only; Windows, where the owner and staff work, had none.
 - Decision: the app's own program doubles as an MCP server. `Copyboxx --mcp` (src-tauri/src/mcp.rs) speaks the Model
@@ -14,7 +14,9 @@
     that exports all secrets at once (the command line's `secret export` stays command-line only).
   - The tool's own name (MCP `clientInfo`, e.g. "Codex") travels as `_client` in the command; the shell takes it out and
     hands it to the page as `client` next to the command. It is what the program says about itself, not proof: any
-    program on this computer can claim to be Codex. An always-allow per program (D-059) must say so.
+    program on this computer can claim to be Codex, so an always-allow (D-059) must not trust it. D-059 finds the caller
+    from the connecting process; through MCP that process is Copyboxx itself (`--mcp`), so it has to look past it to
+    its parent (Codex). Until it does, an always-allow given to an MCP call covers every tool that uses `--mcp`.
   - 设置 → AI → 「连接 Codex 等工具」 shows the `codex mcp add …` / `claude mcp add …` commands and the
     `~/.codex/config.toml` lines with this computer's program path, each with 复制. How-to: docs/codex-mcp.md.
 - Consequences: AI tools on this computer can read and change 话术 while Copyboxx is open; secrets still need a click

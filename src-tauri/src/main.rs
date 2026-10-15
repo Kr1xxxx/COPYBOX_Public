@@ -47,7 +47,7 @@ fn mcp_program_path() -> Option<String> {
 }
 
 fn main() {
-    // `Copyboxx --mcp`: a tool such as Codex started us as its MCP server. No window; talk to the running app (D-058).
+    // `Copyboxx --mcp`: a tool such as Codex started us as its MCP server. No window; talk to the running app (D-060).
     if mcp::is_mcp_launch(&std::env::args().collect::<Vec<_>>()) {
         mcp::run();
         return;

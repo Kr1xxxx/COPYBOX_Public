@@ -1,4 +1,4 @@
-// The MCP server (D-058). `Copyboxx --mcp` speaks the Model Context Protocol on stdin/stdout, so Codex, Claude Code,
+// The MCP server (D-060). `Copyboxx --mcp` speaks the Model Context Protocol on stdin/stdout, so Codex, Claude Code,
 // Cursor and other AI tools can start it as a local tool. It does not open a window: each tool call becomes one command
 // on the running app's local door (automation.rs), and the app answers it exactly as it answers the `clipbox` command
 // line, including the 「允许读取秘密吗？」 question before any 秘密 leaves the app.

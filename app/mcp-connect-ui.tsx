@@ -1,6 +1,6 @@
 "use client";
 
-// 设置 → AI → 「连接 Codex 等工具」 (D-058): copyable commands that let AI tools reach Copyboxx through `--mcp`.
+// 设置 → AI → 「连接 Codex 等工具」 (D-060): copyable commands that let AI tools reach Copyboxx through `--mcp`.
 import { useEffect, useState } from "react";
 import { EXAMPLE_PROGRAM_PATH, claudeAddCommand, codexAddCommand, codexConfigBlock } from "./mcp-connect";
 

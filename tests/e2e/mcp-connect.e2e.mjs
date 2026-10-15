@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { asDesktop } from "./helpers.mjs";
 
-// 设置 → AI → 「连接 Codex 等工具」 (D-058): the commands that let Codex and others start `Copyboxx --mcp`.
+// 设置 → AI → 「连接 Codex 等工具」 (D-060): the commands that let Codex and others start `Copyboxx --mcp`.
 async function openAiSettings(page) {
   await page.goto("/");
   await page.waitForSelector(".app-shell");

@@ -62,7 +62,7 @@ export type ClipboxDesktop = {
   onAutomationCommand: (callback: (request: { requestId: string; command: unknown; client?: string | null }) => void) => () => void;
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;
-  // The program AI tools start as Copyboxx's MCP server (`<path> --mcp`, D-058); older shells lack it.
+  // The program AI tools start as Copyboxx's MCP server (`<path> --mcp`, D-060); older shells lack it.
   mcpProgramPath?: () => Promise<string | null>;
   setWindowMode?: (mode: WindowMode) => void;
   // 固定在最上层: keeps the full window above other windows (the mini window always is).

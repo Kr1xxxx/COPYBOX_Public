@@ -1,4 +1,4 @@
-# 让 Codex 等 AI 工具连接 Copyboxx（本机接口，D-058）
+# 让 Codex 等 AI 工具连接 Copyboxx（本机接口，D-060）
 
 Copyboxx 自带一个本机接口（MCP）。Codex、Claude Code、Cursor 这类 AI 工具接上以后，可以帮你查话术、新增话术、
 改话术、移动目录、把话术移进回收站。数据不会离开这台电脑。

@@ -1,6 +1,6 @@
 // The local door for other programs: one JSON command per connection, passed to the page, whose answer goes back.
 // macOS and Linux: a private unix socket (the `clipbox` command line uses it; same protocol as the former Electron
-// shell). Windows: a named pipe for this user only (D-058). Both carry the commands of the MCP server (mcp.rs) that
+// shell). Windows: a named pipe for this user only (D-060). Both carry the commands of the MCP server (mcp.rs) that
 // Codex and similar tools start with `Copyboxx --mcp`.
 use serde_json::{json, Value};
 use std::collections::HashMap;

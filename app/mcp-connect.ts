@@ -1,4 +1,4 @@
-// What 设置 → AI → 「连接 Codex 等工具」 shows (D-058): the commands that register Copyboxx's MCP server
+// What 设置 → AI → 「连接 Codex 等工具」 shows (D-060): the commands that register Copyboxx's MCP server
 // (`<this program> --mcp`, src-tauri/src/mcp.rs) with Codex and Claude Code, and the lines for Codex's config file.
 
 export const MCP_SERVER_NAME = "copyboxx";
