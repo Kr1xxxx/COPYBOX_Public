@@ -1,6 +1,7 @@
 import type { SecretItem, SharedContent, SharedLink, SnippetMeta } from "./clipbox-core.ts";
 import { extractPlaceholders, productGroupsForRawProduct } from "./snippet-import.ts";
-import { normalizeImportedSnippetFolder } from "./snippet-folders.ts";
+import { PRESET_LIBRARY, type PresetLibrary } from "./preset-library.ts";
+import { STANDARD_SNIPPET_FOLDERS, normalizeImportedSnippetFolder } from "./snippet-folders.ts";
 
 // The company 话术 library: one JSON file that every employee's app reads. Entries have a stable id, so a sync can tell
 // "new", "changed" and "removed" apart. A sync never overwrites what an employee wrote or edited, and never deletes.
@@ -97,7 +98,7 @@ function readEntry(raw: unknown): SharedSnippet | null {
     id,
     label,
     secret,
-    folder: normalizeImportedSnippetFolder(text(entry.folder)) || "询盘接待",
+    folder: normalizeImportedSnippetFolder(text(entry.folder)) || STANDARD_SNIPPET_FOLDERS[0],
     note: text(entry.note),
     summary: text(entry.summary),
     scene: text(entry.scene) || label,
@@ -143,11 +144,16 @@ export function parseSharedLibrary(source: string): { items: SharedSnippet[]; sk
   return { items, skipped };
 }
 
+// The 话术 this build ships with (D-066), as a company library file; "" when the build has none.
+export function presetLibraryText(library: PresetLibrary = PRESET_LIBRARY) {
+  return library.items.length ? JSON.stringify({ format: SHARED_FORMAT, version: 1, items: library.items }) : "";
+}
+
 // Writes the 话术 of this app as a company library file (for whoever maintains the shared library).
 export function exportSharedLibrary(items: SecretItem[], now: number) {
   const entries = items
     .filter((item) => item.kind === "snippet" && !item.deletedAt && item.secret.trim())
-    .map((item) => ({ id: item.shared?.id || item.id, folder: item.folder || item.snippetMeta?.stage || "询盘接待", ...contentOf(item) }));
+    .map((item) => ({ id: item.shared?.id || item.id, folder: item.folder || item.snippetMeta?.stage || STANDARD_SNIPPET_FOLDERS[0], ...contentOf(item) }));
   return JSON.stringify({ format: SHARED_FORMAT, version: 1, updatedAt: now, items: entries }, null, 2) + "\n";
 }
 
