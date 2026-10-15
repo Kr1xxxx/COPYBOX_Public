@@ -31,6 +31,13 @@ test("macOS: a 秘密 export over the command line waits for 允许, and 拒绝 
   const dialog = page.getByRole("alertdialog", { name: "允许读取秘密吗？" });
   await expect(dialog).toContainText("导出全部秘密");
   await expect(dialog.getByRole("button", { name: "拒绝" })).toBeFocused();
+  // Same small card as the delete confirmation (390px), title first with nothing above it, buttons on one row.
+  const card = await dialog.boundingBox();
+  expect(card.width).toBeLessThanOrEqual(400);
+  expect(await dialog.locator("header > *").first().evaluate((node) => node.tagName)).toBe("H2");
+  const denyBox = await dialog.getByRole("button", { name: "拒绝" }).boundingBox();
+  const allowBox = await dialog.getByRole("button", { name: "允许", exact: true }).boundingBox();
+  expect(Math.abs(denyBox.y - allowBox.y)).toBeLessThan(1);
   expect(await page.evaluate(() => window.__answers.denied)).toBeUndefined();
   await dialog.getByRole("button", { name: "拒绝" }).click();
   expect(await answer(page, "denied")).toMatchObject({ ok: false, error: { code: "NOT_ALLOWED" } });
