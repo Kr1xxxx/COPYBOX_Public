@@ -282,6 +282,19 @@ async function main() {
     return "key only in Credential Manager";
   });
 
+  await step("a TinyPNG key round-trips through Credential Manager and is removed again (D-057)", async () => {
+    const state = await page.evaluate(async () => {
+      const desktop = window.clipboxDesktop;
+      await desktop.secretSet("tinify-key-2", "smoke-test-value");
+      const stored = await desktop.secretGet("tinify-key-2");
+      await desktop.secretDelete("tinify-key-2");
+      return { stored, after: await desktop.secretGet("tinify-key-2") };
+    });
+    if (state.stored !== "smoke-test-value") throw new Error("Credential Manager did not give the value back");
+    if (state.after !== null) throw new Error("the value was not removed");
+    return "stored, read back and removed";
+  });
+
   await step("a hard kill keeps the data that was already saved", async () => {
     await sleep(2500);
     await stopApp();

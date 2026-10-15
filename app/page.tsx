@@ -68,6 +68,7 @@ import {
 import { createLazyWriter, type LazyWriter } from "./lazy-writer";
 import { derivePbkdf2AesKey } from "./key-cache";
 import { DEVICE_KEY, deviceKeyCandidates, secureKeyStore, settleDeviceKey } from "./device-key-store";
+import { loadSecretSettings } from "./secret-settings";
 import { assertWritesOpen, onQuiesce, writesClosed } from "./write-gate";
 import { drainAll } from "./store-queue";
 import { waitForImageWrites } from "./image-store";
@@ -381,6 +382,8 @@ export default function Home() {
     }
 
     async function openVault() {
+      // The TinyPNG keys and the 同步码, once, before anything reads them (D-057); never throws.
+      await loadSecretSettings();
       const raw = localStorage.getItem(STORAGE_KEY);
       const secure = secureKeyStore();
       const knownKeys = await deviceKeyCandidates(localStorage, secure, DEVICE_KEY);

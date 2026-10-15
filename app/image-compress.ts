@@ -1,6 +1,7 @@
 // Every picture added to 图片 is shrunk with TinyPNG first (D-037), at most 100 a month on this computer.
 // The desktop shell does the network call; here we keep the monthly count and decide what to tell the user.
 import type { ClipboxDesktop } from "./desktop-bridge";
+import { secretAwareStorage } from "./secret-settings.ts";
 
 // Each person fills in up to two TinyPNG keys of their own in 设置 → 数据 → 图片压缩 (D-055). No key is built into the app
 // or kept on the website; without a key, pictures are stored as they are.
@@ -109,7 +110,8 @@ type Deps = { bridge?: ClipboxDesktop; storage?: KeyValueStorage; now?: Date };
 // Returns the picture to store. Throws only when the monthly cap is reached; any other trouble keeps the original.
 export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<CompressResult> {
   const bridge = deps.bridge ?? (typeof window === "undefined" ? undefined : window.clipboxDesktop);
-  const storage = deps.storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
+  // The own keys come from memory (Windows Credential Manager, read once on start; D-057), the counters from storage.
+  const storage = deps.storage ?? secretAwareStorage();
   const now = deps.now ?? new Date();
   const same: CompressResult = { blob: file, saved: 0, failed: false, notice: "" };
   if (!bridge?.compressImage || !COMPRESSIBLE_TYPES.includes(file.type)) return same;

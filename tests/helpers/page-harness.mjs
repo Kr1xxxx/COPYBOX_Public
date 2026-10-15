@@ -8,6 +8,7 @@ import * as automation from '../../app/clipbox-automation.ts';
 import * as keyCache from '../../app/key-cache.ts';
 import * as writeGate from '../../app/write-gate.ts';
 import * as deviceKeyStore from '../../app/device-key-store.ts';
+import * as secretSettings from '../../app/secret-settings.ts';
 
 export async function pageHarness() {
   // page.tsx is being split into component files; the editor (saveItem, submit) now lives in item-editor.tsx.
@@ -32,7 +33,7 @@ export async function pageHarness() {
   let rejectWrite = false;
   const caps = { platform: 'darwin', globalShortcut: '⌥ Space', supportsSecrets: true, supportsExport: true, supportsAutomation: true, edition: 'full' };
   const c = {
-    ...core, ...order, ...automation, ...edition, ...keyCache, ...writeGate, ...deviceKeyStore, storageWarnedRef: { current: false }, crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, btoa, atob, Date, JSON,
+    ...core, ...order, ...automation, ...edition, ...keyCache, ...writeGate, ...deviceKeyStore, ...secretSettings, storageWarnedRef: { current: false }, crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, btoa, atob, Date, JSON,
     ITERATIONS: 310_000, STORAGE_KEY: 'vault', DEVICE_KEY: 'key', LEGACY_STORAGE_KEY: 'legacy',
     localStorage: { getItem: key => storage.get(key) ?? null, removeItem: key => storage.delete(key), setItem: (key, value) => {
       if (key === 'vault' && rejectWrite) { rejectWrite = false; throw new Error('injected write failure'); }
