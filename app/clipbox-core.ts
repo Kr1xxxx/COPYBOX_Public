@@ -280,8 +280,9 @@ export function resolveRefreshedFolder(folders: string[], activeFolder: string) 
 }
 
 export function resolveRefreshedActiveFolder(kind: ItemKind, folders: string[], activeFolder: string) {
-  const resolved = resolveRefreshedFolder(folders, activeFolder);
-  return kind === "snippet" && resolved === "uncategorized" ? "all" : resolved;
+  const resolved = resolveRefreshedFolder(kind === "secret" ? [] : folders, activeFolder);
+  // Neither 话术 nor 账号 has a 未分类 list, and 账号 has no 目录 at all (sorted by 分类 since 2026-10-15).
+  return resolved === "uncategorized" ? "all" : resolved;
 }
 
 export const SNIPPET_NOTE_MAX = 40;
