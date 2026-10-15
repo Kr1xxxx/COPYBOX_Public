@@ -64,6 +64,8 @@
     getBuildTime: function () { return invoke("get_build_time"); },
     fetchSiteIcon: function (host) { return invoke("fetch_site_icon", { host: host }); },
     fetchSharedLibrary: function (url) { return invoke("fetch_shared_library", { url: url }); },
+    // 登录同步 (D-064): one request to https://copyboxx.com/api/…; resolves to { status, text }.
+    cloudRequest: function (request) { return invoke("cloud_request", { request: request }); },
     flushDone: function () { fireAndForget("flush_done"); },
     onFlushRequest: function (callback) {
       var stopped = false;

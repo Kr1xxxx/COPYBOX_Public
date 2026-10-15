@@ -23,7 +23,8 @@ const SKIPPED_KEYS = new Set(["clipbox.ai-key.web.v1", "clipbox.web-backups.v1"]
 // Kept on this device only (D-043): never copied into any backup, and dropped when an older backup file still carries them. The pre-migration copy of the 账号 data is encrypted with the device key only, so
 // putting it next to the device key in an automatic backup would undo D-040; the last auto-backup error is about this device.
 // The 「始终允许」 programs (D-059) name files on this computer; another computer, or a restore, starts with none.
-export const LOCAL_ONLY_KEYS = new Set(["clipbox.account-premigration.v1", "clipbox.auto-backup.last-error", "clipbox.automation-trusted.v1"]);
+// The 登录同步 sign-in, email and last-sync base belong to this computer (D-064); a backup never signs another one in.
+export const LOCAL_ONLY_KEYS = new Set(["clipbox.account-premigration.v1", "clipbox.auto-backup.last-error", "clipbox.automation-trusted.v1", "clipbox.cloud-session.v1", "clipbox.cloud-account.v1", "clipbox.cloud-sync-base.v1", "clipbox.cloud-demo.v1"]);
 // Of those, what a restore leaves alone. The pre-migration copy is removed by a restore (as before D-043): it belongs to the
 // data being replaced, and the restored device key may not even open it.
 const KEPT_BY_RESTORE = new Set(["clipbox.auto-backup.last-error"]);

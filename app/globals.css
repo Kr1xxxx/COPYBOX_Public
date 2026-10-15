@@ -1057,6 +1057,14 @@ button { -webkit-tap-highlight-color: transparent; }
 .shared-url input { box-sizing: border-box; width: 100%; margin-top: 6px; padding: 7px 10px; border: 0; border-radius: 8px; background: var(--fill); color: var(--ink); font: inherit; font-size: 13px; }
 .shared-url input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 .shared-error { color: var(--danger, #b3261e); }
+/* 登录同步 (D-064): the email and code fields, like the 企业同步码 field above. */
+.cloud-login { align-items: flex-end; }
+.cloud-login > div:first-child { flex: 1; min-width: 0; }
+.cloud-login input { box-sizing: border-box; width: 100%; margin: 6px 0 8px; padding: 7px 10px; border: 0; border-radius: 8px; background: var(--fill); color: var(--ink); font: inherit; font-size: 13px; }
+.cloud-login input:disabled { color: var(--muted); }
+.cloud-login input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.cloud-resend { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.cloud-resend:hover { text-decoration: underline; }
 .row-shared-mark { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 11px; font-weight: 600; white-space: nowrap; }
 .row-shared-mark[data-mark="retired"] { background: var(--fill); color: var(--muted); }
 .shared-notice { display: grid; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12.5px; }

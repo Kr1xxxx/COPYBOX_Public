@@ -6,7 +6,8 @@
 // D-012), so these commands refuse there.
 const SERVICE: &str = "com.clipbox.tauri";
 /// Only these names can be stored; the page cannot use this to write anything else into Credential Manager.
-const NAMES: [&str; 3] = ["tinify-key-1", "tinify-key-2", "shared-library-url"];
+/// "cloud-session": the 登录同步 sign-in (D-064), which never goes into a 完整备份.
+const NAMES: [&str; 4] = ["tinify-key-1", "tinify-key-2", "shared-library-url", "cloud-session"];
 /// Far above a TinyPNG key or a sync address, and well inside Credential Manager's 2560-byte limit.
 const MAX_CHARS: usize = 1000;
 
@@ -90,8 +91,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_the_three_names_and_sensible_values_are_accepted() {
-        for name in ["tinify-key-1", "tinify-key-2", "shared-library-url"] {
+    fn only_the_known_names_and_sensible_values_are_accepted() {
+        for name in ["tinify-key-1", "tinify-key-2", "shared-library-url", "cloud-session"] {
             assert!(is_known_name(name), "{name}");
         }
         for name in ["", "device-key", "ai-key", "tinify-key-3", "../x"] {
