@@ -2,13 +2,15 @@
 // at the KV key sync/<CODE>/snippets.json, served by worker.mjs at https://copyboxx.com/sync/<CODE>/snippets.json.
 //
 //   node tools/website/sync.mjs --new-code XS [--dry-run]                       new code with an empty library
-//   node tools/website/sync.mjs --code XS-7KQ2M9AB --snippets file.json [--dry-run]   validate, diff, upload
+//   node tools/website/sync.mjs --code XS-7KQ2M9AB --snippets file.json [--notice notice.txt] [--dry-run]   validate, diff, upload
 //   node tools/website/sync.mjs --code XS-7KQ2M9AB --rollback [--dry-run]       restore the newest history copy
 //   node tools/website/sync.mjs --list-codes                                     codes in KV (agents only)
 //
 // Before an upload the version online is copied to sync/<CODE>/history/snippets-<UTC ISO>.json. A rollback puts the
 // newest history copy back, keeps the replaced version as history/replaced-<UTC ISO>.json and removes the copy it
-// restored, so a second rollback goes one step further back. Codes are not secret but must not be guessable: never
+// restored, so a second rollback goes one step further back. --notice adds the 更新通知 the owner approved (D-069,
+// docs/whats-new.md): a text file with one line per item, or JSON {"title"?, "items": [...]}; a library without
+// --notice goes up with no notice, so an old one is never shown again. Codes are not secret but must not be guessable: never
 // commit a real code. Talks to the Cloudflare API directly (in the Claude cloud session the proxy adds the token;
 // elsewhere set CLOUDFLARE_API_TOKEN). Node's fetch needs NODE_USE_ENV_PROXY=1 behind the proxy.
 import { randomInt } from "node:crypto";
@@ -16,6 +18,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { contentHash, parseSharedLibrary, SHARED_FORMAT } from "../../app/shared-library.ts";
+import { parseContentNotice } from "../../app/whats-new.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const api = "https://api.cloudflare.com/client/v4";
@@ -77,6 +80,24 @@ export function diffLibraries(beforeItems, afterItems) {
   const removed = [...before.keys()].filter((id) => !after.has(id)).sort();
   const changed = [...after.keys()].filter((id) => before.has(id) && before.get(id) !== after.get(id)).sort();
   return { added, changed, removed };
+}
+
+// Puts the approved 更新通知 into the library text. The id is new for every push (code + UTC minute), so devices show it once.
+export function withNotice(source, noticeText, code, now) {
+  const trimmed = noticeText.trim();
+  let raw;
+  if (trimmed.startsWith("{")) {
+    try { raw = JSON.parse(trimmed); } catch { throw new Error("--notice JSON is not valid."); }
+  } else {
+    raw = { items: trimmed.split(/\r?\n/).map((line) => line.replace(/^\s*[-*•]\s*/, "").trim()).filter(Boolean) };
+  }
+  const stamp = new Date(now).toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  const notice = parseContentNotice({ ...raw, id: `${code}-${stamp}` });
+  if (!notice) throw new Error("--notice needs at least one line of text.");
+  const library = JSON.parse(source);
+  if (Array.isArray(library)) throw new Error("--notice needs a library file with \"items\", not a bare list.");
+  library.notice = { id: notice.id, title: notice.title, items: notice.items };
+  return { text: `${JSON.stringify(library, null, 2)}\n`, notice };
 }
 
 function option(argv, name) {
@@ -186,7 +207,13 @@ export async function main(argv = process.argv.slice(2), kv = cloudflare(), now 
   const file = option(argv, "--snippets");
   if (!file) throw new Error("Give --snippets <file.json>, --rollback, --new-code <XX> or --list-codes.");
   if (current === null) throw new Error(`${code} does not exist; create codes with --new-code.`);
-  const source = readFileSync(resolve(file), "utf8");
+  let source = readFileSync(resolve(file), "utf8");
+  const noticeFile = option(argv, "--notice");
+  if (noticeFile) {
+    const added = withNotice(source, readFileSync(resolve(noticeFile), "utf8"), code, now);
+    source = added.text;
+    console.log(`notice  ${added.notice.title}: ${added.notice.items.join(" / ")}`);
+  }
   const items = validateLibrary(source);
   const diff = diffLibraries(validateLibrary(current), items);
   printDiff(diff);

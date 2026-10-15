@@ -63,6 +63,7 @@ RNG. They are not secret but must not be guessable, so **never commit a real cod
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --new-code XS [--dry-run]                  # new code, empty library
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json --dry-run # check + list added/changed/removed ids
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json           # upload
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json --notice notice.txt  # upload with the 更新通知 the owner approved (D-069)
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --rollback                     # put the previous version back
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --list-codes                               # agents only
 ```

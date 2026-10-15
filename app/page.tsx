@@ -126,6 +126,7 @@ import { useValueOptionDrag } from "./value-option-drag";
 import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, quickFillValues, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
+import { WhatsNewDialog, useWhatsNew } from "./whats-new-dialog";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import { onRowAnimationEnd } from "./row-entrance";
@@ -575,7 +576,14 @@ export default function Home() {
   // First-run guide: once, when the full window first shows after the data opened (never in the mini window).
   const guide = useFirstRunGuide(!loading && !startupError && windowMode === "full");
   const guideShown = guide.open && windowMode === "full";
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || guideShown);
+  // 更新通知 (D-069): after an app update, or when a 同步码 sync brings a notice; waits for the guide and the full window.
+  const whatsNew = useWhatsNew({
+    ready: !loading && !startupError && windowMode === "full" && !guideShown,
+    version: appVersion,
+    firstRun: guide.firstRun,
+    previewTools: typeof window !== "undefined" && (!window.clipboxDesktop || Boolean(window.clipboxDesktop.testTools)),
+  });
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || guideShown || whatsNew.notice);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -629,7 +637,7 @@ export default function Home() {
 
   // Company 话术 library: new entries come in, untouched ones update, edited ones keep their text (see shared-library.ts).
   async function applySharedLibraryText(text: string): Promise<SyncSummary> {
-    const { items: incoming, skipped } = parseSharedLibrary(text);
+    const { items: incoming, skipped, notice } = parseSharedLibrary(text);
     let summary: SyncSummary | null = null;
     await persist((current) => {
       const result = syncSharedLibrary(current.items, incoming, skipped, { createId: () => crypto.randomUUID(), now: timestampNow(), seen: new Set(current.sharedSeen) });
@@ -639,6 +647,8 @@ export default function Home() {
     const done = summary as SyncSummary | null;
     if (!done) throw new Error("同步没有成功，你的话术没有变化");
     writeSharedSummary(done);
+    // A notice is shown only to a device that already had this library (an older push), not on its first sync.
+    whatsNew.offerContent(notice, done.total > done.added);
     return done;
   }
 
@@ -2411,6 +2421,7 @@ export default function Home() {
         onOpenAccount={() => { setSettingsOpen(false); switchKind("secret"); }}
       />}
       {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
+      {whatsNew.notice && <WhatsNewDialog notice={whatsNew.notice} onClose={whatsNew.dismiss} />}
       {automationConsent.dialog}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog

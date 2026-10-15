@@ -1547,3 +1547,62 @@ button { -webkit-tap-highlight-color: transparent; }
 .note-api-field .totp-error{grid-column:1/-1}
 .note-api-fields>.secondary-button{justify-self:start}
 @media (max-width:520px){.note-api-field{grid-template-columns:1fr 1fr}}
+
+/* Brand dialogs (D-069; owner 2026-10-15: every popup follows the brand-guidelines skill). Palette: dark #141413,
+   light #faf9f5, mid gray #b0aea5, light gray #e8e6dc; accents orange #d97757, blue #6a9bcc, green #788c5d. Titles in
+   Poppins, text in Lora, each falling back to the system Chinese font. Only colour and type change, never the layout.
+   Dark theme swaps surface and ink. `:root:not(.brand-off)` only lifts these rules over the older dark-theme dialog
+   rules above (same specificity, later in the file); nothing sets .brand-off. */
+:root {
+  --brand-dark: #141413; --brand-light: #faf9f5; --brand-mid: #b0aea5; --brand-subtle: #e8e6dc;
+  --brand-orange: #d97757; --brand-blue: #6a9bcc; --brand-green: #788c5d;
+  --brand-font-heading: "Poppins", Arial, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --brand-font-body: "Lora", var(--font-sans);
+  --dlg-surface: var(--brand-light); --dlg-well: #f1efe8; --dlg-line: var(--brand-subtle); --dlg-ink: var(--brand-dark);
+  --dlg-soft: #5e5d59; --dlg-edge: var(--brand-mid); --dlg-primary: var(--brand-dark); --dlg-primary-hover: #3d3d3a; --dlg-on-primary: var(--brand-light);
+  --dlg-backdrop: rgba(20, 20, 19, .5);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --dlg-surface: var(--brand-dark); --dlg-well: #1f1e1c; --dlg-line: #2f2e2b; --dlg-ink: var(--brand-light); --dlg-soft: var(--brand-mid); --dlg-edge: #4a4945; --dlg-primary: var(--brand-light); --dlg-primary-hover: var(--brand-subtle); --dlg-on-primary: var(--brand-dark); --dlg-backdrop: rgba(0, 0, 0, .62); }
+}
+:root[data-theme="dark"] { --dlg-surface: var(--brand-dark); --dlg-well: #1f1e1c; --dlg-line: #2f2e2b; --dlg-ink: var(--brand-light); --dlg-soft: var(--brand-mid); --dlg-edge: #4a4945; --dlg-primary: var(--brand-light); --dlg-primary-hover: var(--brand-subtle); --dlg-on-primary: var(--brand-dark); --dlg-backdrop: rgba(0, 0, 0, .62); }
+
+:root:not(.brand-off) :is(.backup-backdrop, .delete-confirm-backdrop, .snippet-dialog-backdrop, .guide-backdrop, .whats-new-backdrop) { background: var(--dlg-backdrop); }
+:root:not(.brand-off) :is(.backup-dialog, .delete-confirm-dialog, .snippet-import-dialog, .snippet-copy-dialog, .guide-dialog) { background: var(--dlg-surface); border-color: var(--dlg-line); color: var(--dlg-ink); font-family: var(--brand-font-body); }
+:root:not(.brand-off) :is(.backup-head h2, .delete-confirm-dialog h2, .snippet-dialog-head h2, .guide-text h2, .settings-dialog #settings-title) { font-family: var(--brand-font-heading); font-weight: 600; letter-spacing: -.01em; }
+:root:not(.brand-off) :is(.backup-head h2, .delete-confirm-dialog h2, .snippet-dialog-head h2, .guide-text h2, .backup-field, .backup-strategy legend, .backup-strategy button strong, .import-preview-list strong, .delete-confirm-item strong, .tips-dialog .tips-text) { color: var(--dlg-ink); }
+:root:not(.brand-off) :is(.delete-confirm-dialog header, .snippet-dialog-head, .snippet-dialog-actions) { background: var(--dlg-surface); border-color: var(--dlg-line); }
+:root:not(.brand-off) :is(.backup-head p, .backup-intro, .backup-note, .import-privacy, .import-section h3, .snippet-dialog-head small, .import-preview-list span, .delete-confirm-dialog header p, .delete-confirm-item small, .backup-strategy button small, .tips-dialog .tips-source, .guide-count, .guide-text li, .automation-consent-caller) { color: var(--dlg-soft); }
+:root:not(.brand-off) :is(.delete-confirm-item, .import-preview-list, .import-preview-list div, .backup-field input, .backup-strategy button, .copy-preview, .copy-fields input, .guide-art) { background: var(--dlg-well); border-color: var(--dlg-line); color: var(--dlg-ink); }
+:root:not(.brand-off) .import-metrics div:not(.positive):not(.warning) { background: var(--dlg-well); }
+:root:not(.brand-off) :is(.backup-head > button, .snippet-dialog-head > button) { background: var(--dlg-line); color: var(--dlg-soft); }
+:root:not(.brand-off) .guide-close { background: var(--dlg-surface); color: var(--dlg-soft); }
+:root:not(.brand-off) :is(.backup-actions, .snippet-dialog-actions, .delete-confirm-actions) button:not(.primary):not(.danger) { background: transparent; border-color: var(--dlg-edge); color: var(--dlg-ink); }
+:root:not(.brand-off) :is(.backup-actions, .snippet-dialog-actions, .delete-confirm-actions) button:not(.primary):not(.danger):hover:not(:disabled) { background: var(--dlg-well); }
+:root:not(.brand-off) :is(.backup-actions, .snippet-dialog-actions, .delete-confirm-actions) button.primary, :root:not(.brand-off) .guide-dialog .primary-button { background: var(--dlg-primary); border-color: var(--dlg-primary); color: var(--dlg-on-primary); }
+:root:not(.brand-off) :is(.backup-actions, .snippet-dialog-actions, .delete-confirm-actions) button.primary:hover:not(:disabled), :root:not(.brand-off) .guide-dialog .primary-button:hover { background: var(--dlg-primary-hover); border-color: var(--dlg-primary-hover); }
+:root:not(.brand-off) :is(.backup-dialog, .delete-confirm-dialog, .snippet-import-dialog, .snippet-copy-dialog, .guide-dialog) :is(button, input):focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
+:root:not(.brand-off) .import-folder-list span { background: var(--dlg-line); color: var(--dlg-ink); }
+:root:not(.brand-off) .tips-dialog .tips-good { background: color-mix(in srgb, var(--brand-green) 18%, var(--dlg-surface)); color: var(--dlg-ink); }
+:root:not(.brand-off) .guide-dots button.active::after { background: var(--brand-orange); }
+:root:not(.brand-off) .copy-fields input:focus { border-color: var(--brand-orange); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-orange) 18%, transparent); }
+
+/* 更新通知 (app/whats-new-dialog.tsx): a short card with the new things, one dot per line in the three accents. */
+.whats-new-backdrop { position: fixed; inset: 0; z-index: 130; display: grid; place-items: center; padding: 16px; background: var(--dlg-backdrop); backdrop-filter: blur(8px); animation: backdrop-in .2s ease-out both; }
+.whats-new-dialog { width: min(380px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 24px 24px 20px; border: 1px solid var(--dlg-line); border-radius: 20px; background: var(--dlg-surface); color: var(--dlg-ink); font-family: var(--brand-font-body); box-shadow: 0 28px 70px rgba(20, 20, 19, .28); animation: dialog-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.whats-new-mark { width: 40px; height: 40px; margin-bottom: 14px; padding: 0 10px; display: grid; align-content: center; gap: 4px; border-radius: 12px; background: var(--dlg-line); }
+.whats-new-mark i { display: block; height: 4px; border-radius: 2px; background: var(--brand-orange); }
+.whats-new-mark i:nth-child(2) { width: 75%; background: var(--brand-blue); }
+.whats-new-mark i:nth-child(3) { width: 50%; background: var(--brand-green); }
+.whats-new-head h2 { margin: 0 0 4px; color: var(--dlg-ink); font-family: var(--brand-font-heading); font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; text-wrap: balance; }
+.whats-new-head p { margin: 0; color: var(--dlg-soft); font-size: 12.5px; line-height: 1.5; }
+.whats-new-list { margin: 18px 0 0; padding: 16px 0 0; display: grid; gap: 10px; list-style: none; border-top: 1px solid var(--dlg-line); }
+.whats-new-list li { position: relative; padding-left: 18px; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; text-wrap: pretty; }
+.whats-new-list li::before { content: ""; position: absolute; left: 1px; top: calc(.775em - 4px); width: 8px; height: 8px; border-radius: 50%; background: var(--brand-orange); }
+.whats-new-list li[data-accent="blue"]::before { background: var(--brand-blue); }
+.whats-new-list li[data-accent="green"]::before { background: var(--brand-green); }
+.whats-new-actions { margin-top: 22px; display: grid; }
+.whats-new-actions button { height: 40px; padding: 0 0 1px; border: 1px solid var(--dlg-primary); border-radius: 11px; background: var(--dlg-primary); color: var(--dlg-on-primary); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.whats-new-actions button:hover { background: var(--dlg-primary-hover); border-color: var(--dlg-primary-hover); }
+.whats-new-actions button:active { transform: scale(.97); }
+.whats-new-actions button:focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
