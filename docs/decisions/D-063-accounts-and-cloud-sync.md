@@ -17,4 +17,4 @@
 - Consequences: the privacy page, the in-app wording and `AGENTS.md` ("no server, no accounts") need updating when
   the app side ships. The app side touches saving and encryption, so it is a high-risk PR that waits for 合并.
   Nothing is live until the owner says 部署 and the D1/R2 resources and secrets exist (`tools/website/README.md`).
-- Status: proposed, waiting for the owner (server side written, not deployed).
+- Status: accepted by the owner (「可以」, 2026-10-15 06:59Z). Server side merged but not deployed until the owner says 部署.
