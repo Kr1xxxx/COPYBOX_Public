@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { deviceName, handleApi, normalizeEmail, randomCode } from "../tools/website/api.mjs";
+import { deviceName, emailDomain, handleApi, normalizeEmail, randomCode } from "../tools/website/api.mjs";
 import worker from "../tools/website/worker.mjs";
 
 // D1 stand-in on an in-memory SQLite database with the real schema.sql: prepare().bind().first()/run()/all().
@@ -502,4 +502,109 @@ test("api: without an R2 bucket the encrypted blob is kept in D1, capped below i
   assert.equal((await big.json()).error, "too_large");
   assert.equal((await (await call(env, "DELETE", "/api/account", { token })).json()).ok, true);
   assert.equal(env.DB.sqlite.prepare("SELECT count(*) AS n FROM vault_blobs").get().n, 0);
+});
+
+// ---- company 话术 by email domain: GET /api/library ----
+
+// KV stand-in with get(key) → text or null, as the FILES binding answers.
+function fakeKv(initial = {}) {
+  const store = new Map(Object.entries(initial));
+  return {
+    store,
+    reads: [],
+    async get(key) {
+      this.reads.push(key);
+      return store.has(key) ? store.get(key) : null;
+    },
+  };
+}
+
+const companyLibrary = { format: "clipbox-shared-library", version: 1, items: [{ id: "CO-1", label: "公司 · 问候", secret: "您好" }] };
+
+function libraryEnv(files) {
+  return fakeEnv({ FILES: fakeKv(files) });
+}
+
+async function library(env, token) {
+  const response = await call(env, "GET", "/api/library", { token });
+  return { status: response.status, headers: response.headers, body: await response.json() };
+}
+
+test("api: the email domain is the text after the last @, lower-cased; not a domain gives null", () => {
+  assert.equal(emailDomain("a@Company.COM"), "company.com");
+  assert.equal(emailDomain('"x@y"@sales.company.com'), "sales.company.com");
+  assert.equal(emailDomain("a@localhost"), null);
+  assert.equal(emailDomain("no-at-sign"), null);
+  assert.equal(emailDomain(null), null);
+});
+
+test("api: GET /api/library gives the library bound to the account's email domain", async (t) => {
+  const sent = stubMail(t);
+  const env = libraryEnv({ "domains/company.com": "xs-7kq2m9ab\n", "sync/XS-7KQ2M9AB/snippets.json": JSON.stringify(companyLibrary) });
+  const token = await signIn(env, sent, "Staff@Company.com");
+  const answer = await library(env, token);
+  assert.equal(answer.status, 200);
+  assert.deepEqual(answer.body, { domain: "company.com", library: companyLibrary });
+  assert.equal(answer.headers.get("Cache-Control"), "no-store");
+  for (const [name] of answer.headers) assert.ok(!name.toLowerCase().startsWith("access-control-"), `carries ${name}`);
+
+  // Read on every request: unbinding takes effect at once.
+  env.FILES.store.delete("domains/company.com");
+  assert.deepEqual((await library(env, token)).body, { domain: null, library: null });
+});
+
+test("api: GET /api/library answers nulls when there is nothing to give", async (t) => {
+  const sent = stubMail(t);
+  const live = JSON.stringify(companyLibrary);
+  const cases = [
+    ["unbound domain", { "sync/XS-7KQ2M9AB/snippets.json": live }, "a@other.com"],
+    ["free-mail domain bound anyway", { "domains/gmail.com": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": live }, "a@gmail.com"],
+    ["free-mail country version", { "domains/hotmail.fr": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": live }, "a@hotmail.fr"],
+    ["subdomain of a bound domain", { "domains/company.com": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": live }, "a@sales.company.com"],
+    ["bound code has no library", { "domains/company.com": "XS-7KQ2M9AB" }, "a@company.com"],
+    ["library is not valid JSON", { "domains/company.com": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": "{not json" }, "a@company.com"],
+    ["library is a bare string", { "domains/company.com": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": '"text"' }, "a@company.com"],
+    ["binding is not a code", { "domains/company.com": "../../x", "sync/XS-7KQ2M9AB/snippets.json": live }, "a@company.com"],
+  ];
+  for (const [name, files, email] of cases) {
+    const env = libraryEnv(files);
+    const token = await signIn(env, sent, email);
+    const answer = await library(env, token);
+    assert.equal(answer.status, 200, name);
+    assert.deepEqual(answer.body, { domain: null, library: null }, name);
+  }
+  const noFiles = fakeEnv();
+  const token = await signIn(noFiles, sent, "a@company.com");
+  assert.deepEqual((await library(noFiles, token)).body, { domain: null, library: null }, "no FILES binding");
+});
+
+test("api: GET /api/library never reads KV for a free-mail account; a failing KV read is a 500", async (t) => {
+  const sent = stubMail(t);
+  const env = libraryEnv({ "domains/qq.com": "XS-7KQ2M9AB" });
+  const token = await signIn(env, sent, "a@qq.com");
+  await library(env, token);
+  assert.deepEqual(env.FILES.reads, []);
+
+  const broken = fakeEnv({ FILES: { async get() { throw new Error("KV down"); } } });
+  const other = await signIn(broken, sent, "a@company.com");
+  const answer = await library(broken, other);
+  assert.equal(answer.status, 500);
+  assert.equal(answer.body.error, "storage_error");
+});
+
+test("api: GET /api/library needs a sign-in (401), only allows GET (405) and needs D1 (503)", async (t) => {
+  const sent = stubMail(t);
+  const env = libraryEnv({ "domains/company.com": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": JSON.stringify(companyLibrary) });
+  const missing = await call(env, "GET", "/api/library");
+  assert.equal(missing.status, 401);
+  assert.equal((await missing.json()).error, "unauthorized");
+  assert.equal((await call(env, "GET", "/api/library", { token: "A".repeat(43) })).status, 401);
+  const token = await signIn(env, sent, "a@company.com");
+  for (const method of ["POST", "PUT", "DELETE"]) {
+    const wrong = await call(env, method, "/api/library", { token });
+    assert.equal(wrong.status, 405, method);
+    assert.equal(wrong.headers.get("Allow"), "GET, OPTIONS");
+  }
+  const unavailable = await call(fakeEnv({ DB: undefined, FILES: env.FILES }), "GET", "/api/library", { token });
+  assert.equal(unavailable.status, 503);
 });
