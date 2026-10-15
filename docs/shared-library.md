@@ -51,7 +51,7 @@ the company 话术 creates it from their own app with 导出为公司话术库�
   code for it and give it to the people who stay.
 - Accounts (later step) are sent without passwords: site, user name and note only.
 
-## 更新通知 with a push (D-070)
+## 更新通知 with a push (D-071)
 
 A push can carry a short notice that each device shows once (「公司话术有更新」, 「不用更新软件，已经自动同步好了」):
 `"notice": {"id": "XS-…-202610151340", "title": "公司话术有更新", "items": ["新增 12 条话术", "新增 5 条 Tips"]}` at the top

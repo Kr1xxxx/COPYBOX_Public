@@ -8,7 +8,7 @@
 //
 // Before an upload the version online is copied to sync/<CODE>/history/snippets-<UTC ISO>.json. A rollback puts the
 // newest history copy back, keeps the replaced version as history/replaced-<UTC ISO>.json and removes the copy it
-// restored, so a second rollback goes one step further back. --notice adds the 更新通知 the owner approved (D-070,
+// restored, so a second rollback goes one step further back. --notice adds the 更新通知 the owner approved (D-071,
 // docs/whats-new.md): a text file with one line per item, or JSON {"title"?, "items": [...]}; a library without
 // --notice goes up with no notice, so an old one is never shown again. Codes are not secret but must not be guessable: never
 // commit a real code. Talks to the Cloudflare API directly (in the Claude cloud session the proxy adds the token;

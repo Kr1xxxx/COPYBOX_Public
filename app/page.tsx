@@ -576,7 +576,7 @@ export default function Home() {
   // First-run guide: once, when the full window first shows after the data opened (never in the mini window).
   const guide = useFirstRunGuide(!loading && !startupError && windowMode === "full");
   const guideShown = guide.open && windowMode === "full";
-  // 更新通知 (D-070): after an app update, or when a 同步码 sync brings a notice; waits for the guide and the full window.
+  // 更新通知 (D-071): after an app update, or when a 同步码 sync brings a notice; waits for the guide and the full window.
   const whatsNew = useWhatsNew({
     ready: !loading && !startupError && windowMode === "full" && !guideShown,
     version: appVersion,

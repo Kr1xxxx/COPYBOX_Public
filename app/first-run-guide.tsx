@@ -24,7 +24,7 @@ export function useFirstRunGuide(ready: boolean) {
   const [again, setAgain] = useState(false);
   const close = useCallback(() => { setClosed(true); setAgain(false); markGuideSeen(); }, []);
   const show = useCallback(() => setAgain(true), []);
-  // firstRun: the guide was never closed on this device, i.e. a new install (no 更新通知 for it, D-070).
+  // firstRun: the guide was never closed on this device, i.e. a new install (no 更新通知 for it, D-071).
   return { open: again || (unseen && !closed && ready), show, close, firstRun: unseen };
 }
 

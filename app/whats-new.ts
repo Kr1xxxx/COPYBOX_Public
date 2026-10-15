@@ -1,4 +1,4 @@
-// "What's new" notices (D-070): one short popup after an update reaches staff. Two sources:
+// "What's new" notices (D-071): one short popup after an update reaches staff. Two sources:
 // - a new app version: the lines for that version in app/release-notes.ts, shown once after the update installs;
 // - company 话术 / Tips pushed by 企业同步码 (no app update): a `notice` inside the synced library file.
 // Only notable additions (a new feature, "新增 N 条话术"); never button or design tweaks, never old changes.

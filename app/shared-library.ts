@@ -126,7 +126,7 @@ function tooLong(raw: unknown): boolean {
   return Object.values(raw as Record<string, unknown>).some((value) => (typeof value === "string" ? value.length > SHARED_MAX_FIELD : Array.isArray(value) && value.length > 200));
 }
 
-// `notice` is the optional 更新通知 that came with this push (D-070); a broken one is ignored, never the whole file.
+// `notice` is the optional 更新通知 that came with this push (D-071); a broken one is ignored, never the whole file.
 export function parseSharedLibrary(source: string): { items: SharedSnippet[]; skipped: number; notice: WhatsNewNotice | null } {
   if (source.length > SHARED_MAX_BYTES) throw new Error(SHARED_TOO_BIG);
   let parsed: unknown;
