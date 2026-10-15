@@ -10,6 +10,7 @@ import { useSiteIconScan } from "./site-icons-context";
 import { detectSite, isPlausibleUrl, normalizeUrl } from "./site-core";
 import { accountTitle, generateTotp, formatCode, type TotpAccount } from "./totp-core";
 import { openTotpStore } from "./totp-store";
+import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Icon } from "./ui-atoms";
 
 type Draft = { id: string | null; name: string; url: string; username: string; password: string; totpId: string; note: string };
@@ -51,9 +52,9 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmSave, setConfirmSave] = useState(false);
   const [deleteId, setDeleteId] = useState("");
-  const [shownId, setShownId] = useState("");
+  const reveal = useReveal();
   const [copiedKey, setCopiedKey] = useState("");
-  const timers = useRef<{ copied?: ReturnType<typeof setTimeout>; shown?: ReturnType<typeof setTimeout> }>({});
+  const timers = useRef<{ copied?: ReturnType<typeof setTimeout> }>({});
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
     openTotpStore(deviceKey).list().then((list) => { if (live) setTotps(list.filter((account) => !account.trashedAt)); }).catch(() => undefined);
     return () => { live = false; };
   }, [deviceKey]);
-  useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
+  useEffect(() => () => { clearTimeout(timers.current.copied); }, []);
   useEffect(() => { if (draft && !draft.id) nameRef.current?.focus(); }, [draft?.id, draft === null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function copy(key: string, text: string) {
@@ -77,12 +78,6 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
     } catch {
       onToast("复制失败，请重试");
     }
-  }
-
-  function reveal(id: string) {
-    setShownId(id);
-    clearTimeout(timers.current.shown);
-    timers.current.shown = setTimeout(() => setShownId(""), 5000);
   }
 
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
@@ -182,10 +177,10 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
             const open = openId === item.id;
             const site = detectSite({ url: item.url, name: item.name });
             const linked = item.totpId ? totps.find((account) => account.id === item.totpId) : undefined;
-            const shown = shownId === item.id;
+            const shown = reveal.isShown(item.id);
             return (
               <li key={item.id} className={`pay-item${open ? " open" : ""}`}>
-                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); setShownId(""); }}>
+                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); reveal.hide(); }}>
                   <SiteBadge site={site} />
                   <span className="totp-who"><strong>{item.name}</strong><small>{item.username}</small></span>
                   <Icon name="chevron" className="pay-chevron" />
@@ -198,8 +193,7 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
                         <button type="button" className={`icon-button pay-copy${copiedKey === `${item.id}:u` ? " copied" : ""}`} onClick={() => void copy(`${item.id}:u`, item.username)} aria-label="复制用户名" title="复制"><Icon name={copiedKey === `${item.id}:u` ? "check" : "copy"} /></button></div>
                       <div className="pay-field"><dt>密码</dt><dd className="login-pass">{shown ? item.password : "••••••••••"}</dd>
                         <span className="login-pass-actions">
-                          <button type="button" className="icon-button pay-copy" aria-label="显示密码" title="按住显示"
-                            onPointerDown={() => reveal(item.id)} onPointerUp={() => setShownId("")} onPointerLeave={() => setShownId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") reveal(item.id); }} onKeyUp={() => setShownId("")}><Icon name="eye" /></button>
+                          <RevealButtons reveal={reveal} id={item.id} label="密码" />
                           <button type="button" className={`icon-button pay-copy${copiedKey === `${item.id}:p` ? " copied" : ""}`} onClick={() => void copy(`${item.id}:p`, item.password)} aria-label="复制密码" title="复制"><Icon name={copiedKey === `${item.id}:p` ? "check" : "copy"} /></button>
                         </span></div>
                       {linked && <LinkedCode account={linked} onCopy={(code) => void copy(`${item.id}:t`, code)} />}

@@ -87,7 +87,11 @@ test("恢复码: add many at once, hidden until held, copy one or all, and 全�
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("a1b2-c3d4\ne5f6-g7h8\ni9j0-k1l2");
   const stored = await page.evaluate(() => localStorage.getItem("clipbox.vault-items.v1"));
   expect(stored).not.toContain("a1b2");
-  const eye = dialog.getByRole("button", { name: "显示恢复码" });
+  await dialog.getByRole("button", { name: "显示恢复码", exact: true }).click();
+  await expect(dialog).toContainText("a1b2-c3d4");
+  await dialog.getByRole("button", { name: "隐藏恢复码", exact: true }).click();
+  await expect(dialog).not.toContainText("a1b2-c3d4");
+  const eye = dialog.getByRole("button", { name: "按住显示恢复码" });
   const box = await eye.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();

@@ -75,6 +75,7 @@ import { isQuotaError, isStorageNearlyFull, STORAGE_FULL_MESSAGE, STORAGE_NEARLY
 import { FolderRow } from "./folder-row";
 import { ListEmptyState } from "./list-empty-state";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
@@ -328,7 +329,8 @@ export default function Home() {
   const [appVersion, setAppVersion] = useState("");
   const [buildTime, setBuildTime] = useState("");
   const [windowMode, setWindowMode] = useState<WindowMode>("full");
-  const [revealedId, setRevealedId] = useState("");
+  const secretReveal = useReveal();
+  const hideSecret = secretReveal.hide;
   const [rowMenuId, setRowMenuId] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1365,7 +1367,7 @@ export default function Home() {
       return;
     }
     setSelected(0);
-    setRevealedId("");
+    hideSecret();
     showToast(list.length > 1 ? `已移入回收站 ${list.length} 条` : "已移入回收站", { tone: "ok", ms: 6000, actions: [{ label: "撤销", onClick: () => void undoTrashNow(list) }] });
   }
 
@@ -1399,7 +1401,7 @@ export default function Home() {
   function toggleBulk(id: string) {
     setBulkMode(true);
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
     setBulkIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   }
 
@@ -1563,7 +1565,7 @@ export default function Home() {
     setSearchAllFolders(false);
     setSelected(0);
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
     setFolderMenu("");
     setRenamingFolder(null);
     setNewFolder(null);
@@ -1593,7 +1595,7 @@ export default function Home() {
     setSearchAllFolders(false);
     setSelected(0);
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
     setFolderMenu("");
     setRenamingFolder(null);
     setNewFolder(null);
@@ -1622,7 +1624,7 @@ export default function Home() {
     if (folder === "trash") setProductFilter("全部产品");
     setSelected(0);
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
     setFolderMenu("");
     exitBulk();
     setFill(null);
@@ -1647,7 +1649,7 @@ export default function Home() {
     if (fill && filtered[index]?.id !== fill.itemId) setFill(null);
     moveSelection(() => index);
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
   }
 
   function collapseCards() {
@@ -1660,7 +1662,7 @@ export default function Home() {
     setCollapsedAt(`${selected}|${activeFolder}|${activeKind}|${query}`);
     setOpenId("");
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
   }
 
   function requestWindowMode(mode: WindowMode) {
@@ -1668,7 +1670,7 @@ export default function Home() {
     setMenuOpen(false);
     setProductMenuOpen(false);
     setRowMenuId("");
-    setRevealedId("");
+    hideSecret();
     if (mode === "mini" && activeFolder === "trash") setActiveFolder("all");
     window.clipboxDesktop?.setWindowMode?.(mode);
     window.setTimeout(() => searchRef.current?.focus(), 60);
@@ -1961,7 +1963,7 @@ export default function Home() {
                 }
                 const isSelected = expandedIndex === index && !bulkMode;
                 const checked = bulkIds.includes(item.id);
-                const revealed = revealedId === item.id;
+                const revealed = secretReveal.isShown(item.id);
                 const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
                 const moveTargets = activeFolders.filter((folder) => folder !== (item.folder || ""));
                 return (
@@ -1997,7 +1999,7 @@ export default function Home() {
                       {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
-                          <button type="button" className="ghost-button reveal-button" aria-pressed={revealed} onPointerDown={() => setRevealedId(item.id)} onPointerUp={() => setRevealedId("")} onPointerLeave={() => setRevealedId("")} onPointerCancel={() => setRevealedId("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setRevealedId(item.id); } }} onKeyUp={() => setRevealedId("")} onBlur={() => setRevealedId("")}><Icon name="eye" />按住显示</button>
+                          <RevealButtons reveal={secretReveal} id={item.id} label="内容" className="ghost-button reveal-button" />
                         </div>
                       )}
                       <div className="row-actions">

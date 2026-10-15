@@ -7,6 +7,7 @@ import type { ApiKeyItem } from "./payment-core";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
 import { detectSite, isPlausibleUrl, normalizeUrl, siteFromApiKey } from "./site-core";
+import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Icon } from "./ui-atoms";
 
 type Draft = { id: string | null; name: string; service: string; key: string; secret: string; endpoint: string; expires: string };
@@ -29,10 +30,10 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
   const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState("");
-  const [shown, setShown] = useState("");
+  const reveal = useReveal();
   const [copiedKey, setCopiedKey] = useState("");
   const [now] = useState(() => Date.now());
-  const timers = useRef<{ copied?: ReturnType<typeof setTimeout>; shown?: ReturnType<typeof setTimeout> }>({});
+  const timers = useRef<{ copied?: ReturnType<typeof setTimeout> }>({});
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
     store.list().then((list) => { if (live) setItems(list.filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
-  useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
+  useEffect(() => () => { clearTimeout(timers.current.copied); }, []);
   useEffect(() => { if (draft && !draft.id) nameRef.current?.focus(); }, [draft?.id, draft === null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function copy(key: string, text: string) {
@@ -55,12 +56,6 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
     } catch {
       onToast("复制失败，请重试");
     }
-  }
-
-  function reveal(id: string) {
-    setShown(id);
-    clearTimeout(timers.current.shown);
-    timers.current.shown = setTimeout(() => setShown(""), 5000);
   }
 
   function setField<K extends keyof Draft>(field: K, value: Draft[K]) {
@@ -151,7 +146,7 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
             ];
             return (
               <li key={item.id} className={`pay-item${open ? " open" : ""}`}>
-                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); setShown(""); }}>
+                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); reveal.hide(); }}>
                   <SiteBadge site={siteOf(item)} />
                   <span className="totp-who"><strong>{item.name}</strong><small>{item.service ? `${item.service} · ` : ""}尾号 {lastFour(item.key)}</small></span>
                   {expiry.kind === "soon" || expiry.kind === "expired" ? <span className={`apikey-expiry ${expiry.kind}`}>{expiry.text}</span> : null}
@@ -165,10 +160,9 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
                         return (
                           <div key={field.id} className="pay-field">
                             <dt>{field.label}</dt>
-                            <dd className="login-pass">{shown === id ? field.value : `••••••••${lastFour(field.value)}`}</dd>
+                            <dd className="login-pass">{reveal.isShown(id) ? field.value : `••••••••${lastFour(field.value)}`}</dd>
                             <span className="login-pass-actions">
-                              <button type="button" className="icon-button pay-copy" aria-label={`显示${field.label}`} title="按住显示"
-                                onPointerDown={() => reveal(id)} onPointerUp={() => setShown("")} onPointerLeave={() => setShown("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") reveal(id); }} onKeyUp={() => setShown("")}><Icon name="eye" /></button>
+                              <RevealButtons reveal={reveal} id={id} label={field.label} />
                               <button type="button" className={`icon-button pay-copy${copiedKey === id ? " copied" : ""}`} onClick={() => void copy(id, field.value)} aria-label={`复制${field.label}`} title="复制"><Icon name={copiedKey === id ? "check" : "copy"} /></button>
                             </span>
                           </div>
