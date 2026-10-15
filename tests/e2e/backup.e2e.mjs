@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
+import { asDesktop, openAccountCategory, seedSnippets, openRow } from "./helpers.mjs";
 
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
@@ -36,7 +36,7 @@ test("macOS: 账号 can be exported to its own encrypted file and imported back"
   await expect(page.locator(".toast, [role=status]").filter({ hasText: "账号备份已导出" }).first()).toBeVisible();
 
   // Move the entry to the trash, then restore it with 覆盖: only 账号 is replaced, the 34 snippets stay.
-  await page.locator(".native-row .row-main", { hasText: "公司地址" }).click();
+  await openRow(page, page.locator(".native-row .row-main", { hasText: "公司地址" }));
   await page.getByRole("button", { name: "更多操作 公司地址" }).click();
   await page.getByRole("menuitem", { name: "移到回收站" }).click();
   await expect(page.locator(".native-row")).toHaveCount(0);
@@ -75,7 +75,7 @@ test("macOS: importing with 合并 brings a trashed 账号 back instead of skipp
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
   const file = await download.path();
 
-  await page.locator(".native-row .row-main", { hasText: "公司地址" }).click();
+  await openRow(page, page.locator(".native-row .row-main", { hasText: "公司地址" }));
   await page.getByRole("button", { name: "更多操作 公司地址" }).click();
   await page.getByRole("menuitem", { name: "移到回收站" }).click();
   await expect(page.locator(".native-row")).toHaveCount(0);

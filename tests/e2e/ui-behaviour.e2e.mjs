@@ -2,7 +2,7 @@
 // editor-typography, product-filter-ui). They look at what a person sees and what the browser computes,
 // not at the wording of the source files.
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, openRow } from "./helpers.mjs";
 
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
@@ -21,7 +21,7 @@ test.describe("snippet list", () => {
     // the number belongs to the opened entry only: there is never more than one on the page
     await expect(page.locator(".native-row:not(.selected) .row-snippet-number")).toHaveCount(0);
 
-    await page.locator(".native-row .row-main").nth(2).click();
+    await openRow(page, page.locator(".native-row .row-main").nth(2));
     const selected = page.locator(".native-row.selected");
     await expect(selected.locator(".row-snippet-number")).toHaveCount(1);
     await expect(selected.locator(".row-snippet-number")).toHaveText(/\S+/);
@@ -63,7 +63,7 @@ test.describe("snippet list", () => {
     await button.focus();
     expect(await button.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
 
-    await plain.nth(3).locator(".row-main").click();
+    await openRow(page, plain.nth(3).locator(".row-main"));
     const primary = page.locator(".native-row.selected").locator(".primary-button.copy-main").first();
     await expect(primary).toBeVisible();
     // the opening card is still settling (another one folds away), so wait until the button has a stable box
@@ -136,7 +136,7 @@ test("a row's ⋯ menu stays inside the window, even on the last row", async ({ 
   await seedSnippets(page);
   const rows = page.locator(".native-row");
   await rows.last().scrollIntoViewIfNeeded();
-  await rows.last().locator(".row-main").click();
+  await openRow(page, rows.last().locator(".row-main"));
   await page.waitForTimeout(500);
   const more = page.locator(".native-row.selected").getByRole("button", { name: /^更多操作/ });
   await more.click();

@@ -1,6 +1,6 @@
 // Saving when storage is full or nearly full, and restoring a backup while a delayed save is still under way.
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, openRow } from "./helpers.mjs";
 
 const FULL = "存储空间满了，请清空回收站或删掉不用的内容";
 const NEARLY_FULL = "存储空间快满了，请清空回收站或删掉不用的内容";
@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 
 test("saving an edit when storage is full says so plainly instead of asking to retry", async ({ page }) => {
   await fillStorage(page);
-  await page.locator(".native-row .row-main").nth(1).click();
+  await openRow(page, page.locator(".native-row .row-main").nth(1));
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   const editor = page.locator(".inline-editor");
   await editor.locator("textarea").first().fill("改过的内容 storage-full-check");
@@ -56,7 +56,7 @@ test("when storage is nearly full, a save warns once", async ({ page }) => {
   await expect(page.getByText(NEARLY_FULL)).toHaveCount(0, { timeout: 6000 });
   // Further saves in the same session do not repeat it.
   for (const n of [1, 2]) {
-    await page.locator(".native-row .row-main").nth(n).click();
+    await openRow(page, page.locator(".native-row .row-main").nth(n));
     await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
     const editor = page.locator(".inline-editor");
     await editor.locator("textarea").first().fill(`改过的内容 nearly-full-${n}`);

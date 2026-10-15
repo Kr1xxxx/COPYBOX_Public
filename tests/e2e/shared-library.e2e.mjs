@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
-import { seedSnippets } from "./helpers.mjs";
+import { seedSnippets, openRow } from "./helpers.mjs";
 
 const V1 = fileURLToPath(new URL("../../docs/samples/shared-library-v1.json", import.meta.url));
 const V2 = fileURLToPath(new URL("../../docs/samples/shared-library-v2.json", import.meta.url));
@@ -29,7 +29,7 @@ test("the shared library adds new entries, updates untouched ones, keeps edited 
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
 
   // the employee rewrites one company 话术
-  await page.locator(".native-row", { hasText: "公司 · 开场问候" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "公司 · 开场问候" }).locator(".row-main"));
   await page.locator(".native-row.selected:not(.closing-row)").getByRole("button", { name: "编辑" }).click();
   await page.locator(".inline-editor textarea").first().fill("My own greeting for [Name]");
   await page.locator(".inline-editor .editor-save").first().click();
@@ -42,14 +42,14 @@ test("the shared library adds new entries, updates untouched ones, keeps edited 
   await expect(page.locator(".native-row")).toHaveCount(before + 4);
 
   // untouched entry changed, removed entry is still there with a mark
-  await page.locator(".native-row", { hasText: "公司 · 样品费说明" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "公司 · 样品费说明" }).locator(".row-main"));
   await expect(page.locator(".native-row.selected:not(.closing-row)")).toContainText("Shipping is paid by the buyer");
   await expect(page.locator(".native-row", { hasText: "公司 · 付款方式" }).locator(".row-shared-mark")).toHaveText("公司已停用");
 
   // the edited entry keeps the employee's text and offers the company version
   const mine = page.locator(".native-row", { hasText: "公司 · 开场问候" });
   await expect(mine.locator(".row-shared-mark")).toHaveText("公司版有更新");
-  await mine.locator(".row-main").click();
+  await openRow(page, mine.locator(".row-main"));
   const notice = page.locator(".native-row.selected:not(.closing-row) .shared-notice");
   await expect(notice).toContainText("My own greeting for [Name]");
   await expect(notice).toContainText("Are you looking for lashes");
@@ -63,12 +63,12 @@ test("the shared library adds new entries, updates untouched ones, keeps edited 
 
 test("choosing the company version replaces the edited text", async ({ page }) => {
   await syncFile(page, V1);
-  await page.locator(".native-row", { hasText: "公司 · 开场问候" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "公司 · 开场问候" }).locator(".row-main"));
   await page.locator(".native-row.selected:not(.closing-row)").getByRole("button", { name: "编辑" }).click();
   await page.locator(".inline-editor textarea").first().fill("Edited greeting [Name]");
   await page.locator(".inline-editor .editor-save").first().click();
   await syncFile(page, V2);
-  await page.locator(".native-row", { hasText: "公司 · 开场问候" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "公司 · 开场问候" }).locator(".row-main"));
   await page.locator(".native-row.selected:not(.closing-row) .shared-notice").getByRole("button", { name: "用公司版" }).click();
   await expect(page.locator(".native-row.selected:not(.closing-row)")).toContainText("Are you looking for lashes");
   await expect(page.locator(".native-row.selected:not(.closing-row) .shared-notice")).toHaveCount(0);

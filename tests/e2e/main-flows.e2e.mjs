@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { pinyin } from "pinyin-pro";
-import { seedSnippets, settle } from "./helpers.mjs";
+import { seedSnippets, settle, openRow } from "./helpers.mjs";
 
 test.beforeEach(async ({ page }) => { await seedSnippets(page); });
 
@@ -10,7 +10,7 @@ test("importing the sample sheet gives 34 snippets and the standard folders", as
 });
 
 test("switching entries folds the old card away gradually instead of removing it at once", async ({ page }) => {
-  await page.locator(".native-row .row-main").nth(1).click();
+  await openRow(page, page.locator(".native-row .row-main").nth(1));
   await settle(page);
   await page.evaluate(() => {
     window.__heights = [];
@@ -26,7 +26,7 @@ test("switching entries folds the old card away gradually instead of removing it
     };
     requestAnimationFrame(tick);
   });
-  await page.locator(".native-row .row-main").nth(4).click();
+  await openRow(page, page.locator(".native-row .row-main").nth(4));
   await page.waitForFunction(() => window.__sampled);
   const heights = await page.evaluate(() => window.__heights);
   expect(heights.length).toBeGreaterThan(4);
@@ -41,7 +41,7 @@ test("switching entries folds the old card away gradually instead of removing it
 test("variables are highlighted blocks without brackets and are typed in place", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   const rows = page.locator(".native-row .row-main");
-  await rows.first().click();
+  await openRow(page, rows.first());
   const row = page.locator(".native-row.selected");
   // the open card shows fields, not bracketed text, and there is no separate fill page or button
   await expect(row.locator(".row-content")).not.toContainText("[");
@@ -60,13 +60,13 @@ test("variables are highlighted blocks without brackets and are typed in place",
   await page.keyboard.press("Enter");
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda Rodriguez, thanks for reaching out to Comely Beauty! How can I help you today?");
   // the closed list shows variables as plain highlighted names too
-  await rows.nth(1).click();
+  await openRow(page, rows.nth(1));
   await expect(page.locator(".snippet-preview").first()).not.toContainText("[");
 });
 
 test("a variable remembers the last value, and with one variable Enter copies the finished text", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   await expect(row).toHaveCount(1);
   // typing then Enter walks through the empty blocks; the last Enter copies
@@ -77,7 +77,7 @@ test("a variable remembers the last value, and with one variable Enter copies th
   await page.keyboard.press("Enter");
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Amanda, thanks for reaching out to Comely! How can I help you today?");
   // another snippet with the same variable starts with the remembered value, marked as remembered
-  await page.locator(".native-row", { hasText: "二次问候" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "二次问候" }).locator(".row-main"));
   await expect(page.locator(".native-row.selected")).toHaveCount(1);
   const same = page.locator(".native-row.selected input[data-var=Name]");
   await expect(same).toHaveValue("Amanda");
@@ -97,7 +97,7 @@ test("a variable remembers the last value, and with one variable Enter copies th
 
 test("a block offers its last three values; clicking one fills it and copies when nothing else is missing", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   for (const [name, company] of [["Amanda", "Comely"], ["Bella", "Comely"], ["Cara", "Comely"], ["Dana", "Comely"]]) {
     await row.locator("input[data-var=Name]").fill(name);
@@ -123,7 +123,7 @@ test("a block offers its last three values; clicking one fills it and copies whe
 
 test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   await expect(row.locator("input[data-var=Name]")).toHaveValue("Friend");
   await row.locator("input[data-var=Company]").fill("Comely");
@@ -145,7 +145,7 @@ test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out 
 });
 
 test("the 英文/中文 switch sits just left of the favourite star, and the 常用值 strip can be folded away and back", async ({ page }) => {
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await row.locator("input[data-var=Company]").fill("Comely");
@@ -171,7 +171,7 @@ test("the 英文/中文 switch sits just left of the favourite star, and the 常
 
 test("remembered values stay after many clicks; a right-click pins one so new values never push it out; ? explains", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   const name = row.locator("input[data-var=Name]");
   await row.locator("input[data-var=Company]").fill("Comely");
@@ -207,7 +207,7 @@ test("remembered values stay after many clicks; a right-click pins one so new va
 
 test("each remembered value has a six-dot handle; tapping it offers 上移 and 下移, and the value itself still fills", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   const name = row.locator("input[data-var=Name]");
   await row.locator("input[data-var=Company]").fill("Comely");
@@ -226,7 +226,7 @@ test("each remembered value has a six-dot handle; tapping it offers 上移 and �
 });
 test("a right-click on a remembered value offers 固定, 解锁 and 删除; holding and moving one changes its place", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   const name = row.locator("input[data-var=Name]");
   await row.locator("input[data-var=Company]").fill("Comely");
@@ -234,7 +234,9 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await name.click();
   const options = row.locator("[aria-label='Name 最近用过的'] .var-memory-option");
   await expect(options).toHaveText(["Cara", "Bella", "Amanda"]);
-  // drag Amanda (last) in front of Cara by holding and moving
+  // drag Amanda (last) in front of Cara by holding and moving; measure once the list has stopped sliding into place,
+  // or the press can land where the grip was a moment ago
+  await settle(page);
   const from = await options.nth(2).locator(".var-grip").boundingBox();
   const to = await options.nth(0).boundingBox();
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
@@ -276,7 +278,7 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
 
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "需要整理的文本" }).first().locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "需要整理的文本" }).first().locator(".row-main"));
   const row = page.locator(".native-row.selected:not(.closing-row)");
   await row.getByRole("button", { name: "中文" }).click();
   // the Chinese text has only [Sender]; [Name] belongs to the English text and must not block the copy
@@ -305,7 +307,7 @@ test("the snippet note field is called 小提示", async ({ page }) => {
   await page.locator(".inline-editor input").first().fill("测试话术");
   await page.locator(".inline-editor textarea").first().fill("Hello there");
   await page.locator(".inline-editor .editor-save").first().click();
-  await page.locator(".native-row", { hasText: "测试话术" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "测试话术" }).locator(".row-main"));
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   await expect(page.locator(".inline-editor")).toContainText("小提示");
   await expect(page.locator(".inline-editor")).not.toContainText("备注");
@@ -335,7 +337,7 @@ test("when adding a 话术 by hand, selected words can be set as highlighted blo
   await editor.getByRole("button", { name: "设为高亮" }).click();
   await editor.locator(".editor-save").first().click();
   // the saved 话术 shows a highlighted block that can be filled, and copies the filled text
-  await page.locator(".native-row", { hasText: "手动高亮测试" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "手动高亮测试" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   const field = row.locator("input[data-var='dear friend']");
   await expect(field).toBeVisible();
@@ -359,7 +361,7 @@ test("the 全部产品 filter and the row menu close on an outside click and on 
 
   // Opening the filter then a row's ⋯ menu leaves only one open; an outside click closes it.
   await filter.click();
-  await page.locator(".row-main").first().click();
+  await openRow(page, page.locator(".row-main").first());
   await page.getByRole("button", { name: /^更多操作/ }).first().click();
   await expect(menu).toHaveCount(0);
   await expect(page.locator(".row-menu")).toBeVisible();
@@ -442,7 +444,7 @@ test("dialog backdrops fade in by tint only: the blurred page behind is not re-b
 
 test("remembered values are always shown with the ? at their right end, and not inside the text", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
   await row.locator("input[data-var=Company]").fill("Comely");
   await row.locator("input[data-var=Name]").fill("Amanda");
@@ -472,7 +474,7 @@ test("a 话术 written by hand can carry its own 中文翻译, kept exactly as t
   await editor.getByLabel(/中文翻译/).fill("你好呀");
   await editor.locator(".editor-save").first().click();
   const row = page.locator(".native-row", { hasText: "手写问候" });
-  await row.locator(".row-main").click();
+  await openRow(page, row.locator(".row-main"));
   await expect(page.locator(".native-row.selected .copy-language")).toBeVisible();
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   await expect(page.locator(".inline-editor").getByLabel(/中文翻译/)).toHaveValue("你好呀");
@@ -648,7 +650,7 @@ test("the standard 话术 folders can be dragged to a new place and the order is
 });
 
 test("the 发送前确认 and 发送前核实 ticks are gone and copying does not wait for them", async ({ page }) => {
-  await page.locator(".native-row", { hasText: "催付款" }).first().locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "催付款" }).first().locator(".row-main"));
   const row = page.locator(".native-row.selected").first();
   await expect(row.locator(".snippet-fill")).toBeVisible();
   await expect(row.locator(".copy-checks")).toHaveCount(0);

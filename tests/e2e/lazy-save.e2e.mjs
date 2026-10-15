@@ -1,7 +1,7 @@
 // Small frequent changes (copy counts, pins, order) are saved one second after the last change, or at once when
 // the window is hidden or the app asks the page to save. Real edits still save immediately.
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, openRow } from "./helpers.mjs";
 
 const vault = (page) => page.evaluate(() => localStorage.getItem("clipbox.vault.v1"));
 const hideWindow = (page) => page.evaluate(() => {
@@ -52,7 +52,7 @@ test("when the desktop app asks the page to save before quitting, the pending ch
 
 test("an edit is saved immediately, not delayed", async ({ page }) => {
   const before = await vault(page);
-  await page.locator(".native-row .row-main").nth(1).click();
+  await openRow(page, page.locator(".native-row .row-main").nth(1));
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑" }).click();
   const editor = page.locator(".inline-editor");
   await editor.locator("textarea").first().fill("改过的内容 lazy-save-check");

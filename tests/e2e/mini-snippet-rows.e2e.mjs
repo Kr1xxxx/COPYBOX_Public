@@ -1,7 +1,7 @@
 // Mini window 话术 rows (owner's request, 2026-10-13): a click opens the row in place with only 「修改」; a floating
 // 「复制」 button on hover copies without opening it. Folder tabs show two-character names.
 import { test, expect } from "@playwright/test";
-import { asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
+import { asDesktop, openAccountCategory, seedSnippets, openRow } from "./helpers.mjs";
 
 async function openMini(page, platform = "win32") {
   await asDesktop(page, platform);
@@ -18,7 +18,7 @@ test("mini: a click on a 话术 row opens it with the whole text and only 修改
   await openMini(page);
   const row = rows(page).nth(1);
   const label = (await row.locator(".snippet-label").textContent()).trim();
-  await row.locator(".row-main").click();
+  await openRow(page, row.locator(".row-main"));
   await expect(row).toHaveClass(/\bopen\b/);
   await expect(row.locator(".row-main")).toHaveAttribute("aria-expanded", "true");
   await expect(page.evaluate(() => window.__copied)).resolves.toBeUndefined();
@@ -37,9 +37,9 @@ test("mini: a click on a 话术 row opens it with the whole text and only 修改
 
 test("mini: opening another 话术 row closes the first", async ({ page }) => {
   await openMini(page);
-  await rows(page).nth(0).locator(".row-main").click();
+  await openRow(page, rows(page).nth(0).locator(".row-main"));
   await expect(rows(page).nth(0)).toHaveClass(/\bopen\b/);
-  await rows(page).nth(2).locator(".row-main").click();
+  await openRow(page, rows(page).nth(2).locator(".row-main"));
   await expect(rows(page).nth(2)).toHaveClass(/\bopen\b/);
   await expect(rows(page).nth(0)).not.toHaveClass(/\bopen\b/);
   await expect(page.locator(".mini-row.open")).toHaveCount(1);
@@ -50,7 +50,7 @@ test("mini: 修改 opens the editor for that 话术 and saving keeps the mini wi
   await openMini(page);
   const row = rows(page).nth(1);
   const label = (await row.locator(".snippet-label").textContent()).trim();
-  await row.locator(".row-main").click();
+  await openRow(page, row.locator(".row-main"));
   await row.getByRole("button", { name: `修改 ${label}` }).click();
   const editor = page.getByRole("group", { name: `编辑 ${label}` });
   await expect(editor).toBeVisible();
@@ -98,7 +98,7 @@ test("mini: the copied text is the row's text and the copy is counted under 最�
   await openMini(page);
   const row = rows(page).nth(3);
   const label = (await row.locator(".snippet-label").textContent()).trim();
-  await row.locator(".row-main").click();
+  await openRow(page, row.locator(".row-main"));
   const text = await row.locator(".row-content").innerText();
   await row.hover();
   await page.getByRole("button", { name: `复制 ${label}` }).click();
@@ -164,7 +164,7 @@ test("macOS mini: an old 账号 row still copies on click and does not open", as
   const row = page.locator(".mini-row", { hasText: "测试服务器" });
   await expect(row).toBeVisible();
   await expect(row.locator(".mini-copy")).toHaveCount(0);
-  await row.locator(".row-main").click();
+  await openRow(page, row.locator(".row-main"));
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("secret-value-123");
   await expect(row.locator(".mini-detail")).toHaveCount(0);
   await expect(row.locator(".mini-copied")).toHaveText("已复制");
@@ -185,7 +185,7 @@ test("mini: a block uses its pinned value, but never what was typed in the main 
   await asDesktop(page, "win32");
   await seedSnippets(page);
   // Main window: this customer is Amanda.
-  await page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main").click();
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const open = page.locator(".native-row.selected");
   await open.locator("input[data-var=Name]").click();
   await page.keyboard.press("ControlOrMeta+a");
