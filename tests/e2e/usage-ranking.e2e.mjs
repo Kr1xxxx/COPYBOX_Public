@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, openRow } from "./helpers.mjs";
 
 for (const platform of ["win32", "darwin"]) {
   test(`${platform}: 使用排行 counts a snippet once per minute and lists never-used ones`, async ({ page }) => {
     await asDesktop(page, platform);
     await seedSnippets(page);
-    await page.locator(".native-row", { hasText: "非目标客户" }).locator(".row-main").click();
+    await openRow(page, page.locator(".native-row", { hasText: "非目标客户" }).locator(".row-main"));
     const row = page.locator(".native-row.selected");
     await row.getByRole("button", { name: "复制", exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__copied)).toBeTruthy();

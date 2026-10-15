@@ -9,7 +9,8 @@ export default defineConfig({
   testMatch: "**/*.e2e.mjs",
   timeout: 60_000,
   fullyParallel: false,
-  retries: process.env.CI ? 1 : 0,
+  // No retry, also on CI: a test that fails once is a real problem to fix, not something to try again (audit F).
+  retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,

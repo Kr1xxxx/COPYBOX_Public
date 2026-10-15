@@ -47,6 +47,15 @@ export async function settle(page) {
   }, null, { polling: 50 });
 }
 
+// Opens a list row (话术, 账号 or 图片) by clicking its title, then waits until the card has finished opening. The card
+// grows over a quarter of a second and its buttons travel down while it does; on a busy machine Playwright can see two
+// identical frames mid-way, call the button "stable" and click where it was a moment ago, so the click hits the card
+// instead of the button and nothing happens. Use this instead of a bare `.row-main` click before acting inside a card.
+export async function openRow(page, rowMain) {
+  await rowMain.click();
+  await settle(page);
+}
+
 // Pretends to be the desktop app on a given platform ("win32" | "darwin").
 // `imageView: "list"` starts the 图片 section in the list view (the default is the grid), for tests about list rows.
 // testTools: act as the web preview, which shows 导入测试内容 / 清除测试内容 (the installed app never does).

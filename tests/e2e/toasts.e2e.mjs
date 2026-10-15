@@ -1,7 +1,7 @@
 // The message at the bottom: one at a time, a newer one keeps its full time (an older message's timer used to wipe it
 // early), and failures show a red exclamation mark instead of the ✓.
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, openRow } from "./helpers.mjs";
 
 // Notes, in page time, when each toast text appears and when the toast leaves the page.
 async function recordToasts(page) {
@@ -52,7 +52,7 @@ test("an ok message draws the check; a failed 清空回收站 says so with the e
   const toast = page.locator(".toast");
 
   // Move one snippet to the 回收站 (the 撤销 message uses the ok look).
-  await page.locator(".row-main").first().click();
+  await openRow(page, page.locator(".row-main").first());
   await page.getByRole("button", { name: /^更多操作/ }).first().click();
   await page.locator(".row-menu").getByRole("menuitem", { name: "移到回收站" }).click();
   await expect(toast).toContainText("已移入回收站");

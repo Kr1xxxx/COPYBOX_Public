@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { asDesktop, openAccountCategory } from "./helpers.mjs";
+import { asDesktop, openAccountCategory, openRow } from "./helpers.mjs";
 
 const PNG_FILE = fileURLToPath(new URL("../fixtures/sample-gradient.png", import.meta.url));
 const JPG_FILE = fileURLToPath(new URL("../fixtures/sample-photo.jpg", import.meta.url));
@@ -93,7 +93,7 @@ test("selecting a row shows the image larger with 复制, 改名 and 删除", as
   await openImages(page);
   await addImages(page, PNG_FILE);
   await expect(rows(page)).toHaveCount(1);
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   const row = page.locator(".image-row.selected");
   await expect(row.locator(".image-preview img")).toBeVisible();
   await expect.poll(() => row.locator(".image-preview img").evaluate((img) => img.naturalWidth)).toBe(48);
@@ -104,7 +104,7 @@ test("selecting a row shows the image larger with 复制, 改名 and 删除", as
   expect(box.height).toBeLessThanOrEqual(260);
   await row.getByRole("button", { name: "复制", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual(PNG_SIGNATURE);
-  await row.locator(".row-main").click();
+  await openRow(page, row.locator(".row-main"));
   await expect(page.locator(".image-row.selected")).toHaveCount(0);
 });
 
@@ -113,14 +113,14 @@ test("opening the last of many rows scrolls all of it into view", async ({ page 
   const buffer = readFileSync(PNG_FILE);
   await addImages(page, Array.from({ length: 7 }, (_, index) => ({ name: `图${index + 1}.png`, mimeType: "image/png", buffer })));
   await expect(rows(page)).toHaveCount(7);
-  await rows(page).last().locator(".row-main").click();
+  await openRow(page, rows(page).last().locator(".row-main"));
   await expect(page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true })).toBeInViewport({ ratio: 1 });
 });
 
 test("改名 edits the title in the row and keeps it to 40 characters", async ({ page }) => {
   await openImages(page);
   await addImages(page, PNG_FILE);
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   await page.locator(".image-row.selected").getByRole("button", { name: "改名", exact: true }).click();
   const input = page.getByRole("textbox", { name: "图片标题", exact: true });
   await expect(input).toBeFocused();
@@ -160,7 +160,7 @@ test("the search box filters images by title", async ({ page }) => {
 test("删除 moves the image to the 回收站 with an undo; 恢复 brings it back; 永久删除 asks first and removes only that one", async ({ page }) => {
   await openImages(page);
   await addImages(page, PNG_FILE);
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
   await expect(rows(page)).toHaveCount(0);
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
@@ -172,7 +172,7 @@ test("删除 moves the image to the 回收站 with an undo; 恢复 brings it bac
   await expect(page.locator(".nav-footer .nav-item", { hasText: "回收站" })).not.toContainText("1");
 
   // Delete again, then work from the 回收站.
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
   await expect(rows(page)).toHaveCount(0);
   const trashNav = page.locator(".nav-footer .nav-item", { hasText: "回收站" });
@@ -200,7 +200,7 @@ test("删除 moves the image to the 回收站 with an undo; 恢复 brings it bac
   await expect(rows(page)).toHaveCount(1);
 
   // Permanent deletion: gone for good, also after a reload.
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
   await page.locator(".nav-footer .nav-item", { hasText: "回收站" }).click();
   await page.locator(".trash-row").getByRole("button", { name: /^永久删除/ }).click();
@@ -221,7 +221,7 @@ test("永久删除 in the 回收站 removes only the chosen image, and trashed i
   await addImages(page, ["甲", "乙", "丙"].map((name) => ({ name: `${name}.png`, mimeType: "image/png", buffer })));
   await expect(rows(page)).toHaveCount(3);
   for (const title of ["甲", "乙"]) {
-    await rows(page).filter({ hasText: title }).locator(".row-main").click();
+    await openRow(page, rows(page).filter({ hasText: title }).locator(".row-main"));
     await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
     await expect(rows(page).filter({ hasText: title })).toHaveCount(0);
   }
@@ -243,7 +243,7 @@ test("the 回收站 empties itself after the chosen days (7 by default); an imag
   const buffer = readFileSync(PNG_FILE);
   await addImages(page, ["旧", "新"].map((name) => ({ name: `${name}.png`, mimeType: "image/png", buffer })));
   await expect(rows(page)).toHaveCount(2);
-  await rows(page).filter({ hasText: "旧" }).locator(".row-main").click();
+  await openRow(page, rows(page).filter({ hasText: "旧" }).locator(".row-main"));
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
 
@@ -258,7 +258,7 @@ test("the 回收站 empties itself after the chosen days (7 by default); an imag
 
   // An image deleted now is still there a day later.
   await page.locator(".sidebar .nav-item", { hasText: "全部图片" }).click();
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   await page.locator(".image-row.selected").getByRole("button", { name: "删除", exact: true }).click();
   // The change is written to the store before the row goes away: reloading earlier would cut that write off.
   await expect(rows(page)).toHaveCount(0);
@@ -463,7 +463,7 @@ test("in the list view 选择 shows a tick box on each row and 删除 moves the 
   await openImages(page);
   await addImages(page, [PNG_FILE, JPG_FILE]);
   await expect(rows(page)).toHaveCount(2);
-  await rows(page).first().locator(".row-main").click();
+  await openRow(page, rows(page).first().locator(".row-main"));
   await expect(page.getByRole("button", { name: "收起展开的图片" })).toBeVisible();
   await page.getByRole("button", { name: "选择", exact: true }).click();
   await expect(page.locator(".image-row.selected")).toHaveCount(0);
