@@ -1,7 +1,7 @@
 // After a save in the editor the toast offers 编辑 (more prominent) and 撤销. Every toast fades out at the end of its time,
 // and while the pointer is on it the time stops and it is fully visible again.
 import { expect, test } from "@playwright/test";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, openRow } from "./helpers.mjs";
 
 const toast = (page) => page.locator(".toast");
 
@@ -10,7 +10,7 @@ async function firstTitle(page) {
 }
 
 async function editFirst(page, title) {
-  await page.locator(".native-row .row-main").first().click();
+  await openRow(page, page.locator(".native-row .row-main").first());
   await page.locator(".native-row.selected").getByRole("button", { name: "编辑", exact: true }).click();
   const editor = page.locator(".inline-editor");
   await editor.locator("input").first().fill(title);
@@ -172,7 +172,7 @@ test.describe("win32", () => {
 
   test("the 回收站 撤销 still works through the same toast", async ({ page }) => {
     const title = await firstTitle(page);
-    await page.locator(".row-main").first().click();
+    await openRow(page, page.locator(".row-main").first());
     await page.getByRole("button", { name: /^更多操作/ }).first().click();
     await page.locator(".row-menu").getByRole("menuitem", { name: "移到回收站" }).click();
     await expect(toast(page)).toContainText("已移入回收站");

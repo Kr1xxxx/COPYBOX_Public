@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { makePng } from "../helpers/png.mjs";
-import { asDesktop, settle } from "./helpers.mjs";
+import { asDesktop, settle, openRow } from "./helpers.mjs";
 
 // The 图片 folders (docs/specs/image-folders.md). Every picture is generated here, so no binary fixtures are needed.
 const png = (name, width = 40, height = 40, color = [90, 140, 220]) => ({ name: `${name}.png`, mimeType: "image/png", buffer: makePng(width, height, color) });
@@ -178,7 +178,7 @@ test("move an image from the row's ⋯ menu and from the 目录 line of the open
   await expect(navCount(page, "未分类")).toHaveText("2");
 
   // Row menu.
-  await rows(page).filter({ hasText: "图甲" }).locator(".row-main").click();
+  await openRow(page, rows(page).filter({ hasText: "图甲" }).locator(".row-main"));
   const open = page.locator(".image-row.selected");
   await expect(open.locator(".image-folder-button")).toContainText("未分类");
   await open.getByRole("button", { name: "更多操作 图甲" }).click();
@@ -198,7 +198,7 @@ test("move an image from the row's ⋯ menu and from the 目录 line of the open
   await expect(page.getByRole("menu", { name: "移动到" })).toHaveCount(0);
 
   // The 目录 line of the open image opens the same menu.
-  await rows(page).filter({ hasText: "图乙" }).locator(".row-main").click();
+  await openRow(page, rows(page).filter({ hasText: "图乙" }).locator(".row-main"));
   await page.locator(".image-row.selected .image-folder-button").click();
   await page.getByRole("menu", { name: "移动到" }).getByRole("menuitem", { name: "价目表" }).click();
   await expect(page.locator(".toast")).toContainText("已移到「价目表」");
@@ -410,7 +410,7 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
   }
 
   for (const { name, width, height } of cases) {
-    await rows(page).filter({ hasText: name }).locator(".row-main").click();
+    await openRow(page, rows(page).filter({ hasText: name }).locator(".row-main"));
     const open = page.locator(".image-row.selected");
     await expect(open).toContainText(name);
     const preview = open.locator(".image-preview");
@@ -440,7 +440,7 @@ test("wide, tall, tiny and large pictures stay inside the panel", async ({ page 
     expect(overflow.page, name).toBeLessThanOrEqual(0);
     // The buttons below the picture are still there.
     await expect(open.getByRole("button", { name: "删除", exact: true })).toBeVisible();
-    await open.locator(".row-main").click();
+    await openRow(page, open.locator(".row-main"));
     await expect(page.locator(".image-row.selected")).toHaveCount(0);
   }
 });
