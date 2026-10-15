@@ -27,6 +27,13 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
 
+-- Sessions ended because the account signed in on a 4th computer (at most 3, D-069): SHA-256 of the old token and
+-- when it would have expired, so that computer hears why (401 device_limit) instead of a plain 请重新登录.
+CREATE TABLE IF NOT EXISTS ended_sessions (
+  token_hash TEXT PRIMARY KEY,
+  expires_at INTEGER
+);
+
 -- Hourly counters: "ip:<address>" (20 code requests) and "email:<address>" (5 codes).
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,

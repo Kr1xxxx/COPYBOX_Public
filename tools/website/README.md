@@ -88,14 +88,15 @@ are `{ "error": <code>, "message": <plain Chinese> }`.
 | Request | Answer |
 | --- | --- |
 | `POST /api/auth/code` `{email}` | `200 {ok:true}` for any well-formed email, registered or not (creates the user on first use; mails the code through Resend). `400 bad_email`, `429 rate_limited`, `503 unavailable` (no `RESEND_API_KEY`), `502 mail_failed` |
-| `POST /api/auth/verify` `{email, code, device?}` | `200 {token, email}`; `device` (e.g. "Windows 电脑") is trimmed, cut to 40 characters and kept on the session. Wrong, expired, used-up or unknown: always `401 bad_code` |
+| `POST /api/auth/verify` `{email, code, device?}` | `200 {token, email, signedOut}`; `device` (e.g. "Windows 电脑") is trimmed, cut to 40 characters and kept on the session. At most 3 computers per account (D-069): a 4th sign-in ends the oldest sessions, and `signedOut` lists their device names (`[]` when none). Wrong, expired, used-up or unknown: always `401 bad_code` |
 | `POST /api/auth/logout` (Bearer) | `200 {ok:true}`; ends only that session |
 | `GET /api/vault` (Bearer) | `200 {version, updatedAt, data}` (`data` is the JSON object last uploaded), or `{version:0, updatedAt:null, data:null}` |
 | `PUT /api/vault` (Bearer) `{baseVersion, data}` | `200 {version}` (old + 1). `409 {error:"version_conflict", version}` when `baseVersion` is not the current version; `400 bad_data` when `data` is not an object; `413 too_large` over 5 MB of request, or over 1.9 MB of data while the blobs live in D1 |
 | `DELETE /api/account` (Bearer) | `200 {ok:true}`; deletes the user, all sessions, any code and the blob |
 | other `/api/*` | `404 not_found`; a known path with another method `405 method_not_allowed` |
 
-A missing, unknown or expired token is `401 unauthorized`. Limits: a code lives 10 minutes and dies after 5 wrong
+A missing, unknown or expired token is `401 unauthorized`; a token ended by a newer sign-in is `401 device_limit` (D1
+`ended_sessions` remembers it until it would have expired). Limits: a code lives 10 minutes and dies after 5 wrong
 tries; at most 5 codes per email and 20 code requests per IP (`CF-Connecting-IP`) each hour; sessions last 90 days.
 
 Storage: D1 `copyboxx-users` (tables in `schema.sql`; emails trimmed and lower-cased, at most 120 characters; codes

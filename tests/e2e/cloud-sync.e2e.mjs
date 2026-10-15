@@ -124,3 +124,43 @@ test("without the app's connection (an older app) there is no sign-in", async ({
   await expect(card.getByLabel("企业同步码")).toBeVisible();
   await expect(card.getByText("登录同步")).toHaveCount(0);
 });
+
+test("one account stays signed in on at most 3 computers: the oldest one signs out and is told why (D-069)", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.addInitScript((email) => {
+    window.clipboxDesktop.cloudDemo = true;
+    if (!localStorage.getItem("clipbox.cloud-demo.v1")) {
+      localStorage.setItem("clipbox.cloud-demo.v1", JSON.stringify({
+        vaults: {}, sent: {},
+        sessions: { "demo-old-1": email, "demo-old-2": email, "demo-old-3": email },
+        devices: { "demo-old-1": "Windows 电脑", "demo-old-2": "Mac 电脑", "demo-old-3": "Windows 电脑" },
+      }));
+    }
+  }, EMAIL);
+  await seedSnippets(page);
+  const card = await openHome(page);
+  await card.getByRole("button", { name: "登录…" }).click();
+  await card.getByLabel("邮箱").fill(EMAIL);
+  await card.getByRole("button", { name: "发送验证码" }).click();
+  await card.getByLabel("验证码").fill("123456");
+  await card.getByRole("button", { name: "登录", exact: true }).click();
+
+  await expect(card.locator(".cloud-last-sync")).toContainText("最后同步");
+  await expect(card.locator(".cloud-notice")).toHaveText("已超过 3 台，最早登录的「Windows 电脑」已自动退出登录");
+  await expect(card.getByText("一个账号最多同时登录 3 台电脑。", { exact: false })).toBeVisible();
+  const demo = await page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.cloud-demo.v1")));
+  expect(Object.keys(demo.sessions)).toHaveLength(3);
+  expect(demo.sessions["demo-old-1"]).toBeUndefined();
+  expect(demo.ended["demo-old-1"]).toBe(true);
+
+  // Later a 4th computer signs in elsewhere and ends this one: the next sync says so and shows 登录… again.
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("clipbox.cloud-demo.v1"));
+    for (const token of Object.keys(state.sessions)) { delete state.sessions[token]; state.ended[token] = true; }
+    localStorage.setItem("clipbox.cloud-demo.v1", JSON.stringify(state));
+  });
+  await card.locator(".settings-row").filter({ hasText: "已登录" }).getByRole("button", { name: "立即同步" }).click();
+  await expect(card.getByRole("alert")).toHaveText("这个账号在别的电脑上登录了。一个账号最多同时登录 3 台电脑，这台电脑已退出登录，要同步请重新登录");
+  await expect(card.getByRole("button", { name: "登录…" })).toBeVisible();
+  await expect(card.locator(".cloud-notice")).toHaveCount(0);
+});
