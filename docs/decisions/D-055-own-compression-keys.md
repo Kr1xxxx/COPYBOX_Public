@@ -9,3 +9,6 @@
 - Consequences: no shared quota to abuse and nothing on the site to attack; each person's 500 free compressions a month
   are their own. Staff who never fill a key get uncompressed pictures. Revisit only if the owner asks again.
 - Status: accepted (owner, 2026-10-15).
+- Follow-up (2026-10-15, PR for the per-person keys): the build-time key path (`CLIPBOX_TINIFY_KEYS` in tauri.yml, the
+  `tinify_builtin_count` command, `builtin:N` names) is removed from the code, and the key row in 设置 is no longer folded
+  under 高级, so nobody can ship or expect a built-in key again.
