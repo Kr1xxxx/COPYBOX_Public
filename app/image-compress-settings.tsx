@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { secretAwareStorage } from "./secret-settings";
 import { COMPRESS_MONTHLY_LIMIT, customKeyStatus, readCompressUsage, readCustomKeys, saveCustomKeys } from "./image-compress";
 
 const SLOT = ["第一个", "第二个"];
 
 // What the 压缩服务密钥 row says about the keys in use.
 function keyStatusText(keys: [string, string], now: Date): string {
-  const { active, refused } = customKeyStatus(localStorage, now);
+  const { active, refused } = customKeyStatus(secretAwareStorage(), now);
   if (active === null) return "还没有填写密钥，新图片不会压缩。每个人用自己的：去 TinyPNG 官网免费申请一个，填在这里";
   const count = keys.filter(Boolean).length;
   if (refused.includes(active)) return "你填写的密钥本月都不能用了，下个月 1 号恢复";
@@ -20,14 +21,14 @@ function keyStatusText(keys: [string, string], now: Date): string {
 // 设置 → 数据: how many pictures were compressed this month, and the person's own keys (D-055: none is built in).
 export function ImageCompressSettings() {
   const [now] = useState(() => new Date());
-  const [used] = useState(() => readCompressUsage(localStorage, now));
-  const [keys, setKeys] = useState<[string, string]>(() => readCustomKeys(localStorage));
+  const [used] = useState(() => readCompressUsage(secretAwareStorage(), now));
+  const [keys, setKeys] = useState<[string, string]>(() => readCustomKeys(secretAwareStorage()));
   const [draft, setDraft] = useState<[string, string]>(["", ""]);
   const [editing, setEditing] = useState(false);
 
   function save() {
-    saveCustomKeys(localStorage, draft, now);
-    setKeys(readCustomKeys(localStorage));
+    saveCustomKeys(secretAwareStorage(), draft, now);
+    setKeys(readCustomKeys(secretAwareStorage()));
     setEditing(false);
     setDraft(["", ""]);
   }

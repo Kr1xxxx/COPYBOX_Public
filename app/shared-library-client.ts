@@ -1,11 +1,13 @@
+import { secretAwareStorage } from "./secret-settings.ts";
 import { SHARED_MAX_BYTES, SHARED_TOO_BIG, SYNC_BASE_URL, sharedSourceUrl, type SyncSummary } from "./shared-library.ts";
 
 // Settings of the company 话术 library on this device: the 同步码 (or an address) typed in, empty until someone does.
 export const SHARED_URL_KEY = "clipbox.shared-library-url";
 const SHARED_LAST_KEY = "clipbox.shared-library-last";
 
-function read(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
-function write(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* the sync still worked, only the memory of it is lost */ } }
+// The 同步码 itself is kept in Windows Credential Manager on the Windows app and read once on start (D-057).
+function read(key: string) { try { return secretAwareStorage().getItem(key); } catch { return null; } }
+function write(key: string, value: string) { try { secretAwareStorage().setItem(key, value); } catch { /* the sync still worked, only the memory of it is lost */ } }
 
 export function readSharedUrl() { return (read(SHARED_URL_KEY) || "").trim(); }
 export function writeSharedUrl(url: string) { write(SHARED_URL_KEY, url.trim()); }

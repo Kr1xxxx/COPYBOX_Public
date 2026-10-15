@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { secureKeyStore, withDeviceKey } from "./device-key-store";
+import { withSecretSettings } from "./secret-settings";
 import { applyPayload, collectPayload, countImages, countPayload, countStoredImages, hasStashedBackup, openTransfer, restoreStashedBackup, TransferError, type TransferPayload, parseTransferFile, sealTransfer, transferFileName, transferFileParts, type TransferFile } from "./data-transfer";
 
 // One-time move of all local data between the old (Electron) and new (Tauri) desktop app. Reuses the backup dialog's look.
@@ -76,7 +77,8 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
     try {
       if (exporting) {
         // The sealed file carries the device key even where it lives in Credential Manager (D-053).
-        const payload = await withDeviceKey(await collectPayload(), secureKeyStore());
+        // …and the TinyPNG keys and the 同步码 (D-057).
+        const payload = await withSecretSettings(await withDeviceKey(await collectPayload(), secureKeyStore()));
         const sealed = await sealTransfer(payload, password);
         const url = URL.createObjectURL(new Blob(transferFileParts(sealed), { type: "application/json" }));
         const anchor = document.createElement("a");
