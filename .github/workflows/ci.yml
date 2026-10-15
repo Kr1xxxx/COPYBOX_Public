@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# A new push to the same PR stops the older, now-outdated run. Runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     name: lint + tests
@@ -20,9 +25,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-  e2e:
-    name: browser end-to-end
+  # The browser tests are split over four machines that run at the same time; together they still run every test.
+  e2e-shard:
+    name: browser end-to-end (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,15 +45,28 @@ jobs:
       - if: hashFiles('playwright.config.mjs') != ''
         run: npx playwright install --with-deps chromium
       - if: hashFiles('playwright.config.mjs') != ''
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
           retention-days: 7
+
+  # One check with the old name, green only when every part passed.
+  e2e:
+    name: browser end-to-end
+    if: always()
+    needs: [e2e-shard]
+    runs-on: ubuntu-latest
+    steps:
+      - if: needs.e2e-shard.result != 'success'
+        run: |
+          echo "::error::A part of the browser tests failed: ${{ needs.e2e-shard.result }}"
+          exit 1
+      - run: echo "All four parts passed."
 
   handoff:
     name: handoff updated
