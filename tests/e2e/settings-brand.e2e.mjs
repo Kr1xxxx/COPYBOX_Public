@@ -37,5 +37,8 @@ test("Settings rows are split by a single hairline, never a doubled one", async 
       }).length;
     });
     expect(doubled, tab).toBe(0);
+    // A note right under a row still gets its line, now that rows draw only the line above them.
+    const bare = await page.evaluate(() => [...document.querySelectorAll("#settings-panel .settings-row + .settings-note")].filter((el) => el.offsetParent && parseFloat(getComputedStyle(el).borderTopWidth) === 0).length);
+    expect(bare, tab).toBe(0);
   }
 });

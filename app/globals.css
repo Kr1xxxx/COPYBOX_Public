@@ -1697,3 +1697,4 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-dialog .mcp-connect-code, .settings-body code { background: var(--set-track); }
 /* One hairline between rows: a row's own bottom line and the next row's top line used to stack into a thick one. */
 .settings-body > .settings-card > .settings-row { border-bottom: 0; }
+.settings-body > .settings-card > .settings-row + .settings-note { border-top: 1px solid var(--line-soft); }
