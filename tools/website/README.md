@@ -31,6 +31,7 @@ Source files in this folder:
 | `404.html` | Body of the 404 page; built with the same head, header and footer |
 | `icons/`, `images/` | Committed icons and screenshots, made by hand when the icon or the UI changes |
 | `build.mjs`, `deploy.mjs`, `worker.mjs`, `wrangler.jsonc` | Build, upload, the Worker and its config |
+| `api.mjs`, `schema.sql` | The account and sync API under `/api/` and its D1 tables (see 账号与同步接口 below; wrangler bundles `api.mjs` into the Worker) |
 
 The repo is private, so the public cannot download from GitHub; that is why the site hosts the installer.
 
@@ -71,6 +72,51 @@ of those, keeps the version it replaced as `history/replaced-<UTC ISO>.json` and
 second rollback goes one step further back. The script calls the Cloudflare API directly (the cloud session's proxy
 adds the token; elsewhere set `CLOUDFLARE_API_TOKEN`, and optionally `CLOUDFLARE_ACCOUNT_ID`). Agents upload only
 after the owner says 发布 or 部署 in the website thread.
+
+## 账号与同步接口 (account and sync API, D-063)
+
+`/api/*` is the server side of optional in-app registration and sync across computers (`api.mjs`, imported by
+`worker.mjs` and routed before the GET-only rule; HSTS is added as on every answer). Live since 2026-10-15 (owner's
+部署): D1 `copyboxx-users` is bound as `DB` and the secret `VAULT_KEY` is set. Without the `DB` binding every `/api/*`
+answers `503 {"error":"unavailable"}`; without `RESEND_API_KEY`, `/api/auth/code` answers 503 until the owner sets it.
+
+Login is only a 6-digit code sent to the email; there is no password. The app calls from Rust, so `/api` sends no
+CORS headers (a browser page cannot read the answers); `OPTIONS` gets 204 with `Allow` only. JSON in and out; errors
+are `{ "error": <code>, "message": <plain Chinese> }`.
+
+| Request | Answer |
+| --- | --- |
+| `POST /api/auth/code` `{email}` | `200 {ok:true}` for any well-formed email, registered or not (creates the user on first use; mails the code through Resend). `400 bad_email`, `429 rate_limited`, `503 unavailable` (no `RESEND_API_KEY`), `502 mail_failed` |
+| `POST /api/auth/verify` `{email, code, device?}` | `200 {token, email}`; `device` (e.g. "Windows 电脑") is trimmed, cut to 40 characters and kept on the session. Wrong, expired, used-up or unknown: always `401 bad_code` |
+| `POST /api/auth/logout` (Bearer) | `200 {ok:true}`; ends only that session |
+| `GET /api/vault` (Bearer) | `200 {version, updatedAt, data}` (`data` is the JSON object last uploaded), or `{version:0, updatedAt:null, data:null}` |
+| `PUT /api/vault` (Bearer) `{baseVersion, data}` | `200 {version}` (old + 1). `409 {error:"version_conflict", version}` when `baseVersion` is not the current version; `400 bad_data` when `data` is not an object; `413 too_large` over 5 MB of request, or over 1.9 MB of data while the blobs live in D1 |
+| `DELETE /api/account` (Bearer) | `200 {ok:true}`; deletes the user, all sessions, any code and the blob |
+| other `/api/*` | `404 not_found`; a known path with another method `405 method_not_allowed` |
+
+A missing, unknown or expired token is `401 unauthorized`. Limits: a code lives 10 minutes and dies after 5 wrong
+tries; at most 5 codes per email and 20 code requests per IP (`CF-Connecting-IP`) each hour; sessions last 90 days.
+
+Storage: D1 `copyboxx-users` (tables in `schema.sql`; emails trimmed and lower-cased, at most 120 characters; codes
+and tokens only as SHA-256). The blob, one per user under the key `vaults/<user id>.json`, goes to the R2 bucket bound
+as `VAULTS` when there is one, otherwise to the D1 table `vault_blobs` (R2 was switched off on the owner's account on
+2026-10-15; turning it on needs the dashboard, then add `"r2_buckets": [{ "binding": "VAULTS", "bucket_name":
+"copyboxx-vaults" }]` and move existing rows). The blob is `JSON.stringify(data)` encrypted with AES-GCM under a key
+derived by HKDF-SHA-256 from the secret `VAULT_KEY` and the user id (format byte, 12-byte IV, ciphertext), so the
+stored copy alone reveals no content. It is not end-to-end: whoever reads the mailbox can sign in, and whoever
+controls the Worker can decrypt. `VAULT_KEY` was generated in the cloud session and stored only as a Worker secret
+(never printed); changing or losing it makes every stored blob unreadable, and the apps then upload again from their
+local copies.
+
+Setting up again from scratch (already done once; only after the owner says 部署):
+
+1. `npx --yes wrangler@4.150.0 d1 create copyboxx-users`, then `d1 execute copyboxx-users --remote --file
+   tools/website/schema.sql` (the schema only uses `CREATE TABLE IF NOT EXISTS`, so running it again is safe), and
+   put the id into `wrangler.jsonc`.
+2. Secrets (dashboard: Workers → copyboxx-site → Settings → Variables and Secrets, or `wrangler secret put`):
+   `RESEND_API_KEY` (copyboxx.com must be a verified sending domain in Resend; mail goes from
+   `Copyboxx <noreply@copyboxx.com>`) and `VAULT_KEY` (32 random bytes, base64).
+3. `npm run website:deploy`.
 
 ## Build and deploy
 
