@@ -102,6 +102,9 @@ export type MarkItem = {
   updatedAt: number;
 };
 
+// One hidden value of an API entry. The label is what a person (and the command line's --field) calls it, unique per entry.
+export type ApiSecretField = { id: string; label: string; value: string };
+
 export type ApiKeyItem = EntryMeta & {
   id: string;
   type: "apikey";
@@ -111,6 +114,12 @@ export type ApiKeyItem = EntryMeta & {
   key: string;
   // The second half of a Key + Secret pair.
   secret: string;
+  // Since D-061: every hidden value of the entry, in order (Key, Secret, Client ID…). When present it is the truth, and
+  // key / secret above repeat its first two values so older app versions still read the entry. Entries saved before have
+  // no fields; apiSecretFields() reads them from key / secret.
+  fields?: ApiSecretField[];
+  // Free text shown under the fields, not hidden.
+  note?: string;
   endpoint: string;
   // YYYY-MM-DD, or "" when the key does not expire.
   expires: string;

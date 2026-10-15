@@ -129,6 +129,7 @@ import { DailyTipsCard } from "./daily-tips-card";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand, secretAutomationAction, secretGateRefusal } from "./clipbox-automation";
 import { useAutomationConsent } from "./automation-consent";
 import { parseAutomationCaller } from "./automation-trust";
+import { isApiKeySecretCommand, runApiKeySecretCommand } from "./apikey-automation";
 
 type VaultEnvelope = {
   version: 1;
@@ -460,6 +461,8 @@ export default function Home() {
   // Read by the command line door when it asks for a 秘密 (a locked 账号 page refuses it at once).
   const accountLockedRef = useRef(accountLocked);
   accountLockedRef.current = accountLocked;
+  const accountKeyRef = useRef(accountKey);
+  accountKeyRef.current = accountKey;
   const automationConsent = useAutomationConsent();
   const askAutomationConsent = automationConsent.ask;
   // 账号 slide-to-unlock (D-051): frosted until slid open; closes again on leaving the section or when the window hides.
@@ -922,6 +925,12 @@ export default function Home() {
               backup,
             });
             showToast(`${SECRET_WORD}加密备份已生成`);
+            return;
+          }
+          if (isApiKeySecretCommand(command)) {
+            if (!accountKeyRef.current) throw new AutomationCommandError("ACCOUNT_LOCKED", "账号已上锁，请先在 Copyboxx 里打开账号页并解锁");
+            const result = runApiKeySecretCommand(await openSecretItemsStore(accountKeyRef.current).list(), command);
+            window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: true, ...result });
             return;
           }
           const committed = await commitSnippetAutomationCommand(

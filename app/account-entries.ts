@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { lastFour } from "./apikey-core";
+import { apiKeyHint, apiSecretFields } from "./apikey-core";
 import { type AccountEntry, type EntryKind, NOTE_SITE, UNKNOWN_SITE } from "./account-view";
 import { noteHint, plainText } from "./note-core";
 import { buildEnglishBlock, paymentHint, type EntryMeta, type MarkItem } from "./payment-core";
@@ -58,7 +58,7 @@ export function useAccountEntries(deviceKey: string, legacySecrets: LegacySecret
       for (const item of items) {
         if (item.type === "mark") marks[item.target] = item;
         else if (item.type === "login") add({ id: item.id, tab: "login", title: item.name, hint: item.username, site: detectSite({ url: item.url, name: item.name }), copy: { label: "复制密码", text: async () => item.password } }, item);
-        else if (item.type === "apikey") add({ id: item.id, tab: "apikey", title: item.name, hint: `${item.service ? `${item.service} · ` : ""}尾号 ${lastFour(item.key)}`, site: detectSite({ apiKey: item.key, url: item.endpoint, name: item.service || item.name }), copy: { label: "复制密钥", text: async () => item.key } }, item);
+        else if (item.type === "apikey") add({ id: item.id, tab: "apikey", title: item.name, hint: apiKeyHint(item), site: detectSite({ apiKey: item.key, url: item.endpoint, name: item.service || item.name }), copy: { label: "复制密钥", text: async () => apiSecretFields(item)[0]?.value ?? "" } }, item);
         else if (item.type === "note") add({ id: item.id, tab: "note", title: item.name, hint: noteHint(item.body), search: plainText(item.body), site: NOTE_SITE, copy: { label: "复制笔记", text: async () => item.body } }, item);
         else if (item.type === "recovery") add({ id: item.id, tab: "recovery", title: item.name, hint: `${item.codes.length} 个恢复码`, site: detectSite({ name: item.site || item.name }), copy: { label: "复制全部恢复码", text: async () => item.codes.join("\n") } }, item);
         else add({ id: item.id, tab: "payment", title: item.name, hint: paymentHint(item), site: paymentSite(item.kind, item.name), copy: { label: "复制收款信息", text: async () => buildEnglishBlock(item) } }, item);

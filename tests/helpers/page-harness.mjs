@@ -5,6 +5,7 @@ import ts from 'typescript';
 import * as core from '../../app/clipbox-core.ts';
 import * as order from '../../app/clipbox-order.ts';
 import * as automation from '../../app/clipbox-automation.ts';
+import * as apikeyAutomation from '../../app/apikey-automation.ts';
 import * as keyCache from '../../app/key-cache.ts';
 import * as writeGate from '../../app/write-gate.ts';
 import * as deviceKeyStore from '../../app/device-key-store.ts';
@@ -33,7 +34,7 @@ export async function pageHarness() {
   let rejectWrite = false;
   const caps = { platform: 'darwin', globalShortcut: '⌥ Space', supportsSecrets: true, supportsExport: true, supportsAutomation: true, edition: 'full' };
   const c = {
-    ...core, ...order, ...automation, ...edition, ...keyCache, ...writeGate, ...deviceKeyStore, ...secretSettings, storageWarnedRef: { current: false }, crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, btoa, atob, Date, JSON,
+    ...core, ...order, ...automation, ...apikeyAutomation, ...edition, ...keyCache, ...writeGate, ...deviceKeyStore, ...secretSettings, storageWarnedRef: { current: false }, crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, btoa, atob, Date, JSON,
     ITERATIONS: 310_000, STORAGE_KEY: 'vault', DEVICE_KEY: 'key', LEGACY_STORAGE_KEY: 'legacy',
     localStorage: { getItem: key => storage.get(key) ?? null, removeItem: key => storage.delete(key), setItem: (key, value) => {
       if (key === 'vault' && rejectWrite) { rejectWrite = false; throw new Error('injected write failure'); }
