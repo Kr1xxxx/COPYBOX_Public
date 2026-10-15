@@ -4,10 +4,6 @@ import test from "node:test";
 import worker, {
   cacheControlFor,
   candidateKeys,
-  compressCodeKey,
-  imageKind,
-  isTinifyOutput,
-  tinifyKeys,
   contentTypeFor,
   httpsRedirect,
   syncKeyFor,
@@ -273,99 +269,4 @@ test("worker: company 话术 sync at /sync/<code>/snippets.json, every miss the 
   }
   assert.deepEqual([...bodies], ["404 Not Found"]);
   assert.ok(!env.reads.includes("sync/XS-7KQ2M9AB/history/snippets-1.json"));
-});
-
-// /compress (D-055): a fake TinyPNG that records what it was sent.
-const pngBytes = () => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...new Array(200).fill(7)]);
-
-function fakeTinify(answers) {
-  const calls = [];
-  const fetcher = async (url, init = {}) => {
-    calls.push({ url: String(url), method: init.method || "GET", auth: init.headers?.Authorization });
-    const key = Buffer.from(String(init.headers?.Authorization || "").replace("Basic ", ""), "base64").toString().replace("api:", "");
-    if (String(url).endsWith("/shrink")) {
-      const status = answers[key] ?? 201;
-      return new Response(null, { status, headers: status === 201 ? { Location: "https://api.tinify.com/output/abc" } : {} });
-    }
-    return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
-  };
-  return { calls, fetcher };
-}
-
-function compressEnv(extra = {}) {
-  const env = fakeEnv({ ...files, "sync/CB-TEST1234/snippets.json": '{"snippets":[]}' });
-  return Object.assign(env, { TINIFY_KEYS: " k1 , k2 ", ...extra });
-}
-
-function compress(env, { code = "cb-test1234", body = pngBytes(), fetcher = fakeTinify({}).fetcher, headers = {} } = {}) {
-  const init = { method: "POST", body, headers: { ...(code === null ? {} : { "X-Copyboxx-Code": code }), ...headers } };
-  return worker.fetch(new Request("https://copyboxx.com/compress", init), env, {}, fetcher);
-}
-
-test("compress: helpers check codes, keys, picture types and TinyPNG addresses", () => {
-  assert.equal(compressCodeKey(" cb-test1234 "), "sync/CB-TEST1234/snippets.json");
-  for (const bad of ["", "abc", "../../x", "CB TEST1234", null]) assert.equal(compressCodeKey(bad), null);
-  assert.deepEqual(tinifyKeys(" a , ,b,"), ["a", "b"]);
-  assert.deepEqual(tinifyKeys(undefined), []);
-  assert.equal(imageKind(pngBytes()), "image/png");
-  assert.equal(imageKind(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), "image/jpeg");
-  assert.equal(imageKind(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])), "image/webp");
-  assert.equal(imageKind(new TextEncoder().encode("<svg></svg>")), null);
-  assert.equal(isTinifyOutput("https://api.tinify.com/output/x"), true);
-  for (const bad of ["http://api.tinify.com/output/x", "https://api.tinify.com.evil.example/x", "https://api.tinify.com:444/x", "nope"]) {
-    assert.equal(isTinifyOutput(bad), false, bad);
-  }
-});
-
-test("compress: a known code gets the compressed picture back, using the first key", async () => {
-  const tinify = fakeTinify({});
-  const response = await compress(compressEnv(), { fetcher: tinify.fetcher });
-  assert.equal(response.status, 200);
-  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3]);
-  assert.equal(response.headers.get("Cache-Control"), "no-store");
-  assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
-  assert.deepEqual(tinify.calls.map((call) => call.url), ["https://api.tinify.com/shrink", "https://api.tinify.com/output/abc"]);
-  assert.equal(tinify.calls[0].auth, `Basic ${Buffer.from("api:k1").toString("base64")}`);
-});
-
-test("compress: a refused key falls over to the next; all used up is 429, all wrong is 503", async () => {
-  const over = fakeTinify({ k1: 429 });
-  assert.equal((await compress(compressEnv(), { fetcher: over.fetcher })).status, 200);
-  assert.equal(over.calls[1].auth, `Basic ${Buffer.from("api:k2").toString("base64")}`);
-  assert.equal((await compress(compressEnv(), { fetcher: fakeTinify({ k1: 429, k2: 429 }).fetcher })).status, 429);
-  assert.equal((await compress(compressEnv(), { fetcher: fakeTinify({ k1: 401, k2: 401 }).fetcher })).status, 503);
-  assert.equal((await compress(compressEnv(), { fetcher: fakeTinify({ k1: 415 }).fetcher })).status, 415);
-});
-
-test("compress: a missing or unknown code gets the same plain 404 as /sync/, and TinyPNG is never called", async () => {
-  const tinify = fakeTinify({});
-  const answers = [];
-  for (const code of [null, "", "short", "CB-NOPE0000", "../sync/CB-TEST1234"]) {
-    const response = await compress(compressEnv(), { code, fetcher: tinify.fetcher });
-    answers.push([response.status, await response.text(), response.headers.get("Content-Type")]);
-  }
-  const sync = await get("/sync/CB-NOPE0000/snippets.json");
-  for (const answer of answers) assert.deepEqual(answer, [404, await sync.clone().text(), sync.headers.get("Content-Type")]);
-  assert.equal(tinify.calls.length, 0);
-});
-
-test("compress: too big, empty, not a picture, no keys and too many requests are refused before TinyPNG", async () => {
-  const tinify = fakeTinify({});
-  const big = new Uint8Array(5 * 1024 * 1024 + 1);
-  big.set(pngBytes());
-  assert.equal((await compress(compressEnv(), { body: big, fetcher: tinify.fetcher })).status, 413);
-  assert.equal((await compress(compressEnv(), { body: new Uint8Array(0), fetcher: tinify.fetcher })).status, 400);
-  assert.equal((await compress(compressEnv(), { body: new TextEncoder().encode("<svg/>"), fetcher: tinify.fetcher })).status, 415);
-  assert.equal((await compress(compressEnv({ TINIFY_KEYS: undefined }), { fetcher: tinify.fetcher })).status, 503);
-  const limited = [];
-  const limiter = { async limit({ key }) { limited.push(key); return { success: false }; } };
-  assert.equal((await compress(compressEnv({ COMPRESS_LIMITER: limiter }), { fetcher: tinify.fetcher })).status, 429);
-  assert.deepEqual(limited, ["sync/CB-TEST1234/snippets.json"]);
-  assert.equal(tinify.calls.length, 0);
-});
-
-test("compress: only POST /compress compresses; GET /compress is the ordinary 404 page", async () => {
-  const response = await get("/compress");
-  assert.equal(response.status, 404);
-  assert.match(await response.text(), /找不到这个页面/);
 });

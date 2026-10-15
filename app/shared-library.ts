@@ -256,12 +256,6 @@ export const SYNC_BASE_URL = "https://copyboxx.com/sync/";
 export const SHARED_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 const SYNC_CODE = /^[A-Za-z0-9-]{6,40}$/;
 
-// The 同步码 typed in Settings (upper case), or "" when the setting is empty or a full address instead of a code.
-export function syncCodeOf(value: string): string {
-  const typed = (value || "").trim();
-  return SYNC_CODE.test(typed) ? typed.toUpperCase() : "";
-}
-
 export function sharedSourceUrl(value: string): string {
   const typed = value.trim();
   if (!typed) return "";

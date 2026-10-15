@@ -211,7 +211,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
             </div>
             <p className="settings-note">内容用 AES-256 加密，只保存在这台设备上，不会上传。</p>
             <p className="settings-note">密钥也放在这台电脑里，请不要把整个数据文件夹拷给别人。自动备份和数据放在一起，保护程度一样；要带走备份，请用带密码的「完整备份」。{PLAIN_NOTES ? "" : `复制${SECRET_WORD}默认只给出引用。`}</p>
-            <p className="settings-note">只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。填了企业同步码时，图片经 copyboxx.com 转给压缩服务，不会留在那里。</p>
+            <p className="settings-note">只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-usage" hidden={hideSection("usage", "set-usage")}><h3 id="set-usage">使用排行</h3>
             <UsageSection items={usageItems} now={openedAt} onShow={onShowItem} />

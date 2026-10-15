@@ -404,12 +404,10 @@ async function withCompressor(page, behaviour, key = "test-key") {
   await page.addInitScript(([mode, key]) => {
     if (key) localStorage.setItem("clipbox.tinify.key.v1", key);
     window.__compressCalls = 0;
-    window.__compressKeys = [];
     const desktop = () => window.clipboxDesktop;
     Object.defineProperty(window, "__installCompressor", { value: () => {
-      desktop().compressImage = async (bytes, sentKey) => {
+      desktop().compressImage = async () => {
         window.__compressCalls += 1;
-        window.__compressKeys.push(sentKey);
         if (mode === "fail") return { ok: false, reason: "network" };
         // a real, much smaller picture (a 1×1 PNG)
         return { ok: true, bytes: Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0)) };
@@ -498,7 +496,7 @@ test("two own compression keys can be set; when the first is used up the second 
     return dialog.locator("section[aria-labelledby=set-compress]");
   };
   let card = await openCompress();
-  await expect(card).toContainText("还没有填企业同步码，新图片不会压缩");
+  await expect(card).toContainText("还没有填写密钥，新图片不会压缩");
   await card.getByRole("button", { name: "更换…" }).click();
   await card.getByLabel("第一个密钥").fill("key-one");
   await card.getByLabel("第二个密钥（选填）").fill(" key-two ");
@@ -524,33 +522,9 @@ test("with no compression key set, a picture is stored as it is and the toast sa
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await addImages(page, PNG_FILE);
-  await expect(page.locator(".toast")).toContainText("未压缩：在 设置 → 账号与同步 填好企业同步码后就能压缩");
+  await expect(page.locator(".toast")).toContainText("未压缩：请先在 设置 → 数据 → 图片压缩 填写压缩密钥");
   await expect(rows(page)).toHaveCount(1);
   expect(await page.evaluate(() => window.__compressCalls)).toBe(0);
-});
-
-// D-055: with no key of one's own, a 企业同步码 lets the picture go through copyboxx.com, which holds the company key.
-test("with a 企业同步码 and no key of one's own, pictures are compressed through the company code and 设置 says so", async ({ page }) => {
-  await asDesktop(page, "win32", { imageView: "list" });
-  // The company 话术 sync at start stays unanswered here, so its own messages stay out of the way.
-  await page.route("https://copyboxx.com/sync/**", () => new Promise(() => {}));
-  await page.addInitScript(() => localStorage.setItem("clipbox.shared-library-url", "cb-test1234"));
-  await withCompressor(page, "ok", "");
-  await page.goto("/");
-  await page.waitForSelector(".app-shell");
-  await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
-  await addImages(page, PNG_FILE);
-  await expect(page.locator(".toast")).toContainText("已通过企业同步码压缩");
-  await expect(rows(page)).toHaveCount(1);
-  expect(await page.evaluate(() => window.__compressKeys)).toEqual(["proxy:CB-TEST1234"]);
-  await page.getByRole("button", { name: /设置/ }).first().click();
-  const dialog = page.locator(".settings-dialog");
-  await dialog.getByRole("tab", { name: "数据" }).click();
-  const card = dialog.locator("section[aria-labelledby=set-compress]");
-  await expect(card).toContainText("1 / 100 张");
-  await expect(card.getByRole("button", { name: "更换…" })).toBeHidden();
-  await card.getByText("高级", { exact: true }).click();
-  await expect(card).toContainText("已通过企业同步码压缩，不用自己填密钥");
 });
 
 test("with the app's own compression keys, the key row is folded under 高级 until it is opened", async ({ page }) => {

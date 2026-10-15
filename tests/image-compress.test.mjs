@@ -181,30 +181,3 @@ test("own keys come before the built-in ones", async () => {
   await compressForUpload(png(100), { bridge: builtInBridge(sent, 2), storage: withKey(), now: october });
   assert.deepEqual(sent, ["mine"]);
 });
-
-// D-055: with a 企业同步码 and no own key, the shell is asked for the company proxy.
-test("a 企业同步码 sends the picture through the company proxy; an own key still comes first", async () => {
-  const sent = [];
-  const bridge = { compressImage: async (bytes, key) => { sent.push(key); return { ok: true, bytes: bytes.slice(0, 10) }; }, compressBuiltInCount: async () => 2 };
-  const storage = memoryStorage({ "clipbox.shared-library-url": " cb-test1234 " });
-  const result = await compressForUpload(png(1000), { bridge, storage, now: october });
-  assert.deepEqual(sent, ["proxy:CB-TEST1234"]);
-  assert.match(result.notice, /^已通过企业同步码压缩/);
-  assert.equal(readCompressUsage(storage, october), 1);
-  storage.setItem(TINIFY_KEY_STORAGE, "mine");
-  await compressForUpload(png(1000), { bridge, storage, now: october });
-  assert.deepEqual(sent, ["proxy:CB-TEST1234", "mine"]);
-});
-
-test("a full address instead of a 同步码 does not use the proxy; a refused code keeps the original and says why", async () => {
-  const storage = memoryStorage({ "clipbox.shared-library-url": "https://company.example/library.json" });
-  const bridge = { compressImage: async () => { throw new Error("must not be called"); } };
-  assert.equal((await compressForUpload(png(100), { bridge, storage, now: october })).notice, COMPRESS_NO_KEY_NOTICE);
-  const refused = memoryStorage({ "clipbox.shared-library-url": "CB-NOPE0000" });
-  const original = png(100);
-  const result = await compressForUpload(original, { bridge: { compressImage: async () => ({ ok: false, reason: "code" }) }, storage: refused, now: october });
-  assert.equal(result.blob, original);
-  assert.equal(result.failed, true);
-  assert.equal(result.notice, "企业同步码不能用来压缩，已保存原图");
-  assert.equal(readCompressUsage(refused, october), 0);
-});
