@@ -67,7 +67,7 @@ test("Windows: keys typed in 设置 go to Credential Manager only, and clearing 
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   let card = await compressCard(page);
-  await card.getByRole("button", { name: "更换…" }).click();
+  await card.getByRole("button", { name: "填写…" }).click();
   await card.getByLabel("第一个密钥").fill("key-one");
   await card.getByLabel("第二个密钥（选填）").fill("key-two");
   await card.getByRole("button", { name: "保存" }).click();
