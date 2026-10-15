@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { appVersionFrom, withCargoVersion } from "../scripts/sync-version.mjs";
+import { appVersionFrom, previewFromApp, withCargoVersion } from "../scripts/sync-version.mjs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -9,6 +9,11 @@ test("the app version is the trial version with .0 added", () => {
   assert.equal(appVersionFrom("1.43"), "1.43.0");
   assert.equal(appVersionFrom("1.43\n"), "1.43.0");
   assert.equal(appVersionFrom(" 2.5 "), "2.5.0");
+  // 1.99 → 2.00: no leading zero in an app version, and the order still goes up.
+  assert.equal(appVersionFrom("2.00"), "2.0.0");
+  assert.equal(appVersionFrom("2.05"), "2.5.0");
+  assert.equal(appVersionFrom("2.10"), "2.10.0");
+  for (const preview of ["1.43", "1.99", "2.00", "2.05", "2.10"]) assert.equal(previewFromApp(appVersionFrom(preview)), preview);
   assert.throws(() => appVersionFrom("1.43.2"), /must look like/);
   assert.throws(() => appVersionFrom("v1"), /must look like/);
 });
