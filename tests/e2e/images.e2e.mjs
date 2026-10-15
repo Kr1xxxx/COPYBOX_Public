@@ -497,7 +497,7 @@ test("two own compression keys can be set; when the first is used up the second 
   };
   let card = await openCompress();
   await expect(card).toContainText("还没有填写密钥，新图片不会压缩");
-  await card.getByRole("button", { name: "更换…" }).click();
+  await card.getByRole("button", { name: "填写…" }).click();
   await card.getByLabel("第一个密钥").fill("key-one");
   await card.getByLabel("第二个密钥（选填）").fill(" key-two ");
   await card.getByRole("button", { name: "保存" }).click();
@@ -522,14 +522,13 @@ test("with no compression key set, a picture is stored as it is and the toast sa
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await addImages(page, PNG_FILE);
-  await expect(page.locator(".toast")).toContainText("未压缩：请先在 设置 → 数据 → 图片压缩 填写压缩密钥");
+  await expect(page.locator(".toast")).toContainText("未压缩：请先在 设置 → 数据 → 图片压缩 填写你自己的压缩密钥");
   await expect(rows(page)).toHaveCount(1);
   expect(await page.evaluate(() => window.__compressCalls)).toBe(0);
 });
 
-test("with the app's own compression keys, the key row is folded under 高级 until it is opened", async ({ page }) => {
+test("the compression key row is always shown and asks each person for their own key", async ({ page }) => {
   await asDesktop(page, "win32");
-  await page.addInitScript(() => { window.clipboxDesktop.compressBuiltInCount = async () => 2; });
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.getByRole("button", { name: /设置/ }).first().click();
@@ -537,9 +536,8 @@ test("with the app's own compression keys, the key row is folded under 高级 un
   await dialog.getByRole("tab", { name: "数据" }).click();
   const card = dialog.locator("section[aria-labelledby=set-compress]");
   await expect(card.getByText("本月已压缩")).toBeVisible();
-  await expect(card.getByText("高级", { exact: true })).toBeVisible();
-  await expect(card.getByRole("button", { name: "更换…" })).toBeHidden();
-  await card.getByText("高级", { exact: true }).click();
-  await expect(card.getByRole("button", { name: "更换…" })).toBeVisible();
-  await expect(card).toContainText("正在使用软件自带的密钥");
+  await expect(card.getByText("高级", { exact: true })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "填写…" })).toBeVisible();
+  await expect(card).toContainText("每个人用自己的：去 TinyPNG 官网免费申请一个，填在这里");
+  await expect(card).not.toContainText("自带");
 });

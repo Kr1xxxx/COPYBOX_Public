@@ -23,7 +23,7 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-012 | Windows: the vault's device key is protected by OS encryption | Superseded by D-015 |
 | D-013 | No code signing for now (internal tool); auto-update undecided | Accepted |
 | D-014 | No real-device testing round before merging | Accepted |
-| D-015 | Device-key protection removed for now | Accepted |
+| D-015 | Device-key protection removed for now | Superseded by D-053 (Windows) |
 | D-016 | Backups stay local files; no cloud or email upload | Accepted |
 | D-017 | 图片 section: replaces 备注 on Windows, added next to 秘密 on macOS | Accepted |
 | D-018 | 图片 folders (目录) | Accepted |
@@ -33,6 +33,45 @@ Statuses: Accepted / Superseded / Deprecated.
 | D-022 | Trash auto-cleanup defaults to 7 days for everyone | Accepted |
 | D-023 | Version update reminder: tells, never installs; source address not chosen yet | Accepted |
 | D-024 | 图片 thumbnails: small encrypted copies kept in their own database | Accepted |
+
+## Index of `docs/decisions/` (D-025 onwards)
+
+Kept up to date by the coordinator, not by feature PRs. Links are written `[D-NNN](…)` on purpose: the uniqueness test in
+`tests/docs-structure.test.mjs` counts only plain `| D-NNN |` rows, so these do not clash with the files. D-054 was
+reserved for update signing (PR #168); the owner dropped signing and closed the PR, so the number stays unused.
+
+| # | Decision | Status |
+| --- | --- | --- |
+| [D-025](decisions/D-025-thumbnails-not-encrypted.md) | 图片 thumbnails are stored unencrypted | Accepted |
+| [D-026](decisions/D-026-shared-library.md) | Shared 话术 library: per-entry sync that never overwrites the employee's edits | Accepted |
+| [D-027](decisions/D-027-hidden-totp-mac.md) | Hidden 验证码 (two-factor codes), Mac only | Accepted |
+| [D-028](decisions/D-028-variable-pins-and-name-defaults.md) | Variable blocks: pinned values and Name defaults | Accepted |
+| [D-029](decisions/D-029-tauri-desktop-shell.md) | Desktop app moves from Electron to Tauri 2 | Accepted |
+| [D-030](decisions/D-030-vault-typed-items.md) | 保险箱: typed secret items, Mac only | Accepted |
+| [D-031](decisions/D-031-vault-site-icons.md) | 保险箱 site icons, no live lookup | Accepted |
+| [D-032](decisions/D-032-data-move-file.md) | Old data moves to the Tauri app through one encrypted file | Accepted |
+| [D-033](decisions/D-033-image-trash.md) | 图片 have a 回收站 | Accepted |
+| [D-034](decisions/D-034-electron-removed.md) | Electron removed; Tauri is the only desktop shell | Accepted |
+| [D-035](decisions/D-035-standard-folders-sortable.md) | The standard 话术 folders can be sorted | Accepted |
+| [D-036](decisions/D-036-app-version-follows-trial.md) | The app version follows the web preview version | Accepted |
+| [D-037](decisions/D-037-tinypng-image-compression.md) | Pictures are compressed with TinyPNG, at most 100 a month | Accepted; keys: only each person's own (D-055) |
+| [D-038](decisions/D-038-account-windows-and-lock.md) | Windows gets the 账号 page, with an opening password | Accepted; "password is only a door" superseded by D-040 |
+| [D-039](decisions/D-039-auto-backup-in-data-folder.md) | Daily automatic backup in the data folder | Accepted |
+| [D-040](decisions/D-040-account-password-encrypts-data.md) | The 账号 password really encrypts the 账号 data | Accepted |
+| [D-041](decisions/D-041-agents-merge-green-prs.md) | Agents merge green PRs; only high-risk PRs wait for 合并 | Accepted |
+| [D-042](decisions/D-042-premigration-copy-auto-delete.md) | Recovery code never lost unseen; pre-migration copy deletes itself | Accepted |
+| [D-043](decisions/D-043-incremental-image-backups.md) | Automatic backups keep each picture once | Accepted |
+| [D-044](decisions/D-044-product-name-clipboxx.md) | Product name Clipboxx (复制盒) | Superseded by D-046 |
+| [D-045](decisions/D-045-website-copyboxx.md) | Public website at copyboxx.com | Accepted; site preview copy removed 2026-10-14 |
+| [D-046](decisions/D-046-product-name-copyboxx.md) | Product name Copyboxx (复制盒), Chinese installer | Accepted; icon superseded by D-050 |
+| [D-047](decisions/D-047-auto-update.md) | Windows updates itself (立即更新) | Accepted |
+| [D-048](decisions/D-048-test-builds-carry-their-version.md) | Test builds carry their own version and come from main only | Accepted |
+| [D-049](decisions/D-049-folder-short-names.md) | Own folders can have a short name for the mini window | Accepted |
+| [D-050](decisions/D-050-app-icon-c-mark.md) | The app icon is the owner's C mark | Accepted |
+| [D-051](decisions/D-051-account-slide-unlock.md) | The 账号 page is frosted until slid open | Accepted |
+| [D-052](decisions/D-052-sync-codes.md) | Company content reaches staff by 同步码, published by an agent | Accepted |
+| [D-053](decisions/D-053-device-key-windows-credential-manager.md) | Windows keeps the device key in Credential Manager | Accepted |
+| [D-055](decisions/D-055-own-compression-keys.md) | Image compression uses only keys each person fills in; no built-in key, no website proxy | Accepted |
 
 ---
 

@@ -605,7 +605,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-body h3{margin:0 0 4px;color:var(--muted);font-size:11px;font-weight:650;letter-spacing:.06em}
 .settings-row{min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid var(--line-soft)}
 .settings-row:last-child{border-bottom:0}
-.settings-advanced>summary{min-height:36px;display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:12px;font-weight:600;cursor:pointer;list-style:none}.settings-advanced>summary::-webkit-details-marker{display:none}.settings-advanced>summary::after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}.settings-advanced[open]>summary::after{transform:rotate(45deg)}
 .settings-row strong{display:block;font-size:13px;font-weight:600}
 .settings-row small{display:block;margin-top:2px;color:var(--muted);font-size:11.5px}
 .settings-row .secondary-button{flex:none}

@@ -19,8 +19,6 @@
         .then(function (buffer) { return { ok: true, bytes: new Uint8Array(buffer) }; })
         .catch(function (error) { return { ok: false, reason: String(error && error.message ? error.message : error) }; });
     },
-    // How many TinyPNG keys the installer carries (from a CI secret); the page asks for them as "builtin:N".
-    compressBuiltInCount: function () { return invoke("tinify_builtin_count").catch(function () { return 0; }); },
     // Automatic daily backup: the file bytes go as the raw body, the file name as a header (backup.rs keeps the newest seven).
     backupSave: function (name, bytes) { return invoke("backup_save", bytes, { headers: { "x-backup-name": name } }).then(noop); },
     backupList: function () { return invoke("backup_list"); },
