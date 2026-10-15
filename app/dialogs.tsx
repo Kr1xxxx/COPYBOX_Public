@@ -201,15 +201,12 @@ export function AutomationConsentDialog({ question, onAnswer }: { question: stri
   useDialogKeyboard(dialogRef, deny);
   useEffect(() => { dialogRef.current?.querySelector<HTMLElement>("[data-deny]")?.focus(); }, []);
   return (
-    <div className="backup-backdrop" role="presentation">
-      <section ref={dialogRef} className="backup-dialog" role="alertdialog" aria-modal="true" aria-labelledby="automation-consent-title" aria-describedby="automation-consent-text">
-        <header className="backup-head">
-          <div><p>命令行</p><h2 id="automation-consent-title">允许读取秘密吗？</h2></div>
-        </header>
-        <div className="backup-form">
-          <p className="backup-intro" id="automation-consent-text">{question}</p>
-          <p className="backup-note">如果不是你自己刚刚运行的命令，请点「拒绝」。</p>
-          <div className="backup-actions"><button type="button" data-deny onClick={deny}>拒绝</button><button type="button" className="primary" onClick={() => onAnswer(true)}>允许</button></div>
+    <div className="delete-confirm-backdrop" role="presentation">
+      <section ref={dialogRef} className="delete-confirm-dialog consent-dialog" role="alertdialog" aria-modal="true" aria-labelledby="automation-consent-title" aria-describedby="automation-consent-text">
+        <header><h2 id="automation-consent-title">允许读取秘密吗？</h2><p id="automation-consent-text">{question}</p></header>
+        <div className="consent-body">
+          <p className="consent-note">如果不是你自己刚刚运行的命令，请点「拒绝」。</p>
+          <div className="delete-confirm-actions consent-actions"><button type="button" data-deny onClick={deny}>拒绝</button><button type="button" className="primary" onClick={() => onAnswer(true)}>允许</button></div>
         </div>
       </section>
     </div>
