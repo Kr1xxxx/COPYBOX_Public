@@ -13,8 +13,9 @@ export type AutomationCommand =
   | { action: "status" }
   | { action: "list"; folder?: string; query?: string }
   | { action: "get"; number: string }
-  | { action: "secret-get"; reference: string }
-  | { action: "secret-verify"; reference: string; candidate: string }
+  // field: one named field of an API entry (clipbox://apikey/…, apikey-automation.ts); not used by old 秘密 references.
+  | { action: "secret-get"; reference: string; field?: string }
+  | { action: "secret-verify"; reference: string; candidate: string; field?: string }
   | { action: "add"; title: string; content: string; summary?: string; folder?: string; chineseText?: string }
   | { action: "update"; number: string; title?: string; content?: string; summary?: string; folder?: string; chineseText?: string }
   | { action: "move"; number: string; folder: string }
@@ -46,7 +47,7 @@ export type AutomationItem = {
 export type AutomationResult =
   | { action: "status"; ready: true; snippetCount: number }
   | { action: "list"; items: AutomationItem[] }
-  | { action: "secret-get"; secret: { reference: string; title: string; value: string; segments?: [string, string]; folder: string; updatedAt: number } }
+  | { action: "secret-get"; secret: { reference: string; title: string; value: string; segments?: [string, string]; folder: string; updatedAt: number; field?: string; fields?: string[]; note?: string } }
   | { action: "secret-verify"; match: boolean; clipboard: SecretValueProfile; stored: SecretValueProfile }
   | { action: "get" | "add" | "update" | "move"; item: AutomationItem }
   | { action: "delete"; number: string };
@@ -108,8 +109,8 @@ const COMMAND_FIELDS: Record<AutomationCommand["action"], Set<string>> = {
   status: new Set(["action"]),
   list: new Set(["action", "folder", "query"]),
   get: new Set(["action", "number"]),
-  "secret-get": new Set(["action", "reference"]),
-  "secret-verify": new Set(["action", "reference", "candidate"]),
+  "secret-get": new Set(["action", "reference", "field"]),
+  "secret-verify": new Set(["action", "reference", "candidate", "field"]),
   add: new Set(["action", "title", "content", "summary", "folder", "chineseText"]),
   update: new Set(["action", "number", "title", "content", "summary", "folder", "chineseText"]),
   move: new Set(["action", "number", "folder"]),
@@ -176,13 +177,16 @@ export function parseAutomationCommand(value: unknown): AutomationCommand {
     };
   }
   if (typedAction === "secret-get") {
-    return { action: "secret-get", reference: stringValue(record, "reference", true)! };
+    const field = stringValue(record, "field");
+    return { action: "secret-get", reference: stringValue(record, "reference", true)!, ...(field === undefined ? {} : { field }) };
   }
   if (typedAction === "secret-verify") {
+    const field = stringValue(record, "field");
     return {
       action: "secret-verify",
       reference: stringValue(record, "reference", true)!,
       candidate: stringValue(record, "candidate", true)!,
+      ...(field === undefined ? {} : { field }),
     };
   }
 
@@ -277,14 +281,15 @@ function targetSnippet(data: VaultData, number: string) {
   return item;
 }
 
-function targetSecret(data: VaultData, reference: string) {
+function targetSecret(data: VaultData, reference: string, field?: string) {
   const id = secretIdFromReference(reference);
+  if (field !== undefined) throw new AutomationCommandError("FIELD_NOT_SUPPORTED", "只有 API 条目（clipbox://apikey/…）可以按名字读取某一项");
   const item = data.items.find((candidate) => (candidate.kind || "secret") === "secret" && candidate.id === id && !isTrashedItem(candidate));
   if (!item) throw new AutomationCommandError("NOT_FOUND", "未找到对应的秘密");
   return item;
 }
 
-function secretValueProfile(value: string): SecretValueProfile {
+export function secretValueProfile(value: string): SecretValueProfile {
   return {
     chars: Array.from(value).length,
     bytes: new TextEncoder().encode(value).byteLength,
@@ -335,7 +340,7 @@ export function applySnippetAutomationCommand(
     return { data: vault, changed: false, result: { action: "list", items } };
   }
   if (command.action === "secret-get") {
-    const item = targetSecret(vault, command.reference);
+    const item = targetSecret(vault, command.reference, command.field);
     return {
       data: vault,
       changed: false,
@@ -353,7 +358,7 @@ export function applySnippetAutomationCommand(
     };
   }
   if (command.action === "secret-verify") {
-    const item = targetSecret(vault, command.reference);
+    const item = targetSecret(vault, command.reference, command.field);
     return {
       data: vault,
       changed: false,

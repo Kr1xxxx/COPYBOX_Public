@@ -15,13 +15,14 @@ const VALUE_OPTIONS = new Map([
   ["--folder", "folder"],
   ["--chinese", "chineseText"],
   ["--query", "query"],
+  ["--field", "field"],
 ]);
 const ALLOWED_FIELDS = {
   status: new Set(),
   list: new Set(["folder", "query"]),
   get: new Set(),
-  "secret-get": new Set(),
-  "secret-verify": new Set(),
+  "secret-get": new Set(["field"]),
+  "secret-verify": new Set(["field"]),
   "secret-export": new Set(["password"]),
   add: new Set(["title", "content", "summary", "folder", "chineseText"]),
   update: new Set(["title", "content", "summary", "folder", "chineseText"]),
@@ -53,7 +54,7 @@ function parseCliArguments(argv) {
       index += 1;
     } else {
       if (!["get", "verify"].includes(subcommand) || typeof argv[index + 1] !== "string") {
-        throw usageError("用法：clipbox secret get <引用>、clipbox secret verify <引用> --clipboard，或 clipbox secret export --output <文件> --stdin --confirm");
+        throw usageError("用法：clipbox secret get <引用> [--field <名字>]、clipbox secret verify <引用> --clipboard [--field <名字>]，或 clipbox secret export --output <文件> --stdin --confirm");
       }
       command = `secret-${subcommand}`;
       index += 2;

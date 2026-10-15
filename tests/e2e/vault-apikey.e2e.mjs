@@ -48,11 +48,13 @@ test("API 密钥: service is guessed from the prefix, key is hidden until held, 
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog).toContainText("中间不能有空格");
   await dialog.getByLabel("密钥", { exact: true }).fill("  AIzaSyKEY0000  \n");
+  await dialog.getByRole("button", { name: "再加一项" }).click();
+  await expect(dialog.getByLabel("第 2 项的名字")).toHaveValue("Secret");
   await dialog.getByLabel("Secret", { exact: true }).fill("shh-secret-9999");
   await dialog.getByLabel("到期日（可不填）").fill(day(3));
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("button", { name: /物流接口/ })).toContainText("3 天后到期");
-  await expect(dialog.getByRole("button", { name: /物流接口/ })).toContainText("Google · 尾号 0000");
+  await expect(dialog.getByRole("button", { name: /物流接口/ })).toContainText("Google · 尾号 0000 · 2 项");
   await dialog.getByRole("button", { name: "复制Secret" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("shh-secret-9999");
   // 全部: the AIza… key sits under Google with the API chip.

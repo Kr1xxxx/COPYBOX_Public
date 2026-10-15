@@ -96,6 +96,15 @@ exactly that entry:
 clipbox secret get "clipbox://secret/<ID>" --json
 ```
 
+An API entry under 账号 → API 密钥 has 「复制引用」 too (`clipbox://apikey/<ID>`). It can hold several hidden fields
+(Key, Secret, Client ID…); `--field` picks one by its name (any case) or by position (`1`, `2`…). Without `--field`
+the first field (the key) comes back. The answer also lists the entry's field names and its 备注.
+
+```bash
+clipbox secret get "clipbox://apikey/<ID>" --field "Client ID" --json
+clipbox secret verify "clipbox://apikey/<ID>" --field Secret --clipboard
+```
+
 The `--json` response contains the secret; the calling task should pass it straight to the target API and never
 print it. Secrets cannot be listed, searched, bulk-read or modified through the command.
 
