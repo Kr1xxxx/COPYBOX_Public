@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   compileModuleTree,
   ensureTitle,
+  hasPreloadHelper,
   patchPreloadHelper,
   previewBuildInfo,
   relativizeAssets,
@@ -23,6 +24,11 @@ test("patchPreloadHelper patches exactly one match", () => {
   assert.ok(out.includes("=function(e){return new URL(`../../../`+e,import.meta.url).href}"));
   assert.throws(() => patchPreloadHelper("nothing here"), /0 times/);
   assert.throws(() => patchPreloadHelper(js + ";" + js), /2 times/);
+});
+
+test("hasPreloadHelper finds the helper in whichever chunk holds it", () => {
+  assert.ok(hasPreloadHelper("var yl=`modulepreload`,bl=function(e){return`/`+e},xl={}"));
+  assert.ok(!hasPreloadHelper("function be(e){return e.split(`/`)}"));
 });
 
 test("withDesktopShim inserts the shim right after <head> for both platforms", () => {
