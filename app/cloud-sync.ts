@@ -39,7 +39,7 @@ export async function syncOnce(steps: SyncSteps): Promise<SyncResult> {
     };
     const next: SyncBase = { snippets: snippets.base, accounts: accounts ? accounts.base : base.accounts };
     if (sameCloudDoc(remote, doc)) return { base: next, counts, accountsSkipped: !steps.accounts };
-    if (new TextEncoder().encode(JSON.stringify(doc)).length > CLOUD_MAX_BYTES) throw new CloudError("server", "内容太多，超过了同步的上限（5 MB），这次没有上传");
+    if (new TextEncoder().encode(JSON.stringify(doc)).length > CLOUD_MAX_BYTES) throw new CloudError("too_large", "要同步的内容太多，超过了云端的上限，这次没有上传，这台电脑上的内容没有变化");
     try {
       await steps.api.putVault(steps.token, version, doc);
       return { base: next, counts, accountsSkipped: !steps.accounts };

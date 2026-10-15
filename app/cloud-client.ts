@@ -21,7 +21,7 @@ export function cloudTransport(desktop: ClipboxDesktop | undefined = typeof wind
   return null;
 }
 
-export type CloudErrorCode = "signed_out" | "bad_code" | "bad_email" | "rate_limited" | "mail_failed" | "conflict" | "network" | "server";
+export type CloudErrorCode = "signed_out" | "bad_code" | "bad_email" | "rate_limited" | "mail_failed" | "conflict" | "too_large" | "unavailable" | "network" | "server";
 
 export class CloudError extends Error {
   readonly code: CloudErrorCode;
@@ -40,6 +40,8 @@ const MESSAGES: Record<CloudErrorCode, string> = {
   rate_limited: "发送太频繁了，请过一会儿再试",
   mail_failed: "验证码邮件没有发出去，请稍后再试",
   conflict: "另一台电脑刚同步过，请再同步一次",
+  too_large: "要同步的内容太多，超过了云端的上限，这次没有上传，这台电脑上的内容没有变化",
+  unavailable: "登录同步暂时不能用，请稍后再试",
   network: "连不上服务器，请检查网络后再试",
   server: "服务器出了点问题，请稍后再试",
 };
@@ -61,6 +63,8 @@ async function call(transport: CloudTransport, request: CloudRequest): Promise<R
   if (response.status === 409) throw new CloudError("conflict", MESSAGES.conflict, typeof body.version === "number" ? body.version : undefined);
   if (response.status === 429 || code === "rate_limited") throw new CloudError("rate_limited", MESSAGES.rate_limited);
   if (code === "bad_email") throw new CloudError("bad_email", MESSAGES.bad_email);
+  if (response.status === 413 || code === "too_large") throw new CloudError("too_large", MESSAGES.too_large);
+  if (response.status === 503 || code === "unavailable") throw new CloudError("unavailable", MESSAGES.unavailable);
   if (code === "mail_failed") throw new CloudError("mail_failed", MESSAGES.mail_failed);
   if (code === "bad_code" || response.status === 401) throw new CloudError("bad_code", MESSAGES.bad_code);
   throw new CloudError("server", typeof body.message === "string" && body.message ? body.message : MESSAGES.server);
