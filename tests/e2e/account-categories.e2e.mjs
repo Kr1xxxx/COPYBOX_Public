@@ -8,7 +8,7 @@ test("macOS: the 账号 page has 分类 and no 目录", async ({ page }) => {
   const sidebar = page.locator("aside.sidebar");
   await expect(sidebar.getByRole("button", { name: "新建目录" })).toBeVisible(); // 话术 still has its 目录
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText([/^登录/, /^收款信息/, /^API 密钥/, /^验证码/, /^恢复码/, /^其他/]);
+  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText([/^登录/, /^收款信息/, /^API 密钥/, /^验证码/, /^恢复码/, /^笔记/, /^其他/]);
   await expect(sidebar.locator(".nav-heading")).toHaveText(["分类"]);
   await expect(sidebar.getByRole("button", { name: "新建目录" })).toHaveCount(0);
   await expect(sidebar).not.toContainText("未分类");

@@ -128,6 +128,7 @@ import { ListScrollFrame } from "./list-scroll-rail";
 import { DailyTipsCard } from "./daily-tips-card";
 import { AutomationCommandError, commitSnippetAutomationCommand, formatSecretReference, isAutomationReadAction, parseSecretExportCommand, secretAutomationAction, secretGateRefusal } from "./clipbox-automation";
 import { useAutomationConsent } from "./automation-consent";
+import { parseAutomationCaller } from "./automation-trust";
 
 type VaultEnvelope = {
   version: 1;
@@ -893,7 +894,7 @@ export default function Home() {
 
   useEffect(() => {
     if (loading || !deviceKey || !window.clipboxDesktop?.onAutomationCommand) return;
-    const remove = window.clipboxDesktop.onAutomationCommand(({ requestId, command }) => {
+    const remove = window.clipboxDesktop.onAutomationCommand(({ requestId, command, caller }) => {
       const execute = async () => {
         try {
           const secretExport = parseSecretExportCommand(command);
@@ -959,7 +960,11 @@ export default function Home() {
       }
       // A 秘密 only leaves the app after the person here says yes; the question waits outside the save queue.
       void (async () => {
-        const allowed = !accountLockedRef.current && await askAutomationConsent(secretAction);
+        const asker = parseAutomationCaller(caller);
+        const answer = accountLockedRef.current ? "denied" : await askAutomationConsent(secretAction, asker);
+        const allowed = answer !== "denied";
+        // Allowed without a question (「始终允许」, D-059): say so, so it never happens unseen.
+        if (allowed && answer === "remembered" && asker && !accountLockedRef.current) showToast(`已自动允许「${asker.name}」读取秘密`);
         const refusal = secretGateRefusal({ accountLocked: accountLockedRef.current, allowed });
         if (refusal) {
           window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: false, error: refusal });
@@ -2130,7 +2135,7 @@ export default function Home() {
             {accountMode && <>
               <div className="nav-heading"><span>分类</span></div>
               <nav className="nav-list account-categories" aria-label="分类">
-                {categoryList.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
+                {categoryList.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "note" ? "note" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
               </nav>
             </>}
             {!accountMode && <>

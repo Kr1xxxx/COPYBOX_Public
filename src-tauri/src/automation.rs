@@ -22,8 +22,6 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 const READ_TIMEOUT: Duration = Duration::from_secs(10);
 /// After answering, wait this long for the other side to read the answer and hang up.
 const LINGER: Duration = Duration::from_secs(2);
-/// The name a program may give for itself (`"_client"`, e.g. "Codex"); passed to the page next to the command.
-pub const CLIENT_FIELD: &str = "_client";
 /// A command that hands out a 秘密 waits for the person at the app to allow it (the page gives up after 45 s).
 const SECRET_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -61,19 +59,28 @@ pub fn parse_request(source: &str) -> Result<Value, Value> {
     }
 }
 
-/// Takes the program's name out of a command: the page only accepts its own fields. Short, printable text only.
-pub fn take_client(command: &mut Value) -> Option<String> {
-    let raw = command.as_object_mut()?.remove(CLIENT_FIELD)?;
-    let name: String = raw.as_str()?.chars().filter(|c| !c.is_control()).take(40).collect();
-    let name = name.trim().to_string();
-    (!name.is_empty()).then_some(name)
+/// Who asked, as the page receives it ({ name, id }), or null when it cannot be told (D-059). `peer` is the process
+/// id of whatever connected; through `Copyboxx --mcp` that is Copyboxx itself, which caller.rs looks past.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+async fn caller_of(peer: Option<u32>) -> Value {
+    let Some(pid) = peer else { return Value::Null };
+    match tauri::async_runtime::spawn_blocking(move || crate::caller::identify(pid)).await {
+        Ok(Some(caller)) => json!({ "name": caller.name, "id": caller.id }),
+        _ => Value::Null,
+    }
+}
+
+/// Windows cannot tell who asked yet: the question offers only 拒绝 / 允许.
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+async fn caller_of(_peer: Option<u32>) -> Value {
+    Value::Null
 }
 
 /// Reads one command line, has it carried out and writes the answer back, on any kind of connection.
-async fn handle<S, F, Fut>(mut stream: S, forward: Arc<F>)
+async fn handle<S, F, Fut>(mut stream: S, peer: Option<u32>, forward: Arc<F>)
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    F: Fn(Value, Option<String>) -> Fut + Send + Sync + 'static,
+    F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
 {
     let mut source = Vec::new();
@@ -99,9 +106,10 @@ where
     let Ok(Some(reply)) = read else { return };
     let response = match reply {
         Err(body) => body,
-        Ok(mut command) => {
-            let client = take_client(&mut command);
-            match tokio::time::timeout(timeout_for(&command), forward(command, client)).await {
+        Ok(command) => {
+            // Only a 秘密 command needs to know who asked (for 「始终允许」); the others skip the lookup.
+            let caller = if is_secret_command(&command) { caller_of(peer).await } else { Value::Null };
+            match tokio::time::timeout(timeout_for(&command), forward(command, caller)).await {
                 Err(_) => error_body("RENDERER_TIMEOUT", "Copyboxx 窗口响应超时"),
                 Ok(Err(failure)) => failure_body(&failure),
                 Ok(Ok(value)) => value,
@@ -119,13 +127,14 @@ where
 #[cfg(unix)]
 pub async fn serve<F, Fut>(listener: UnixListener, forward: F)
 where
-    F: Fn(Value, Option<String>) -> Fut + Send + Sync + 'static,
+    F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
 {
     let forward = Arc::new(forward);
     loop {
         let Ok((stream, _)) = listener.accept().await else { continue };
-        tauri::async_runtime::spawn(handle(stream, forward.clone()));
+        let peer = stream.peer_cred().ok().and_then(|cred| cred.pid()).and_then(|pid| u32::try_from(pid).ok());
+        tauri::async_runtime::spawn(handle(stream, peer, forward.clone()));
     }
 }
 
@@ -147,7 +156,7 @@ pub fn default_pipe_name() -> String {
 #[cfg(windows)]
 pub async fn serve_pipe<F, Fut>(name: String, forward: F) -> std::io::Result<()>
 where
-    F: Fn(Value, Option<String>) -> Fut + Send + Sync + 'static,
+    F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
 {
     use tokio::net::windows::named_pipe::ServerOptions;
@@ -159,7 +168,7 @@ where
             continue;
         }
         let connected = std::mem::replace(&mut server, ServerOptions::new().reject_remote_clients(true).create(&name)?);
-        tauri::async_runtime::spawn(handle(connected, forward.clone()));
+        tauri::async_runtime::spawn(handle(connected, None, forward.clone()));
     }
 }
 
@@ -263,7 +272,8 @@ impl Bridge {
         }
     }
 
-    pub async fn forward(&self, app: &AppHandle, command: Value, client: Option<String>) -> Result<Value, Failure> {
+    /// `caller` is who asked ({ name, id } or null); the page lets a remembered caller read a 秘密 without asking.
+    pub async fn forward(&self, app: &AppHandle, command: Value, caller: Value) -> Result<Value, Failure> {
         let window = app.get_webview_window("main");
         let Some(window) = window.filter(|_| self.ready.load(Ordering::SeqCst)) else {
             return Err(("WINDOW_UNAVAILABLE".into(), "Copyboxx 窗口尚未就绪".into()));
@@ -276,7 +286,7 @@ impl Bridge {
             let _ = window.set_focus();
         }
         let (entry, rx) = self.register();
-        if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command, "client": client })).is_err() {
+        if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command, "caller": caller })).is_err() {
             return Err(("COMMAND_FAILED".into(), "命令执行失败".into()));
         }
         Self::wait_for(entry, rx, limit).await
@@ -380,9 +390,9 @@ pub fn start(app: &AppHandle) {
         }
         let bridge = app.state::<Bridge>().inner().clone();
         let handle = app.clone();
-        serve(listener, move |command, client| {
+        serve(listener, move |command, caller| {
             let (bridge, handle) = (bridge.clone(), handle.clone());
-            async move { bridge.forward(&handle, command, client).await }
+            async move { bridge.forward(&handle, command, caller).await }
         })
         .await;
     });
@@ -400,9 +410,9 @@ pub fn start(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         let bridge = app.state::<Bridge>().inner().clone();
         let handle = app.clone();
-        let served = serve_pipe(default_pipe_name(), move |command, client| {
+        let served = serve_pipe(default_pipe_name(), move |command, caller| {
             let (bridge, handle) = (bridge.clone(), handle.clone());
-            async move { bridge.forward(&handle, command, client).await }
+            async move { bridge.forward(&handle, command, caller).await }
         })
         .await;
         if let Err(e) = served {
@@ -443,18 +453,6 @@ mod tests {
     }
 
     #[test]
-    fn the_program_name_is_taken_out_of_the_command() {
-        let mut command = json!({ "action": "status", "_client": "  Codex\n " });
-        assert_eq!(take_client(&mut command).as_deref(), Some("Codex"));
-        assert_eq!(command, json!({ "action": "status" }));
-        let mut odd = json!({ "action": "status", "_client": 7 });
-        assert_eq!(take_client(&mut odd), None);
-        assert_eq!(odd, json!({ "action": "status" }));
-        let long = "x".repeat(100);
-        assert_eq!(take_client(&mut json!({ "_client": long })).unwrap().len(), 40);
-    }
-
-    #[test]
     fn secret_commands_wait_longer_for_the_person_to_answer() {
         for action in ["secret-get", "secret-verify", "secret-export"] {
             assert!(is_secret_command(&json!({ "action": action })), "{action}");
@@ -480,12 +478,11 @@ mod tests {
             let path = temp_socket("serve");
             prepare_socket(&path).await.unwrap();
             let listener = UnixListener::bind(&path).unwrap();
-            tauri::async_runtime::spawn(serve(listener, |command: Value, client: Option<String>| async move {
-                if command["action"] == "whoami" {
-                    return Ok(json!({ "ok": true, "client": client, "command": command }));
-                }
+            tauri::async_runtime::spawn(serve(listener, |command: Value, caller: Value| async move {
                 match command["action"].as_str() {
                     Some("status") => Ok(json!({ "ok": true, "action": "status", "snippetCount": 3 })),
+                    // A 秘密 command carries who asked: this test process (or null where it cannot be read).
+                    Some("secret-get") => Ok(json!({ "ok": true, "caller": caller })),
                     _ => Err(("NOT_FOUND".to_string(), "没有这个命令".to_string())),
                 }
             }));
@@ -496,12 +493,9 @@ mod tests {
             assert_eq!(ok2["ok"], true);
             let bad = ask(&path, "{\"action\":\"other\"}\n").await;
             assert_eq!(bad["error"]["code"], "NOT_FOUND");
-            let junk = ask(&path, "x\n").await;
-            assert_eq!(junk["error"]["code"], "INVALID_JSON");
-            // The program's name is taken out of the command and passed next to it.
-            let who = ask(&path, "{\"action\":\"whoami\",\"_client\":\"Codex\"}\n").await;
-            assert_eq!(who["client"], "Codex");
-            assert_eq!(who["command"], json!({ "action": "whoami" }));
+            let secret = ask(&path, "{\"action\":\"secret-get\"}\n").await;
+            assert_eq!(secret["ok"], true);
+            assert!(secret["caller"].is_null() || secret["caller"]["id"].is_string());
             // A client that writes its line but keeps its side open is still answered.
             let mut open = UnixStream::connect(&path).await.unwrap();
             open.write_all(b"{\"action\":\"status\"}\n").await.unwrap();
@@ -513,6 +507,8 @@ mod tests {
                 line.push_str(std::str::from_utf8(&buf[..n]).unwrap());
             }
             assert_eq!(serde_json::from_str::<Value>(line.trim()).unwrap()["snippetCount"], 3);
+            let junk = ask(&path, "x\n").await;
+            assert_eq!(junk["error"]["code"], "INVALID_JSON");
             let _ = std::fs::remove_file(&path);
         });
     }
@@ -673,19 +669,17 @@ mod windows_tests {
         let name = format!(r"\\.\pipe\copyboxx-automation-test-{}", std::process::id());
         let served = name.clone();
         tauri::async_runtime::spawn(async move {
-            let _ = serve_pipe(served, |command: Value, client: Option<String>| async move {
-                Ok(json!({ "ok": true, "client": client, "command": command }))
-            })
-            .await;
+            let _ = serve_pipe(served, |command: Value, caller: Value| async move { Ok(json!({ "ok": true, "caller": caller, "command": command })) }).await;
         });
         std::thread::sleep(Duration::from_millis(200));
         for round in 0..3 {
-            let answer = crate::mcp::ask_pipe(&name, json!({ "action": "status", "_client": "Codex", "round": round })).unwrap();
-            assert_eq!(answer["client"], "Codex");
-            assert_eq!(answer["command"], json!({ "action": "status", "round": round }));
+            let answer = crate::mcp::ask_pipe(&name, json!({ "action": "secret-get", "round": round })).unwrap();
+            // Windows cannot tell who asked yet.
+            assert!(answer["caller"].is_null());
+            assert_eq!(answer["command"], json!({ "action": "secret-get", "round": round }));
         }
         // The name is taken: a second Copyboxx (or another program) cannot serve it.
-        let second = tauri::async_runtime::block_on(serve_pipe(name.clone(), |_: Value, _: Option<String>| async { Ok(json!({})) }));
+        let second = tauri::async_runtime::block_on(serve_pipe(name.clone(), |_: Value, _: Value| async { Ok(json!({})) }));
         assert!(second.is_err());
         assert!(crate::mcp::ask_pipe(r"\\.\pipe\copyboxx-automation-nobody-here", json!({ "action": "status" })).is_err());
     }

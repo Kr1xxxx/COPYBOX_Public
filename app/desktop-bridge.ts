@@ -62,8 +62,8 @@ export type ClipboxDesktop = {
   onFocusSearch: (callback: () => void) => () => void;
   onFlushRequest?: (callback: () => void) => () => void;
   flushDone?: () => void;
-  // `client` is the name the program gave for itself (e.g. "Codex" through the MCP server); not proven, may be absent.
-  onAutomationCommand: (callback: (request: { requestId: string; command: unknown; client?: string | null }) => void) => () => void;
+  // caller: who asked ({ name, id }), or null when the shell could not tell (D-059).
+  onAutomationCommand: (callback: (request: { requestId: string; command: unknown; caller?: unknown }) => void) => () => void;
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;
   // The program AI tools start as Copyboxx's MCP server (`<path> --mcp`, D-060); older shells lack it.

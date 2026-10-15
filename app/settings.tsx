@@ -18,6 +18,7 @@ import { PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 import { BrandWordmark } from "./brand-wordmark";
+import { AutomationTrustRows, automationCardShown, useTrustedCallers } from "./automation-trust-ui";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
 const SETTINGS_TABS = [["look", "概览"], ["folders", "目录"], ["data", "数据"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
@@ -98,6 +99,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
   const [dataMove, setDataMove] = useState<"export" | "import" | null>(null);
   const [openedAt] = useState(() => Date.now());
   const builtAt = formatBuildTime(buildTime);
+  const trustedCallers = useTrustedCallers();
   const [aiAvailable] = useState(() => typeof window !== "undefined" && "LanguageModel" in window);
   const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
   useEffect(() => {
@@ -214,6 +216,10 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
             <p className="settings-note">密钥也放在这台电脑里，请不要把整个数据文件夹拷给别人。自动备份和数据放在一起，保护程度一样；要带走备份，请用带密码的「完整备份」。{PLAIN_NOTES ? "" : `复制${SECRET_WORD}默认只给出引用。`}</p>
             <p className="settings-note">只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
+          {automationCardShown(isDesktop, trustedCallers.length) && <section className="settings-card" aria-labelledby="set-automation" hidden={hideSection("data", "set-automation")}><h3 id="set-automation">始终允许的程序</h3>
+            <AutomationTrustRows list={trustedCallers} />
+            <p className="settings-note">「始终允许」按程序文件所在的位置认人。同一台电脑上别的程序也能冒用它，所以只给你信得过的工具。把秘密整份导出时，每次都会问。</p>
+          </section>}
           <section className="settings-card" data-solo="" aria-labelledby="set-usage" hidden={hideSection("usage", "set-usage")}><h3 id="set-usage">使用排行</h3>
             <UsageSection items={usageItems} now={openedAt} onShow={onShowItem} />
           </section>

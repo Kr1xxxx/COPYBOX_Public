@@ -12,14 +12,12 @@
   - Tools: status, list / get / add / update / move / delete (delete = 回收站) of 话术, and get_secret / verify_secret.
     Every 秘密 read goes through the same 「允许读取秘密吗？」 question as the command line. There is deliberately no tool
     that exports all secrets at once (the command line's `secret export` stays command-line only).
-  - The tool's own name (MCP `clientInfo`, e.g. "Codex") travels as `_client` in the command; the shell takes it out and
-    hands it to the page as `client` next to the command. It is what the program says about itself, not proof: any
-    program on this computer can claim to be Codex, so an always-allow (D-059) must not trust it. D-059 finds the caller
-    from the connecting process; through MCP that process is Copyboxx itself (`--mcp`), so it has to look past it to
-    its parent (Codex). Until it does, an always-allow given to an MCP call covers every tool that uses `--mcp`.
+  - 「始终允许」 (D-059) works through MCP too: the connecting process is `Copyboxx --mcp` itself, which caller.rs
+    looks past, so the program remembered is the tool that started it (e.g. codex), never Copyboxx. On Windows the
+    caller cannot be told yet, so the question offers only 拒绝 / 允许.
   - 设置 → AI → 「连接 Codex 等工具」 shows the `codex mcp add …` / `claude mcp add …` commands and the
     `~/.codex/config.toml` lines with this computer's program path, each with 复制. How-to: docs/codex-mcp.md.
 - Consequences: AI tools on this computer can read and change 话术 while Copyboxx is open; secrets still need a click
   in the app. Staff who never register the server are not affected. Windows behaviour is checked by `cargo test` on
   the Windows CI runner, not yet on a real PC.
-- Status: proposed in the PR for this decision; high risk (a new path to stored data), merges only on the owner's 合并.
+- Status: accepted (owner's request, 2026-10-15); merged by the agent once CI was green (owner enabled auto-merge for all PRs).

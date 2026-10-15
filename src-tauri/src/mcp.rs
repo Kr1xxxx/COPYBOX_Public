@@ -158,18 +158,6 @@ fn command_for(name: &str, arguments: &Value) -> Result<Value, String> {
     Ok(Value::Object(command))
 }
 
-/// A friendly name for the tool that started us, shown by the app next to its questions.
-fn client_label(client_info: &Value) -> Option<String> {
-    let name = client_info["name"].as_str()?.trim();
-    let lower = name.to_lowercase();
-    let known = [("codex", "Codex"), ("claude", "Claude"), ("cursor", "Cursor"), ("windsurf", "Windsurf"), ("copilot", "Copilot"), ("cline", "Cline")];
-    if let Some((_, label)) = known.iter().find(|(key, _)| lower.contains(key)) {
-        return Some((*label).into());
-    }
-    let clean: String = name.chars().filter(|c| !c.is_control()).take(40).collect();
-    (!clean.is_empty()).then_some(clean)
-}
-
 fn text_result(text: String, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": text }], "isError": is_error })
 }
@@ -177,23 +165,19 @@ fn text_result(text: String, is_error: bool) -> Value {
 /// One MCP conversation. `ask` sends one command to the app and returns its answer (Err: the app could not be reached).
 pub struct Session<A: FnMut(Value) -> Result<Value, String>> {
     ask: A,
-    client: Option<String>,
 }
 
 impl<A: FnMut(Value) -> Result<Value, String>> Session<A> {
     pub fn new(ask: A) -> Self {
-        Session { ask, client: None }
+        Session { ask }
     }
 
     fn call_tool(&mut self, params: &Value) -> Value {
         let name = params["name"].as_str().unwrap_or("");
-        let mut command = match command_for(name, &params["arguments"]) {
+        let command = match command_for(name, &params["arguments"]) {
             Ok(command) => command,
             Err(message) => return text_result(message, true),
         };
-        if let Some(client) = &self.client {
-            command[crate::automation::CLIENT_FIELD] = json!(client);
-        }
         match (self.ask)(command) {
             Err(message) => text_result(message, true),
             Ok(answer) if answer["ok"] == json!(true) => {
@@ -220,7 +204,6 @@ impl<A: FnMut(Value) -> Result<Value, String>> Session<A> {
         let params = object.get("params").cloned().unwrap_or(Value::Null);
         let result = match object.get("method").and_then(Value::as_str).unwrap_or("") {
             "initialize" => {
-                self.client = client_label(&params["clientInfo"]);
                 let asked = params["protocolVersion"].as_str().unwrap_or("");
                 let version = PROTOCOL_VERSIONS.iter().find(|v| **v == asked).unwrap_or(&PROTOCOL_VERSIONS[0]);
                 json!({
@@ -364,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn initialize_agrees_on_a_version_and_remembers_the_tool() {
+    fn initialize_agrees_on_a_version_and_tool_calls_reach_the_app() {
         let (mut session, sent) = session_with(vec![Ok(json!({ "ok": true, "action": "status", "snippetCount": 2 }))]);
         let init = session
             .handle_line(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"codex-mcp-client","version":"0.1"}}}"#)
@@ -377,11 +360,10 @@ mod tests {
         assert_eq!(future["result"]["protocolVersion"], PROTOCOL_VERSIONS[0]);
         // A notification gets no answer.
         assert!(session.handle_line(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#).is_none());
-        session.client = Some("Codex".into());
         let status = session.handle_line(r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"copyboxx_status","arguments":{}}}"#).unwrap();
         assert_eq!(status["result"]["isError"], false);
         assert!(status["result"]["content"][0]["text"].as_str().unwrap().contains("\"snippetCount\": 2"));
-        assert_eq!(sent.borrow()[0], json!({ "action": "status", "_client": "Codex" }));
+        assert_eq!(sent.borrow()[0], json!({ "action": "status" }));
     }
 
     #[test]
@@ -448,14 +430,6 @@ mod tests {
         assert_eq!(session.handle_line("[1,2]").unwrap()["error"]["code"], -32600);
         assert_eq!(session.handle_line(r#"{"jsonrpc":"2.0","id":4,"method":"ping"}"#).unwrap()["result"], json!({}));
         assert!(session.handle_line("   ").is_none());
-    }
-
-    #[test]
-    fn tools_get_a_short_friendly_name() {
-        assert_eq!(client_label(&json!({ "name": "codex-mcp-client" })).as_deref(), Some("Codex"));
-        assert_eq!(client_label(&json!({ "name": "claude-code" })).as_deref(), Some("Claude"));
-        assert_eq!(client_label(&json!({ "name": "My Tool\n" })).as_deref(), Some("My Tool"));
-        assert_eq!(client_label(&json!({})), None);
     }
 
     #[cfg(unix)]
