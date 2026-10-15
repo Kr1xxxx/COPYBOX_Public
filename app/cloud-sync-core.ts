@@ -10,8 +10,9 @@ import type { SecretItem } from "./clipbox-core.ts";
 import type { VaultItem } from "./secret-items-store.ts";
 
 export const CLOUD_FORMAT = 1;
-// The cloud copy is refused above this size, before anything is sent (the server takes 5 MB per upload, D-063).
-export const CLOUD_MAX_BYTES = 5 * 1024 * 1024 - 4096;
+// The cloud copy is refused above this size, before anything is sent: the server keeps at most 1.9 MB of
+// JSON.stringify(data) per person while the copies live in D1 (D-063, tools/website/api.mjs maxD1Blob).
+export const CLOUD_MAX_BYTES = 1_900_000;
 
 export type CloudDoc = {
   format: typeof CLOUD_FORMAT;

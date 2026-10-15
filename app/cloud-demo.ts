@@ -34,7 +34,7 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
     return reply(200);
   }
   if (request.path === "/api/auth/verify" && request.method === "POST") {
-    if (!state.sent[email] || body.code !== DEMO_CODE) return reply(400, { error: "bad_code" });
+    if (!state.sent[email] || body.code !== DEMO_CODE) return reply(401, { error: "bad_code" });
     const token = `demo-${crypto.randomUUID()}`;
     state.sessions[token] = email;
     delete state.sent[email];
@@ -42,13 +42,15 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
     return reply(200, { token, email });
   }
   const owner = request.token ? state.sessions[request.token] : undefined;
-  if (!owner) return reply(401, { error: "signed_out" });
+  if (!owner) return reply(401, { error: "unauthorized" });
   if (request.path === "/api/vault" && request.method === "GET") {
     const vault = state.vaults[owner];
     return reply(200, vault ?? { version: 0, data: null });
   }
   if (request.path === "/api/vault" && request.method === "PUT") {
     const current = state.vaults[owner]?.version ?? 0;
+    // Like the live server while the copies live in D1: at most 1.9 MB of data.
+    if (new TextEncoder().encode(JSON.stringify(body.data)).length > 1_900_000) return reply(413, { error: "too_large" });
     if (body.baseVersion !== current) return reply(409, { error: "version_conflict", version: current });
     state.vaults[owner] = { version: current + 1, data: body.data };
     save(state);
