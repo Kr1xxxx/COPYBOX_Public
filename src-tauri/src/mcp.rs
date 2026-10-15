@@ -33,6 +33,8 @@ struct ToolSpec {
 }
 
 const NUMBER: (&str, &str, bool) = ("number", "Snippet number, e.g. CB-0001", true);
+const REFERENCE: &str = "Secret reference, e.g. clipbox://secret/abc or clipbox://apikey/abc";
+const FIELD: &str = "For an API entry with several secret fields: the field's label (e.g. Secret, Client ID) or its position counted from 1";
 const FOLDER_CHOICE: &str = "Folder name (目录); must be one of the app's standard snippet folders";
 
 const TOOLS: &[ToolSpec] = &[
@@ -85,8 +87,8 @@ const TOOLS: &[ToolSpec] = &[
         name: "get_secret",
         action: "secret-get",
         title: "Read a secret",
-        description: "Read one secret (秘密) by its reference (clipbox://secret/...). The user must click 允许 in Copyboxx first.",
-        fields: &[("reference", "Secret reference, e.g. clipbox://secret/abc", true)],
+        description: "Read one secret (秘密) by its reference (clipbox://secret/... or clipbox://apikey/...). The user must click 允许 in Copyboxx first.",
+        fields: &[("reference", REFERENCE, true), ("field", FIELD, false)],
         read_only: true,
         destructive: false,
     },
@@ -95,7 +97,7 @@ const TOOLS: &[ToolSpec] = &[
         action: "secret-verify",
         title: "Check a secret",
         description: "Check whether a value equals a stored secret without reading it; answers match yes/no and the length of both. The user must click 允许 in Copyboxx first.",
-        fields: &[("reference", "Secret reference, e.g. clipbox://secret/abc", true), ("candidate", "The value to compare", true)],
+        fields: &[("reference", REFERENCE, true), ("field", FIELD, false), ("candidate", "The value to compare", true)],
         read_only: true,
         destructive: false,
     },
@@ -405,6 +407,10 @@ mod tests {
         assert_eq!(
             command_for("verify_secret", &json!({ "reference": "clipbox://secret/x", "candidate": "abc" })).unwrap(),
             json!({ "action": "secret-verify", "reference": "clipbox://secret/x", "candidate": "abc" })
+        );
+        assert_eq!(
+            command_for("get_secret", &json!({ "reference": "clipbox://apikey/x", "field": "Client ID" })).unwrap(),
+            json!({ "action": "secret-get", "reference": "clipbox://apikey/x", "field": "Client ID" })
         );
         assert_eq!(command_for("list_snippets", &Value::Null).unwrap(), json!({ "action": "list" }));
         assert!(command_for("get_snippet", &json!({})).is_err());
