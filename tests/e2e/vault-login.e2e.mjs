@@ -102,8 +102,9 @@ test("账号密码: the same password is flagged, a linked 验证码 shows its c
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog.getByRole("button", { name: "复制验证码" })).toBeVisible();
   await expect(dialog.locator(".login-code")).toContainText(/\d{3} \d{3}/);
-  // 全部 by website: Google holds the 验证码 and both logins, each marked with its type.
+  // 全部 by website: Google holds its login and the 验证码, each marked with its type; Gmail has its own card and logo.
   await openAll(page);
   const google = dialog.getByRole("region", { name: "Google" });
-  await expect(google.locator(".vault-type-chip")).toHaveText(["登录", "登录", "验证码"]);
+  await expect(google.locator(".vault-type-chip")).toHaveText(["登录", "验证码"]);
+  await expect(dialog.getByRole("region", { name: "Gmail" }).locator(".vault-entry")).toContainText("Gmail 备用");
 });

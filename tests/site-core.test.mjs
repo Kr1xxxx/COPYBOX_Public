@@ -20,7 +20,7 @@ test("registrable domain handles two-part suffixes", () => {
 
 test("sites are found by address, by API key prefix, by name or issuer; unknown ones get an initial", () => {
   assert.equal(detectSite({ url: "https://admin.shopify.com/store" }).key, "shopify");
-  assert.equal(detectSite({ url: "mail.google.com" }).name, "Google");
+  assert.equal(detectSite({ url: "https://accounts.google.com" }).name, "Google");
   assert.equal(detectSite({ url: "https://supplier.example.cn" }).key, "example.cn");
   assert.equal(detectSite({ apiKey: "AIzaSyABC123" }).key, "google");
   assert.equal(detectSite({ apiKey: "sk-ant-api03-xyz" }).key, "anthropic");
@@ -79,6 +79,28 @@ test("new sites are recognised and every bundled glyph belongs to a known site",
     assert.ok(/^#[0-9a-f]{6}$/i.test(SITE_ICONS[key].hex), key);
     assert.notEqual(detectSite({ name: key }).key.startsWith("name:"), true, `${key} is not a known site`);
   }
+});
+
+test("big sites each get their own logo, matched by address (subdomains too) or by name", async () => {
+  const { SITE_ICONS } = await import("../app/site-icons.ts");
+  const byUrl = {
+    "mail.google.com": "gmail", "https://www.gmail.com": "gmail", "studio.youtube.com": "youtube", "https://www.instagram.com/accounts/login": "instagram",
+    "web.whatsapp.com": "whatsapp", "business.facebook.com": "meta", "m.facebook.com": "facebook", "x.com": "twitter", "twitter.com": "twitter",
+    "www.linkedin.com": "linkedin", "outlook.live.com": "outlook", "login.live.com": "microsoft", "sellercentral.amazon.com": "amazon",
+    "weixin.qq.com": "wechat", "mail.qq.com": "qq", "www.aliexpress.com": "aliexpress", "signin.aliyun.com": "alibabacloud", "i.alibaba.com": "alibaba",
+    "www.xiaohongshu.com": "xiaohongshu", "pan.baidu.com": "baidu", "chatgpt.com": "openai", "app.slack.com": "slack", "www.ups.com": "ups", "www.canva.com": "canva",
+  };
+  for (const [url, key] of Object.entries(byUrl)) {
+    assert.equal(detectSite({ url }).key, key, url);
+    assert.ok(SITE_ICONS[key], `${key} has a logo`);
+  }
+  assert.equal(detectSite({ name: "阿里云 主账号" }).key, "alibabacloud");
+  assert.equal(detectSite({ name: "阿里国际站" }).key, "alibaba");
+  assert.equal(detectSite({ name: "小红书" }).key, "xiaohongshu");
+  assert.equal(detectSite({ name: "Instagram 主号" }).key, "instagram");
+  // a look-alike address is not the big site
+  assert.equal(detectSite({ url: "notgmail.com" }).key, "notgmail.com");
+  assert.equal(detectSite({ url: "instagram.com.example.net" }).key, "example.net");
 });
 
 test("a payment entry named after a bank joins the shared 收款 group, not a group made from its title", async () => {
