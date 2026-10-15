@@ -96,8 +96,29 @@ test("a Mac says its passwords stay on the Mac, and 注销账号 asks first and 
   expect(vaults).toEqual({});
 });
 
-test("real installs show no sign-in until the server is live", async ({ page }) => {
+test("real installs talk to the server through the app; a server that is not ready says so plainly", async ({ page }) => {
   await asDesktop(page, "win32");
+  await page.addInitScript(() => {
+    window.__cloudCalls = [];
+    window.clipboxDesktop.cloudRequest = async (request) => {
+      window.__cloudCalls.push(`${request.method} ${request.path}`);
+      return { status: 503, text: JSON.stringify({ error: "unavailable", message: "同步服务暂时不能用，请稍后再试" }) };
+    };
+  });
+  await seedSnippets(page);
+  const card = await openHome(page);
+  await expect(card.getByLabel("企业同步码")).toBeVisible();
+  await card.getByRole("button", { name: "登录…" }).click();
+  await expect(card.getByText("测试版不会真的发邮件", { exact: false })).toHaveCount(0);
+  await card.getByLabel("邮箱").fill(EMAIL);
+  await card.getByRole("button", { name: "发送验证码" }).click();
+  await expect(card.getByRole("alert")).toHaveText("登录同步暂时不能用，请稍后再试");
+  expect(await page.evaluate(() => window.__cloudCalls)).toEqual(["POST /api/auth/code"]);
+});
+
+test("without the app's connection (an older app) there is no sign-in", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.addInitScript(() => { delete window.clipboxDesktop.cloudRequest; });
   await seedSnippets(page);
   const card = await openHome(page);
   await expect(card.getByLabel("企业同步码")).toBeVisible();

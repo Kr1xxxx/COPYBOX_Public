@@ -1,14 +1,9 @@
 // Talks to the Copyboxx server for 登录 and 同步 (D-064): email code sign-in, the person's cloud copy, sign-out and
 // deleting the account. The desktop shell sends the requests (no browser rules in between, only https://copyboxx.com/api/);
-// the web preview uses a pretend server kept in the page (cloud-demo.ts).
-//
-// The server is not live yet. Until it is, real installs show no 登录 at all (CLOUD_SERVER_LIVE), so nobody meets a
-// sign-in that cannot work; the preview shows it with the pretend server.
+// the web preview uses a pretend server kept in the page (cloud-demo.ts). Without either (a plain browser) there is no 登录.
 import { demoCloudRequest } from "./cloud-demo.ts";
 import { secureSecretStore } from "./secret-settings.ts";
 import type { ClipboxDesktop } from "./desktop-bridge";
-
-export const CLOUD_SERVER_LIVE = false;
 
 export type CloudRequest = { method: "GET" | "POST" | "PUT" | "DELETE"; path: string; body?: unknown; token?: string };
 export type CloudResponse = { status: number; text: string };
@@ -17,7 +12,7 @@ export type CloudTransport = (request: CloudRequest) => Promise<CloudResponse>;
 /** How this page reaches the server, or null when 登录 is not offered here. */
 export function cloudTransport(desktop: ClipboxDesktop | undefined = typeof window === "undefined" ? undefined : window.clipboxDesktop): CloudTransport | null {
   if (desktop?.cloudDemo) return demoCloudRequest;
-  if (CLOUD_SERVER_LIVE && desktop?.cloudRequest) return desktop.cloudRequest;
+  if (desktop?.cloudRequest) return desktop.cloudRequest;
   return null;
 }
 
