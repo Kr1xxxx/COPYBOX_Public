@@ -47,6 +47,10 @@ export type ClipboxDesktop = {
   // Windows only (D-053): the vault's device key in Credential Manager; get gives null when none is stored yet.
   deviceKeyGet?: () => Promise<string | null>;
   deviceKeySet?: (key: string) => Promise<void>;
+  // Windows only (D-057): the own TinyPNG keys and the 企业同步码 in Credential Manager; get gives null when none is stored.
+  secretGet?: (name: string) => Promise<string | null>;
+  secretSet?: (name: string, value: string) => Promise<void>;
+  secretDelete?: (name: string) => Promise<void>;
   aiStatus?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiSave?: (settings: { baseUrl: string; key: string }) => Promise<{ hasKey: boolean; origin: string }>;
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;

@@ -10,6 +10,7 @@ mod mcp;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod old_autostart;
 mod power;
+mod secret_store;
 mod shared_library;
 mod site_icon;
 mod tinify;
@@ -86,6 +87,9 @@ fn main() {
             backup::backup_image_prune,
             device_key::device_key_get,
             device_key::device_key_set,
+            secret_store::secret_get,
+            secret_store::secret_set,
+            secret_store::secret_delete,
             ai::ai_status,
             ai::ai_save,
             ai::ai_clear,

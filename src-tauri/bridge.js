@@ -52,6 +52,11 @@
     // The page only uses these on Windows; elsewhere the shell refuses them.
     deviceKeyGet: function () { return invoke("device_key_get"); },
     deviceKeySet: function (key) { return invoke("device_key_set", { key: key }).then(noop); },
+    // The own TinyPNG keys and the 企业同步码 in Windows Credential Manager (D-057), by name; get resolves to null when
+    // nothing is stored. Windows only, like the device key; elsewhere the shell refuses them.
+    secretGet: function (name) { return invoke("secret_get", { name: name }); },
+    secretSet: function (name, value) { return invoke("secret_set", { name: name, value: value }).then(noop); },
+    secretDelete: function (name) { return invoke("secret_delete", { name: name }).then(noop); },
     aiStatus: function () { return invoke("ai_status"); },
     aiSave: function (settings) { return invoke("ai_save", { settings: settings }); },
     aiClear: function () { return invoke("ai_clear"); },
