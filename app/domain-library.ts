@@ -30,11 +30,10 @@ export function emailDomain(email: string) {
   return at >= 0 ? email.slice(at + 1).trim().toLowerCase() : "";
 }
 
-/** Whether a library bound to `domain` belongs to this email (its own domain, or a subdomain of it). */
+/** Whether a library bound to `domain` belongs to this email: exactly its domain, like the server (D-072). */
 export function emailAtDomain(email: string, domain: string) {
   const own = emailDomain(email);
-  const bound = domain.trim().toLowerCase();
-  return Boolean(own && bound) && (own === bound || own.endsWith(`.${bound}`));
+  return Boolean(own) && own === domain.trim().toLowerCase();
 }
 
 /** Ask the server only when signed in and no 同步码 is typed. */

@@ -99,6 +99,8 @@ test("Settings names the domain only while it applies", () => {
   assert.equal(domainLibraryActive("company.com", "a@other.com", ""), "");
   assert.equal(domainLibraryActive("", "a@company.com", ""), "");
   assert.equal(emailAtDomain("a@notcompany.com", "company.com"), false);
+  assert.equal(emailAtDomain("a@sales.company.com", "company.com"), false);
+  assert.equal(emailAtDomain("A@Company.com", "company.com"), true);
   assert.equal(domainLibraryLine("company.com"), "公司话术：按邮箱自动获取（company.com）");
 });
 
