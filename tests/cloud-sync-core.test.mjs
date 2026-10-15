@@ -219,6 +219,18 @@ test("the server's answers turn into plain messages: too big, not available yet,
   await assert.rejects(api.getVault("t"), { code: "signed_out" });
 });
 
+test("at most 3 computers: a new sign-in hears which ones signed out, an ended one hears why (D-069)", async () => {
+  const answers = {
+    "POST /api/auth/verify": { status: 200, text: JSON.stringify({ token: "new", email: "a@example.com", signedOut: ["Windows 电脑", 7] }) },
+    "GET /api/vault": { status: 401, text: JSON.stringify({ error: "device_limit", message: "…" }) },
+  };
+  const api = createCloudApi(async ({ method, path }) => answers[`${method} ${path}`]);
+  assert.deepEqual(await api.verify("a@example.com", "123456", "Mac 电脑"), { token: "new", email: "a@example.com", signedOut: ["Windows 电脑"] });
+  await assert.rejects(api.getVault("old"), { code: "replaced", message: /最多同时登录 3 台电脑，这台电脑已退出登录/ });
+  answers["POST /api/auth/verify"].text = JSON.stringify({ token: "t", email: "a@example.com" });
+  assert.deepEqual((await api.verify("a@example.com", "123456", "Mac 电脑")).signedOut, [], "an older server sends no list");
+});
+
 test("a cloud copy over 1.9 MB is not sent at all, and nothing here changes", async () => {
   const { state, api } = fakeServer();
   const big = "字".repeat(700_000);

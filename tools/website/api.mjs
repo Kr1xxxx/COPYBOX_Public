@@ -16,6 +16,8 @@ const requestsPerIpPerHour = 20;
 const maxVaultBody = 5 * 1024 * 1024;
 const maxSmallBody = 4 * 1024;
 const maxDeviceName = 40;
+// At most this many computers are signed in to one account; a new sign-in signs out the oldest (D-069).
+const maxDevices = 3;
 
 const messages = {
   unavailable: "同步服务暂时不能用，请稍后再试",
@@ -24,6 +26,7 @@ const messages = {
   bad_code: "验证码不对或已过期，请重新获取",
   rate_limited: "请求太频繁，请一小时后再试",
   unauthorized: "请重新登录",
+  device_limit: "这个账号在别的电脑上登录了，一个账号最多同时登录 3 台电脑，这台电脑已退出",
   bad_request: "请求格式不对",
   bad_data: "同步内容格式不对",
   too_large: "内容太大，无法同步",
@@ -167,6 +170,11 @@ async function sweep(db, now) {
   await db.prepare("DELETE FROM rate_limits WHERE window_start <= ?").bind(now - hour).run();
   await db.prepare("DELETE FROM login_codes WHERE expires_at <= ?").bind(now).run();
   await db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now).run();
+  try {
+    await db.prepare("DELETE FROM ended_sessions WHERE expires_at <= ?").bind(now).run();
+  } catch {
+    // Table not created yet (schema.sql not applied again); nothing to sweep.
+  }
 }
 
 async function userByEmail(db, email) {
@@ -178,13 +186,42 @@ async function ensureUser(db, email, now) {
   return userByEmail(db, email);
 }
 
-// The user id of a valid `Authorization: Bearer <token>`, or null.
+// True when this token was signed out because its account signed in on a 4th computer (until it would have expired).
+async function endedByNewerDevice(db, tokenHash, now) {
+  try {
+    const row = await db.prepare("SELECT expires_at FROM ended_sessions WHERE token_hash = ?").bind(tokenHash).first();
+    return Boolean(row && row.expires_at > now);
+  } catch {
+    return false;
+  }
+}
+
+// Keeps the newest `maxDevices` live sessions of a user (`keep` is the one just made) and ends the rest; their tokens are
+// remembered in ended_sessions so those computers can say why they were signed out. Returns the ended devices' names.
+async function keepNewestSessions(db, userId, keep, now) {
+  const { results = [] } = await db
+    .prepare("SELECT token_hash, expires_at, device FROM sessions WHERE user_id = ? AND token_hash != ? AND expires_at > ? ORDER BY expires_at DESC")
+    .bind(userId, keep, now)
+    .all();
+  const older = results.slice(maxDevices - 1);
+  for (const session of older) {
+    try {
+      await db.prepare("INSERT OR REPLACE INTO ended_sessions (token_hash, expires_at) VALUES (?, ?)").bind(session.token_hash, session.expires_at).run();
+    } catch {
+      // Without the table that computer only hears 请重新登录; it is signed out all the same.
+    }
+    await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(session.token_hash).run();
+  }
+  return older.map((session) => session.device || "一台电脑");
+}
+
+// The user id of a valid `Authorization: Bearer <token>`, { ended: true } for a token signed out by a newer computer, or null.
 async function authorizedUser(request, db, now) {
   const match = /^Bearer ([A-Za-z0-9_-]{20,100})$/.exec(request.headers.get("Authorization") ?? "");
   if (!match) return null;
   const tokenHash = await sha256Hex(match[1]);
   const row = await db.prepare("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?").bind(tokenHash).first();
-  if (!row) return null;
+  if (!row) return (await endedByNewerDevice(db, tokenHash, now)) ? { ended: true } : null;
   if (row.expires_at <= now) {
     await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
     return null;
@@ -326,11 +363,13 @@ async function verifyCode(request, env, now) {
   if (changes(removed) !== 1) return wrong();
   const user = await ensureUser(db, email, now);
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const tokenHash = await sha256Hex(token);
   await db
     .prepare("INSERT INTO sessions (token_hash, user_id, expires_at, device) VALUES (?, ?, ?, ?)")
-    .bind(await sha256Hex(token), user.id, now + sessionLifetime, deviceName(parsed.body.device))
+    .bind(tokenHash, user.id, now + sessionLifetime, deviceName(parsed.body.device))
     .run();
-  return json({ token, email });
+  const signedOut = await keepNewestSessions(db, user.id, tokenHash, now);
+  return json({ token, email, signedOut });
 }
 
 async function logout(env, auth) {
@@ -419,6 +458,7 @@ export async function handleApi(request, env, now = Date.now()) {
   if (action === "verify") return verifyCode(request, env, now);
   const auth = await authorizedUser(request, env.DB, now);
   if (!auth) return fail(401, "unauthorized");
+  if (auth.ended) return fail(401, "device_limit");
   if (action === "logout") return logout(env, auth);
   if (action === "getVault") return getVault(env, auth);
   if (action === "putVault") return putVault(request, env, auth, now);

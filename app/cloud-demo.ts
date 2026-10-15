@@ -1,12 +1,21 @@
 // A pretend Copyboxx server for the web preview (and the browser tests), so 登录 and 同步 can be tried before the real
 // one is live. It keeps everything in this browser's storage and follows the same rules as the real server
-// (D-064): any email gets the code 123456, and an upload with an old version number is refused.
+// (D-064): any email gets the code 123456, an upload with an old version number is refused, and at most 3 computers stay
+// signed in to one email (D-069; sessions are kept in sign-in order).
 import type { CloudRequest, CloudResponse } from "./cloud-client.ts";
 
 export const DEMO_CODE = "123456";
 export const CLOUD_DEMO_KEY = "clipbox.cloud-demo.v1";
 
-type DemoState = { vaults: Record<string, { version: number; data: unknown }>; sessions: Record<string, string>; sent: Record<string, boolean> };
+type DemoState = {
+  vaults: Record<string, { version: number; data: unknown }>;
+  sessions: Record<string, string>;
+  sent: Record<string, boolean>;
+  // Optional (older saved states lack them): each session's device name, and tokens a newer sign-in ended.
+  devices?: Record<string, string>;
+  ended?: Record<string, true>;
+};
+const MAX_DEVICES = 3;
 
 function load(): DemoState {
   try {
@@ -37,12 +46,21 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
     if (!state.sent[email] || body.code !== DEMO_CODE) return reply(401, { error: "bad_code" });
     const token = `demo-${crypto.randomUUID()}`;
     state.sessions[token] = email;
+    state.devices = { ...state.devices, [token]: typeof body.device === "string" ? body.device : "" };
     delete state.sent[email];
+    const mine = Object.keys(state.sessions).filter((key) => state.sessions[key] === email);
+    const signedOut = mine.slice(0, Math.max(0, mine.length - MAX_DEVICES)).map((old) => {
+      const name = state.devices?.[old] || "一台电脑";
+      delete state.sessions[old];
+      delete state.devices?.[old];
+      state.ended = { ...state.ended, [old]: true };
+      return name;
+    });
     save(state);
-    return reply(200, { token, email });
+    return reply(200, { token, email, signedOut });
   }
   const owner = request.token ? state.sessions[request.token] : undefined;
-  if (!owner) return reply(401, { error: "unauthorized" });
+  if (!owner) return reply(401, { error: request.token && state.ended?.[request.token] ? "device_limit" : "unauthorized" });
   if (request.path === "/api/vault" && request.method === "GET") {
     const vault = state.vaults[owner];
     return reply(200, vault ?? { version: 0, data: null });

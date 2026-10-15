@@ -4,7 +4,7 @@
 // other computers. Shown only where the server can be reached (cloud-client.ts); the preview uses a pretend server.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { maskEmail } from "./account-lock";
-import { CloudError, clearSessionToken, cloudTransport, createCloudApi, deviceName, looksLikeEmail, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeSessionToken, type CloudAccount } from "./cloud-client";
+import { CloudError, MAX_DEVICES, clearSessionToken, cloudTransport, createCloudApi, deviceName, looksLikeEmail, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeSessionToken, type CloudAccount } from "./cloud-client";
 import { DEMO_CODE } from "./cloud-demo";
 import { describeCounts } from "./cloud-sync-core";
 import { clearSyncBase, readSyncBase, syncOnce, writeSyncBase, type SyncSteps } from "./cloud-sync";
@@ -35,6 +35,8 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
   const [account, setAccount] = useState<CloudAccount | null>(() => (transport ? readCloudAccount() : null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // After signing in here made the oldest computer sign out (more than MAX_DEVICES).
+  const [notice, setNotice] = useState("");
   const tokenRef = useRef<string | null>(null);
   const mergersRef = useRef(mergers);
   const onIncomingRef = useRef(onIncoming);
@@ -73,7 +75,12 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
         setError("");
         if (changed && !manual) onIncomingRef.current(`已从其他电脑同步：${next.lastResult}`);
       } catch (failure) {
-        if (failure instanceof CloudError && failure.code === "signed_out") { await forget(); setError(failure.message); return; }
+        if (failure instanceof CloudError && (failure.code === "signed_out" || failure.code === "replaced")) {
+          await forget(); setError(failure.message); setNotice("");
+          // Said out loud too: this computer stopped syncing because another one signed in.
+          if (failure.code === "replaced" && !manual) onIncomingRef.current(failure.message);
+          return;
+        }
         // Automatic rounds stay quiet when offline; the next round tries again.
         if (manual || !(failure instanceof CloudError && failure.code === "network")) setError(failure instanceof Error ? failure.message : "同步没有成功，内容没有变化");
       } finally {
@@ -125,6 +132,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     accountRef.current = next;
     setAccount(next);
     setError("");
+    setNotice(signedOutNotice(result.signedOut));
     await sync(true);
   }
 
@@ -133,6 +141,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     if (api.current && session) { try { await api.current.logout(session); } catch { /* signed out here either way */ } }
     await forget();
     setError("");
+    setNotice("");
   }
 
   async function deleteAccount() {
@@ -141,12 +150,19 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     await api.current.deleteAccount(session);
     await forget();
     setError("");
+    setNotice("");
   }
 
-  return { available: Boolean(transport), demo: Boolean(transport && typeof window !== "undefined" && window.clipboxDesktop?.cloudDemo), account, busy, error, sendCode, signIn, syncNow: () => sync(true), signOut, deleteAccount };
+  return { available: Boolean(transport), demo: Boolean(transport && typeof window !== "undefined" && window.clipboxDesktop?.cloudDemo), account, busy, error, notice, sendCode, signIn, syncNow: () => sync(true), signOut, deleteAccount };
 }
 
 export type CloudSync = ReturnType<typeof useCloudSync>;
+
+function signedOutNotice(names: string[]) {
+  if (!names.length) return "";
+  const who = names.length === 1 ? `「${names[0]}」` : ` ${names.length} 台电脑`;
+  return `已超过 ${MAX_DEVICES} 台，最早登录的${who}已自动退出登录`;
+}
 
 function errorText(failure: unknown) {
   return failure instanceof Error ? failure.message : "没有成功，请再试一次";
@@ -206,6 +222,7 @@ export function CloudAccountRows({ cloud, platform, accountsLocked }: { cloud: C
 
   const mac = platform === "darwin";
   const scope = mac ? "话术和账号会自动同步；账号里的密码、API 密钥和恢复码只存在这台 Mac 上" : "话术和账号（包括密码）会在你登录的电脑之间自动同步";
+  const limit = `一个账号最多同时登录 ${MAX_DEVICES} 台电脑。`;
 
   if (!cloud.account) {
     return (
@@ -246,7 +263,8 @@ export function CloudAccountRows({ cloud, platform, accountsLocked }: { cloud: C
           <button type="button" className="secondary-button" disabled={cloud.busy} onClick={() => void cloud.syncNow()}>{cloud.busy ? "同步中…" : "立即同步"}</button>
           <button type="button" className="secondary-button" onClick={() => void cloud.signOut()}>退出登录</button>
         </div></div>
-      <p className="settings-note">{scope}。{accountsLocked ? "账号页上了锁，打开账号页解锁后才会同步账号。" : ""}退出登录后，这台电脑上的内容不变。</p>
+      <p className="settings-note">{scope}。{limit}{accountsLocked ? "账号页上了锁，打开账号页解锁后才会同步账号。" : ""}退出登录后，这台电脑上的内容不变。</p>
+      {cloud.notice && <p className="settings-note cloud-notice" role="status">{cloud.notice}</p>}
       {cloud.error && <p className="settings-note shared-error" role="alert">{cloud.error}</p>}
       {!cloud.error && cloud.account.lastResult && <p className="settings-note cloud-result" role="status">上次同步：{cloud.account.lastResult}</p>}
       <div className="settings-row"><div><strong>注销账号</strong><small>删除云端保存的全部内容，每台电脑上已有的内容不变</small></div>

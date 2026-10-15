@@ -16,7 +16,7 @@ export function cloudTransport(desktop: ClipboxDesktop | undefined = typeof wind
   return null;
 }
 
-export type CloudErrorCode = "signed_out" | "bad_code" | "bad_email" | "rate_limited" | "mail_failed" | "conflict" | "too_large" | "unavailable" | "network" | "server";
+export type CloudErrorCode = "signed_out" | "replaced" | "bad_code" | "bad_email" | "rate_limited" | "mail_failed" | "conflict" | "too_large" | "unavailable" | "network" | "server";
 
 export class CloudError extends Error {
   readonly code: CloudErrorCode;
@@ -28,8 +28,13 @@ export class CloudError extends Error {
   }
 }
 
+/** How many computers one account can be signed in on at once (the server's limit, D-069). */
+export const MAX_DEVICES = 3;
+
 const MESSAGES: Record<CloudErrorCode, string> = {
   signed_out: "登录已过期，请重新登录",
+  // The server ended this computer's sign-in because the account signed in on a 4th one (D-069).
+  replaced: `这个账号在别的电脑上登录了。一个账号最多同时登录 ${MAX_DEVICES} 台电脑，这台电脑已退出登录，要同步请重新登录`,
   bad_code: "验证码不对或已过期，请重新输入",
   bad_email: "邮箱格式不对，请检查一下",
   rate_limited: "发送太频繁了，请过一会儿再试",
@@ -54,7 +59,7 @@ async function call(transport: CloudTransport, request: CloudRequest): Promise<R
   const body = parse(response.text);
   if (response.status >= 200 && response.status < 300) return body;
   const code = typeof body.error === "string" ? body.error : "";
-  if (response.status === 401 && request.token) throw new CloudError("signed_out", MESSAGES.signed_out);
+  if (response.status === 401 && request.token) throw code === "device_limit" ? new CloudError("replaced", MESSAGES.replaced) : new CloudError("signed_out", MESSAGES.signed_out);
   if (response.status === 409) throw new CloudError("conflict", MESSAGES.conflict, typeof body.version === "number" ? body.version : undefined);
   if (response.status === 429 || code === "rate_limited") throw new CloudError("rate_limited", MESSAGES.rate_limited);
   if (code === "bad_email") throw new CloudError("bad_email", MESSAGES.bad_email);
@@ -86,7 +91,8 @@ export function createCloudApi(transport: CloudTransport) {
     async verify(email: string, code: string, device: string) {
       const body = await call(transport, { method: "POST", path: "/api/auth/verify", body: { email: normalizeEmail(email), code: code.trim(), device } });
       if (typeof body.token !== "string" || !body.token) throw new CloudError("server", MESSAGES.server);
-      return { token: body.token, email: typeof body.email === "string" ? body.email : normalizeEmail(email) };
+      const signedOut = Array.isArray(body.signedOut) ? body.signedOut.filter((name): name is string => typeof name === "string") : [];
+      return { token: body.token, email: typeof body.email === "string" ? body.email : normalizeEmail(email), signedOut };
     },
     async getVault(token: string) {
       const body = await call(transport, { method: "GET", path: "/api/vault", token });

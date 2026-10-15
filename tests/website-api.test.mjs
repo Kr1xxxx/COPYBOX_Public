@@ -342,6 +342,58 @@ test("api: logout ends only that session", async (t) => {
   assert.equal((await call(env, "GET", "/api/vault", { token: two })).status, 200);
 });
 
+async function signInAs(env, sent, device, now) {
+  const email = "staff@example.com";
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email }, now })).status, 200);
+  const verified = await call(env, "POST", "/api/auth/verify", { body: { email, code: codeFrom(sent.at(-1)), device }, now });
+  assert.equal(verified.status, 200);
+  return verified.json();
+}
+
+test("api: at most 3 computers per account; a 4th sign-in ends the oldest and says which", async (t) => {
+  const env = fakeEnv();
+  const sent = stubMail(t);
+  const first = await signInAs(env, sent, "Windows 电脑", clock);
+  assert.deepEqual(first.signedOut, []);
+  const second = await signInAs(env, sent, "Mac 电脑", clock + day);
+  const third = await signInAs(env, sent, undefined, clock + 2 * day);
+  assert.deepEqual(third.signedOut, []);
+  assert.equal(count(env, "sessions"), 3);
+
+  const fourth = await signInAs(env, sent, "新的 Windows 电脑", clock + 3 * day);
+  assert.deepEqual(fourth.signedOut, ["Windows 电脑"]);
+  assert.equal(count(env, "sessions"), 3);
+  const later = clock + 3 * day + 1;
+  const ended = await call(env, "GET", "/api/vault", { token: first.token, now: later });
+  assert.equal(ended.status, 401);
+  const answer = await ended.json();
+  assert.equal(answer.error, "device_limit");
+  assert.match(answer.message, /最多同时登录 3 台电脑/);
+  for (const still of [second, third, fourth]) assert.equal((await call(env, "GET", "/api/vault", { token: still.token, now: later })).status, 200);
+
+  // The next one ends the unnamed oldest, and a computer that signed out by itself is not counted.
+  assert.equal((await call(env, "POST", "/api/auth/logout", { token: second.token, now: later })).status, 200);
+  const fifth = await signInAs(env, sent, "Mac 电脑", clock + 4 * day);
+  assert.deepEqual(fifth.signedOut, []);
+  const sixth = await signInAs(env, sent, "Mac 电脑", clock + 5 * day);
+  assert.deepEqual(sixth.signedOut, ["一台电脑"]);
+
+  // Once the old token would have expired anyway, it is forgotten and answers like any unknown token.
+  await call(env, "POST", "/api/auth/code", { body: { email: "other@example.com" }, now: clock + 91 * day });
+  assert.equal(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM ended_sessions WHERE expires_at <= ?").get(clock + 91 * day).n, 0);
+  assert.equal((await (await call(env, "GET", "/api/vault", { token: first.token, now: clock + 91 * day })).json()).error, "unauthorized");
+});
+
+test("api: before ended_sessions exists the device limit still holds, the old computer just hears 请重新登录", async (t) => {
+  const env = fakeEnv();
+  env.DB.sqlite.exec("DROP TABLE ended_sessions");
+  const sent = stubMail(t);
+  const first = await signInAs(env, sent, "Windows 电脑", clock);
+  for (let i = 1; i <= 3; i += 1) await signInAs(env, sent, "Mac 电脑", clock + i * day);
+  assert.equal(count(env, "sessions"), 3);
+  assert.equal((await (await call(env, "GET", "/api/vault", { token: first.token, now: clock + 4 * day })).json()).error, "unauthorized");
+});
+
 test("api: deleting the account removes the user, sessions, codes and the R2 blob", async (t) => {
   const env = fakeEnv();
   const sent = stubMail(t);
