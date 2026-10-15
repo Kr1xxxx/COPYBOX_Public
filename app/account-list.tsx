@@ -134,7 +134,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
                 <li key={entry.target} className={`vault-entry-row acct-row${selecting ? " selecting" : ""}`}>
                   {selecting && <button type="button" className={`row-check ${picked.includes(entry.target) ? "on" : ""}`} role="checkbox" aria-checked={picked.includes(entry.target)} aria-label={`选择 ${entry.title}`} onClick={() => togglePicked(entry.target)}><Icon name="check" /></button>}
                   <button type="button" className="vault-entry" disabled={view === "trash"} onClick={() => (selecting ? togglePicked(entry.target) : onOpen(entry))}>
-                    <SiteBadge site={entry.site} size={26} />
+                    <SiteBadge site={entry.site} size={26} decorative />
                     <span className="vault-type-chip">{TYPE_LABEL[entry.tab]}</span>
                     <span className="totp-who"><strong>{entry.title}</strong><small>{entry.hint}</small></span>
                   </button>
