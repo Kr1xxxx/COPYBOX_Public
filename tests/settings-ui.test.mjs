@@ -103,6 +103,9 @@ test("no fake title-bar band, drag regions or missing fonts off Mac", () => {
   assert.match(css, /\.desktop-app:not\(\.platform-darwin\) \.sidebar-top \.traffic-lights \{ display: none; \}/);
   assert.match(css, /\.desktop-app:not\(\.platform-darwin\) \.drag-region \{ -webkit-app-region: no-drag; \}/);
   assert.match(css, /--font-sans:[^;]*"Segoe UI"[^;]*"Microsoft YaHei UI"/);
+  // List titles are 宋体 on Windows too (owner, 2026-10-15): SimSun is in the serif list and Windows does not swap it out.
+  assert.match(css, /--font-serif:[^;]*"Songti SC"[^;]*"SimSun"/);
+  assert.doesNotMatch(css, /--font-serif: var\(--font-sans\)/);
 });
 
 test("there are no keyboard-shortcut hints or modifier shortcuts anywhere", () => {
