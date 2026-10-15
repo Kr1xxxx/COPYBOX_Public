@@ -183,3 +183,42 @@ test("上一条 from the first tip wraps to the last tip, 下一条 from there c
   await page.setViewportSize({ width: 680, height: 620 });
   await page.screenshot({ path: test.info().outputPath("tips-card.png") });
 });
+
+test("the Tips dialog has 上一条 / 下一条 too; they move the card along, and Tab stays inside the dialog", async ({ page }) => {
+  // T-001 on an earlier day: today's tip is T-002.
+  await seedTips(page, { version: 1, extra: [], shownId: "T-001", shownDate: "2000-01-01", companyFirst: true });
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await opener(page).click();
+  // One dialog; its name follows the tip on show.
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName("拼音也能搜");
+  await expect(dialog.locator(".tips-text")).toContainText("搜索框可以直接打拼音");
+
+  await dialog.getByRole("button", { name: "下一条" }).click();
+  await expect(dialog).toHaveAccessibleName("按编号找话术");
+  await expect(dialog.getByRole("heading", { name: "按编号找话术" })).toBeVisible();
+  await expect(dialog.locator(".tips-text")).toContainText("#14");
+  await dialog.getByRole("button", { name: "上一条" }).click();
+  await dialog.getByRole("button", { name: "上一条" }).click();
+  await expect(dialog).toHaveAccessibleName("一点就复制");
+
+  // Tab goes 上一条 → 下一条 → 知道了 → 上一条, never out of the dialog.
+  await dialog.getByRole("button", { name: "上一条" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "下一条" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "知道了" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "上一条" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "知道了" })).toBeFocused();
+  await page.setViewportSize({ width: 680, height: 620 });
+  await page.screenshot({ path: test.info().outputPath("tips-dialog.png") });
+
+  // Closing leaves the card on the tip that was open; today's tip is unchanged.
+  await dialog.getByRole("button", { name: "知道了" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".daily-tips-title")).toHaveText("一点就复制");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.tips.v1") || "{}").shownId)).toBe("T-002");
+});
