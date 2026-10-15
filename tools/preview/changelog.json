@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.95",
+    "date": "10-15",
+    "at": "2026-10-15 14:49",
+    "items": [
+      "账号列表每一条前面显示网站 logo：Gmail、Instagram、WhatsApp、LinkedIn、亚马逊、阿里巴巴、小红书等 120 多个常用大网站按网址自动认出来，子域名也认",
+      "Instagram、WhatsApp、Gmail、YouTube、Outlook、速卖通、阿里云不再归到 Meta / Google / 微软 / 阿里巴巴一组，各有自己的分组和 logo",
+      "API 密钥按密钥开头认出服务（例如 Anthropic），笔记显示「记」；不认识的网站还是彩色首字母；分组标题只在「收起」时显示 logo"
+    ]
+  },
+  {
     "version": "1.94",
     "date": "10-15",
     "at": "2026-10-15 14:05",
