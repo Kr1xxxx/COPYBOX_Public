@@ -6,3 +6,5 @@
 - User-visible change (plain Chinese, for the preview changelog): 无
 - Not done / risks: 无
 - Next step: 无
+- Also: `website:deploy` no longer deletes KV keys under `download/private-` (the private builds' update files), like
+  `sync/`.
