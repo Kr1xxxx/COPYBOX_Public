@@ -7,6 +7,8 @@
   "preview_urls": false,
   "main": "worker.mjs",
   "kv_namespaces": [{ "binding": "FILES", "id": "fb78ad5c8e0e4469adff21ebbe638088" }],
+  // Accounts and sync (api.mjs, D-063): users, codes, sessions and, while R2 is off, the encrypted blobs.
+  "d1_databases": [{ "binding": "DB", "database_name": "copyboxx-users", "database_id": "078d71d5-0d93-484a-a035-668181c2bba2" }],
   "routes": [
     { "pattern": "copyboxx.com", "custom_domain": true },
     { "pattern": "www.copyboxx.com", "custom_domain": true }

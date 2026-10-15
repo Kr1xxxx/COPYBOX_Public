@@ -361,9 +361,9 @@ test("api: deleting the account removes the user, sessions, codes and the R2 blo
   assert.equal((await (await call(env, "GET", "/api/vault", { token: other })).json()).data.who, "theirs");
 });
 
-test("api: without the D1 or R2 binding every /api path answers 503", async (t) => {
+test("api: without the D1 binding every /api path answers 503", async (t) => {
   const sent = stubMail(t);
-  for (const env of [fakeEnv({ DB: undefined }), fakeEnv({ VAULTS: undefined }), {}]) {
+  for (const env of [fakeEnv({ DB: undefined }), {}]) {
     for (const [method, path] of [["POST", "/api/auth/code"], ["POST", "/api/auth/verify"], ["GET", "/api/vault"], ["PUT", "/api/vault"], ["POST", "/api/auth/logout"], ["DELETE", "/api/account"]]) {
       const response = await call(env, method, path, { body: method === "GET" ? undefined : { email: "a@example.com" } });
       assert.equal(response.status, 503, `${method} ${path}`);
@@ -434,4 +434,20 @@ test("api: the worker routes /api/ before the GET-only rule, and keeps the site 
   assert.equal(post.headers.get("Strict-Transport-Security"), "max-age=15552000");
   const plain = await worker.fetch(new Request("http://copyboxx.com/api/vault"), env);
   assert.equal(plain.status, 301);
+});
+
+test("api: without an R2 bucket the encrypted blob is kept in D1, capped below its 2 MB row limit", async (t) => {
+  const env = fakeEnv({ VAULTS: undefined });
+  const sent = stubMail(t);
+  const token = await signIn(env, sent);
+  const data = { snippets: [{ title: "问候", content: "secret-marker" }] };
+  assert.deepEqual(await (await call(env, "PUT", "/api/vault", { token, body: { baseVersion: 0, data } })).json(), { version: 1 });
+  assert.deepEqual((await (await call(env, "GET", "/api/vault", { token })).json()).data, data);
+  const row = env.DB.sqlite.prepare("SELECT data FROM vault_blobs").get();
+  assert.ok(!Buffer.from(row.data).toString("latin1").includes("secret-marker"), "the D1 copy is encrypted");
+  const big = await call(env, "PUT", "/api/vault", { token, body: { baseVersion: 1, data: { text: "x".repeat(2_000_000) } } });
+  assert.equal(big.status, 413);
+  assert.equal((await big.json()).error, "too_large");
+  assert.equal((await (await call(env, "DELETE", "/api/account", { token })).json()).ok, true);
+  assert.equal(env.DB.sqlite.prepare("SELECT count(*) AS n FROM vault_blobs").get().n, 0);
 });

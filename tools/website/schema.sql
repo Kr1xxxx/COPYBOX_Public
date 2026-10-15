@@ -40,3 +40,9 @@ CREATE TABLE IF NOT EXISTS vault_meta (
   version INTEGER,
   updated_at INTEGER
 );
+
+-- The encrypted blob itself when no R2 bucket is bound (key vaults/<user id>.json, at most 1.9 MB).
+CREATE TABLE IF NOT EXISTS vault_blobs (
+  key TEXT PRIMARY KEY,
+  data BLOB NOT NULL
+);

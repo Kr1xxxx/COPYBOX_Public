@@ -1,8 +1,8 @@
 // Account and sync API of copyboxx.com (D-063, README.md「账号与同步接口」), imported by worker.mjs for /api/*.
-// Login is only a 6-digit code sent to the email (no password). Each user has one blob, stored in R2 (binding VAULTS)
+// Login is only a 6-digit code sent to the email (no password). Each user has one blob, stored in R2 (binding VAULTS) or, without it, in D1,
 // encrypted with a key derived from the Worker secret VAULT_KEY and the user id; D1 (binding DB, schema.sql) keeps
 // users, code and session hashes, rate limits and the blob's version. Codes and session tokens are never stored,
-// only their SHA-256. Without DB or VAULTS every /api/* answers 503, so the site can be deployed before they exist.
+// only their SHA-256. Without DB every /api/* answers 503, so the site can be deployed before they exist.
 // The app calls from Rust, not from a browser page, so /api sends no CORS headers: browsers cannot read its answers.
 // Errors are { error: <stable code for the app>, message: <plain Chinese> }.
 // Only functions may be named exports of a Worker module (see worker.mjs), so constants stay private.
@@ -216,6 +216,31 @@ function vaultObjectKey(userId) {
   return `vaults/${userId}.json`;
 }
 
+// D1 keeps a row at most 2 MB, so a blob stored there (no R2 bucket bound) is capped a little below that.
+const maxD1Blob = 1_900_000;
+
+// Where the encrypted blobs live: the R2 bucket VAULTS when bound, otherwise the vault_blobs table in D1 (R2 needs to be
+// switched on in the dashboard first; owner's account had it off on 2026-10-15). Both answer get / put / delete.
+function vaultStore(env) {
+  if (env.VAULTS) return { store: env.VAULTS, limit: Infinity };
+  const db = env.DB;
+  const store = {
+    async get(key) {
+      const row = await db.prepare("SELECT data FROM vault_blobs WHERE key = ?").bind(key).first();
+      if (!row) return null;
+      const bytes = new Uint8Array(row.data);
+      return { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
+    },
+    async put(key, bytes) {
+      await db.prepare("INSERT OR REPLACE INTO vault_blobs (key, data) VALUES (?, ?)").bind(key, bytes).run();
+    },
+    async delete(key) {
+      await db.prepare("DELETE FROM vault_blobs WHERE key = ?").bind(key).run();
+    },
+  };
+  return { store, limit: maxD1Blob };
+}
+
 // Stored bytes: 1 format byte (1), 12-byte IV, ciphertext. The user id is bound as additional data.
 async function sealVault(key, userId, text) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -318,7 +343,7 @@ async function getVault(env, auth) {
   if (!meta) return json({ version: 0, updatedAt: null, data: null });
   const key = await vaultKey(env, auth.userId);
   if (!key) return fail(503, "unavailable");
-  const object = await env.VAULTS.get(vaultObjectKey(auth.userId));
+  const object = await vaultStore(env).store.get(vaultObjectKey(auth.userId));
   if (!object) return fail(500, "storage_error");
   try {
     const data = JSON.parse(await unsealVault(key, auth.userId, new Uint8Array(await object.arrayBuffer())));
@@ -337,6 +362,9 @@ async function putVault(request, env, auth, now) {
   const { baseVersion, data } = parsed.body ?? {};
   if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) return fail(400, "bad_request");
   if (!isPlainObject(data)) return fail(400, "bad_data");
+  const { store, limit } = vaultStore(env);
+  const text = JSON.stringify(data);
+  if (new TextEncoder().encode(text).length > limit) return fail(413, "too_large");
   const current = async () => (await db.prepare("SELECT version FROM vault_meta WHERE user_id = ?").bind(auth.userId).first())?.version ?? 0;
   // Claim the next version in D1 first (atomic), so of two uploads from the same base only one goes ahead.
   const claim =
@@ -346,7 +374,7 @@ async function putVault(request, env, auth, now) {
   if (changes(await claim.run()) !== 1) return fail(409, "version_conflict", { body: { version: await current() } });
   const version = baseVersion + 1;
   try {
-    await env.VAULTS.put(vaultObjectKey(auth.userId), await sealVault(key, auth.userId, JSON.stringify(data)), { customMetadata: { version: String(version) } });
+    await store.put(vaultObjectKey(auth.userId), await sealVault(key, auth.userId, text), { customMetadata: { version: String(version) } });
   } catch {
     // Give the version back so the app retries from the same base.
     if (baseVersion === 0) await db.prepare("DELETE FROM vault_meta WHERE user_id = ? AND version = 1").bind(auth.userId).run();
@@ -360,7 +388,7 @@ async function putVault(request, env, auth, now) {
 async function deleteAccount(env, auth) {
   const db = env.DB;
   const user = await db.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
-  await env.VAULTS.delete(vaultObjectKey(auth.userId));
+  await vaultStore(env).store.delete(vaultObjectKey(auth.userId));
   await db.prepare("DELETE FROM vault_meta WHERE user_id = ?").bind(auth.userId).run();
   await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(auth.userId).run();
   if (user) await db.prepare("DELETE FROM login_codes WHERE email = ?").bind(user.email).run();
@@ -386,7 +414,7 @@ export async function handleApi(request, env, now = Date.now()) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { Allow: allow } });
   const action = Object.hasOwn(known, request.method) ? known[request.method] : null;
   if (!action) return fail(405, "method_not_allowed", { headers: { Allow: allow } });
-  if (!env?.DB || !env?.VAULTS) return fail(503, "unavailable");
+  if (!env?.DB) return fail(503, "unavailable");
   if (action === "code") return requestCode(request, env, now);
   if (action === "verify") return verifyCode(request, env, now);
   const auth = await authorizedUser(request, env.DB, now);
