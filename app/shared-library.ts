@@ -2,6 +2,7 @@ import type { SecretItem, SharedContent, SharedLink, SnippetMeta } from "./clipb
 import { extractPlaceholders, productGroupsForRawProduct } from "./snippet-import.ts";
 import { PRESET_LIBRARY, type PresetLibrary } from "./preset-library.ts";
 import { STANDARD_SNIPPET_FOLDERS, normalizeImportedSnippetFolder } from "./snippet-folders.ts";
+import { parseContentNotice, type WhatsNewNotice } from "./whats-new.ts";
 
 // The company 话术 library: one JSON file that every employee's app reads. Entries have a stable id, so a sync can tell
 // "new", "changed" and "removed" apart. A sync never overwrites what an employee wrote or edited, and never deletes.
@@ -125,7 +126,8 @@ function tooLong(raw: unknown): boolean {
   return Object.values(raw as Record<string, unknown>).some((value) => (typeof value === "string" ? value.length > SHARED_MAX_FIELD : Array.isArray(value) && value.length > 200));
 }
 
-export function parseSharedLibrary(source: string): { items: SharedSnippet[]; skipped: number } {
+// `notice` is the optional 更新通知 that came with this push (D-071); a broken one is ignored, never the whole file.
+export function parseSharedLibrary(source: string): { items: SharedSnippet[]; skipped: number; notice: WhatsNewNotice | null } {
   if (source.length > SHARED_MAX_BYTES) throw new Error(SHARED_TOO_BIG);
   let parsed: unknown;
   try { parsed = JSON.parse(source); } catch { throw new Error("这不是有效的公司话术库文件"); }
@@ -141,7 +143,8 @@ export function parseSharedLibrary(source: string): { items: SharedSnippet[]; sk
     seen.add(entry.id);
     items.push(entry);
   }
-  return { items, skipped };
+  const notice = Array.isArray(parsed) ? null : parseContentNotice((parsed as { notice?: unknown }).notice);
+  return { items, skipped, notice };
 }
 
 // The 话术 this build ships with (D-066), as a company library file; "" when the build has none.

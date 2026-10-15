@@ -14,7 +14,9 @@ import {
   newestHistoryKey,
   normalizeCode,
   validateLibrary,
+  withNotice,
 } from "../tools/website/sync.mjs";
+import { parseSharedLibrary } from "../app/shared-library.ts";
 
 const code = "XS-TEST0000";
 const entry = (id, secret, extra = {}) => ({ id, label: `公司 · ${id}`, secret, ...extra });
@@ -131,4 +133,26 @@ test("sync refuses unknown codes and lists codes for agents", async () => {
   const kv = fakeKv({ [`sync/${code}/snippets.json`]: emptyLibrary(), [`sync/${code}/history/snippets-x.json`]: emptyLibrary() });
   await assert.rejects(main(["--code", "AB-NOPE0000", "--snippets", file(emptyLibrary())], kv), /does not exist/);
   assert.deepEqual(await quiet(() => main(["--list-codes"], kv)), [code]);
+});
+
+test("sync --notice puts the approved 更新通知 in the upload with a new id; without it no notice goes up", async () => {
+  const live = `sync/${code}/snippets.json`;
+  const kv = fakeKv({ [live]: library(entry("A", "one")) });
+  const next = library(entry("A", "one"), entry("B", "two"));
+  const notice = join(mkdtempSync(join(tmpdir(), "clipbox-notice-")), "notice.txt");
+  writeFileSync(notice, "- 新增 1 条话术\n\n- 新增 2 条 Tips\n");
+  const at = Date.UTC(2026, 9, 15, 13, 40);
+  const lines = await quiet(() => main(["--code", code, "--snippets", file(next), "--notice", notice], kv, at));
+  assert.equal(lines[0], "notice  公司话术有更新: 新增 1 条话术 / 新增 2 条 Tips");
+  const uploaded = JSON.parse(kv.store.get(live));
+  assert.deepEqual(uploaded.notice, { id: `${code}-202610151340`, title: "公司话术有更新", items: ["新增 1 条话术", "新增 2 条 Tips"] });
+  assert.equal(parseSharedLibrary(kv.store.get(live)).notice?.id, `${code}-202610151340`);
+
+  const json = withNotice(next, JSON.stringify({ title: "新功能", items: ["话术可以分享了"] }), code, at);
+  assert.equal(json.notice.title, "新功能");
+  assert.throws(() => withNotice(next, "  \n", code, at), /at least one line/);
+  assert.throws(() => withNotice("[]", "新增 1 条", code, at), /bare list/);
+
+  await quiet(() => main(["--code", code, "--snippets", file(next)], kv, at + 60_000));
+  assert.equal(JSON.parse(kv.store.get(live)).notice, undefined);
 });

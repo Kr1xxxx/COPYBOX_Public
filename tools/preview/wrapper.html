@@ -95,6 +95,13 @@
           <button type="button" role="menuitem" data-file="samples/4-full-test-sheet.csv">第 4 组 · 完整测试表<small>37 行，含 2 行错误和 1 条重复</small></button>
         </div>
       </div>
+      <div class="menu-wrap">
+        <button type="button" class="tool" id="noticeBtn" aria-haspopup="menu" aria-expanded="false">看更新通知 ▾</button>
+        <div class="menu" id="noticeMenu" role="menu" hidden>
+          <button type="button" role="menuitem" data-kind="app">软件更新后<small>「Copyboxx 已更新」，示例文字</small></button>
+          <button type="button" role="menuitem" data-kind="content">公司推送话术后<small>「公司话术有更新」，不用更新软件</small></button>
+        </div>
+      </div>
       <button type="button" class="tool" id="reseed">补齐 10 张测试图</button>
     </div>
   </header>
@@ -259,6 +266,24 @@ setOs(store.get(OS) === "mac" ? "mac" : "win", store.get(OS) === "mac");
     });
   } catch { list.innerHTML = '<li class="empty">暂时读不到更新记录</li>'; }
 })();
+
+// 更新通知 (D-071): shows the app's real card with sample lines; nothing is stored, so it can be shown again.
+const noticeBtn = document.getElementById("noticeBtn");
+const noticeMenu = document.getElementById("noticeMenu");
+const NOTICE_SAMPLES = {
+  app: { kind: "app", items: ["新增：话术可以一键分享给同事", "设置 → 数据 可以直接导入公司发来的 Tips 文件"] },
+  content: { kind: "content", items: ["新增 12 条话术", "新增 5 条 Tips"] },
+};
+function setNoticeMenu(open) { noticeMenu.hidden = !open; noticeBtn.setAttribute("aria-expanded", String(open)); }
+noticeBtn.addEventListener("click", (event) => { event.stopPropagation(); setNoticeMenu(noticeMenu.hidden); });
+document.addEventListener("click", (event) => { if (!noticeMenu.contains(event.target)) setNoticeMenu(false); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") setNoticeMenu(false); });
+noticeMenu.querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+  setNoticeMenu(false);
+  if (mode === "mini") { frame.src = `app-${os}.html`; mode = "full"; win.dataset.mode = "full"; renderNote(); await new Promise((resolve) => setTimeout(resolve, 300)); }
+  const w = await appReady(); if (!w) return;
+  w.dispatchEvent(new w.CustomEvent("clipbox:whats-new", { detail: NOTICE_SAMPLES[b.dataset.kind] }));
+}));
 
 // Nothing is added on open (owner, 2026-10-14: no automatic demo); 补齐 10 张测试图 and 导入测试话术 add test data by hand.
 </script>
