@@ -51,6 +51,17 @@ the company 话术 creates it from their own app with 导出为公司话术库�
   code for it and give it to the people who stay.
 - Accounts (later step) are sent without passwords: site, user name and note only.
 
+## By the signed-in email's domain (D-072)
+
+A company domain can be bound to a 同步码: everyone signed in to 登录同步 with an address at that domain then gets the
+code's library without typing the code (`GET /api/library`). A typed 同步码 still wins on that computer.
+- Bind only after the owner names the domain and says 发布 in the thread:
+  `node tools/website/sync.mjs --link-domain company.com --code XS-7KQ2M9AB` (`--dry-run` first; `--unlink-domain`,
+  `--list-domains`). The code's library must already exist.
+- Whole domains only, exact match. Free-mail domains (gmail, QQ, 163, outlook, …) are refused by the tool and never
+  served by the Worker (`tools/website/free-mail.mjs`).
+- Never put a real company domain or code in the repo.
+
 ## 更新通知 with a push (D-071)
 
 A push can carry a short notice that each device shows once (「公司话术有更新」, 「不用更新软件，已经自动同步好了」):
