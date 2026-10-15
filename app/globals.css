@@ -1521,3 +1521,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .automation-consent-caller strong{color:var(--ink-2);font-weight:650;word-break:break-all}
 .automation-trust-list{list-style:none;margin:0;padding:0}
 .automation-trust-list small{word-break:break-all}
+.note-api-fields{margin:0;padding:8px 10px 10px;border:1px solid var(--line);border-radius:8px;display:grid;gap:8px}
+.note-api-fields legend{padding:0 4px;color:var(--muted);font-size:11.5px}
+.note-api-field{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1fr) minmax(0,.9fr) auto;gap:6px;align-items:center}
+.note-api-field .totp-error{grid-column:1/-1}
+.note-api-fields>.secondary-button{justify-self:start}
+@media (max-width:520px){.note-api-field{grid-template-columns:1fr 1fr}}

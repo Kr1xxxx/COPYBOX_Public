@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { copyTextWithExpiry } from "./clipboard";
 import type { EntryKind } from "./account-view";
-import { revertLogin } from "./note-core";
+import { revertToNote } from "./note-core";
 import { NoteMarkdown } from "./note-markdown";
 import type { LoginItem } from "./payment-core";
 import { generatePassword, hasEdgeSpace } from "./password-core";
@@ -141,7 +141,7 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEnt
     if (!item.fromNote) return;
     const noteId = item.fromNote.id;
     try {
-      const list = await storeRef.current!.update((current) => revertLogin(current, item.id));
+      const list = await storeRef.current!.update((current) => revertToNote(current, item.id));
       setItems(list.filter((entry): entry is LoginItem => entry.type === "login" && !entry.trashedAt));
       setRevertId("");
       onToast("已还原为笔记");

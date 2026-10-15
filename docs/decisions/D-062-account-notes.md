@@ -10,3 +10,6 @@
 - Consequences: older app versions keep the note in the store but do not show it. 「转为 API」 follows once the API entry
   has several secret fields (D-061).
 - Status: accepted (owner's request, 2026-10-15).
+- Follow-up (2026-10-15, 「转为 API」): Mac only, since Windows has no API 密钥 category (owner, 2026-10-15). The preview maps
+  名称 / 服务 / 接口地址 and each hidden value (named after its label, e.g. Client ID) into the D-061 `fields`, the rest into
+  备注; the API entry keeps the note in `fromNote` and has the same 「看原文」 / 「还原为笔记」.

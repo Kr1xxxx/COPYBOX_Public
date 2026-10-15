@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { copyTextWithExpiry } from "./clipboard";
 import { API_FIELD_LABEL_MAX, API_FIELD_MAX, API_FIELD_SUGGESTIONS, API_NOTE_MAX, apiKeyHint, apiSecretFields, checkApiFields, expiryState, isValidDay, lastFour, nextFieldLabel, storedApiFields, type ApiField, type ApiFieldErrors } from "./apikey-core";
 import { formatApiKeyReference } from "./apikey-automation";
+import type { EntryKind } from "./account-view";
+import { revertToNote } from "./note-core";
+import { NoteMarkdown } from "./note-markdown";
 import { PLAIN_NOTES } from "./platform";
 import type { ApiKeyItem } from "./payment-core";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
@@ -26,7 +29,7 @@ function siteOf(item: Pick<ApiKeyItem, "key" | "endpoint" | "service" | "name">)
 
 // API 密钥 on the 账号 page. An entry holds several hidden fields (Key, Secret, Client ID…) and a 备注; each field stays hidden
 // until 按住显示 / 显示. The service is guessed from the first field's prefix.
-export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
+export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding, onShowEntry }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean; onShowEntry?: (tab: EntryKind, id: string) => void }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const [items, setItems] = useState<ApiKeyItem[] | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -35,6 +38,8 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<ApiFieldErrors>({});
   const [deleteId, setDeleteId] = useState("");
+  const [revertId, setRevertId] = useState("");
+  const [sourceId, setSourceId] = useState("");
   const reveal = useReveal();
   const [copiedKey, setCopiedKey] = useState("");
   const [now] = useState(() => Date.now());
@@ -114,6 +119,21 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
       setOpenId("");
     } catch {
       onToast("删除失败，请重试");
+    }
+  }
+
+  // 还原为笔记: the entry made by 「转为 API」 goes away and the note comes back exactly as it was.
+  async function revert(item: ApiKeyItem) {
+    if (!item.fromNote) return;
+    const noteId = item.fromNote.id;
+    try {
+      const list = await storeRef.current!.update((current) => revertToNote(current, item.id));
+      setItems(list.filter((entry): entry is ApiKeyItem => entry.type === "apikey" && !entry.trashedAt));
+      setRevertId("");
+      onToast("已还原为笔记");
+      onShowEntry?.("note", noteId);
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "还原失败，请重试");
     }
   }
 
@@ -198,10 +218,16 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding }: { devi
                         <button type="button" className={`icon-button pay-copy${copiedKey === `${item.id}:n` ? " copied" : ""}`} onClick={() => void copy(`${item.id}:n`, item.note ?? "")} aria-label="复制备注" title="复制"><Icon name={copiedKey === `${item.id}:n` ? "check" : "copy"} /></button></div>}
                       {item.expires && <div className="pay-field"><dt>到期</dt><dd className={expiry.kind === "ok" ? "" : `apikey-expiry-text ${expiry.kind}`}>{expiry.text}</dd><span /></div>}
                     </dl>
-                    <p className="pay-meta">上次修改 {whenText(item.updatedAt)}</p>
+                    <p className="pay-meta">上次修改 {whenText(item.updatedAt)}{item.fromNote && <> · 由笔记「{item.fromNote.name}」转来</>}</p>
+                    {item.fromNote && sourceId === item.id && <div className="note-source" aria-label="笔记原文"><NoteMarkdown source={item.fromNote.body} /></div>}
+                    {revertId === item.id && <p className="pay-confirm" role="alert">还原后这条 API 会删除，笔记「{item.fromNote?.name}」按原样回来。这条 API 里后来改过的内容不会保留。</p>}
                     <div className="pay-actions">
                       <button type="button" className="secondary-button" onClick={() => { setDraft({ id: item.id, name: item.name, service: item.service, fields: apiSecretFields(item), note: item.note ?? "", endpoint: item.endpoint, expires: item.expires }); setErrors({}); setFieldErrors({}); }}>修改</button>
                       {!PLAIN_NOTES && <button type="button" className="secondary-button" title="给命令行用的引用，不含密钥本身" onClick={() => void copy(`${item.id}:r`, formatApiKeyReference(item.id))}>{copiedKey === `${item.id}:r` ? "已复制" : "复制引用"}</button>}
+                      {item.fromNote && <button type="button" className="secondary-button" aria-pressed={sourceId === item.id} onClick={() => setSourceId(sourceId === item.id ? "" : item.id)}>{sourceId === item.id ? "收起原文" : "看原文"}</button>}
+                      {item.fromNote && (revertId === item.id
+                        ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setRevertId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => void revert(item)}>确认还原</button></span>
+                        : <button type="button" className="secondary-button" onClick={() => setRevertId(item.id)}>还原为笔记</button>)}
                       {deleteId === item.id
                         ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setDeleteId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => void remove(item.id)}>确认删除</button></span>
                         : <button type="button" className="secondary-button" onClick={() => setDeleteId(item.id)}>删除</button>}

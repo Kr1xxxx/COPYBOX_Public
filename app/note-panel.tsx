@@ -3,15 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EntryKind } from "./account-view";
 import { copyTextWithExpiry } from "./clipboard";
-import { LOGIN_FIELDS, NOTE_BODY_MAX, NOTE_NAME_MAX, convertNote, guessLoginFields, loginDraftProblems, loginFromNote, noteHint, noteLines, type LoginField } from "./note-core";
+import { API_FIELD_MAX, nextFieldLabel } from "./apikey-core";
+import { LOGIN_FIELDS, NOTE_BODY_MAX, NOTE_NAME_MAX, apiDraftProblems, apiFromNote, convertNote, guessApiFields, guessLoginFields, loginDraftProblems, loginFromNote, noteHint, noteLines, type ApiDraft, type LoginField } from "./note-core";
 import { NoteMarkdown } from "./note-markdown";
 import type { NoteItem } from "./payment-core";
+import { PLAIN_NOTES } from "./platform";
 import { openSecretItemsStore, type SecretItemsStore, type VaultItem } from "./secret-items-store";
 import { Icon } from "./ui-atoms";
 
 type Draft = { id: string | null; name: string; body: string };
 const EMPTY: Draft = { id: null, name: "", body: "" };
 type Convert = { note: NoteItem; values: Record<LoginField, string>; from: Partial<Record<LoginField, number>> };
+type ApiConvert = { note: NoteItem; draft: ApiDraft };
+const API_META: { key: "name" | "service" | "endpoint"; label: string; optional: boolean }[] = [
+  { key: "name", label: "名称", optional: false }, { key: "service", label: "服务", optional: true }, { key: "endpoint", label: "接口地址", optional: true },
+];
 
 const onlyNotes = (list: VaultItem[]) => list.filter((entry): entry is NoteItem => entry.type === "note" && !entry.trashedAt);
 
@@ -36,6 +42,8 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
   const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [previewing, setPreviewing] = useState(false);
   const [convert, setConvert] = useState<Convert | null>(null);
+  const [apiConvert, setApiConvert] = useState<ApiConvert | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, { label?: string; value?: string }>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState("");
   const [copiedId, setCopiedId] = useState("");
@@ -52,7 +60,8 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
   useEffect(() => () => { clearTimeout(timers.current.copied); }, []);
   useEffect(() => { if (draft && !draft.id) nameRef.current?.focus(); }, [draft?.id, draft === null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const lines = useMemo(() => (convert ? noteLines(convert.note.body) : []), [convert]);
+  const sourceNote = convert?.note ?? apiConvert?.note;
+  const lines = useMemo(() => (sourceNote ? noteLines(sourceNote.body) : []), [sourceNote]);
 
   async function copy(item: NoteItem) {
     try {
@@ -134,6 +143,39 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
     }
   }
 
+  function startApiConvert(note: NoteItem) {
+    setApiConvert({ note, draft: guessApiFields(note) });
+    setErrors({});
+    setFieldErrors({});
+  }
+
+  function setApi(change: (draft: ApiDraft) => ApiDraft) {
+    setApiConvert((current) => current && { ...current, draft: change(current.draft) });
+  }
+
+  function setApiField(id: string, part: "label" | "value", value: string, from?: number) {
+    setApi((draft) => ({ ...draft, fields: draft.fields.map((field) => (field.id === id ? { ...field, [part]: value, ...(part === "value" ? { from } : {}) } : field)) }));
+    setFieldErrors((current) => (current[id]?.[part] ? { ...current, [id]: { ...current[id], [part]: undefined } } : current));
+  }
+
+  async function saveApiConvert() {
+    const store = storeRef.current;
+    if (!apiConvert || !store) return;
+    const checked = apiDraftProblems(apiConvert.draft);
+    if (Object.keys(checked.found).length > 0 || Object.keys(checked.fieldErrors).length > 0) { setErrors(checked.found as Record<string, string>); setFieldErrors(checked.fieldErrors); return; }
+    const entry = apiFromNote(apiConvert.note, apiConvert.draft, checked.fields, crypto.randomUUID(), Date.now());
+    try {
+      setItems(onlyNotes(await store.update((current) => convertNote(current, apiConvert.note.id, entry))));
+      setApiConvert(null);
+      onToast("已转为 API，原文已保留，可以还原");
+      onShowEntry?.("apikey", entry.id);
+    } catch (error) {
+      setErrors({ name: error instanceof Error ? error.message : "保存失败，请重试" });
+    }
+  }
+
+  const lineOptions = lines.map((line) => <option key={line.line} value={line.line}>第 {line.line} 行：{short(line.text)}</option>);
+
   if (loadError) return <p className="settings-note" role="alert">{loadError}</p>;
   if (items === null) return <p className="settings-note">正在读取…</p>;
 
@@ -156,7 +198,7 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
                 setValue(key, line ? line.value : key === "name" ? convert.note.name : "", line?.line);
               }}>
                 <option value="">{key === "name" ? "用笔记标题" : "不从笔记取"}</option>
-                {lines.map((line) => <option key={line.line} value={line.line}>第 {line.line} 行：{short(line.text)}</option>)}
+                {lineOptions}
               </select>}
             </div>
           );
@@ -164,6 +206,54 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
         <div className="settings-inline-actions">
           <button type="button" className="secondary-button" onClick={() => setConvert(null)}>取消</button>
           <button type="submit" className="primary-button">保存为登录</button>
+        </div>
+      </form>
+    );
+  }
+
+  if (apiConvert) {
+    const { draft: api } = apiConvert;
+    return (
+      <form className="totp-form pay-form note-convert" aria-label="转为 API" onSubmit={(event) => { event.preventDefault(); void saveApiConvert(); }} noValidate>
+        <p className="settings-note">先看一下每一项来自笔记的哪一行，不对可以换一行或直接改。保密的内容会像其他 API 密钥一样默认藏起来。保存后，原来的笔记会跟着一起保存，随时可以「还原为笔记」。</p>
+        {API_META.map(({ key, label, optional }) => (
+          <div key={key} className="note-map-row">
+            <label>{label}{optional ? "（可不填）" : ""}
+              <input aria-label={label} value={api[key]} autoComplete="off" spellCheck={false} maxLength={key === "name" ? NOTE_NAME_MAX : undefined} onChange={(event) => { const value = event.target.value; setApi((draft) => ({ ...draft, [key]: value })); setErrors((current) => ({ ...current, [key]: "" })); }} />
+              {errors[key] && <span className="totp-error" role="alert">{errors[key]}</span>}
+            </label>
+            <select aria-label={`${label}来自哪一行`} value={api.from[key] ?? ""} onChange={(event) => {
+              const line = lines.find((entry) => entry.line === Number(event.target.value));
+              setApi((draft) => ({ ...draft, [key]: line ? line.value : key === "name" ? apiConvert.note.name : "", from: { ...draft.from, [key]: line?.line } }));
+            }}>
+              <option value="">{key === "name" ? "用笔记标题" : "不从笔记取"}</option>
+              {lineOptions}
+            </select>
+          </div>
+        ))}
+        <fieldset className="note-api-fields">
+          <legend>保密的内容</legend>
+          {api.fields.map((field, index) => (
+            <div key={field.id} className="note-api-field">
+              <input aria-label={`第 ${index + 1} 项的名字`} value={field.label} maxLength={30} autoComplete="off" spellCheck={false} placeholder="例如 Client ID" onChange={(event) => setApiField(field.id, "label", event.target.value)} />
+              <input aria-label={`第 ${index + 1} 项的内容`} value={field.value} autoComplete="off" spellCheck={false} onChange={(event) => setApiField(field.id, "value", event.target.value)} />
+              <select aria-label={`第 ${index + 1} 项来自哪一行`} value={field.from ?? ""} onChange={(event) => {
+                const line = lines.find((entry) => entry.line === Number(event.target.value));
+                setApiField(field.id, "value", line ? line.value : "", line?.line);
+              }}>
+                <option value="">不从笔记取</option>
+                {lineOptions}
+              </select>
+              {api.fields.length > 1 && <button type="button" className="icon-button" aria-label={`删掉第 ${index + 1} 项`} title="删掉" onClick={() => setApi((draft) => ({ ...draft, fields: draft.fields.filter((entry) => entry.id !== field.id) }))}><Icon name="trash" /></button>}
+              {(fieldErrors[field.id]?.label || fieldErrors[field.id]?.value) && <span className="totp-error" role="alert">{fieldErrors[field.id]?.label ?? fieldErrors[field.id]?.value}</span>}
+            </div>
+          ))}
+          {api.fields.length < API_FIELD_MAX && <button type="button" className="secondary-button" onClick={() => setApi((draft) => ({ ...draft, fields: [...draft.fields, { id: crypto.randomUUID(), label: nextFieldLabel(draft.fields), value: "" }] }))}><Icon name="plus" />添加一项</button>}
+        </fieldset>
+        <label>备注（可不填）<textarea aria-label="备注" rows={3} value={api.note} onChange={(event) => { const value = event.target.value; setApi((draft) => ({ ...draft, note: value })); }} /></label>
+        <div className="settings-inline-actions">
+          <button type="button" className="secondary-button" onClick={() => setApiConvert(null)}>取消</button>
+          <button type="submit" className="primary-button">保存为 API</button>
         </div>
       </form>
     );
@@ -215,6 +305,8 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
                       <button type="button" className={`secondary-button${copiedId === item.id ? " copied" : ""}`} onClick={() => void copy(item)}>{copiedId === item.id ? "已复制" : "复制全文"}</button>
                       <button type="button" className="secondary-button" onClick={() => { setDraft({ id: item.id, name: item.name, body: item.body }); setErrors({}); }}>修改</button>
                       <button type="button" className="secondary-button" onClick={() => startConvert(item)}>转为登录…</button>
+                      {/* Windows has no API 密钥 category (owner, 2026-10-15), so only the Mac offers 转为 API. */}
+                      {!PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => startApiConvert(item)}>转为 API…</button>}
                       {deleteId === item.id
                         ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setDeleteId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => void remove(item.id)}>确认删除</button></span>
                         : <button type="button" className="secondary-button" onClick={() => setDeleteId(item.id)}>删除</button>}

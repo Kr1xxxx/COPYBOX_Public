@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { convertNote, guessLoginFields, loginDraftProblems, loginFromNote, noteHint, noteLines, parseInline, parseMarkdown, plainText, revertLogin, safeHref } from "../app/note-core.ts";
+import { apiDraftProblems, apiFromNote, convertNote, guessApiFields, guessLoginFields, loginDraftProblems, loginFromNote, noteHint, noteLines, parseInline, parseMarkdown, plainText, revertToNote, safeHref } from "../app/note-core.ts";
 
 test("Markdown blocks: headings, lists, tasks, quotes, code and rules", () => {
   const blocks = parseMarkdown("# 标题\n\n第一行\n第二行\n\n- 甲\n- [x] 乙\n\n1. 一\n2. 二\n\n> 引用\n\n```\n<b>不渲染</b>\n```\n\n---");
@@ -74,7 +74,38 @@ test("convert swaps note for login in one list; 还原 brings the note back exac
   const after = convertNote([other, note], "n1", login);
   assert.deepEqual(after.map((item) => item.id), ["a", "l1"]);
   assert.throws(() => convertNote(after, "n1", login), /不在了/);
-  const back = revertLogin(after, "l1");
+  const back = revertToNote(after, "l1");
   assert.deepEqual(back, [other, note]);
-  assert.throws(() => revertLogin([{ id: "l2", type: "login" }], "l2"), /不是从笔记转来的/);
+  assert.throws(() => revertToNote([{ id: "l2", type: "login" }], "l2"), /不是从笔记转来的/);
+});
+
+test("转为 API guesses named hidden fields, service, address and note; a bare long token becomes 密钥", () => {
+  const body = "# OpenAI 接口\n服务: OpenAI\nBase URL: https://api.openai.com/v1\n- Client ID: abc-123\n- **Client Secret**: s3cr3t-value\nsk-proj-0123456789abcdefABCDEF\n只给客服机器人用";
+  const draft = guessApiFields({ name: "笔记", body });
+  assert.equal(draft.name, "OpenAI 接口");
+  assert.equal(draft.service, "OpenAI");
+  assert.equal(draft.endpoint, "https://api.openai.com/v1");
+  assert.deepEqual(draft.fields.map((field) => [field.label, field.value, field.from]), [["Client ID", "abc-123", 4], ["Client Secret", "s3cr3t-value", 5], ["Secret", "sk-proj-0123456789abcdefABCDEF", 6]]);
+  assert.equal(draft.note, "只给客服机器人用");
+
+  const empty = guessApiFields({ name: "空", body: "随便写写" });
+  assert.deepEqual(empty.fields.map((field) => [field.label, field.value]), [["密钥", ""]]);
+  const problems = apiDraftProblems(empty);
+  assert.deepEqual(Object.keys(problems.fieldErrors).length, 1);
+});
+
+test("转为 API stores fields with key/secret mirrors and the note; 还原 brings the note back", () => {
+  const note = { id: "n1", type: "note", name: "笔记", body: "Key: k1\nSecret: s1", createdAt: 1, updatedAt: 1 };
+  const draft = guessApiFields(note);
+  const checked = apiDraftProblems(draft);
+  assert.deepEqual(checked.found, {});
+  const entry = apiFromNote(note, draft, checked.fields, "a1", 5);
+  assert.equal(entry.type, "apikey");
+  assert.equal(entry.key, "k1");
+  assert.equal(entry.secret, "s1");
+  assert.deepEqual(entry.fields.map((field) => field.label), ["Key", "Secret"]);
+  assert.deepEqual(entry.fromNote, note);
+  const after = convertNote([note], "n1", entry);
+  assert.deepEqual(after.map((item) => item.id), ["a1"]);
+  assert.deepEqual(revertToNote(after, "a1"), [note]);
 });
