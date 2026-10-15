@@ -103,3 +103,41 @@ test("转为登录: the preview shows which line fills which field, saves a logi
   await openAccountCategory(page, "登录");
   await expect(dialog).not.toContainText("Shopify 主账号");
 });
+
+test("Mac: 转为 API previews named hidden fields, saves an API entry with them hidden, and 还原 brings the note back", async ({ page }) => {
+  const dialog = await openNotes(page, "darwin");
+  const body = "# 店铺接口\n服务: Shopify\n地址: https://shop.example.com/api\nClient ID: client-AAAA1111\nClient Secret: secret-BBBB2222\n只给售后组用";
+  await addNote(page, "接口备忘", body);
+  await dialog.getByRole("button", { name: "转为 API…" }).click();
+
+  const form = dialog.getByRole("form", { name: "转为 API" });
+  await expect(form.getByLabel("名称", { exact: true })).toHaveValue("店铺接口");
+  await expect(form.getByLabel("服务", { exact: true })).toHaveValue("Shopify");
+  await expect(form.getByLabel("接口地址", { exact: true })).toHaveValue("https://shop.example.com/api");
+  await expect(form.getByLabel("第 1 项的名字")).toHaveValue("Client ID");
+  await expect(form.getByLabel("第 2 项的内容")).toHaveValue("secret-BBBB2222");
+  await expect(form.getByLabel("第 2 项来自哪一行")).toHaveValue("5");
+  await expect(form.getByLabel("备注", { exact: true })).toHaveValue("只给售后组用");
+  // Add a third field by hand, then drop it again.
+  await form.getByRole("button", { name: "添加一项" }).click();
+  await form.getByRole("button", { name: "删掉第 3 项" }).click();
+  await form.getByRole("button", { name: "保存为 API" }).click();
+
+  await expect(dialog.getByRole("button", { name: /店铺接口/ })).toContainText("尾号 1111 · 2 项");
+  await expect(dialog).not.toContainText("BBBB2222");
+  await expect(dialog).toContainText("由笔记「接口备忘」转来");
+  await dialog.getByRole("button", { name: "复制Client Secret" }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("secret-BBBB2222");
+
+  await dialog.getByRole("button", { name: "还原为笔记" }).click();
+  await dialog.getByRole("button", { name: "确认还原" }).click();
+  await expect(dialog.locator(".note-md h3")).toHaveText("店铺接口");
+  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button", { name: /^API 密钥/ })).toContainText("0");
+});
+
+test("Windows: notes offer 转为登录 only, no 转为 API", async ({ page }) => {
+  const dialog = await openNotes(page, "win32");
+  await addNote(page, "接口备忘", "Key: abc");
+  await expect(dialog.getByRole("button", { name: "转为登录…" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "转为 API…" })).toHaveCount(0);
+});

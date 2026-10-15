@@ -34,7 +34,7 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
   }
 
   const back = () => setPanel(null);
-  // 「转为登录」 and 「还原为笔记」 move the entry to another type: show it there.
+  // 「转为登录 / API」 and 「还原为笔记」 move the entry to another type: show it there.
   const showEntry = (tab: EntryKind, id: string) => setPanel({ tab, focusId: id, adding: false, n: Date.now() });
   function open(entry: AccountEntry) {
     if (entry.legacy) onOpenLegacy(entry.id);
@@ -50,7 +50,7 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
         <div><button type="button" className="secondary-button" onClick={back}>‹ 返回列表</button></div>
         {panel.tab === "login" && <LoginPanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "payment" && <PaymentPanel {...common} />}
-        {panel.tab === "apikey" && <ApiKeyPanel {...common} />}
+        {panel.tab === "apikey" && <ApiKeyPanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "recovery" && <RecoveryPanel {...common} />}
         {panel.tab === "note" && <NotePanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "totp" && <TotpPanel deviceKey={deviceKey} onToast={onToast} startAdding={panel.adding} />}

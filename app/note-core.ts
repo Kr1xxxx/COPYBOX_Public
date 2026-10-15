@@ -1,7 +1,8 @@
 // 笔记 in 账号: free text in Markdown, and 「转为登录」 (a note becomes a login, the note kept inside it so 还原 can bring it
 // back). Pure functions, no storage, no React: the Markdown is parsed into plain data that the page draws itself, so
 // nothing written in a note can ever become HTML or a script.
-import type { LoginItem, NoteItem } from "./payment-core.ts";
+import { API_FIELD_LABEL_MAX, API_FIELD_MAX, API_NOTE_MAX, type ApiField, checkApiFields, storedApiFields } from "./apikey-core.ts";
+import type { ApiKeyItem, LoginItem, NoteItem } from "./payment-core.ts";
 import { isPlausibleUrl, normalizeUrl } from "./site-core.ts";
 
 export const NOTE_NAME_MAX = 40;
@@ -255,10 +256,82 @@ export function convertNote<T extends Item>(items: T[], noteId: string, login: T
   return [...items.filter((item) => item.id !== noteId), login];
 }
 
-// 还原: the login goes away and the note comes back exactly as it was before 「转为登录」.
-export function revertLogin<T extends Item & { fromNote?: unknown }>(items: T[], loginId: string): T[] {
-  const login = items.find((item) => item.id === loginId && item.type === "login");
-  if (!login?.fromNote) throw new Error("这条登录不是从笔记转来的");
-  const note = login.fromNote as T;
-  return [...items.filter((item) => item.id !== loginId && item.id !== note.id), note];
+// 还原: the login or API entry goes away and the note comes back exactly as it was before 「转为登录 / API」.
+export function revertToNote<T extends Item & { fromNote?: unknown }>(items: T[], entryId: string): T[] {
+  const entry = items.find((item) => item.id === entryId && (item.type === "login" || item.type === "apikey"));
+  if (!entry?.fromNote) throw new Error("这一条不是从笔记转来的");
+  const note = entry.fromNote as T;
+  return [...items.filter((item) => item.id !== entryId && item.id !== note.id), note];
+}
+
+// ---- 转为 API (Mac only: Windows has no API 密钥 category) ---------------------------------------------------------
+
+export type ApiDraft = {
+  name: string; service: string; endpoint: string; note: string;
+  // Each hidden value with its name and the note line it came from.
+  fields: (ApiField & { from?: number })[];
+  from: Partial<Record<"name" | "service" | "endpoint", number>>;
+};
+
+const API_LABELS: { field: "name" | "service" | "endpoint"; re: RegExp }[] = [
+  { field: "endpoint", re: /^(接口地址|接口|地址|网址|链接|endpoint|url|base ?url|api ?url|host)$/i },
+  { field: "service", re: /^(服务|平台|服务商|service|provider|platform)$/i },
+  { field: "name", re: /^(名称|标题|名字|name|title)$/i },
+];
+// Labels that name a hidden value: kept as the field's own name.
+const SECRET_LABEL = /(key|secret|token|密钥|秘钥|令牌|client ?id|app ?id|access|password|密码|pwd|凭证|证书|signature|签名)/i;
+const TOKEN_LIKE = /^[A-Za-z0-9_\-.:+/=]{16,}$/;
+
+export function guessApiFields(note: Pick<NoteItem, "name" | "body">): ApiDraft {
+  const lines = noteLines(note.body);
+  const draft: ApiDraft = { name: "", service: "", endpoint: "", note: "", fields: [], from: {} };
+  const used = new Set<number>();
+  const labels = new Set<string>();
+  const addField = (label: string, line: NoteLine) => {
+    let name = Array.from(label.trim()).slice(0, API_FIELD_LABEL_MAX).join("") || (draft.fields.length === 0 ? "密钥" : "Secret");
+    if (labels.has(name.toLowerCase()) || /^\d+$/.test(name)) name = `${name} ${draft.fields.length + 1}`;
+    labels.add(name.toLowerCase());
+    draft.fields.push({ id: `f${line.line}`, label: name, value: line.value, from: line.line });
+    used.add(line.line);
+  };
+  for (const line of lines) {
+    if (!line.label) continue;
+    const label = line.label.replace(/\s+/g, " ");
+    const rule = API_LABELS.find((entry) => entry.re.test(label));
+    if (rule && !draft[rule.field]) { draft[rule.field] = line.value; draft.from[rule.field] = line.line; used.add(line.line); }
+    else if (!rule && SECRET_LABEL.test(label) && draft.fields.length < API_FIELD_MAX) addField(label, line);
+  }
+  for (const line of lines) {
+    if (used.has(line.line) || line.label) continue;
+    if (!draft.endpoint && /^https?:\/\//i.test(line.value) && !/\s/.test(line.value)) { draft.endpoint = line.value; draft.from.endpoint = line.line; used.add(line.line); }
+    else if (TOKEN_LIKE.test(line.value) && draft.fields.length < API_FIELD_MAX) addField("", line);
+  }
+  if (!draft.name) {
+    const heading = /^\s{0,3}#{1,6}\s+(.+)$/m.exec(note.body);
+    const headingLine = heading ? lines.find((line) => line.text === cleanLine(heading[1])) : undefined;
+    if (headingLine && !used.has(headingLine.line)) { draft.name = headingLine.value; draft.from.name = headingLine.line; used.add(headingLine.line); }
+    else draft.name = note.name;
+  }
+  draft.name = Array.from(draft.name).slice(0, NOTE_NAME_MAX).join("");
+  if (draft.fields.length === 0) draft.fields.push({ id: "f0", label: "密钥", value: "" });
+  draft.note = lines.filter((line) => !used.has(line.line)).map((line) => line.text).join("\n");
+  return draft;
+}
+
+export function apiDraftProblems(draft: ApiDraft) {
+  const checked = checkApiFields(draft.fields);
+  const found: Partial<Record<"name" | "endpoint", string>> = {};
+  if (!draft.name.trim()) found.name = "请填写名称";
+  if (draft.endpoint.trim() && !isPlausibleUrl(draft.endpoint)) found.endpoint = "接口地址格式不对";
+  return { found, fieldErrors: checked.errors, fields: checked.fields };
+}
+
+// The new API entry, carrying the note exactly as it was (same swap as 转为登录).
+export function apiFromNote(note: NoteItem, draft: ApiDraft, fields: ApiField[], id: string, now: number): ApiKeyItem {
+  const clean = fields.map(({ id: fieldId, label, value }) => ({ id: fieldId, label, value }));
+  return {
+    id, type: "apikey", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, NOTE_NAME_MAX).join(""),
+    service: draft.service.trim(), ...storedApiFields(clean), note: draft.note.trim().slice(0, API_NOTE_MAX),
+    endpoint: draft.endpoint.trim() ? normalizeUrl(draft.endpoint) : "", expires: "", fromNote: note, createdAt: now, updatedAt: now,
+  };
 }

@@ -120,6 +120,8 @@ export type ApiKeyItem = EntryMeta & {
   fields?: ApiSecretField[];
   // Free text shown under the fields, not hidden.
   note?: string;
+  // Set when this entry was made from a 笔记 (「转为 API」): the note exactly as it was, so 还原 can bring it back.
+  fromNote?: NoteItem;
   endpoint: string;
   // YYYY-MM-DD, or "" when the key does not expire.
   expires: string;
