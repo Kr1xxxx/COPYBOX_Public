@@ -82,7 +82,10 @@ test("signing out or signing in at another domain clears the marker", () => {
   const storage = memoryStorage();
   writeDomainLibrary({ domain: "company.com", at: 1 }, storage);
   assert.deepEqual(settleDomainMark("me@company.com", storage), { domain: "company.com", at: 1 });
-  assert.deepEqual(settleDomainMark("Me@Sales.Company.com", storage), { domain: "company.com", at: 1 });
+  assert.deepEqual(settleDomainMark("Me@Company.com", storage), { domain: "company.com", at: 1 });
+  // Exact domain only, like the server (D-072): a subdomain is another domain.
+  assert.equal(settleDomainMark("me@sales.company.com", storage), null);
+  writeDomainLibrary({ domain: "company.com", at: 1 }, storage);
   assert.equal(settleDomainMark("me@gmail.com", storage), null);
   assert.equal(readDomainLibrary(storage), null);
   writeDomainLibrary({ domain: "company.com", at: 1 }, storage);
