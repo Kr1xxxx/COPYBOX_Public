@@ -50,3 +50,10 @@ the company 话术 creates it from their own app with 导出为公司话术库�
 - Never put a live 同步码 in the repo, the public site or a commit message. To remove someone from a group, create a new
   code for it and give it to the people who stay.
 - Accounts (later step) are sent without passwords: site, user name and note only.
+
+## Built-in 话术 in a company build (D-066)
+
+`node tools/preset-library.mjs <标准话术库.md> [--json library.json]` writes `app/preset-library.ts`; `--clear` empties it
+(the public repo keeps it empty). With entries, their chapters become the standard 话术 folders and the app adds them on
+start when no 同步码 is set, with the same rules as a synced library. `--json` writes the same entries as a library file
+for `npm run sync:publish`, so a 同步码 can carry them without retiring anything. Sample: `docs/samples/standard-library-sample.md`.

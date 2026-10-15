@@ -114,7 +114,7 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
 import { isSyncedSnippet, mergeAccounts, mergeSnippets, syncPolicy, tooManyRemovals } from "./cloud-sync-core";
-import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
+import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, presetLibraryText, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
@@ -639,9 +639,17 @@ export default function Home() {
 
   // On start and every 30 minutes while open, if a 同步码 is set: stay silent unless something changed, and never
   // complain when offline or when the code finds nothing (the next round tries again).
+  // Without a 同步码, a build that ships the company's 话术 (D-066) adds and updates them once on start instead.
   useEffect(() => {
     if (loading) return;
     let running = false;
+    const preset = presetLibraryText();
+    if (preset && !readSharedUrl()) {
+      void applySharedLibraryText(preset).then((summary) => {
+        if (!summary.added && !summary.updated && !summary.keptMine && !summary.retired) return;
+        showToast(`公司话术已装好：${describeSync(summary)}`, { ms: 3600 });
+      }).catch(() => undefined);
+    }
     const syncNow = () => {
       const source = readSharedUrl();
       if (!source || running) return;

@@ -1,4 +1,6 @@
-export const STANDARD_SNIPPET_FOLDERS = [
+import { PRESET_LIBRARY } from "./preset-library.ts";
+
+export const DEFAULT_SNIPPET_FOLDERS = [
   "询盘接待",
   "产品样品",
   "报价成交",
@@ -8,7 +10,10 @@ export const STANDARD_SNIPPET_FOLDERS = [
   "售后争议",
 ] as const;
 
-export type StandardSnippetFolder = typeof STANDARD_SNIPPET_FOLDERS[number];
+// A build that ships the company's own 话术 uses that library's folders as its standard folders (D-066).
+export const STANDARD_SNIPPET_FOLDERS: readonly string[] = PRESET_LIBRARY.folders.length ? PRESET_LIBRARY.folders : DEFAULT_SNIPPET_FOLDERS;
+
+export type StandardSnippetFolder = string;
 
 const STANDARD_FOLDER_SET = new Set<string>(STANDARD_SNIPPET_FOLDERS);
 
@@ -43,7 +48,8 @@ export function requireStandardSnippetFolder(value: string): StandardSnippetFold
 export function normalizeImportedSnippetFolder(value: string): StandardSnippetFolder | "" {
   const folder = value.trim();
   if (isStandardSnippetFolder(folder)) return folder;
-  return LEGACY_SNIPPET_FOLDERS[folder] || "";
+  const legacy = LEGACY_SNIPPET_FOLDERS[folder];
+  return legacy && isStandardSnippetFolder(legacy) ? legacy : "";
 }
 
 export function orderStandardSnippetFolders(values: Iterable<string>) {
