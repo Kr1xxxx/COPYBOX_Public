@@ -11,65 +11,14 @@
 // [名字], $[金额] and other [ ] parts become fill-in blocks in the app, as in every 话术.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseSnippetDocument } from "../app/snippet-doc.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const TARGET = `${root}app/preset-library.ts`;
 
+// The document is read by the app's own parser, so the tool and 导入话术 (D-067) understand the same template.
 export function parsePresetLibrary(markdown) {
-  const folders = [];
-  const items = [];
-  let folder = null;
-  let folderNote = [];
-  let folderNumber = "";
-  let section = null;
-  let entry = null;
-  const finishEntry = () => {
-    if (entry && entry.lines.length) {
-      section.count += 1;
-      const label = [section.title, entry.title].filter(Boolean).join("｜");
-      items.push({
-        id: `STD-${section.number}-${String(section.count).padStart(2, "0")}`,
-        folder,
-        label,
-        secret: entry.lines.join("\n"),
-        scene: section.title || entry.title,
-        action: entry.title || "",
-        usageNote: folderNote.join("\n"),
-      });
-    }
-    entry = null;
-  };
-  for (const raw of markdown.split(/\r?\n/)) {
-    const line = raw.trim();
-    const chapter = line.match(/^##\s+(?:(\d+)\s+)?(.+)$/);
-    if (chapter && !line.startsWith("###")) {
-      finishEntry();
-      folder = chapter[2].trim();
-      folderNumber = chapter[1] ? String(Number(chapter[1])) : "";
-      if (!folders.includes(folder)) folders.push(folder);
-      folderNote = [];
-      section = null;
-      continue;
-    }
-    const heading = line.match(/^###\s+(\d+(?:\.\d+)*)?\s*(.+)$/);
-    if (heading && folder) {
-      finishEntry();
-      section = { number: heading[1] || `${folderNumber || folders.length}.${items.length + 1}`, title: heading[2].trim(), count: 0 };
-      continue;
-    }
-    if (line.startsWith("#") || line === "---") { finishEntry(); continue; }
-    if (line.startsWith(">")) { if (folder && !section) folderNote.push(line.replace(/^>\s*/, "")); continue; }
-    const title = line.match(/^\*\*(.+)\*\*$/);
-    // A folder with entries but no ### sections (such as 通用短句): the entries are numbered under the folder itself.
-    if (folder && !section && (title || line)) section = { number: folderNumber || String(folders.length), title: "", count: 0 };
-    if (!folder || !section) continue;
-    if (title) { finishEntry(); entry = { title: title[1].trim(), lines: [] }; continue; }
-    if (!line) { if (entry?.lines.length && !entry.title) finishEntry(); continue; }
-    if (!entry) entry = { title: "", lines: [] };
-    entry.lines.push(line);
-  }
-  finishEntry();
-  return { folders, items };
+  return parseSnippetDocument(markdown);
 }
 
 export function sharedLibraryJson(library, now = Date.now()) {

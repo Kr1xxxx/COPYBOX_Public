@@ -42,3 +42,25 @@ test("the public build ships no 话术 and keeps the seven standard folders", ()
   assert.equal(presetLibraryText(), "");
   assert.equal(normalizeImportedSnippetFolder("售后"), "售后争议");
 });
+
+test("a 话术 document imports with its chapters as folders, fill-in blocks and no duplicates on a second import", async () => {
+  const { buildSnippetDocImportPreview, SNIPPET_DOC_EMPTY } = await import("../app/snippet-doc.ts");
+  let n = 0;
+  const preview = buildSnippetDocImportPreview(sample, [], () => `id-${++n}`, 5);
+  assert.equal(preview.importableCount, 6);
+  assert.deepEqual(preview.folders, ["开场接待", "群发", "通用短句"]);
+  const first = preview.items[0];
+  assert.equal(first.folder, "开场接待");
+  assert.equal(first.label, "新询盘｜通用开场");
+  assert.deepEqual(first.snippetMeta.placeholders, ["名字", "Company"]);
+  assert.equal(preview.items[3].snippetMeta.usageNote, "群发三行以内.");
+  const again = buildSnippetDocImportPreview(sample, preview.items, () => "x", 6);
+  assert.equal(again.importableCount, 0);
+  assert.equal(again.duplicateCount, 6);
+  assert.throws(() => buildSnippetDocImportPreview("随便写的一段话\n没有目录", [], () => "x", 0), { message: SNIPPET_DOC_EMPTY });
+});
+
+test("Windows line endings and a byte-order mark read the same", async () => {
+  const { parseSnippetDocument } = await import("../app/snippet-doc.ts");
+  assert.deepEqual(parseSnippetDocument(`\uFEFF${sample.replace(/\n/g, "\r\n")}`), parseSnippetDocument(sample));
+});

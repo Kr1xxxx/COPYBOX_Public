@@ -70,7 +70,7 @@ export function SnippetImportDialog({ preview, fileName, secretWord, onClose, on
           <section className="import-section"><h3>将创建或合并的目录</h3><div className="import-folder-list">{preview.folders.map((folder) => <span key={folder}>{folder}</span>)}</div></section>
           <section className="import-section"><h3>内容预览</h3><div className="import-preview-list">{preview.items.slice(0, 5).map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.folder} · {item.summary}</span></div>)}</div></section>
           {preview.errors.length > 0 && <section className="import-errors"><h3>需要跳过的行</h3>{preview.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}{preview.errors.length > 4 && <small>另有 {preview.errors.length - 4} 行</small>}</section>}
-          <p className="import-privacy">表格只在本机解析。导入采用合并方式，不会覆盖{secretWord ? `${secretWord}或` : ""}现有话术。</p>
+          <p className="import-privacy">文件只在本机解析。导入采用合并方式，不会覆盖{secretWord ? `${secretWord}或` : ""}现有话术。</p>
         </div>
         <footer className="snippet-dialog-actions"><button type="button" onClick={onClose} disabled={busy}>取消</button><button type="button" className="primary" onClick={() => void confirm()} disabled={busy || preview.importableCount === 0}>{busy ? "正在加密写入…" : `导入 ${preview.importableCount} 条话术`}</button></footer>
       </section>
