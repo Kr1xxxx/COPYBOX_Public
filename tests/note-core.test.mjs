@@ -109,3 +109,13 @@ test("转为 API stores fields with key/secret mirrors and the note; 还原 brin
   assert.deepEqual(after.map((item) => item.id), ["a1"]);
   assert.deepEqual(revertToNote(after, "a1"), [note]);
 });
+
+test("转为 API keeps at most 10 hidden fields; the rest stays in 备注", () => {
+  const body = Array.from({ length: 12 }, (_, index) => `Token ${index + 1}: value-${index + 1}`).join("\n");
+  const draft = guessApiFields({ name: "多", body });
+  assert.equal(draft.fields.length, 10);
+  assert.match(draft.note, /Token 11: value-11/);
+  const entry = apiFromNote({ id: "n", type: "note", name: "多", body, createdAt: 1, updatedAt: 1 }, draft, apiDraftProblems(draft).fields, "a", 1);
+  assert.equal(entry.fields.length, 10);
+  assert.equal(entry.key, "value-1");
+});

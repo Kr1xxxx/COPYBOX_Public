@@ -1,7 +1,7 @@
 // 笔记 in 账号: free text in Markdown, and 「转为登录」 (a note becomes a login, the note kept inside it so 还原 can bring it
 // back). Pure functions, no storage, no React: the Markdown is parsed into plain data that the page draws itself, so
 // nothing written in a note can ever become HTML or a script.
-import { type ApiField, checkApiFields, storedApiFields } from "./apikey-core.ts";
+import { API_FIELD_LABEL_MAX, API_FIELD_MAX, API_NOTE_MAX, type ApiField, checkApiFields, storedApiFields } from "./apikey-core.ts";
 import type { ApiKeyItem, LoginItem, NoteItem } from "./payment-core.ts";
 import { isPlausibleUrl, normalizeUrl } from "./site-core.ts";
 
@@ -288,7 +288,7 @@ export function guessApiFields(note: Pick<NoteItem, "name" | "body">): ApiDraft 
   const used = new Set<number>();
   const labels = new Set<string>();
   const addField = (label: string, line: NoteLine) => {
-    let name = Array.from(label.trim()).slice(0, 30).join("") || (draft.fields.length === 0 ? "密钥" : "Secret");
+    let name = Array.from(label.trim()).slice(0, API_FIELD_LABEL_MAX).join("") || (draft.fields.length === 0 ? "密钥" : "Secret");
     if (labels.has(name.toLowerCase()) || /^\d+$/.test(name)) name = `${name} ${draft.fields.length + 1}`;
     labels.add(name.toLowerCase());
     draft.fields.push({ id: `f${line.line}`, label: name, value: line.value, from: line.line });
@@ -299,12 +299,12 @@ export function guessApiFields(note: Pick<NoteItem, "name" | "body">): ApiDraft 
     const label = line.label.replace(/\s+/g, " ");
     const rule = API_LABELS.find((entry) => entry.re.test(label));
     if (rule && !draft[rule.field]) { draft[rule.field] = line.value; draft.from[rule.field] = line.line; used.add(line.line); }
-    else if (!rule && SECRET_LABEL.test(label) && draft.fields.length < 10) addField(label, line);
+    else if (!rule && SECRET_LABEL.test(label) && draft.fields.length < API_FIELD_MAX) addField(label, line);
   }
   for (const line of lines) {
     if (used.has(line.line) || line.label) continue;
     if (!draft.endpoint && /^https?:\/\//i.test(line.value) && !/\s/.test(line.value)) { draft.endpoint = line.value; draft.from.endpoint = line.line; used.add(line.line); }
-    else if (TOKEN_LIKE.test(line.value) && draft.fields.length < 10) addField("", line);
+    else if (TOKEN_LIKE.test(line.value) && draft.fields.length < API_FIELD_MAX) addField("", line);
   }
   if (!draft.name) {
     const heading = /^\s{0,3}#{1,6}\s+(.+)$/m.exec(note.body);
@@ -331,7 +331,7 @@ export function apiFromNote(note: NoteItem, draft: ApiDraft, fields: ApiField[],
   const clean = fields.map(({ id: fieldId, label, value }) => ({ id: fieldId, label, value }));
   return {
     id, type: "apikey", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, NOTE_NAME_MAX).join(""),
-    service: draft.service.trim(), ...storedApiFields(clean), note: draft.note.trim().slice(0, 2000),
+    service: draft.service.trim(), ...storedApiFields(clean), note: draft.note.trim().slice(0, API_NOTE_MAX),
     endpoint: draft.endpoint.trim() ? normalizeUrl(draft.endpoint) : "", expires: "", fromNote: note, createdAt: now, updatedAt: now,
   };
 }
