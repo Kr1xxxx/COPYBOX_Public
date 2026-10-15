@@ -32,6 +32,7 @@ Source files in this folder:
 | `icons/`, `images/` | Committed icons and screenshots, made by hand when the icon or the UI changes |
 | `build.mjs`, `deploy.mjs`, `worker.mjs`, `wrangler.jsonc` | Build, upload, the Worker and its config |
 | `api.mjs`, `schema.sql` | The account and sync API under `/api/` and its D1 tables (see 账号与同步接口 below; wrangler bundles `api.mjs` into the Worker) |
+| `admin.mjs` | The owner's read-only user list at `/admin/` (see 后台 below, D-065) |
 
 The repo is private, so the public cannot download from GitHub; that is why the site hosts the installer.
 
@@ -154,3 +155,22 @@ npm run website:deploy                                     # node tools/website/
   npx --yes wrangler@4.150.0 kv bulk put dist-website/kv-bulk.json --binding FILES --local --config tools/website/wrangler.jsonc
   CLOUDFLARE_API_TOKEN=placeholder npx --yes wrangler@4.150.0 dev --config tools/website/wrangler.jsonc --port 8787 --local
   ```
+
+## 后台 (owner page, D-065)
+
+`/admin/` lists who registered, when they last signed in and synced, which computers are signed in and how big their
+cloud copy is (`admin.mjs`, routed after `/api/`). Read-only: it never decrypts a vault and has no buttons that change
+user data. "Last sign-in" is the newest app session's expiry minus 90 days (sessions keep no start time). People who
+only asked for a code show 「还没登录过」.
+
+- Sign-in: a 6-digit code mailed through Resend, only to addresses in the Worker secret `ADMIN_EMAILS`
+  (comma-separated; set it in the dashboard or with the secrets API, never in the repo). Other addresses get the same
+  "sent" answer and no mail. Admin codes live in `login_codes` under `admin:<email>`, so an app code never opens the
+  page and an admin code never creates an app user.
+- Session: cookie `__Host-cbx_admin` (HttpOnly, Secure, SameSite=Strict, 12 hours); its SHA-256 in D1 `admin_sessions`.
+  Removing an address from `ADMIN_EMAILS` ends its sessions at the next request.
+- Page: no inline script, CSP `default-src 'none'` with `'self'` scripts and styles, `X-Frame-Options: DENY`, noindex.
+  POSTs must be JSON and from the same origin.
+- Without `DB`, `RESEND_API_KEY` or `ADMIN_EMAILS`, `/admin/api/*` answers 503.
+- First deploy: create the table (`CREATE TABLE IF NOT EXISTS admin_sessions …` from `schema.sql`, D1 query API or
+  `wrangler d1 execute`), set `ADMIN_EMAILS`, then `npm run website:deploy`.

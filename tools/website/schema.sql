@@ -46,3 +46,10 @@ CREATE TABLE IF NOT EXISTS vault_blobs (
   key TEXT PRIMARY KEY,
   data BLOB NOT NULL
 );
+
+-- Owner page /admin (admin.mjs, D-065): SHA-256 of the admin cookie token, which ADMIN_EMAILS address, 12 hours.
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
