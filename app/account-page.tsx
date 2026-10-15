@@ -6,6 +6,7 @@ import type { AccountEntry, EntryKind } from "./account-view";
 import { ApiKeyPanel } from "./apikey-panel";
 import { ListScrollFrame } from "./list-scroll-rail";
 import { LoginPanel } from "./login-panel";
+import { NotePanel } from "./note-panel";
 import type { MarkItem } from "./payment-core";
 import { PaymentPanel } from "./payment-panel";
 import { RecoveryPanel } from "./recovery-panel";
@@ -33,6 +34,8 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
   }
 
   const back = () => setPanel(null);
+  // 「转为登录」 and 「还原为笔记」 move the entry to another type: show it there.
+  const showEntry = (tab: EntryKind, id: string) => setPanel({ tab, focusId: id, adding: false, n: Date.now() });
   function open(entry: AccountEntry) {
     if (entry.legacy) onOpenLegacy(entry.id);
     else setPanel({ tab: entry.tab, focusId: entry.id, adding: false, n: Date.now() });
@@ -45,10 +48,11 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
     body = (
       <div key={`${panel.tab}:${panel.n}`} className="vault-panel">
         <div><button type="button" className="secondary-button" onClick={back}>‹ 返回列表</button></div>
-        {panel.tab === "login" && <LoginPanel {...common} />}
+        {panel.tab === "login" && <LoginPanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "payment" && <PaymentPanel {...common} />}
         {panel.tab === "apikey" && <ApiKeyPanel {...common} />}
         {panel.tab === "recovery" && <RecoveryPanel {...common} />}
+        {panel.tab === "note" && <NotePanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "totp" && <TotpPanel deviceKey={deviceKey} onToast={onToast} startAdding={panel.adding} />}
       </div>
     );

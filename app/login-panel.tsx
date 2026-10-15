@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { copyTextWithExpiry } from "./clipboard";
+import type { EntryKind } from "./account-view";
+import { revertLogin } from "./note-core";
+import { NoteMarkdown } from "./note-markdown";
 import type { LoginItem } from "./payment-core";
 import { generatePassword, hasEdgeSpace } from "./password-core";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
@@ -41,7 +44,7 @@ function LinkedCode({ account, onCopy }: { account: TotpAccount; onCopy: (code: 
 }
 
 // 账号密码 in the hidden 保险箱. The password is hidden until the eye button is held; each field copies on its own.
-export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean }) {
+export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEntry }: { deviceKey: string; onToast: (message: string) => void; focusId?: string; startAdding?: boolean; onShowEntry?: (tab: EntryKind, id: string) => void }) {
   const storeRef = useRef<SecretItemsStore | null>(null);
   const scanSiteIcons = useSiteIconScan();
   const [items, setItems] = useState<LoginItem[] | null>(null);
@@ -52,6 +55,8 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmSave, setConfirmSave] = useState(false);
   const [deleteId, setDeleteId] = useState("");
+  const [revertId, setRevertId] = useState("");
+  const [sourceId, setSourceId] = useState("");
   const reveal = useReveal();
   const [copiedKey, setCopiedKey] = useState("");
   const timers = useRef<{ copied?: ReturnType<typeof setTimeout> }>({});
@@ -131,6 +136,21 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
     }
   }
 
+  // 还原为笔记: the login made by 「转为登录」 goes away and the note comes back exactly as it was.
+  async function revert(item: LoginItem) {
+    if (!item.fromNote) return;
+    const noteId = item.fromNote.id;
+    try {
+      const list = await storeRef.current!.update((current) => revertLogin(current, item.id));
+      setItems(list.filter((entry): entry is LoginItem => entry.type === "login" && !entry.trashedAt));
+      setRevertId("");
+      onToast("已还原为笔记");
+      onShowEntry?.("note", noteId);
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "还原失败，请重试");
+    }
+  }
+
   if (loadError) return <p className="settings-note" role="alert">{loadError}</p>;
   if (items === null) return <p className="settings-note">正在读取…</p>;
 
@@ -180,7 +200,7 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
             const shown = reveal.isShown(item.id);
             return (
               <li key={item.id} className={`pay-item${open ? " open" : ""}`}>
-                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); reveal.hide(); }}>
+                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); setRevertId(""); reveal.hide(); }}>
                   <SiteBadge site={site} />
                   <span className="totp-who"><strong>{item.name}</strong><small>{item.username}</small></span>
                   <Icon name="chevron" className="pay-chevron" />
@@ -199,9 +219,15 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
                       {linked && <LinkedCode account={linked} onCopy={(code) => void copy(`${item.id}:t`, code)} />}
                       {item.note && <div className="pay-field"><dt>备注</dt><dd>{item.note}</dd><span /></div>}
                     </dl>
-                    <p className="pay-meta">上次修改 {whenText(item.updatedAt)}</p>
+                    <p className="pay-meta">上次修改 {whenText(item.updatedAt)}{item.fromNote && <> · 由笔记「{item.fromNote.name}」转来</>}</p>
+                    {item.fromNote && sourceId === item.id && <div className="note-source" aria-label="笔记原文"><NoteMarkdown source={item.fromNote.body} /></div>}
+                    {revertId === item.id && <p className="pay-confirm" role="alert">还原后这条登录会删除，笔记「{item.fromNote?.name}」按原样回来。登录里后来改过的内容不会保留。</p>}
                     <div className="pay-actions">
                       <button type="button" className="secondary-button" onClick={() => { setDraft({ id: item.id, name: item.name, url: item.url, username: item.username, password: item.password, totpId: item.totpId ?? "", note: item.note }); setErrors({}); setConfirmSave(false); }}>修改</button>
+                      {item.fromNote && <button type="button" className="secondary-button" aria-pressed={sourceId === item.id} onClick={() => setSourceId(sourceId === item.id ? "" : item.id)}>{sourceId === item.id ? "收起原文" : "看原文"}</button>}
+                      {item.fromNote && (revertId === item.id
+                        ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setRevertId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => void revert(item)}>确认还原</button></span>
+                        : <button type="button" className="secondary-button" onClick={() => setRevertId(item.id)}>还原为笔记</button>)}
                       {deleteId === item.id
                         ? <span className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setDeleteId("")}>取消</button><button type="button" className="secondary-button danger-text" onClick={() => void remove(item.id)}>确认删除</button></span>
                         : <button type="button" className="secondary-button" onClick={() => setDeleteId(item.id)}>删除</button>}
