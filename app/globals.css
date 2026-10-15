@@ -187,15 +187,23 @@ button { -webkit-tap-highlight-color: transparent; }
 .directory-row.dragging { z-index: 5; opacity: .8; background: var(--card); box-shadow: 0 10px 25px rgba(31,30,28,.16); }
 .directory-row.drag-over::after { content: ""; position: absolute; left: 5px; right: 5px; top: -2px; height: 2px; border-radius: 2px; background: var(--accent); }
 .nav-footer { flex: 0 0 auto; margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--line); }
-/* 每日小贴士: a small card pinned above 回收站 (app/daily-tips-card.tsx); the dialog reuses .backup-dialog. */
+/* Tips (每日小贴士): a small card pinned above 回收站 (app/daily-tips-card.tsx); the dialog reuses .backup-dialog. */
 .daily-tips-slot { flex: 0 0 auto; margin-top: auto; padding: 8px 0 6px; }
-.daily-tips { width: 100%; margin: 0; padding: 7px 8px 8px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink-2); font: inherit; text-align: left; cursor: pointer; transition: background .14s, border-color .14s; }
+.daily-tips { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; background: var(--card); overflow: hidden; }
 .daily-tips-slot + .nav-footer { margin-top: 0; }
-.daily-tips:hover { background: var(--hover); }
-.daily-tips:active { background: var(--fill); }
-.daily-tips:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.daily-tips-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 4px 0 8px; }
 .daily-tips-label { color: var(--muted); font-size: 11px; font-weight: 650; line-height: 1.2; letter-spacing: .02em; }
+.daily-tips-nav { display: flex; gap: 1px; }
+.daily-tips-nav button { width: 20px; height: 20px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--ink-3); cursor: pointer; transition: background .14s, color .14s, transform .1s; }
+.daily-tips-nav button:hover { background: var(--hover); color: var(--ink); }
+.daily-tips-nav button:active { background: var(--fill); transform: scale(.94); }
+.daily-tips-nav .icon { width: 13px; height: 13px; }
+.daily-tips-open { width: 100%; margin: 0; padding: 2px 8px 7px; display: flex; flex-direction: column; align-items: stretch; gap: 2px; border: 0; background: transparent; color: var(--ink-2); font: inherit; text-align: left; cursor: pointer; transition: background .14s; }
+.daily-tips-open:hover { background: var(--hover); }
+.daily-tips-open:active { background: var(--fill); }
+.daily-tips-nav button:focus-visible, .daily-tips-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .daily-tips-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.daily-tips-preview { overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
 .tips-dialog { width: min(420px, 100%); }
 .tips-dialog:focus { outline: 0; }
 .tips-dialog .tips-text { max-width: 360px; margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
