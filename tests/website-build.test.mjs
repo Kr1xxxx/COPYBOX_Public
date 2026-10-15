@@ -384,7 +384,7 @@ test("website deploy: keys no longer in the build are removed, the key list is r
   assert.deepEqual(staleKeys(["index.html"], ["index.html"]), []);
   assert.deepEqual(staleKeys(["index.html", "sync/XS-AAAA0000/snippets.json", "sync/XS-AAAA0000/history/snippets-1.json"], ["index.html"]), []);
   assert.deepEqual(staleKeys(["index.html", "domains/company.com", "domains/shop.example.cn"], ["index.html"]), []);
-  assert.deepEqual(staleKeys(["index.html", "download/private-abc123/latest.json","download/private-abc123/Copyboxx-Setup.exe"], ["index.html"]), []);
+  assert.deepEqual(staleKeys(["index.html", "download/private-abc123/latest.json", "download/private-abc123/Copyboxx-Setup.exe"], ["index.html"]), []);
   assert.deepEqual(staleKeys(["download/old.exe", "download/privatex.json"], ["index.html"]), ["download/old.exe", "download/privatex.json"]);
   assert.deepEqual(parseKeyList('▲ [WARNING] Proxy environment variables detected.\nResource location: remote\n[{"name":"index.html"},{"name":"404.html","metadata":{}}]\n'), ["index.html", "404.html"]);
   assert.throws(() => parseKeyList("nothing"), /key list/);
