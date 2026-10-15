@@ -14,6 +14,11 @@ export function relativizeAssets(text) {
   return text.replace(/(?:\\?\/)?_next(\\?\/)static/g, "assets$1static");
 }
 
+// A stylesheet lives in assets/static/css/, so the files it points at (fonts in static/media/) are one folder up from it.
+export function relativizeCssUrls(css) {
+  return css.replace(/url\((["']?)\/_next\/static\//g, "url($1../");
+}
+
 const preloadHelperPattern = /=function\(e\)\{return`\/`\+e\}/g;
 
 export function hasPreloadHelper(js) {
@@ -177,7 +182,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (/\/_(build|ssg)Manifest\.js$/.test(file.replaceAll("\\", "/"))) { rmSync(file); continue; }
     if (!/\.(js|css)$/.test(file)) continue;
     const text = readFileSync(file, "utf8");
-    let next = relativizeAssets(text);
+    let next = relativizeAssets(file.endsWith(".css") ? relativizeCssUrls(text) : text);
     // The helper sits in the index chunk up to vinext 1.0 and in the vinext chunk from 1.2; find it by content.
     if (/\/static\/chunks\/[^/]*\.js$/.test(file.replaceAll("\\", "/")) && hasPreloadHelper(next)) {
       next = patchPreloadHelper(next);

@@ -1548,16 +1548,30 @@ button { -webkit-tap-highlight-color: transparent; }
 .note-api-fields>.secondary-button{justify-self:start}
 @media (max-width:520px){.note-api-field{grid-template-columns:1fr 1fr}}
 
+/* The brand fonts ship with the app (owner 2026-10-15 picked 装品牌字体): Latin letters only, so Chinese still uses the
+   system font. Files from Fontsource, SIL Open Font License (app/fonts/OFL-*.txt). */
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/poppins-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 500; font-display: swap; src: url("./fonts/poppins-latin-500.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Poppins"; font-style: normal; font-weight: 600; font-display: swap; src: url("./fonts/poppins-latin-600.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Lora"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/lora-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Lora"; font-style: normal; font-weight: 600; font-display: swap; src: url("./fonts/lora-latin-600.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* Chinese in Settings and the popups: MiSans (Xiaomi), owner's pick 2026-10-15, Windows and the browser; the Mac keeps
+   PingFang. Xiaomi's licence (app/fonts/MiSans-License.pdf) allows shipping it inside an app if the files stay unchanged
+   (no subsetting) and the app says it uses MiSans (设置 → 关于). Two weights only, to keep the installer small. */
+@font-face { font-family: "MiSans"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/MiSans-Regular.woff2") format("woff2"); }
+@font-face { font-family: "MiSans"; font-style: normal; font-weight: 600; font-display: swap; src: url("./fonts/MiSans-Semibold.woff2") format("woff2"); }
+:root { --brand-cjk: "MiSans"; }
+:root.platform-darwin { --brand-cjk: "PingFang SC"; }
 /* Brand dialogs (D-071; owner 2026-10-15: every popup follows the brand-guidelines skill). Palette: dark #141413,
    light #faf9f5, mid gray #b0aea5, light gray #e8e6dc; accents orange #d97757, blue #6a9bcc, green #788c5d. Titles in
-   Poppins, text in Lora, each falling back to the system Chinese font. Only colour and type change, never the layout.
+   Poppins, text in Lora (both bundled, Latin only), each with the system Chinese font behind it. Only colour and type change, never the layout.
    Dark theme swaps surface and ink. `:root:not(.brand-off)` only lifts these rules over the older dark-theme dialog
    rules above (same specificity, later in the file); nothing sets .brand-off. */
 :root {
   --brand-dark: #141413; --brand-light: #faf9f5; --brand-mid: #b0aea5; --brand-subtle: #e8e6dc;
   --brand-orange: #d97757; --brand-blue: #6a9bcc; --brand-green: #788c5d;
-  --brand-font-heading: "Poppins", Arial, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --brand-font-body: "Lora", var(--font-sans);
+  --brand-font-heading: "Poppins", var(--brand-cjk), Arial, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --brand-font-body: "Lora", var(--brand-cjk), var(--font-sans);
   --dlg-surface: var(--brand-light); --dlg-well: #f1efe8; --dlg-line: var(--brand-subtle); --dlg-ink: var(--brand-dark);
   --dlg-soft: #5e5d59; --dlg-edge: var(--brand-mid); --dlg-primary: var(--brand-dark); --dlg-primary-hover: #3d3d3a; --dlg-on-primary: var(--brand-light);
   --dlg-backdrop: rgba(20, 20, 19, .5);
@@ -1606,3 +1620,95 @@ button { -webkit-tap-highlight-color: transparent; }
 .whats-new-actions button:hover { background: var(--dlg-primary-hover); border-color: var(--dlg-primary-hover); }
 .whats-new-actions button:active { transform: scale(.97); }
 .whats-new-actions button:focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
+
+/* 设置 in the brand look (owner 2026-10-15: redesign the Settings window with the brand-guidelines skill, like the
+   D-071 popups). Visual only: every setting keeps its tab, place and behaviour. The app's colour tokens are redefined
+   inside the window, so every part in it (folders, AI, sync, backups) takes the brand palette without its own rule.
+   Headings and controls in Poppins, text in Lora (both bundled above; Chinese in the system font). Accent
+   colour only marks state: the selected tab, focus, links. Dark theme swaps surface and ink. */
+.settings-dialog {
+  --bg: var(--brand-light); --card: #ffffff; --content: #ffffff; --fill: var(--brand-subtle); --hover: #f0eee6;
+  --line: var(--brand-subtle); --line-soft: #ebe9e1; --border: #dedbd0;
+  --ink: var(--brand-dark); --ink-2: #3d3d3a; --ink-3: #5e5d59; --muted: #6b6a64;
+  --accent: var(--brand-orange); --accent-hover: #c6613f; --accent-soft: #f5e1d8; --accent-tint: #f8ebe4; --accent-ink: #a6492b;
+  --ring: rgba(217, 119, 87, .2); --set-card: #ffffff; --set-edge: rgba(20, 20, 19, .08);
+  --set-track: #f0eee6; --set-pill: #ffffff; --set-pill-edge: #dedbd0; --set-nav-on: var(--brand-subtle);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .settings-dialog {
+    --bg: var(--brand-dark); --card: #1f1e1c; --content: #1b1a18; --fill: #2f2e2b; --hover: #22211f;
+    --line: #2f2e2b; --line-soft: #292826; --border: #3d3c38;
+    --ink: var(--brand-light); --ink-2: var(--brand-subtle); --ink-3: #c2c0b6; --muted: #a3a198;
+    --accent: var(--brand-orange); --accent-hover: #e08a6c; --accent-soft: #4a2c20; --accent-tint: #33231c; --accent-ink: #e8a084;
+    --ring: rgba(217, 119, 87, .3); --set-card: #1f1e1c; --set-edge: rgba(250, 249, 245, .08);
+    --set-track: #1b1a18; --set-pill: #2f2e2b; --set-pill-edge: #3d3c38; --set-nav-on: #262523;
+  }
+}
+:root[data-theme="dark"] .settings-dialog {
+  --bg: var(--brand-dark); --card: #1f1e1c; --content: #1b1a18; --fill: #2f2e2b; --hover: #22211f;
+  --line: #2f2e2b; --line-soft: #292826; --border: #3d3c38;
+  --ink: var(--brand-light); --ink-2: var(--brand-subtle); --ink-3: #c2c0b6; --muted: #a3a198;
+  --accent: var(--brand-orange); --accent-hover: #e08a6c; --accent-soft: #4a2c20; --accent-tint: #33231c; --accent-ink: #e8a084;
+  --ring: rgba(217, 119, 87, .3); --set-card: #1f1e1c; --set-edge: rgba(250, 249, 245, .08);
+  --set-track: #1b1a18; --set-pill: #2f2e2b; --set-pill-edge: #3d3c38; --set-nav-on: #262523;
+}
+:root:not(.brand-off) .settings-backdrop { background: var(--dlg-backdrop); }
+:root:not(.brand-off) .settings-dialog { border-color: var(--line); background: var(--bg); color: var(--ink); font-family: var(--brand-font-body); font-variant-numeric: lining-nums; box-shadow: 0 30px 80px rgba(20, 20, 19, .28); }
+.settings-dialog :is(button, input, select, textarea, .settings-brand-version, .settings-build-time, .usage-note, .usage-count, .settings-folder-count) { font-family: var(--brand-font-heading); }
+.settings-dialog code, .settings-dialog .mcp-connect-code { font-family: var(--font-geist-mono), ui-monospace, monospace; }
+
+/* Header and page titles */
+.settings-dialog > header { padding: 16px 20px 12px; }
+:root:not(.brand-off) .settings-dialog #settings-title { font-size: 17px; }
+.settings-dialog > header .icon-button { border-radius: 8px; color: var(--muted); }
+.settings-dialog > header .icon-button:hover { background: var(--hover); color: var(--ink); }
+.settings-dialog .settings-page-title { padding-top: 6px; font-family: var(--brand-font-heading); font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
+.settings-body > .settings-card > h3, .settings-body[data-searching] > .settings-card[data-solo] > h3 { padding: 20px 0 6px; font-family: var(--brand-font-heading); font-size: 15px; font-weight: 600; letter-spacing: -.005em; }
+
+/* Left column: search and tabs. The selected tab sits on a light gray pill with a short orange bar. */
+.settings-dialog .settings-search input { height: 34px; border-color: var(--border); border-radius: 9px; background: var(--content); }
+.settings-dialog .settings-search input:focus { border-color: var(--accent); background: var(--content); box-shadow: 0 0 0 3px var(--ring); }
+.settings-dialog .settings-tabs { gap: 3px; }
+.settings-dialog .settings-tabs button { min-height: 38px; padding: 0 12px 0 16px; border-radius: 9px; color: var(--ink-3); font-family: var(--brand-font-heading); font-size: 13.5px; font-weight: 500; transition-property: color, background-color; }
+.settings-dialog .settings-tabs button:hover:not(.active) { background: var(--hover); color: var(--ink); }
+.settings-dialog .settings-tabs button.active { color: var(--ink); font-weight: 600; }
+.settings-dialog .settings-tabs button:focus-visible { outline-color: var(--accent); }
+.settings-dialog .settings-tab-pill { border-radius: 9px; background: var(--set-nav-on); }
+.settings-dialog .settings-tab-pill::before { content: ""; position: absolute; left: 6px; top: 50%; width: 3px; height: 16px; margin-top: -8px; border-radius: 2px; background: var(--brand-orange); }
+
+/* Rows */
+.settings-body > .settings-card > .settings-row { min-height: 60px; padding-block: 13px; border-top-color: var(--line-soft); }
+.settings-dialog .settings-row strong { color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.settings-dialog .settings-row small { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.settings-dialog .settings-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.settings-body > .settings-card > .settings-note { border-top-color: var(--line-soft); }
+.settings-dialog .settings-brand { border-bottom-color: var(--line); }
+.settings-dialog .settings-brand-version { color: var(--muted); }
+
+/* Buttons: outlined like the popups; the main action is filled with ink. */
+.settings-dialog .secondary-button { height: 32px; padding: 0 13px; border-color: var(--dlg-edge); border-radius: 8px; background: transparent; color: var(--ink); font-weight: 500; }
+.settings-dialog .secondary-button:hover:not(:disabled) { background: var(--hover); }
+.settings-dialog .secondary-button.danger-text { color: var(--danger); }
+.settings-dialog .primary-button { height: 32px; padding: 0 13px; border-radius: 8px; background: var(--dlg-primary); color: var(--dlg-on-primary); box-shadow: none; }
+.settings-dialog .primary-button:hover:not(:disabled) { background: var(--dlg-primary-hover); }
+.settings-dialog .settings-ai-actions :is(.primary-button, .secondary-button) { height: 32px; }
+.settings-dialog .settings-mini-button { border-color: var(--border); border-radius: 7px; background: transparent; }
+.settings-dialog :is(.settings-link-button, .cloud-resend) { color: var(--accent-ink); }
+.settings-dialog .settings-ok { color: var(--brand-green); }
+.settings-dialog :is(button, input, select, textarea, [role=tab]):focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
+
+/* Choice switches (主题, 开/关, 秒数, 天数): a light track with a raised white pill. */
+.settings-dialog .settings-segment { padding: 3px; border-radius: 10px; background: var(--set-track); box-shadow: inset 0 0 0 1px var(--line); }
+.settings-dialog .settings-segment button { height: 28px; padding: 0 12px; border-radius: 7px; color: var(--ink-3); font-size: 12.5px; }
+.settings-dialog .settings-segment button:hover:not(.active) { color: var(--ink); }
+.settings-dialog .settings-segment button.active { color: var(--ink); font-weight: 600; }
+.settings-dialog .settings-segment .arc-seg-pill { border-radius: 7px; background: var(--set-pill); box-shadow: 0 0 0 1px var(--set-pill-edge), 0 1px 2px rgba(20, 20, 19, .08); }
+
+/* Text fields and dropdowns all look the same: white well, light gray edge, orange focus. */
+.settings-dialog :is(.settings-ai-field input, .settings-ai-field textarea, .settings-ai-field select, .settings-folder-form input, .settings-folder-more-field input, .cloud-login input, .account-lock-form input, .settings-body input[type="text"], .settings-body input[type="password"], .settings-body input[type="email"], .settings-body input[type="url"], .settings-body input:not([type])) { border: 1px solid var(--border); border-radius: 8px; background: var(--content); color: var(--ink); }
+.settings-dialog :is(.settings-ai-field input, .settings-ai-field textarea, .settings-ai-field select, .settings-folder-form input, .settings-folder-more-field input, .cloud-login input, .account-lock-form input, .settings-body input[type="text"], .settings-body input[type="password"], .settings-body input[type="email"], .settings-body input[type="url"], .settings-body input:not([type])):focus { outline: 0; border-color: var(--accent); background: var(--content); box-shadow: 0 0 0 3px var(--ring); }
+.settings-dialog :is(input, textarea)::placeholder { color: var(--muted); opacity: .85; }
+.settings-dialog .mcp-connect-code, .settings-body code { background: var(--set-track); }
+/* One hairline between rows: a row's own bottom line and the next row's top line used to stack into a thick one. */
+.settings-body > .settings-card > .settings-row { border-bottom: 0; }
+.settings-body > .settings-card > .settings-row + .settings-note { border-top: 1px solid var(--line-soft); }

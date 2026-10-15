@@ -21,11 +21,12 @@ for (const platform of ["win32", "darwin"]) {
     expect(markBox.width).toBeGreaterThan(markBox.height * 4);
     await expect(brand.locator("strong")).toHaveText("Copyboxx");
     await expect(brand.locator(".settings-brand-text > span")).toHaveText("复制盒");
-    // It is the very first thing on the first page, above the page title and the 外观 rows.
+    // It is the very first thing on the first page, above the 外观 rows; 概览 has no page title under it (owner, 2026-10-15).
     await expect(body.locator(":scope > *").first()).toHaveClass(/settings-brand/);
+    await expect(body.locator(".settings-page-title")).toHaveCount(0);
     const brandBox = await brand.boundingBox();
-    const titleBox = await body.locator(".settings-page-title").boundingBox();
-    expect(brandBox.y + brandBox.height).toBeLessThanOrEqual(titleBox.y);
+    const lookBox = await body.locator("#set-look").boundingBox();
+    expect(brandBox.y + brandBox.height).toBeLessThanOrEqual(lookBox.y);
     // Only the first page carries it, and searching hides it.
     await settings.getByRole("tab", { name: "关于" }).click();
     await expect(brand).toHaveCount(0);
