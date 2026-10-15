@@ -12,7 +12,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { previewBuildInfo } from "../preview/build.mjs";
-import { appVersionFrom } from "../../scripts/sync-version.mjs";
+import { appVersionFrom, previewFromApp } from "../../scripts/sync-version.mjs";
 import { contentTypeFor } from "./worker.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -173,7 +173,7 @@ export function releaseVersionInfo(json, tag = "the release") {
   if (!APP_VERSION.test(version)) throw new Error(`${tag}: ${versionAssetName} has no app version like 1.67.0 (got "${version}").`);
   const ref = String(data.ref ?? "").trim();
   if (ref !== "main") throw new Error(`${tag} was built from "${ref || "?"}", not from main; the website only publishes builds of main (D-048).`);
-  const preview = String(data.preview ?? "").trim() || version.replace(/\.\d+$/, "");
+  const preview = String(data.preview ?? "").trim() || previewFromApp(version);
   if (!/^\d+\.\d+$/.test(preview) || appVersionFrom(preview) !== version) throw new Error(`${tag}: preview ${preview} and app version ${version} do not match.`);
   return { version, preview, ref, commit: String(data.commit ?? "").trim() };
 }
@@ -266,7 +266,7 @@ export async function main(argv = process.argv.slice(2)) {
     installer = readFileSync(resolve(repo, installerArg));
     if (installerVersionArg) {
       if (!APP_VERSION.test(installerVersionArg)) throw new Error(`--installer-version needs an app version like 1.67.0, got "${installerVersionArg}".`);
-      installed = { version: installerVersionArg, preview: installerVersionArg.replace(/\.\d+$/, "") };
+      installed = { version: installerVersionArg, preview: previewFromApp(installerVersionArg) };
     } else {
       installed = { version: appVersionFrom(version), preview: version };
       console.warn(`warning: --installer without --installer-version: latest.json will say ${installed.version} (tools/preview/VERSION); make sure that is the version inside ${installerArg}.`);

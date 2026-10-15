@@ -1,4 +1,5 @@
 // The app version follows the trial version: tools/preview/VERSION "1.43" → app "1.43.0" (D-036).
+// From 2.00 on the minor part loses its leading zero ("2.00" → "2.0.0", "2.05" → "2.5.0"): an app version may not have one.
 // Only the preview publisher (【話術】) changes VERSION; builds run this so package.json, Cargo.toml and
 // Cargo.lock carry the same number as the installer. Run: node scripts/sync-version.mjs
 import { readFileSync, writeFileSync } from "node:fs";
@@ -7,7 +8,14 @@ import { fileURLToPath } from "node:url";
 export function appVersionFrom(trialVersion) {
   const match = /^(\d+)\.(\d+)$/.exec(String(trialVersion).trim());
   if (!match) throw new Error(`tools/preview/VERSION must look like 1.43, got "${String(trialVersion).trim()}"`);
-  return `${match[1]}.${match[2]}.0`;
+  return `${Number(match[1])}.${Number(match[2])}.0`;
+}
+
+// The other way round, for an installer that only says its app version: "1.67.0" → "1.67", "2.0.0" → "2.00".
+export function previewFromApp(appVersion) {
+  const match = /^(\d+)\.(\d+)\.\d+$/.exec(String(appVersion).trim());
+  if (!match) throw new Error(`an app version looks like 1.67.0, got "${String(appVersion).trim()}"`);
+  return `${match[1]}.${match[2].padStart(2, "0")}`;
 }
 
 // Replaces the first `version = "…"` that follows `anchor` (a pattern for the [package] header or the clipbox entry in Cargo.lock).
