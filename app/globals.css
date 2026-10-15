@@ -81,7 +81,7 @@
   --optical-text-rise: -0.5px;
   --optical-glyph-rise: -1px;
   --font-sans: "SF Pro Text", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --font-serif: "Songti SC", "STSong", "Noto Serif SC", Georgia, serif;
+  --font-serif: "Songti SC", "STSong", "Noto Serif SC", "SimSun", "宋体", Georgia, serif;
   --font-geist-sans: var(--font-sans);
   --font-geist-mono: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
@@ -923,7 +923,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-link-button:disabled { opacity: .5; cursor: default; }
 
 /* Windows / Linux desktop: the system draws the title bar, so no fake traffic lights, no empty band, and no drag regions that would maximise on double-click. */
-.desktop-app:not(.platform-darwin) { --font-serif: var(--font-sans); }
 .desktop-app:not(.platform-darwin) .sidebar-top .traffic-lights { display: none; }
 .desktop-app:not(.platform-darwin) .sidebar-top { height: 14px; }
 .desktop-app:not(.platform-darwin) .mini-top { height: 36px; }
