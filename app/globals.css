@@ -644,6 +644,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .inline-editor .editor-body { padding: 0; overflow: visible; }
 .inline-editor .editor-body > * { opacity: 1; animation: none; }
 .inline-editor .editor-meta-grid { grid-template-columns: minmax(0, 1.5fr) minmax(130px, .9fr); gap: 10px; }
+.inline-editor .editor-meta-grid.single { grid-template-columns: minmax(0, 1fr); }
 .inline-editor .native-field { gap: 5px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
 .inline-editor .native-field > span small, .inline-editor .native-field > label small { color: var(--muted); font-size: 11px; font-weight: 500; }
 .inline-editor .soft-input, .inline-editor .folder-select, .inline-editor .soft-textarea, .inline-editor .summary-control input { border: 1px solid var(--border); border-radius: 8px; background: var(--content); }

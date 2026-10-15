@@ -152,6 +152,7 @@ type SecureBackup =
 type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?: BackupScope; vaultBox?: VaultBoxEnvelope };
 // Windows has no old 秘密 list: one shared empty list, so the 账号 stores are not re-read on every change.
 const NO_LEGACY_SECRETS: LegacySecret[] = [];
+const NO_FOLDERS: string[] = [];
 const DETAIL_CLOSE_MS = 220;
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
@@ -437,7 +438,8 @@ export default function Home() {
     setWindowMode(mode === "mini" ? "mini" : "full");
   }), []);
 
-  const activeFolders = useMemo(() => folders[activeKind], [activeKind, folders]);
+  // 账号 has no 目录 (owner, 2026-10-15): it is sorted by 分类 only. Old entries keep their stored folder, it is just not shown.
+  const activeFolders = useMemo(() => (activeKind === "secret" ? NO_FOLDERS : folders[activeKind]), [activeKind, folders]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
   const legacySecrets = useMemo(() => (PLAIN_NOTES ? NO_LEGACY_SECRETS : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
@@ -1318,11 +1320,11 @@ export default function Home() {
   }
 
   function buildSettingsFolderGroups(): SettingsFolderGroup[] {
-    const textGroups = (PLAIN_NOTES ? ["snippet"] as const : ["snippet", "secret"] as const).map((kind): SettingsFolderGroup => {
+    const textGroups = (["snippet"] as const).map((kind): SettingsFolderGroup => {
       const colors = { ...buildCategoryColorMap(folders[kind]), ...(folderColors?.[kind] || {}) };
       return {
         kind,
-        title: kind === "snippet" ? "话术目录" : `${SECRET_WORD}目录`,
+        title: "话术目录",
         unit: "条",
         nameMax: 30,
         sortable: true,
@@ -1866,7 +1868,7 @@ export default function Home() {
   };
   const miniFolderTabs: MiniTab[] = imageView
     ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name, folder.shortName)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
-    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder])), ...(activeKind === "secret" ? [{ id: "uncategorized", label: "未分类" }] : [])];
+    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder]))];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   // The 账号 section's content goes inside the veil (it stays mounted, so sliding open shows it at once); other sections are left as they are.
@@ -1952,7 +1954,7 @@ export default function Home() {
                 <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
                   <span className="trash-row-icon" aria-hidden="true"><Icon name="trash" /></span>
                   <div className="row-main trash-row-main">
-                    <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong><small>{item.folder || "未分类"}</small></span>
+                    <span className="row-copy"><strong className={activeKind === "snippet" ? "snippet-label" : undefined}>{activeKind === "snippet" ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>{activeKind === "snippet" && <small>{item.folder || "未分类"}</small>}</span>
                   </div>
                   <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
                   <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
@@ -1966,7 +1968,7 @@ export default function Home() {
                 const checked = bulkIds.includes(item.id);
                 const revealed = secretReveal.isShown(item.id);
                 const closing = !isSelected && !bulkMode && closingIds.includes(item.id);
-                const moveTargets = [...activeFolders, ...(isSnippet ? [] : [""])].filter((folder) => folder !== (item.folder || ""));
+                const moveTargets = activeFolders.filter((folder) => folder !== (item.folder || ""));
                 return (
                   <article key={item.id} data-row-index={index} data-sort-scope="card" data-sort-id={item.id} className={`native-row ${isSnippet ? "snippet-row" : "secret-row"} ${item.pinned ? "pinned" : ""} ${isSelected || closing ? "selected" : ""} ${closing ? "closing-row" : ""} ${checked ? "checked" : ""} ${copiedId === item.id ? "copied" : ""} ${copiedReferenceId === item.id ? "reference-copied" : ""} ${cardReorder.draggingId === item.id ? "dragging" : ""} ${cardReorder.overId === item.id && cardReorder.draggingId !== item.id ? "drag-over" : ""}`}>
                     <div className="row-line">
@@ -1978,7 +1980,7 @@ export default function Home() {
                           <span className="row-title">
                             <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
                             {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{displaySnippetNumber(item.snippetNumber)}</b>}
-                            {showFolderChip && item.folder && <small className="row-folder">{item.folder}</small>}
+                            {showFolderChip && isSnippet && item.folder && <small className="row-folder">{item.folder}</small>}
                             {isSnippet && sharedMark(item) && <small className="row-shared-mark" data-mark={sharedMark(item)}>{sharedMark(item) === "update" ? "公司版有更新" : "公司已停用"}</small>}
                           </span>
                           {!isSelected && isSnippet && <small className="snippet-preview" lang="en"><SnippetContent text={item.secret} query={query} /></small>}
@@ -2131,7 +2133,7 @@ export default function Home() {
                 {categoryList.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
               </nav>
             </>}
-            {!(accountMode && PLAIN_NOTES) && <>
+            {!accountMode && <>
             <div className="nav-heading">
               <span>目录</span>
               <button ref={folderCreateButtonRef} type="button" onClick={startNewFolder} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
@@ -2148,7 +2150,6 @@ export default function Home() {
                   {newFolder.error && <small className="directory-error" role="alert">{newFolder.error}</small>}
                 </form>
               )}
-              {activeKind === "secret" && <div className={`directory-row fixed ${activeFolder === "uncategorized" ? "active" : ""}`}><button type="button" className="nav-item directory-main" onClick={() => selectFolder("uncategorized")}><span className="nav-icon"><i className="directory-color-marker hollow" aria-hidden="true" /></span><span className="nav-label">未分类</span><b>{activeKindItems.filter((item) => !item.folder?.trim()).length}</b></button></div>}
             </div></>}
             </>}
             <DailyTipsCard />
@@ -2248,12 +2249,12 @@ export default function Home() {
               <strong>已选 {bulkCount} 条</strong>
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>
               <span className="spacer" />
-              <div className="menu-wrap">
+              {activeFolders.length > 0 && <div className="menu-wrap">
                 <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => setBulkMoveOpen((value) => !value)}>移动到<Icon name="chevron" /></button>
                 <AnimatePresence>{bulkMoveOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
-                  {[...activeFolders, ...(activeKind === "secret" ? [""] : [])].map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void bulkMoveTo(folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
+                  {activeFolders.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void bulkMoveTo(folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
                 </ArcMenu>}</AnimatePresence>
-              </div>
+              </div>}
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>
               <button type="button" className="primary-button" onClick={exitBulk}>完成</button>
             </div>}
