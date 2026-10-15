@@ -1,22 +1,27 @@
-// The command line door (macOS and Linux): a unix socket that takes one JSON command per connection, passes it to
-// the page and sends the page's answer back. Same protocol as the former Electron shell (automation-server.cjs, automation-bridge.cjs),
-// so the existing `clipbox` command keeps working.
+// The local door for other programs: one JSON command per connection, passed to the page, whose answer goes back.
+// macOS and Linux: a private unix socket (the `clipbox` command line uses it; same protocol as the former Electron
+// shell). Windows: a named pipe for this user only (D-060). Both carry the commands of the MCP server (mcp.rs) that
+// Codex and similar tools start with `Copyboxx --mcp`.
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::future::Future;
+#[cfg(unix)]
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::oneshot;
-#[cfg(unix)]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 #[cfg(unix)]
 use tokio::net::{UnixListener, UnixStream};
 
 const MAX_BYTES: usize = 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(10);
+/// A program that connects but never sends its line is let go after this long.
+const READ_TIMEOUT: Duration = Duration::from_secs(10);
+/// After answering, wait this long for the other side to read the answer and hang up.
+const LINGER: Duration = Duration::from_secs(2);
 /// A command that hands out a 秘密 waits for the person at the app to allow it (the page gives up after 45 s).
 const SECRET_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -54,55 +59,69 @@ pub fn parse_request(source: &str) -> Result<Value, Value> {
     }
 }
 
-/// Who asked, as the page receives it ({ name, id }), or null when it cannot be told (D-059).
-#[cfg(unix)]
-async fn caller_of(stream: &UnixStream) -> Value {
-    let Some(pid) = stream.peer_cred().ok().and_then(|cred| cred.pid()).and_then(|pid| u32::try_from(pid).ok()) else {
-        return Value::Null;
-    };
+/// Who asked, as the page receives it ({ name, id }), or null when it cannot be told (D-059). `peer` is the process
+/// id of whatever connected; through `Copyboxx --mcp` that is Copyboxx itself, which caller.rs looks past.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+async fn caller_of(peer: Option<u32>) -> Value {
+    let Some(pid) = peer else { return Value::Null };
     match tauri::async_runtime::spawn_blocking(move || crate::caller::identify(pid)).await {
         Ok(Some(caller)) => json!({ "name": caller.name, "id": caller.id }),
         _ => Value::Null,
     }
 }
 
-#[cfg(unix)]
-async fn handle<F, Fut>(mut stream: UnixStream, forward: Arc<F>)
+/// Windows cannot tell who asked yet: the question offers only 拒绝 / 允许.
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+async fn caller_of(_peer: Option<u32>) -> Value {
+    Value::Null
+}
+
+/// Reads one command line, has it carried out and writes the answer back, on any kind of connection.
+async fn handle<S, F, Fut>(mut stream: S, peer: Option<u32>, forward: Arc<F>)
 where
+    S: AsyncRead + AsyncWrite + Unpin,
     F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
 {
     let mut source = Vec::new();
     let mut chunk = [0u8; 8192];
-    let reply = loop {
-        match stream.read(&mut chunk).await {
-            Ok(0) => break parse_request(&String::from_utf8_lossy(&source)),
-            Ok(n) => {
-                source.extend_from_slice(&chunk[..n]);
-                if source.len() > MAX_BYTES {
-                    break Err(error_body("REQUEST_TOO_LARGE", "命令内容过大"));
+    let read = tokio::time::timeout(READ_TIMEOUT, async {
+        loop {
+            match stream.read(&mut chunk).await {
+                Ok(0) => return Some(parse_request(&String::from_utf8_lossy(&source))),
+                Ok(n) => {
+                    source.extend_from_slice(&chunk[..n]);
+                    if source.len() > MAX_BYTES {
+                        return Some(Err(error_body("REQUEST_TOO_LARGE", "命令内容过大")));
+                    }
+                    if source.contains(&b'\n') {
+                        return Some(parse_request(&String::from_utf8_lossy(&source)));
+                    }
                 }
-                if source.contains(&b'\n') {
-                    break parse_request(&String::from_utf8_lossy(&source));
-                }
+                Err(_) => return None,
             }
-            Err(_) => return,
         }
-    };
+    })
+    .await;
+    let Ok(Some(reply)) = read else { return };
     let response = match reply {
         Err(body) => body,
         Ok(command) => {
             // Only a 秘密 command needs to know who asked (for 「始终允许」); the others skip the lookup.
-            let caller = if is_secret_command(&command) { caller_of(&stream).await } else { Value::Null };
+            let caller = if is_secret_command(&command) { caller_of(peer).await } else { Value::Null };
             match tokio::time::timeout(timeout_for(&command), forward(command, caller)).await {
-            Err(_) => error_body("RENDERER_TIMEOUT", "Copyboxx 窗口响应超时"),
-            Ok(Err(failure)) => failure_body(&failure),
-            Ok(Ok(value)) => value,
+                Err(_) => error_body("RENDERER_TIMEOUT", "Copyboxx 窗口响应超时"),
+                Ok(Err(failure)) => failure_body(&failure),
+                Ok(Ok(value)) => value,
             }
         }
     };
     let _ = stream.write_all(format!("{response}\n").as_bytes()).await;
+    let _ = stream.flush().await;
     let _ = stream.shutdown().await;
+    // A pipe drops what the other side has not read yet when it closes, so let the other side hang up first.
+    let mut rest = [0u8; 256];
+    let _ = tokio::time::timeout(LINGER, async { while matches!(stream.read(&mut rest).await, Ok(n) if n > 0) {} }).await;
 }
 
 #[cfg(unix)]
@@ -114,7 +133,42 @@ where
     let forward = Arc::new(forward);
     loop {
         let Ok((stream, _)) = listener.accept().await else { continue };
-        tauri::async_runtime::spawn(handle(stream, forward.clone()));
+        let peer = stream.peer_cred().ok().and_then(|cred| cred.pid()).and_then(|pid| u32::try_from(pid).ok());
+        tauri::async_runtime::spawn(handle(stream, peer, forward.clone()));
+    }
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+/// The pipe's name. Pipe names are shared by everyone on the computer, so it carries the user's name.
+pub fn pipe_name(user: &str) -> String {
+    let user: String = user.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
+    format!(r"\\.\pipe\copyboxx-automation-{}", if user.is_empty() { "user" } else { &user })
+}
+
+#[cfg(windows)]
+pub fn default_pipe_name() -> String {
+    pipe_name(&std::env::var("USERNAME").unwrap_or_default())
+}
+
+/// Windows: one pipe instance per waiting connection. The first instance must be ours (no other program may have taken
+/// the name first), and connections from other computers are refused. The default pipe security lets only this user,
+/// administrators and the system write to it, so other users on the computer cannot send commands.
+#[cfg(windows)]
+pub async fn serve_pipe<F, Fut>(name: String, forward: F) -> std::io::Result<()>
+where
+    F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
+{
+    use tokio::net::windows::named_pipe::ServerOptions;
+    let forward = Arc::new(forward);
+    let mut server = ServerOptions::new().first_pipe_instance(true).reject_remote_clients(true).create(&name)?;
+    loop {
+        if server.connect().await.is_err() {
+            server = ServerOptions::new().reject_remote_clients(true).create(&name)?;
+            continue;
+        }
+        let connected = std::mem::replace(&mut server, ServerOptions::new().reject_remote_clients(true).create(&name)?);
+        tauri::async_runtime::spawn(handle(connected, None, forward.clone()));
     }
 }
 
@@ -349,8 +403,25 @@ pub fn cleanup(app: &AppHandle) {
     let _ = std::fs::remove_file(default_socket_path(app));
 }
 
-// Windows has no command line door (the automation server only runs on macOS and Linux).
-#[cfg(not(unix))]
+/// Windows: starts the pipe server (no command line is installed; tools connect through `Copyboxx --mcp`).
+#[cfg(windows)]
+pub fn start(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let bridge = app.state::<Bridge>().inner().clone();
+        let handle = app.clone();
+        let served = serve_pipe(default_pipe_name(), move |command, caller| {
+            let (bridge, handle) = (bridge.clone(), handle.clone());
+            async move { bridge.forward(&handle, command, caller).await }
+        })
+        .await;
+        if let Err(e) = served {
+            eprintln!("clipbox: automation pipe not started: {e}");
+        }
+    });
+}
+
+#[cfg(not(any(unix, windows)))]
 pub fn start(_app: &AppHandle) {}
 
 #[cfg(not(unix))]
@@ -372,6 +443,13 @@ mod tests {
         let mut answer = String::new();
         stream.read_to_string(&mut answer).await.unwrap();
         serde_json::from_str(answer.trim()).unwrap()
+    }
+
+    #[test]
+    fn the_pipe_name_is_per_user_and_safe() {
+        assert_eq!(pipe_name("Krix"), r"\\.\pipe\copyboxx-automation-Krix");
+        assert_eq!(pipe_name("a b\\c"), r"\\.\pipe\copyboxx-automation-a_b_c");
+        assert_eq!(pipe_name(""), r"\\.\pipe\copyboxx-automation-user");
     }
 
     #[test]
@@ -418,6 +496,17 @@ mod tests {
             let secret = ask(&path, "{\"action\":\"secret-get\"}\n").await;
             assert_eq!(secret["ok"], true);
             assert!(secret["caller"].is_null() || secret["caller"]["id"].is_string());
+            // A client that writes its line but keeps its side open is still answered.
+            let mut open = UnixStream::connect(&path).await.unwrap();
+            open.write_all(b"{\"action\":\"status\"}\n").await.unwrap();
+            let mut line = String::new();
+            let mut buf = [0u8; 256];
+            while !line.contains('\n') {
+                let n = open.read(&mut buf).await.unwrap();
+                assert!(n > 0);
+                line.push_str(std::str::from_utf8(&buf[..n]).unwrap());
+            }
+            assert_eq!(serde_json::from_str::<Value>(line.trim()).unwrap()["snippetCount"], 3);
             let junk = ask(&path, "x\n").await;
             assert_eq!(junk["error"]["code"], "INVALID_JSON");
             let _ = std::fs::remove_file(&path);
@@ -568,5 +657,30 @@ mod tests {
             assert_eq!(Bridge::wait_for(entry, rx, TIMEOUT).await.unwrap()["ok"], true);
             assert!(bridge.pending.lock().unwrap().is_empty());
         });
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    #[test]
+    fn the_pipe_carries_a_command_and_its_answer_and_refuses_a_second_server() {
+        let name = format!(r"\\.\pipe\copyboxx-automation-test-{}", std::process::id());
+        let served = name.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = serve_pipe(served, |command: Value, caller: Value| async move { Ok(json!({ "ok": true, "caller": caller, "command": command })) }).await;
+        });
+        std::thread::sleep(Duration::from_millis(200));
+        for round in 0..3 {
+            let answer = crate::mcp::ask_pipe(&name, json!({ "action": "secret-get", "round": round })).unwrap();
+            // Windows cannot tell who asked yet.
+            assert!(answer["caller"].is_null());
+            assert_eq!(answer["command"], json!({ "action": "secret-get", "round": round }));
+        }
+        // The name is taken: a second Copyboxx (or another program) cannot serve it.
+        let second = tauri::async_runtime::block_on(serve_pipe(name.clone(), |_: Value, _: Value| async { Ok(json!({})) }));
+        assert!(second.is_err());
+        assert!(crate::mcp::ask_pipe(r"\\.\pipe\copyboxx-automation-nobody-here", json!({ "action": "status" })).is_err());
     }
 }
