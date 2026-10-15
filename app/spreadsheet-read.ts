@@ -95,7 +95,7 @@ function numberCellDisplays(bytes: Uint8Array): Map<string, Map<string, string>>
 
 export async function readSpreadsheet(buffer: ArrayBuffer, fileName: string): Promise<SheetTable[]> {
   const extension = fileName.toLocaleLowerCase().split(".").pop();
-  if (extension !== "xlsx" && extension !== "csv") throw new Error("仅支持 XLSX 和 CSV 文件");
+  if (extension !== "xlsx" && extension !== "csv") throw new Error("只支持 .md 话术文档和 .xlsx / .csv 表格");
   if (buffer.byteLength > MAX_SPREADSHEET_BYTES) throw new Error("表格文件太大，请拆成几个小文件再导入");
 
   if (extension === "csv") {

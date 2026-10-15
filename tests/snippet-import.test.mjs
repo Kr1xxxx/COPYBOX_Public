@@ -208,7 +208,7 @@ test("rejects workbooks without the required snippet columns", async () => {
 });
 
 test("rejects unsupported extensions, damaged files and oversized files", async () => {
-  await assert.rejects(parseSnippetWorkbook(new ArrayBuffer(0), "话术.json"), /仅支持 XLSX 和 CSV/);
+  await assert.rejects(parseSnippetWorkbook(new ArrayBuffer(0), "话术.json"), /只支持 .md 话术文档和 .xlsx \/ .csv 表格/);
   await assert.rejects(parseSnippetWorkbook(new TextEncoder().encode("not a zip").buffer, "坏.xlsx"), /无法读取这个表格文件/);
   await assert.rejects(parseSnippetWorkbook(new ArrayBuffer(21 * 1024 * 1024), "大.xlsx"), /表格文件太大/);
 });
