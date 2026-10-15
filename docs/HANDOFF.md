@@ -43,6 +43,9 @@ update check and sync download; showcase pictures white + purple with made-up co
 话术 sync endpoint (PR #156): `GET https://copyboxx.com/sync/<code>/snippets.json`; publish with
 `npm run sync:publish` (README 「话术同步」). Real sync codes never go in the repo or on the public site.
 
+Image compression (D-055, 2026-10-15): only keys each person fills in 设置; no built-in key, no website proxy (owner
+dropped the proxy before merge). The owner revoked the old TinyPNG keys.
+
 ## Reviews of 2026-10-14 (outside the repo, in the project's shared files)
 
 - Audit: `audit/2026-10-14-audit.md`. Severe: S1 auto-update trusts copyboxx.com only, installer unsigned (update

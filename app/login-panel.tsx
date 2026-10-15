@@ -193,7 +193,7 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding }: { devic
                 {open && (
                   <div className="pay-body">
                     <dl className="pay-fields">
-                      {item.url && <div className="pay-field"><dt>网址</dt><dd><a href={item.url} target="_blank" rel="noreferrer noopener">{item.url.replace(/^https?:\/\//, "")}</a></dd><span /></div>}
+                      {/^https?:\/\//i.test(item.url) && <div className="pay-field"><dt>网址</dt><dd><a href={item.url} target="_blank" rel="noreferrer noopener">{item.url.replace(/^https?:\/\//, "")}</a></dd><span /></div>}
                       <div className="pay-field"><dt>用户名</dt><dd>{item.username}</dd>
                         <button type="button" className={`icon-button pay-copy${copiedKey === `${item.id}:u` ? " copied" : ""}`} onClick={() => void copy(`${item.id}:u`, item.username)} aria-label="复制用户名" title="复制"><Icon name={copiedKey === `${item.id}:u` ? "check" : "copy"} /></button></div>
                       <div className="pay-field"><dt>密码</dt><dd className="login-pass">{shown ? item.password : "••••••••••"}</dd>

@@ -139,3 +139,15 @@ test("a 同步码 picks its group's file on copyboxx.com; a full address is used
   assert.equal(sharedSourceUrl("abc"), "abc");
   assert.equal(sharedSourceUrl("../admin"), "../admin");
 });
+
+test("a company library past the limits: too big is refused, extra entries and overlong fields are skipped (audit D)", async () => {
+  const { SHARED_MAX_BYTES, SHARED_MAX_ITEMS, SHARED_TOO_BIG } = await import("../app/shared-library.ts");
+  assert.throws(() => parseSharedLibrary(" ".repeat(SHARED_MAX_BYTES + 1)), { message: SHARED_TOO_BIG });
+  const many = Array.from({ length: SHARED_MAX_ITEMS + 3 }, (_, i) => entry(`id${i}`));
+  const parsed = parseSharedLibrary(file(many));
+  assert.equal(parsed.items.length, SHARED_MAX_ITEMS);
+  assert.equal(parsed.skipped, 3);
+  const long = parseSharedLibrary(file([entry("ok"), entry("long", { secret: "x".repeat(20001) })]));
+  assert.deepEqual(long.items.map((item) => item.id), ["ok"]);
+  assert.equal(long.skipped, 1);
+});

@@ -1,4 +1,4 @@
-import { SYNC_BASE_URL, sharedSourceUrl, type SyncSummary } from "./shared-library.ts";
+import { SHARED_MAX_BYTES, SHARED_TOO_BIG, SYNC_BASE_URL, sharedSourceUrl, type SyncSummary } from "./shared-library.ts";
 
 // Settings of the company 话术 library on this device: the 同步码 (or an address) typed in, empty until someone does.
 export const SHARED_URL_KEY = "clipbox.shared-library-url";
@@ -37,7 +37,10 @@ export async function fetchSharedLibraryText(value: string): Promise<string> {
   try {
     const response = await fetch(address, { credentials: "omit", cache: "no-store" });
     if (!response.ok) throw new Error(notFound(response.status));
-    return await response.text();
+    if (Number(response.headers.get("Content-Length")) > SHARED_MAX_BYTES) throw new Error(SHARED_TOO_BIG);
+    const text = await response.text();
+    if (text.length > SHARED_MAX_BYTES) throw new Error(SHARED_TOO_BIG);
+    return text;
   } catch (error) {
     throw error instanceof Error && /公司话术库|同步码/.test(error.message) ? error : new Error("无法连接到公司话术库地址");
   }
