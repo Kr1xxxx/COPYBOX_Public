@@ -14,9 +14,15 @@ export function relativizeAssets(text) {
   return text.replace(/(?:\\?\/)?_next(\\?\/)static/g, "assets$1static");
 }
 
+const preloadHelperPattern = /=function\(e\)\{return`\/`\+e\}/g;
+
+export function hasPreloadHelper(js) {
+  return (js.match(preloadHelperPattern) || []).length > 0;
+}
+
 // The Vite preload helper builds dependency paths from "/"; make them relative to the chunk file.
 export function patchPreloadHelper(js) {
-  const pattern = /=function\(e\)\{return`\/`\+e\}/g;
+  const pattern = preloadHelperPattern;
   const count = (js.match(pattern) || []).length;
   if (count !== 1) throw new Error(`Preload helper patch must match exactly once, matched ${count} times.`);
   return js.replace(pattern, () => "=function(e){return new URL(`../../../`+e,import.meta.url).href}");
@@ -170,13 +176,14 @@ export async function main(argv = process.argv.slice(2)) {
     if (!/\.(js|css)$/.test(file)) continue;
     const text = readFileSync(file, "utf8");
     let next = relativizeAssets(text);
-    if (/\/static\/chunks\/index-[^/]*\.js$/.test(file.replaceAll("\\", "/"))) {
+    // The helper sits in the index chunk up to vinext 1.0 and in the vinext chunk from 1.2; find it by content.
+    if (/\/static\/chunks\/[^/]*\.js$/.test(file.replaceAll("\\", "/")) && hasPreloadHelper(next)) {
       next = patchPreloadHelper(next);
       patched += 1;
     }
     if (next !== text) writeFileSync(file, next);
   }
-  if (patched !== 1) throw new Error(`Expected one index chunk, found ${patched}.`);
+  if (patched !== 1) throw new Error(`Expected one chunk with the preload helper, found ${patched}.`);
 
   const html = ensureTitle(relativizeAssets(raw));
   if (html.replaceAll("__next", "").includes("_next/")) throw new Error("Page still points at _next/.");
