@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { mergeServerTips, pickTipForDay, readTipsState, TIPS_URL, todayKey, writeTipsState, type Tip } from "./daily-tips";
+import { mergeServerTips, pickTipForDay, readTipsState, stepTip, tipPreview, tipsLibrary, TIPS_URL, todayKey, writeTipsState, type Tip } from "./daily-tips";
 import { fetchSharedLibraryText } from "./shared-library-client";
+import { Icon } from "./ui-atoms";
 
-// The 每日小贴士 card above 回收站 in the sidebar, and the dialog that shows the whole tip.
+// The Tips card above 回收站 in the sidebar (today's tip, 上一条 / 下一条 to browse), and the dialog that shows the whole tip.
 // Reads the stored state, picks today's tip and, when the day moved on, saves the new choice.
 function pickAndSave(): Tip {
   const before = readTipsState();
@@ -16,10 +17,16 @@ function pickAndSave(): Tip {
 
 export function DailyTipsCard() {
   // The page renders only in the browser (it reads storage while rendering too), so the first pick can happen here.
-  const [tip, setTip] = useState<Tip>(() => pickTipForDay(readTipsState(), todayKey()).tip);
+  const [today, setToday] = useState<Tip>(() => pickTipForDay(readTipsState(), todayKey()).tip);
+  // The tip being looked at with 上一条 / 下一条, tied to today's tip: when the day moves on, the card starts again from
+  // the new tip. Browsing is not saved, so tomorrow still moves on from today's tip.
+  const [browsed, setBrowsed] = useState<{ fromId: string; id: string } | null>(null);
   const [open, setOpen] = useState(false);
-  const cardRef = useRef<HTMLButtonElement>(null);
-  const refresh = useCallback(() => setTip(pickAndSave()), []);
+  const openRef = useRef<HTMLButtonElement>(null);
+  const refresh = useCallback(() => setToday(pickAndSave()), []);
+  const library = tipsLibrary(readTipsState());
+  const tip = (browsed?.fromId === today.id && library.find((entry) => entry.id === browsed.id)) || today;
+  const step = (by: number) => setBrowsed({ fromId: today.id, id: stepTip(library, tip.id, by).id });
 
   // Saves the first pick, and picks again when the window comes back, so an app left open overnight moves on.
   useEffect(() => {
@@ -49,15 +56,24 @@ export function DailyTipsCard() {
 
   const close = useCallback(() => {
     setOpen(false);
-    cardRef.current?.focus();
+    openRef.current?.focus();
   }, []);
 
   return (
     <div className="daily-tips-slot">
-      <button ref={cardRef} type="button" className="daily-tips" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
-        <span className="daily-tips-label">每日小贴士</span>
-        <span className="daily-tips-title">{tip.title}</span>
-      </button>
+      <div className="daily-tips">
+        <div className="daily-tips-head">
+          <span className="daily-tips-label">Tips</span>
+          <span className="daily-tips-nav">
+            <button type="button" aria-label="上一条" title="上一条" onClick={() => step(-1)}><Icon name="chevronLeft" /></button>
+            <button type="button" aria-label="下一条" title="下一条" onClick={() => step(1)}><Icon name="chevronRight" /></button>
+          </span>
+        </div>
+        <button ref={openRef} type="button" className="daily-tips-open" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+          <span className="daily-tips-title">{tip.title}</span>
+          <span className="daily-tips-preview">{tipPreview(tip)}</span>
+        </button>
+      </div>
       {open && createPortal(<DailyTipDialog tip={tip} onClose={close} />, document.body)}
     </div>
   );
@@ -83,7 +99,7 @@ function DailyTipDialog({ tip, onClose }: { tip: Tip; onClose: () => void }) {
     <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section ref={dialogRef} className="backup-dialog tips-dialog" role="dialog" aria-modal="true" aria-labelledby="daily-tips-title" aria-describedby="daily-tips-text" tabIndex={-1} data-local-esc>
         <header className="backup-head">
-          <div><p>每日小贴士</p><h2 id="daily-tips-title">{tip.title}</h2></div>
+          <div><p>Tips</p><h2 id="daily-tips-title">{tip.title}</h2></div>
         </header>
         <div className="backup-form">
           <div id="daily-tips-text" className="tips-body">

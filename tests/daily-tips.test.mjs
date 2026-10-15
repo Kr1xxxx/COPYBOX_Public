@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { COMPANY_TIPS } from "../app/company-tips.ts";
 import { parseCompanyTips } from "../tools/company-tips.mjs";
-import { BUILT_IN_TIPS, TIPS_FORMAT, TIPS_KEY, TIPS_URL, mergeServerTips, mergeTips, parseTipsFile, pickTipForDay, readTipsState, tipsLibrary, todayKey, writeTipsState } from "../app/daily-tips.ts";
+import { BUILT_IN_TIPS, TIPS_FORMAT, TIPS_KEY, TIPS_URL, mergeServerTips, mergeTips, parseTipsFile, pickTipForDay, readTipsState, stepTip, tipPreview, tipsLibrary, todayKey, writeTipsState } from "../app/daily-tips.ts";
 
 const fresh = () => ({ version: 1, extra: [], shownId: "", shownDate: "" });
 const memory = (initial) => { const map = new Map(initial ? [[TIPS_KEY, initial]] : []); return { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), map }; };
@@ -203,4 +203,20 @@ test("mergeServerTips adds new tips, can rewrite a built-in tip, and notes the d
 test("todayKey is the local calendar day", () => {
   assert.equal(todayKey(new Date(2026, 0, 5, 0, 0, 1)), "2026-01-05");
   assert.equal(todayKey(new Date(2026, 11, 31, 23, 59, 59)), "2026-12-31");
+});
+
+test("上一条 / 下一条 step through the library and wrap at both ends", () => {
+  const library = [tip("A"), tip("B"), tip("C")];
+  assert.equal(stepTip(library, "B", 1).id, "C");
+  assert.equal(stepTip(library, "B", -1).id, "A");
+  assert.equal(stepTip(library, "C", 1).id, "A");
+  assert.equal(stepTip(library, "A", -1).id, "C");
+  assert.equal(stepTip(library, "gone", 1).id, "B");
+});
+
+test("the card preview is the start of the text and always ends in …", () => {
+  assert.equal(tipPreview(tip("A", "标题", "短")), "短…");
+  assert.equal(tipPreview(tip("A", "标题", "一二三四五"), 3), "一二三…");
+  assert.equal(tipPreview({ id: "A", title: "标题", text: "", examples: [{ good: true, text: "Hi\nthere" }] }), "Hi there…");
+  for (const entry of tipsLibrary({ ...fresh(), companyFirst: true })) assert.match(tipPreview(entry), /^\S.*…$/u, entry.id);
 });

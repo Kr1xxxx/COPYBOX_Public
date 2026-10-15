@@ -26,6 +26,8 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   arrowUp: <path d="M12 19V5M6 11l6-6 6 6" />,
   chevronUp: <path d="M6 14l6-6 6 6" />,
   chevronDown: <path d="M6 10l6 6 6-6" />,
+  chevronLeft: <path d="M14 6l-6 6 6 6" />,
+  chevronRight: <path d="M10 6l6 6-6 6" />,
   arrowDown: <path d="M12 5v14M6 13l6 6 6-6" />,
   grip: <path d="M9.5 6.5h.01M14.5 6.5h.01M9.5 12h.01M14.5 12h.01M9.5 17.5h.01M14.5 17.5h.01" strokeWidth="2.6" />,
 };

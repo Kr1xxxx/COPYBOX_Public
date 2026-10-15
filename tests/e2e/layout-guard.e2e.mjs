@@ -22,6 +22,7 @@ const BY_DESIGN = [
   { el: /snippet-label/, type: /文字省略/, reason: "列表标题单行显示，过长时用 … 结尾（测试数据里有超长场景名）" },
 ];
 
+BY_DESIGN.push({ el: /daily-tips-preview/, type: /文字省略/, reason: "Tips 卡片标题下的内容只露一行，故意用 … 结尾，提示点开看全文" });
 BY_DESIGN.push({ el: /image-tile-title/, type: /文字省略/, reason: "图片名单行显示，过长时用 … 结尾（迷你窗口的小图块只有约 80px 宽）" });
 BY_DESIGN.push({ el: /image-tile-main/, type: /元素重疊/, reason: "图片卡片的「复制」小按钮故意浮在整张卡片按钮上" });
 // `by` narrows an entry to overlaps with one particular element.

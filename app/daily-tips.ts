@@ -1,4 +1,4 @@
-// 每日小贴士: the small card above 回收站 in the sidebar shows one tip a day. The library is the company's sales tips
+// Tips (每日小贴士): the small card above 回收站 in the sidebar shows one tip a day. The library is the company's sales tips
 // (app/company-tips.ts), then the built-in usage tips below, then tips read from the company tips file (TIPS_URL, off
 // for now); one entry per local calendar day, in library order.
 import { COMPANY_TIPS } from "./company-tips.ts";
@@ -134,6 +134,21 @@ export function pickTipForDay(state: TipsState, today: string): { tip: Tip; stat
   if (state.shownDate === today && at >= 0) return { tip: library[at], state };
   const next = library[at < 0 ? 0 : (at + 1) % library.length];
   return { tip: next, state: { ...state, shownId: next.id, shownDate: today } };
+}
+
+// 上一条 / 下一条 on the card: the tip `step` places away from `fromId` in the library, wrapping at both ends. Browsing
+// is not saved, so the daily rotation stays the same.
+export function stepTip(library: Tip[], fromId: string, step: number): Tip {
+  const at = Math.max(0, library.findIndex((tip) => tip.id === fromId));
+  const n = library.length;
+  return library[(((at + step) % n) + n) % n];
+}
+
+// What the card shows under the title: the start of the text (or of the first example) and always a trailing "…",
+// so it reads as "there is more, click to open".
+export function tipPreview(tip: Tip, max = 40): string {
+  const source = (tip.text || tip.examples?.[0]?.text || "").replace(/\s+/g, " ").trim();
+  return `${[...source].slice(0, max).join("")}…`;
 }
 
 const two = (value: number) => String(value).padStart(2, "0");
