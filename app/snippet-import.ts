@@ -1,6 +1,6 @@
 import { readSpreadsheet, type SheetTable } from "./spreadsheet-read.ts";
 import type { SecretItem, SnippetMeta } from "./clipbox-core";
-import { normalizeImportedSnippetFolder, orderStandardSnippetFolders } from "./snippet-folders.ts";
+import { isStandardSnippetFolder, normalizeImportedSnippetFolder, orderStandardSnippetFolders } from "./snippet-folders.ts";
 
 export const PRODUCT_GROUPS = ["睫毛", "镊子", "假发/发束", "洗发水", "包装/Logo", "物流/清关", "平台", "通用"] as const;
 export const REQUIRED_SNIPPET_COLUMNS = ["标题", "沟通阶段", "具体场景", "核心动作", "英文即时消息", "中文对照"] as const;
@@ -119,8 +119,8 @@ export function normalizeSnippetRow(row: Record<string, unknown>, sourceRow: num
   const usageNote = text(row.使用备注);
   if (!englishText) return { sourceRow, item: null, error: `第 ${sourceRow} 行：英文即时消息不能为空` };
   if (!stage || !scene || !action) return { sourceRow, item: null, error: `第 ${sourceRow} 行：沟通阶段、具体场景和核心动作不能为空` };
-  const standardFolder = normalizeImportedSnippetFolder(stage);
-  if (!standardFolder) return { sourceRow, item: null, error: `第 ${sourceRow} 行：沟通阶段“${stage}”不是标准目录` };
+  // A standard folder (or an old name for one) goes there; any other 沟通阶段 becomes a folder of that name (D-068).
+  const standardFolder = normalizeImportedSnippetFolder(stage) || Array.from(stage).slice(0, 30).join("");
 
   const placeholders = extractPlaceholders(`${englishText}\n${chineseText}`);
   const placeholderKeys = new Set(placeholders.map((value) => value.toLocaleLowerCase()));
@@ -197,7 +197,7 @@ export function buildSnippetImportPreview(
     duplicateCount,
     errorCount: errors.length,
     errors,
-    folders: orderStandardSnippetFolders(items.map((item) => item.folder || "")),
+    folders: [...orderStandardSnippetFolders(items.map((item) => item.folder || "")), ...new Set(items.map((item) => item.folder || "").filter((folder) => folder && !isStandardSnippetFolder(folder)))],
     items,
   };
 }

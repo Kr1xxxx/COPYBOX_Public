@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { mergeServerTips, pickTipForDay, readTipsState, stepTip, tipPreview, tipsLibrary, TIPS_URL, todayKey, writeTipsState, type Tip } from "./daily-tips";
 import { fetchSharedLibraryText } from "./shared-library-client";
 import { Icon } from "./ui-atoms";
+import { TIPS_CHANGED_EVENT } from "./tips-import";
 
 // The Tips card above 回收站 in the sidebar (today's tip, 上一条 / 下一条 to browse), and the dialog that shows the whole tip.
 // Reads the stored state, picks today's tip and, when the day moved on, saves the new choice.
@@ -33,9 +34,11 @@ export function DailyTipsCard() {
     pickAndSave();
     const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
     window.addEventListener("focus", refresh);
+    window.addEventListener(TIPS_CHANGED_EVENT, refresh);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("focus", refresh);
+      window.removeEventListener(TIPS_CHANGED_EVENT, refresh);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refresh]);
