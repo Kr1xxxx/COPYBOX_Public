@@ -54,10 +54,22 @@ pub fn parse_request(source: &str) -> Result<Value, Value> {
     }
 }
 
+/// Who asked, as the page receives it ({ name, id }), or null when it cannot be told (D-059).
+#[cfg(unix)]
+async fn caller_of(stream: &UnixStream) -> Value {
+    let Some(pid) = stream.peer_cred().ok().and_then(|cred| cred.pid()).and_then(|pid| u32::try_from(pid).ok()) else {
+        return Value::Null;
+    };
+    match tauri::async_runtime::spawn_blocking(move || crate::caller::identify(pid)).await {
+        Ok(Some(caller)) => json!({ "name": caller.name, "id": caller.id }),
+        _ => Value::Null,
+    }
+}
+
 #[cfg(unix)]
 async fn handle<F, Fut>(mut stream: UnixStream, forward: Arc<F>)
 where
-    F: Fn(Value) -> Fut + Send + Sync + 'static,
+    F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
 {
     let mut source = Vec::new();
@@ -79,11 +91,15 @@ where
     };
     let response = match reply {
         Err(body) => body,
-        Ok(command) => match tokio::time::timeout(timeout_for(&command), forward(command)).await {
+        Ok(command) => {
+            // Only a 秘密 command needs to know who asked (for 「始终允许」); the others skip the lookup.
+            let caller = if is_secret_command(&command) { caller_of(&stream).await } else { Value::Null };
+            match tokio::time::timeout(timeout_for(&command), forward(command, caller)).await {
             Err(_) => error_body("RENDERER_TIMEOUT", "Copyboxx 窗口响应超时"),
             Ok(Err(failure)) => failure_body(&failure),
             Ok(Ok(value)) => value,
-        },
+            }
+        }
     };
     let _ = stream.write_all(format!("{response}\n").as_bytes()).await;
     let _ = stream.shutdown().await;
@@ -92,7 +108,7 @@ where
 #[cfg(unix)]
 pub async fn serve<F, Fut>(listener: UnixListener, forward: F)
 where
-    F: Fn(Value) -> Fut + Send + Sync + 'static,
+    F: Fn(Value, Value) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<Value, Failure>> + Send + 'static,
 {
     let forward = Arc::new(forward);
@@ -202,7 +218,8 @@ impl Bridge {
         }
     }
 
-    pub async fn forward(&self, app: &AppHandle, command: Value) -> Result<Value, Failure> {
+    /// `caller` is who asked ({ name, id } or null); the page lets a remembered caller read a 秘密 without asking.
+    pub async fn forward(&self, app: &AppHandle, command: Value, caller: Value) -> Result<Value, Failure> {
         let window = app.get_webview_window("main");
         let Some(window) = window.filter(|_| self.ready.load(Ordering::SeqCst)) else {
             return Err(("WINDOW_UNAVAILABLE".into(), "Copyboxx 窗口尚未就绪".into()));
@@ -215,7 +232,7 @@ impl Bridge {
             let _ = window.set_focus();
         }
         let (entry, rx) = self.register();
-        if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command })).is_err() {
+        if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command, "caller": caller })).is_err() {
             return Err(("COMMAND_FAILED".into(), "命令执行失败".into()));
         }
         Self::wait_for(entry, rx, limit).await
@@ -319,9 +336,9 @@ pub fn start(app: &AppHandle) {
         }
         let bridge = app.state::<Bridge>().inner().clone();
         let handle = app.clone();
-        serve(listener, move |command| {
+        serve(listener, move |command, caller| {
             let (bridge, handle) = (bridge.clone(), handle.clone());
-            async move { bridge.forward(&handle, command).await }
+            async move { bridge.forward(&handle, command, caller).await }
         })
         .await;
     });
@@ -383,9 +400,11 @@ mod tests {
             let path = temp_socket("serve");
             prepare_socket(&path).await.unwrap();
             let listener = UnixListener::bind(&path).unwrap();
-            tauri::async_runtime::spawn(serve(listener, |command: Value| async move {
+            tauri::async_runtime::spawn(serve(listener, |command: Value, caller: Value| async move {
                 match command["action"].as_str() {
                     Some("status") => Ok(json!({ "ok": true, "action": "status", "snippetCount": 3 })),
+                    // A 秘密 command carries who asked: this test process (or null where it cannot be read).
+                    Some("secret-get") => Ok(json!({ "ok": true, "caller": caller })),
                     _ => Err(("NOT_FOUND".to_string(), "没有这个命令".to_string())),
                 }
             }));
@@ -396,6 +415,9 @@ mod tests {
             assert_eq!(ok2["ok"], true);
             let bad = ask(&path, "{\"action\":\"other\"}\n").await;
             assert_eq!(bad["error"]["code"], "NOT_FOUND");
+            let secret = ask(&path, "{\"action\":\"secret-get\"}\n").await;
+            assert_eq!(secret["ok"], true);
+            assert!(secret["caller"].is_null() || secret["caller"]["id"].is_string());
             let junk = ask(&path, "x\n").await;
             assert_eq!(junk["error"]["code"], "INVALID_JSON");
             let _ = std::fs::remove_file(&path);

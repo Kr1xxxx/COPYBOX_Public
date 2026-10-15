@@ -62,7 +62,8 @@ export type ClipboxDesktop = {
   onFocusSearch: (callback: () => void) => () => void;
   onFlushRequest?: (callback: () => void) => () => void;
   flushDone?: () => void;
-  onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
+  // caller: who asked ({ name, id }), or null when the shell could not tell (D-059).
+  onAutomationCommand: (callback: (request: { requestId: string; command: unknown; caller?: unknown }) => void) => () => void;
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;
   setWindowMode?: (mode: WindowMode) => void;

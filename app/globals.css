@@ -1499,3 +1499,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .note-map-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);gap:8px;align-items:end}
 .note-map-row select{min-width:0}
 @media (max-width:520px){.note-map-row{grid-template-columns:1fr}}
+/* 允许读取秘密吗？ (D-059): who asked, and the 始终允许的程序 list in 设置. */
+.automation-consent-caller{margin:0;font-size:12.5px;color:var(--muted)}
+.automation-consent-caller strong{color:var(--ink-2);font-weight:650;word-break:break-all}
+.automation-trust-list{list-style:none;margin:0;padding:0}
+.automation-trust-list small{word-break:break-all}
