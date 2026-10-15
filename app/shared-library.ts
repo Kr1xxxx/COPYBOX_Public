@@ -112,7 +112,20 @@ function readEntry(raw: unknown): SharedSnippet | null {
   };
 }
 
+// Limits on a company library (audit D): a bigger file is refused, entries past the count are skipped, and an entry with
+// an overlong field is skipped, so a bad or hostile file cannot fill up or freeze the app.
+export const SHARED_MAX_BYTES = 5 * 1024 * 1024;
+export const SHARED_MAX_ITEMS = 5000;
+export const SHARED_MAX_FIELD = 20000;
+export const SHARED_TOO_BIG = "公司话术库文件太大（超过 5 MB）";
+
+function tooLong(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  return Object.values(raw as Record<string, unknown>).some((value) => (typeof value === "string" ? value.length > SHARED_MAX_FIELD : Array.isArray(value) && value.length > 200));
+}
+
 export function parseSharedLibrary(source: string): { items: SharedSnippet[]; skipped: number } {
+  if (source.length > SHARED_MAX_BYTES) throw new Error(SHARED_TOO_BIG);
   let parsed: unknown;
   try { parsed = JSON.parse(source); } catch { throw new Error("这不是有效的公司话术库文件"); }
   const entries = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" ? (parsed as { items?: unknown }).items : undefined;
@@ -121,6 +134,7 @@ export function parseSharedLibrary(source: string): { items: SharedSnippet[]; sk
   const items: SharedSnippet[] = [];
   let skipped = 0;
   for (const raw of entries) {
+    if (items.length >= SHARED_MAX_ITEMS || tooLong(raw)) { skipped += 1; continue; }
     const entry = readEntry(raw);
     if (!entry || seen.has(entry.id)) { skipped += 1; continue; }
     seen.add(entry.id);
@@ -241,6 +255,12 @@ export function describeSync(summary: SyncSummary) {
 export const SYNC_BASE_URL = "https://copyboxx.com/sync/";
 export const SHARED_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 const SYNC_CODE = /^[A-Za-z0-9-]{6,40}$/;
+
+// The 同步码 typed in Settings (upper case), or "" when the setting is empty or a full address instead of a code.
+export function syncCodeOf(value: string): string {
+  const typed = (value || "").trim();
+  return SYNC_CODE.test(typed) ? typed.toUpperCase() : "";
+}
 
 export function sharedSourceUrl(value: string): string {
   const typed = value.trim();

@@ -72,6 +72,19 @@ second rollback goes one step further back. The script calls the Cloudflare API 
 adds the token; elsewhere set `CLOUDFLARE_API_TOKEN`, and optionally `CLOUDFLARE_ACCOUNT_ID`). Agents upload only
 after the owner says 发布 or 部署 in the website thread.
 
+## 图片压缩代理 (POST /compress, D-055)
+
+The app compresses pictures through `https://copyboxx.com/compress` when it has a 企业同步码 and no key of its own. The
+picture is the body, the code goes in the header `X-Copyboxx-Code`; the answer is the compressed bytes (200), or a plain
+404 for a missing/unknown code (same as `/sync/`), 413 over 5 MB, 415 not PNG/JPEG/WebP, 429 rate limit (20 a minute per
+code) or quota used up, 503 when `TINIFY_KEYS` is missing or every key is wrong, 502 when TinyPNG fails.
+
+The TinyPNG keys are the Worker secret **`TINIFY_KEYS`** (one key, or two separated by a comma). Only the owner sets it:
+Cloudflare dashboard → Workers & Pages → copyboxx-site → Settings → Variables and Secrets → Add → type Secret, name
+`TINIFY_KEYS`. Secrets survive `npm run website:deploy`. Never put a key in this repo, in chat or in memory.
+
+Check after a deploy (no key needed; must print 404): `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'X-Copyboxx-Code: XX-NOPE0000' --data-binary @tools/website/icons/apple-touch-icon.png https://copyboxx.com/compress`
+
 ## Build and deploy
 
 ```bash

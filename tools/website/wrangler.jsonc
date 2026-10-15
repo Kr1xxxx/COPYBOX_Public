@@ -7,6 +7,9 @@
   "preview_urls": false,
   "main": "worker.mjs",
   "kv_namespaces": [{ "binding": "FILES", "id": "fb78ad5c8e0e4469adff21ebbe638088" }],
+  // /compress (D-055): at most 20 pictures a minute per 同步码. The TinyPNG keys are the Worker secret TINIFY_KEYS,
+  // set by the owner in the Cloudflare dashboard, never in this file.
+  "ratelimits": [{ "name": "COMPRESS_LIMITER", "namespace_id": "1055", "simple": { "limit": 20, "period": 60 } }],
   "routes": [
     { "pattern": "copyboxx.com", "custom_domain": true },
     { "pattern": "www.copyboxx.com", "custom_domain": true }

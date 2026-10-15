@@ -1,5 +1,6 @@
 // Compresses one picture with the TinyPNG API (D-037). The page cannot call the service itself, so it hands the bytes
-// to this command. Only api.tinify.com is ever contacted. Failures are returned as one of the reason words the page
+// to this command. Only api.tinify.com is ever contacted, or copyboxx.com/compress when the page asks for the company
+// proxy as "proxy:<同步码>" (D-055: the site holds the key, the installer none). Failures are returned as one of the reason words the page
 // understands: key, limit, type, service, network, input.
 use std::time::Duration;
 
@@ -9,6 +10,9 @@ const ENDPOINT: &str = "https://api.tinify.com/shrink";
 const HOST: &str = "api.tinify.com";
 const TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_BYTES: usize = 10 * 1024 * 1024;
+/// The company proxy on copyboxx.com (tools/website/worker.mjs); the 同步码 goes in a header, the picture as the body.
+const PROXY_ENDPOINT: &str = "https://copyboxx.com/compress";
+const PROXY_PREFIX: &str = "proxy:";
 /// The page names a key built into the installer as "builtin:N"; the key itself never reaches the page.
 const BUILTIN_PREFIX: &str = "builtin:";
 
@@ -47,6 +51,36 @@ pub fn reason_for_status(status: u16) -> &'static str {
     }
 }
 
+/// The 同步码 of a "proxy:<code>" request, upper case, or None when it is not a proxy request or not a valid code.
+pub fn proxy_code(asked: &str) -> Option<String> {
+    let code = asked.trim().strip_prefix(PROXY_PREFIX)?.trim();
+    let valid = (6..=40).contains(&code.len()) && code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    valid.then(|| code.to_ascii_uppercase())
+}
+
+/// What a copyboxx.com/compress answer other than 200 means for the page. 404 = the 同步码 is not known there.
+pub fn reason_for_proxy_status(status: u16) -> &'static str {
+    match status {
+        404 => "code",
+        429 => "limit",
+        415 => "type",
+        400 | 413 => "input",
+        _ => "service",
+    }
+}
+
+async fn compress_via_proxy(client: &reqwest::Client, code: &str, bytes: Vec<u8>) -> Result<Response, String> {
+    let answer = client.post(PROXY_ENDPOINT).header("x-copyboxx-code", code).body(bytes).send().await.map_err(|_| "network".to_string())?;
+    if answer.status().as_u16() != 200 {
+        return Err(reason_for_proxy_status(answer.status().as_u16()).into());
+    }
+    let out = answer.bytes().await.map_err(|_| "network".to_string())?;
+    if out.is_empty() {
+        return Err("service".into());
+    }
+    Ok(Response::new(out.to_vec()))
+}
+
 /// The compressed picture must be fetched from TinyPNG itself, never from an address a reply names.
 pub fn is_tinify_url(value: &str) -> bool {
     url::Url::parse(value).map(|url| url.scheme() == "https" && url.host_str() == Some(HOST) && url.port().is_none()).unwrap_or(false)
@@ -59,12 +93,16 @@ pub async fn compress_image(request: Request<'_>) -> Result<Response, String> {
         _ => return Err("input".into()),
     };
     let asked = request.headers().get("x-tinify-key").and_then(|value| value.to_str().ok()).unwrap_or("");
-    let key = resolve_key(asked, &builtin_keys()).ok_or_else(|| "key".to_string())?;
     let client = reqwest::Client::builder()
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|_| "service".to_string())?;
+    if asked.trim().starts_with(PROXY_PREFIX) {
+        let code = proxy_code(asked).ok_or_else(|| "code".to_string())?;
+        return compress_via_proxy(&client, &code, bytes).await;
+    }
+    let key = resolve_key(asked, &builtin_keys()).ok_or_else(|| "key".to_string())?;
     let shrink = client.post(ENDPOINT).basic_auth("api", Some(&key)).body(bytes).send().await.map_err(|_| "network".to_string())?;
     if shrink.status().as_u16() != 201 {
         return Err(reason_for_status(shrink.status().as_u16()).into());
@@ -104,6 +142,19 @@ mod tests {
             assert_eq!(resolve_key(bad, &builtin), None, "{bad}");
         }
         assert_eq!(resolve_key("builtin:0", &[]), None);
+    }
+
+    #[test]
+    fn proxy_requests_carry_a_valid_code() {
+        assert_eq!(proxy_code("proxy:cb-test1234").as_deref(), Some("CB-TEST1234"));
+        assert_eq!(proxy_code(" proxy: CB-TEST1234 ").as_deref(), Some("CB-TEST1234"));
+        for bad in ["proxy:", "proxy:abc", "proxy:CB TEST1234", "proxy:../x/y/z", "CB-TEST1234", "builtin:0", ""] {
+            assert_eq!(proxy_code(bad), None, "{bad}");
+        }
+        assert_eq!(reason_for_proxy_status(404), "code");
+        assert_eq!(reason_for_proxy_status(429), "limit");
+        assert_eq!(reason_for_proxy_status(413), "input");
+        assert_eq!(reason_for_proxy_status(503), "service");
     }
 
     #[test]

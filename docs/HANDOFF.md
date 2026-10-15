@@ -43,6 +43,10 @@ update check and sync download; showcase pictures white + purple with made-up co
 话术 sync endpoint (PR #156): `GET https://copyboxx.com/sync/<code>/snippets.json`; publish with
 `npm run sync:publish` (README 「话术同步」). Real sync codes never go in the repo or on the public site.
 
+Image compression proxy (D-055, 2026-10-15): `POST https://copyboxx.com/compress` with header `X-Copyboxx-Code`; keys only
+in the Worker secret `TINIFY_KEYS`, which the owner sets in the Cloudflare dashboard. No TinyPNG key ships in the
+installer; the owner revoked the old keys. The app uses the proxy when a 企业同步码 is set and no own key is.
+
 ## Reviews of 2026-10-14 (outside the repo, in the project's shared files)
 
 - Audit: `audit/2026-10-14-audit.md`. Severe: S1 auto-update trusts copyboxx.com only, installer unsigned (update

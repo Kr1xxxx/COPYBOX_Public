@@ -1,9 +1,13 @@
 // Every picture added to 图片 is shrunk with TinyPNG first (D-037), at most 100 a month on this computer.
 // The desktop shell does the network call; here we keep the monthly count and decide what to tell the user.
 import type { ClipboxDesktop } from "./desktop-bridge";
+import { SHARED_URL_KEY } from "./shared-library-client.ts";
+import { syncCodeOf } from "./shared-library.ts";
 
-// No key is in the repo (owner, 2026-10-14). The installer may carry keys from a CI secret, which the shell keeps and
-// the page names as "builtin:N"; up to two own keys set in 设置 come first. With neither, pictures are stored as they are.
+// No key is in the repo (owner, 2026-10-14). Up to two own keys set in 设置 come first. Next, with a 企业同步码 set
+// (设置 → 账号与同步), the picture goes through copyboxx.com/compress, which holds the company's key (D-055); the shell is
+// asked for "proxy:<code>". Last, keys an installer may carry from a CI secret, named "builtin:N". With none of these,
+// pictures are stored as they are.
 export const TINIFY_ROTATION_STORAGE = "clipbox.tinify.rotation.v1";
 export const TINIFY_KEY_STORAGE = "clipbox.tinify.key.v1";
 export const TINIFY_KEY2_STORAGE = "clipbox.tinify.key2.v1";
@@ -118,7 +122,12 @@ export function formatBytes(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export const COMPRESS_NO_KEY_NOTICE = "未压缩：请先在 设置 → 数据 → 图片压缩 填写压缩密钥";
+export const COMPRESS_NO_KEY_NOTICE = "未压缩：在 设置 → 账号与同步 填好企业同步码后就能压缩";
+
+// The company 同步码 that compression can go through, or "" (no code, or a full address instead of a code).
+export function companyCompressCode(storage: KeyValueStorage | undefined): string {
+  return syncCodeOf(readStored(storage, SHARED_URL_KEY));
+}
 
 export const COMPRESS_LIMIT_MESSAGE = `本月图片压缩次数已用完（${COMPRESS_MONTHLY_LIMIT}/${COMPRESS_MONTHLY_LIMIT}），下个月 1 号恢复`;
 
@@ -126,6 +135,7 @@ const FAILURE_TEXT: Record<string, string> = {
   network: "没有连上压缩服务",
   key: "压缩服务的密钥不能用",
   limit: "压缩服务本月额度用完",
+  code: "企业同步码不能用来压缩",
 };
 
 export type CompressResult = { blob: Blob; saved: number; failed: boolean; notice: string };
@@ -141,10 +151,11 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
   if (!bridge?.compressImage || !COMPRESSIBLE_TYPES.includes(file.type)) return same;
   const keys = readCustomKeys(storage);
   const own = customKeyOrder(storage, now);
+  const company = own.length ? "" : companyCompressCode(storage);
   let builtIn = 0;
-  if (!own.length) { try { builtIn = Math.max(0, Math.floor(Number(await bridge.compressBuiltInCount?.()) || 0)); } catch { builtIn = 0; } }
+  if (!own.length && !company) { try { builtIn = Math.max(0, Math.floor(Number(await bridge.compressBuiltInCount?.()) || 0)); } catch { builtIn = 0; } }
   // No key at all: nothing is sent and nothing is counted.
-  if (!own.length && !builtIn) return { ...same, failed: true, notice: COMPRESS_NO_KEY_NOTICE };
+  if (!own.length && !company && !builtIn) return { ...same, failed: true, notice: COMPRESS_NO_KEY_NOTICE };
   if (readCompressUsage(storage, now) >= COMPRESS_MONTHLY_LIMIT) throw new Error(COMPRESS_LIMIT_MESSAGE);
   type Outcome = Awaited<ReturnType<NonNullable<ClipboxDesktop["compressImage"]>>>;
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -161,6 +172,8 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
       const state = readCustomState(storage, now);
       if (!state.bad.includes(index)) writeCustomState(storage, { ...state, bad: [...state.bad, index] });
     }
+  } else if (company) {
+    result = await send(`proxy:${company}`);
   } else {
     // Built-in keys take turns. A key that is refused (key or limit) is retried on the next one and skipped for the month.
     for (const index of builtInKeyOrder(storage, now, builtIn)) {
@@ -176,5 +189,6 @@ export async function compressForUpload(file: Blob, deps: Deps = {}): Promise<Co
   // A rare result that is not smaller is not worth keeping.
   if (result.bytes.length >= file.size) return { ...same, notice: "已经很小，保持原样" };
   const blob = new Blob([result.bytes as BlobPart], { type: file.type });
-  return { blob, saved: file.size - blob.size, failed: false, notice: `已压缩 ${formatBytes(file.size)} → ${formatBytes(blob.size)}` };
+  const how = company ? "已通过企业同步码压缩" : "已压缩";
+  return { blob, saved: file.size - blob.size, failed: false, notice: `${how} ${formatBytes(file.size)} → ${formatBytes(blob.size)}` };
 }

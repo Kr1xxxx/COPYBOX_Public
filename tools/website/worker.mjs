@@ -152,6 +152,100 @@ async function syncResponse(request, env, pathname) {
   return new Response(request.method === "HEAD" ? null : file.value, { status: 200, headers });
 }
 
+// Image compression for the app (D-055): POST /compress with the picture as the body and the company 同步码 in the
+// X-Copyboxx-Code header. The Worker sends it on to TinyPNG with a key from the Worker secret TINIFY_KEYS
+// (comma-separated; the next key is tried when one is refused), so no key ever ships in the installer.
+// A missing or unknown code gets the same plain 404 as /sync/, so the answer never tells which codes exist.
+// Pictures are passed through and never stored or logged.
+export function compressCodeKey(value) {
+  const code = String(value ?? "").trim();
+  return /^[A-Za-z0-9-]{6,40}$/.test(code) ? `sync/${code.toUpperCase()}/snippets.json` : null;
+}
+
+export function tinifyKeys(value) {
+  return String(value ?? "").split(",").map((key) => key.trim()).filter(Boolean);
+}
+
+// PNG, JPEG or WebP, judged by the first bytes rather than by what the sender claims.
+export function imageKind(bytes) {
+  const at = (i, ...values) => values.every((value, j) => bytes[i + j] === value);
+  if (bytes.length >= 8 && at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
+  if (bytes.length >= 3 && at(0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (bytes.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return "image/webp";
+  return null;
+}
+
+export function isTinifyOutput(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "api.tinify.com" && url.port === "";
+  } catch {
+    return false;
+  }
+}
+
+function plainResponse(status, text) {
+  return new Response(text, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+}
+
+async function shrinkWithTinify(bytes, keys, fetcher) {
+  let refusedForQuota = false;
+  for (const key of keys) {
+    const auth = `Basic ${btoa(`api:${key}`)}`;
+    let shrink;
+    try {
+      shrink = await fetcher("https://api.tinify.com/shrink", { method: "POST", headers: { Authorization: auth }, body: bytes, redirect: "manual" });
+    } catch {
+      return plainResponse(502, "upstream");
+    }
+    if (shrink.status === 401 || shrink.status === 429) {
+      if (shrink.status === 429) refusedForQuota = true;
+      release(shrink.body);
+      continue;
+    }
+    const location = shrink.headers.get("Location") || "";
+    release(shrink.body);
+    if (shrink.status === 415) return plainResponse(415, "type");
+    if (shrink.status !== 201 || !isTinifyOutput(location)) return plainResponse(502, "upstream");
+    let result;
+    try {
+      result = await fetcher(location, { headers: { Authorization: auth }, redirect: "manual" });
+    } catch {
+      return plainResponse(502, "upstream");
+    }
+    if (!result.ok) {
+      release(result.body);
+      return plainResponse(502, "upstream");
+    }
+    return new Response(result.body, { status: 200, headers: { "Content-Type": "application/octet-stream", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+  }
+  // Every key refused: a used-up quota is "try next month"; wrong keys are the site's own fault.
+  return refusedForQuota ? plainResponse(429, "limit") : plainResponse(503, "unavailable");
+}
+
+const compressMaxBytes = 5 * 1024 * 1024;
+
+async function compressResponse(request, env, fetcher = fetch) {
+  const codeKey = compressCodeKey(request.headers.get("X-Copyboxx-Code"));
+  if (!codeKey) return syncNotFound(request);
+  const known = await env.FILES.getWithMetadata(codeKey, { type: "stream" });
+  if (known?.value == null) return syncNotFound(request);
+  release(known.value);
+  // Per code, so one leaked code cannot use up the month for everyone (binding COMPRESS_LIMITER in wrangler.jsonc).
+  if (env.COMPRESS_LIMITER) {
+    const { success } = await env.COMPRESS_LIMITER.limit({ key: codeKey });
+    if (!success) return plainResponse(429, "slow down");
+  }
+  const declared = Number(request.headers.get("Content-Length"));
+  if (Number.isFinite(declared) && declared > compressMaxBytes) return plainResponse(413, "too large");
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length || bytes.length > compressMaxBytes) return plainResponse(bytes.length ? 413 : 400, bytes.length ? "too large" : "empty");
+  if (!imageKind(bytes)) return plainResponse(415, "type");
+  const keys = tinifyKeys(env.TINIFY_KEYS);
+  if (!keys.length) return plainResponse(503, "unavailable");
+  return shrinkWithTinify(bytes, keys, fetcher);
+}
+
 // Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
 // Six months, no preload (the audit thread's advice), so a mistake can still be undone.
 const hsts = "max-age=15552000";
@@ -164,8 +258,9 @@ export function httpsRedirect(requestUrl) {
   return url.href;
 }
 
-async function serve(request, env) {
+async function serve(request, env, fetcher) {
   const url = new URL(request.url);
+  if (url.pathname === "/compress" && request.method === "POST") return compressResponse(request, env, fetcher);
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
@@ -185,10 +280,11 @@ async function serve(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  // `fetcher` is only passed by the tests, to stand in for TinyPNG.
+  async fetch(request, env, _ctx, fetcher = fetch) {
     const secure = httpsRedirect(request.url);
     if (secure) return new Response(null, { status: 301, headers: { Location: secure, "Cache-Control": "no-cache" } });
-    const response = await serve(request, env);
+    const response = await serve(request, env, fetcher);
     response.headers.set("Strict-Transport-Security", hsts);
     return response;
   },
