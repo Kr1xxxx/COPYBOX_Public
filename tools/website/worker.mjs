@@ -3,7 +3,9 @@
 // { type, sha256, size } is written by build.mjs (kv-bulk.json) and uploaded by deploy.mjs.
 // Plain http:// requests are sent to https:// (301), and every https answer carries HSTS, so a first download of the
 // installer cannot be swapped on the way (audit S2, 2026-10-14). The site no longer hosts the web preview (owner,
-// 2026-10-14): /preview/ is an ordinary 404.
+// 2026-10-14): /preview/ is an ordinary 404. /api/* is the account and sync API (api.mjs, D-063).
+
+import { handleApi, isApiPath } from "./api.mjs";
 
 const types = {
   html: "text/html; charset=utf-8",
@@ -166,6 +168,7 @@ export function httpsRedirect(requestUrl) {
 
 async function serve(request, env) {
   const url = new URL(request.url);
+  if (isApiPath(url.pathname)) return handleApi(request, env);
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
