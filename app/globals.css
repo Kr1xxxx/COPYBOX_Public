@@ -205,6 +205,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .daily-tips-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
 .daily-tips-preview { overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
 .tips-dialog { width: min(420px, 100%); }
+.tips-dialog .daily-tips-nav { flex: 0 0 auto; gap: 2px; margin: -4px -6px 0 12px; }
+.tips-dialog .daily-tips-nav button { width: 26px; height: 26px; border-radius: 7px; }
+.tips-dialog .daily-tips-nav .icon { width: 15px; height: 15px; }
 .tips-dialog:focus { outline: 0; }
 .tips-dialog .tips-text { max-width: 360px; margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
 .tips-dialog .tips-actions { grid-template-columns: 1fr; }

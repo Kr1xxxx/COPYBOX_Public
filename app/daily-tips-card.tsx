@@ -64,29 +64,43 @@ export function DailyTipsCard() {
       <div className="daily-tips">
         <div className="daily-tips-head">
           <span className="daily-tips-label">Tips</span>
-          <span className="daily-tips-nav">
-            <button type="button" aria-label="上一条" title="上一条" onClick={() => step(-1)}><Icon name="chevronLeft" /></button>
-            <button type="button" aria-label="下一条" title="下一条" onClick={() => step(1)}><Icon name="chevronRight" /></button>
-          </span>
+          <TipsNav onStep={step} />
         </div>
         <button ref={openRef} type="button" className="daily-tips-open" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
           <span className="daily-tips-title">{tip.title}</span>
           <span className="daily-tips-preview">{tipPreview(tip)}</span>
         </button>
       </div>
-      {open && createPortal(<DailyTipDialog tip={tip} onClose={close} />, document.body)}
+      {open && createPortal(<DailyTipDialog tip={tip} onStep={step} onClose={close} />, document.body)}
     </div>
   );
 }
 
-function DailyTipDialog({ tip, onClose }: { tip: Tip; onClose: () => void }) {
+// 上一条 / 下一条: the same two small arrows on the card and in the dialog. Both move the same browsed tip.
+function TipsNav({ onStep }: { onStep: (by: number) => void }) {
+  return (
+    <span className="daily-tips-nav">
+      <button type="button" aria-label="上一条" title="上一条" onClick={() => onStep(-1)}><Icon name="chevronLeft" /></button>
+      <button type="button" aria-label="下一条" title="下一条" onClick={() => onStep(1)}><Icon name="chevronRight" /></button>
+    </span>
+  );
+}
+
+function DailyTipDialog({ tip, onStep, onClose }: { tip: Tip; onStep: (by: number) => void; onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
   useEffect(() => { dialogRef.current?.focus(); }, []);
   useEffect(() => {
     const node = dialogRef.current;
     const onKey = (event: KeyboardEvent) => {
-      // The only control is 知道了, so focus stays on it instead of leaving the dialog.
-      if (event.key === "Tab") { event.preventDefault(); node?.querySelector<HTMLButtonElement>("button")?.focus(); return; }
+      // Tab moves between 上一条, 下一条 and 知道了 and never leaves the dialog.
+      if (event.key === "Tab") {
+        event.preventDefault();
+        const buttons = [...(node?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+        const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = at < 0 ? (event.shiftKey ? buttons.length - 1 : 0) : (at + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+        return;
+      }
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
@@ -100,6 +114,7 @@ function DailyTipDialog({ tip, onClose }: { tip: Tip; onClose: () => void }) {
       <section ref={dialogRef} className="backup-dialog tips-dialog" role="dialog" aria-modal="true" aria-labelledby="daily-tips-title" aria-describedby="daily-tips-text" tabIndex={-1} data-local-esc>
         <header className="backup-head">
           <div><p>Tips</p><h2 id="daily-tips-title">{tip.title}</h2></div>
+          <TipsNav onStep={onStep} />
         </header>
         <div className="backup-form">
           <div id="daily-tips-text" className="tips-body">
