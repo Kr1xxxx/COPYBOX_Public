@@ -109,11 +109,11 @@ test("Mac: 账号 has one sidebar with 分类 and counts, one search and one 新
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
   await expect(page.locator(".vault-tabs")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText(["登录0", "收款信息0", "API 密钥0", "验证码0", "恢复码0", "其他0"]);
+  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText(["登录0", "收款信息0", "API 密钥0", "验证码0", "恢复码0", "笔记0", "其他0"]);
   await expect(page.getByRole("heading", { name: "全部账号" })).toBeVisible();
   await expect(page.getByPlaceholder("搜索名称、网站、用户名")).toBeVisible();
   await accountAddButton(page).click();
-  await expect(page.getByRole("menu", { name: "新增什么" }).getByRole("menuitem")).toHaveText(["登录", "收款信息", "API 密钥", "验证码", "恢复码", "其他"]);
+  await expect(page.getByRole("menu", { name: "新增什么" }).getByRole("menuitem")).toHaveText(["登录", "收款信息", "API 密钥", "验证码", "恢复码", "笔记", "其他"]);
   await page.getByRole("menu", { name: "新增什么" }).getByRole("menuitem", { name: "登录" }).click();
   await expect(page.getByPlaceholder("例如：Shopify 后台")).toBeVisible();
   await expect(page.getByRole("dialog", { name: "保险箱" })).toHaveCount(0);

@@ -1468,3 +1468,29 @@ button { -webkit-tap-highlight-color: transparent; }
 .guide-menubar { top: 0; }
 .guide-tray-icon { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .guide-shield { position: absolute; bottom: -8px; left: -12px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--ok-bg); color: var(--ok); box-shadow: 0 0 0 2px var(--content); }
+
+/* 账号 · 笔记: Markdown view, editor tabs and the 转为登录 preview */
+.note-badge{flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:color-mix(in srgb,#8a7a5c 16%,transparent);color:#8a7a5c}
+.note-md{font-size:13px;line-height:1.6;color:var(--ink);overflow-wrap:anywhere;user-select:text}
+.note-md>*{margin:0 0 6px}
+.note-md>*:last-child{margin-bottom:0}
+.note-md h3{font-size:15px}.note-md h4{font-size:14px}.note-md h5,.note-md h6{font-size:13px}
+.note-md ul,.note-md ol{padding-left:20px}
+.note-md ul{list-style:disc}.note-md ol{list-style:decimal}
+.note-md li.note-task{list-style:none;margin-left:-20px;display:flex;gap:6px;align-items:baseline}
+.note-md code{padding:1px 4px;border-radius:4px;background:var(--hover);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+.note-md pre{padding:8px 10px;border-radius:8px;background:var(--hover);overflow-x:auto}
+.note-md pre code{padding:0;background:none}
+.note-md blockquote{padding-left:10px;border-left:3px solid var(--line);color:var(--muted)}
+.note-md hr{border:0;border-top:1px solid var(--line)}
+.note-md a{color:var(--accent)}
+.note-empty{color:var(--muted)}
+.note-edit-head{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:11.5px}
+.note-edit-tabs{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px}
+.note-tab{height:22px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer}
+.note-tab.active{background:var(--hover);color:var(--ink);font-weight:600}
+.note-preview,.note-source{min-height:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.note-source{min-height:0;border-style:dashed}
+.note-map-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);gap:8px;align-items:end}
+.note-map-row select{min-width:0}
+@media (max-width:520px){.note-map-row{grid-template-columns:1fr}}

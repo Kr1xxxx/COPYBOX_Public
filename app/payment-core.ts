@@ -62,6 +62,18 @@ export type LoginItem = EntryMeta & {
   // Id of a 验证码 account (clipbox.totp.v1) whose current code is shown with this login.
   totpId?: string;
   note: string;
+  // Set when this login was made from a 笔记 (「转为登录」): the note exactly as it was, so 还原 can bring it back.
+  fromNote?: NoteItem;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// 笔记: free text written in Markdown. Nothing in it is hidden; it is encrypted like every other entry.
+export type NoteItem = EntryMeta & {
+  id: string;
+  type: "note";
+  name: string;
+  body: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -85,7 +97,7 @@ export type MarkItem = {
   type: "mark";
   // "legacy:<id>" for an old 秘密 entry, "<type>:<id>" for a 保险箱 entry.
   target: string;
-  as?: "login" | "payment" | "apikey" | "totp" | "recovery" | "other";
+  as?: "login" | "payment" | "apikey" | "totp" | "recovery" | "note" | "other";
   site?: string;
   updatedAt: number;
 };

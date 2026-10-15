@@ -1,7 +1,7 @@
 // What the 账号 page (Mac) shows: entries of every type, grouped one card per website. Pure functions, no storage.
 import type { Site } from "./site-core.ts";
 
-export type EntryKind = "login" | "payment" | "apikey" | "recovery" | "totp" | "other";
+export type EntryKind = "login" | "payment" | "apikey" | "recovery" | "totp" | "note" | "other";
 
 export type AccountEntry = {
   id: string; tab: EntryKind; title: string; hint: string; site: Site;
@@ -12,13 +12,17 @@ export type AccountEntry = {
   target: string; autoTab: EntryKind; autoSite: Site;
   // The one most useful thing to copy from this entry (password, code, key, whole payment block); none for old entries.
   copy?: { label: string; text: () => Promise<string> };
+  // More text the search looks in (a note's whole content).
+  search?: string;
 };
 
-export const TYPE_LABEL: Record<EntryKind, string> = { login: "登录", payment: "收款", apikey: "API", recovery: "恢复", totp: "验证码", other: "其他" };
-export const CATEGORY_LABEL: Record<EntryKind, string> = { login: "登录", payment: "收款信息", apikey: "API 密钥", recovery: "恢复码", totp: "验证码", other: "其他" };
-export const CATEGORY_ORDER: EntryKind[] = ["login", "payment", "apikey", "totp", "recovery", "other"];
+export const TYPE_LABEL: Record<EntryKind, string> = { login: "登录", payment: "收款", apikey: "API", recovery: "恢复", totp: "验证码", note: "笔记", other: "其他" };
+export const CATEGORY_LABEL: Record<EntryKind, string> = { login: "登录", payment: "收款信息", apikey: "API 密钥", recovery: "恢复码", totp: "验证码", note: "笔记", other: "其他" };
+export const CATEGORY_ORDER: EntryKind[] = ["login", "payment", "apikey", "totp", "recovery", "note", "other"];
 
 export const UNKNOWN_SITE: Site = { key: "other", name: "其他网站", color: "#8a8a85", letter: "·" };
+// Notes are not about one website: they sit together in one card unless Lock gives one a website.
+export const NOTE_SITE: Site = { key: "note", name: "笔记", color: "#8a7a5c", letter: "记" };
 export const PAYMENT_SITE: Site = { key: "payment", name: "收款信息", color: "#4a7a68", letter: "收" };
 
 export type SiteGroup = { key: string; title: string; site: Site; entries: AccountEntry[] };
@@ -38,12 +42,12 @@ export function mergeSiteKeys(entries: AccountEntry[]): AccountEntry[] {
   return entries.map((entry) => {
     const key = entry.site.key;
     const label = key.startsWith("name:") ? key.slice(5) : entry.site.name.toLowerCase();
-    const same = !domainOf(key) && key !== "payment" && key !== "other" ? domains.get(label) : undefined;
+    const same = !domainOf(key) && key !== "payment" && key !== "other" && key !== "note" ? domains.get(label) : undefined;
     return same ? { ...entry, site: same } : entry;
   });
 }
 
-// One card per website, A to Z; 其他网站 after them and 收款 last (payment is not a website, so every payment entry goes there).
+// One card per website, A to Z; 其他网站 after them, then 笔记, and 收款 last (payment is not a website, so every payment entry goes there).
 export function groupBySite(entries: AccountEntry[]): SiteGroup[] {
   const groups = new Map<string, SiteGroup>();
   for (const entry of mergeSiteKeys(entries)) {
@@ -53,12 +57,12 @@ export function groupBySite(entries: AccountEntry[]): SiteGroup[] {
     group.entries.push(entry);
     groups.set(key, group);
   }
-  const rank = (group: SiteGroup) => (group.key === "payment" ? 2 : group.key === "other" ? 1 : 0);
+  const rank = (group: SiteGroup) => (group.key === "payment" ? 3 : group.key === "note" ? 2 : group.key === "other" ? 1 : 0);
   return [...groups.values()].sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title, "zh-CN"));
 }
 
 export function matchesQuery(entry: AccountEntry, query: string): boolean {
   const text = query.trim().toLowerCase();
   if (!text) return true;
-  return [entry.title, entry.site.name, entry.hint].some((part) => part.toLowerCase().includes(text));
+  return [entry.title, entry.site.name, entry.hint, entry.search ?? ""].some((part) => part.toLowerCase().includes(text));
 }
