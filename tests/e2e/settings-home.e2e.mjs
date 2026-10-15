@@ -29,9 +29,10 @@ test("Settings home shows the version and update date at the top, plus 账号 an
   await expect(card.getByLabel("企业同步码")).toHaveValue("");
   await expect(card.getByRole("button", { name: "立即同步" })).toBeDisabled();
 
-  // 安全设置 goes to the 安全 card; 打开账号页 closes Settings on the 账号 page.
+  // 安全设置 goes to the 安全 page (D-070); 打开账号页 closes Settings on the 账号 page.
   await card.getByRole("button", { name: "安全设置" }).click();
-  await expect(dialog.locator("#set-security")).toBeInViewport();
+  await expect(dialog.getByRole("tab", { name: "安全" })).toHaveAttribute("aria-selected", "true");
+  await expect(dialog.locator("section[aria-labelledby=set-security]")).toBeInViewport();
   await dialog.getByRole("tab", { name: "概览" }).click();
   await card.getByRole("button", { name: "打开账号页" }).click();
   await expect(dialog).toHaveCount(0);

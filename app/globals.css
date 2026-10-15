@@ -793,6 +793,7 @@ button { -webkit-tap-highlight-color: transparent; }
   :root:not([data-theme="light"]) .backup-actions button, :root:not([data-theme="light"]) .snippet-dialog-actions button, :root:not([data-theme="light"]) .delete-confirm-actions button { background: var(--card); border-color: var(--border); color: var(--ink-2); }
   :root:not([data-theme="light"]) .backup-actions button.primary, :root:not([data-theme="light"]) .snippet-dialog-actions button.primary, :root:not([data-theme="light"]) .delete-confirm-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   :root:not([data-theme="light"]) .backup-error, :root:not([data-theme="light"]) .import-errors, :root:not([data-theme="light"]) .delete-confirm-error { background: var(--danger-bg); }
+  :root:not([data-theme="light"]) .delete-confirm-item strong { color: var(--ink); }
   :root:not([data-theme="light"]) .import-folder-list span { background: var(--accent-tint); color: var(--accent-ink); }
   :root:not([data-theme="light"]) .vault-body { background: var(--card); }
 }
@@ -818,6 +819,7 @@ button { -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .backup-actions button, :root[data-theme="dark"] .snippet-dialog-actions button, :root[data-theme="dark"] .delete-confirm-actions button { background: var(--card); border-color: var(--border); color: var(--ink-2); }
 :root[data-theme="dark"] .backup-actions button.primary, :root[data-theme="dark"] .snippet-dialog-actions button.primary, :root[data-theme="dark"] .delete-confirm-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 :root[data-theme="dark"] .backup-error, :root[data-theme="dark"] .import-errors, :root[data-theme="dark"] .delete-confirm-error { background: var(--danger-bg); }
+:root[data-theme="dark"] .delete-confirm-item strong { color: var(--ink); }
 :root[data-theme="dark"] .import-folder-list span { background: var(--accent-tint); color: var(--accent-ink); }
 :root[data-theme="dark"] .vault-body { background: var(--card); }
 

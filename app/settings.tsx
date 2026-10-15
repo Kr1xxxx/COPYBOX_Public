@@ -19,10 +19,12 @@ import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeC
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 import { BrandWordmark } from "./brand-wordmark";
 import { TipsImportRow } from "./tips-import";
+import { AutoLockRow } from "./account-auto-lock-ui";
+import type { AutoLockSeconds } from "./account-auto-lock";
 import { AutomationTrustRows, automationCardShown, useTrustedCallers } from "./automation-trust-ui";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
-const SETTINGS_TABS = [["look", "概览"], ["folders", "目录"], ["data", "数据"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
+const SETTINGS_TABS = [["look", "概览"], ["folders", "目录"], ["data", "数据"], ["security", "安全"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number][0];
 
 function backupAgeLabel(at: number) {
@@ -32,7 +34,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   // Shown only with testTools (the browser and the web preview), never in the installed app: employees don't need them.
   testTools?: boolean; onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
@@ -50,7 +52,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
-  onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; slideUnlock: { on: boolean; onChange: (on: boolean) => void }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
+  onClose: () => void; onExport: () => void; onExportSecret: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; slideUnlock: { on: boolean; onChange: (on: boolean) => void }; autoLock: { seconds: AutoLockSeconds; onChange: (seconds: AutoLockSeconds) => void }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
   // Settings home → 账号: close Settings and show the 账号 page.
   onOpenAccount: () => void;
   syncCode: ReactNode;
@@ -166,7 +168,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
           </section>
           <section className="settings-card" aria-labelledby="set-home-account" hidden={hideSection("look", "set-home-account")}><h3 id="set-home-account">账号与同步</h3>
             <div className="settings-row"><div><strong>账号</strong><small>登录、付款、API Key 和验证码 · {accountLock.mode !== "none" ? "已设账号页密码" : slideUnlock.on ? "打开时先滑动解锁" : "打开就能看到"}</small></div>
-              <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => goToCard("data", "set-security")}>安全设置</button><button type="button" className="secondary-button" onClick={onOpenAccount}>打开账号页</button></div></div>
+              <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => goToCard("security", "set-security")}>安全设置</button><button type="button" className="secondary-button" onClick={onOpenAccount}>打开账号页</button></div></div>
             {syncCode}
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-folders" hidden={hideSection("folders", "set-folders")}><h3 id="set-folders">目录</h3>
@@ -207,18 +209,20 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
                 : <button type="button" className="secondary-button" disabled={trashCount === 0} onClick={() => setConfirmEmpty(true)}>清空…</button>}
             </div>
           </section>
-          <section className="settings-card" aria-labelledby="set-security" hidden={hideSection("data", "set-security")}><h3 id="set-security">安全</h3>
+          <section className="settings-card" data-solo="" aria-labelledby="set-security" hidden={hideSection("security", "set-security")}><h3 id="set-security">安全</h3>
             <AccountLockSettings mode={accountLock.mode} deviceKey={accountLock.deviceKey} onChanged={accountLock.onChanged} onCodeShowing={(showing) => { codeShowingRef.current = showing; }} />
             {/* D-051: the 账号 page is frosted until slid open; with 账号页密码 set, the password is the only gate. */}
             <div className="settings-row"><div><strong>打开账号页先滑动解锁</strong><small>{accountLock.mode !== "none" ? "已设账号页密码，现在只需输入密码" : "没滑开之前，账号内容是模糊的"}</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="打开账号页先滑动解锁" value={slideUnlock.on ? "on" : "off"} onSelect={(value) => slideUnlock.onChange(value === "on")}
                 options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
             </div>
+            {/* D-070: after it is opened, the 账号 page closes again once nobody has touched the app for this long. */}
+            <AutoLockRow seconds={autoLock.seconds} hasLock={accountLock.mode !== "none" || slideUnlock.on} onChange={autoLock.onChange} />
             <p className="settings-note">内容用 AES-256 加密，只保存在这台设备上，不会上传。</p>
             <p className="settings-note">密钥也放在这台电脑里，请不要把整个数据文件夹拷给别人。自动备份和数据放在一起，保护程度一样；要带走备份，请用带密码的「完整备份」。{PLAIN_NOTES ? "" : `复制${SECRET_WORD}默认只给出引用。`}</p>
             <p className="settings-note">只有新添加的图片会在保存前发给压缩服务压缩，别的内容不会发出去。</p>
           </section>
-          {automationCardShown(isDesktop, trustedCallers.length) && <section className="settings-card" aria-labelledby="set-automation" hidden={hideSection("data", "set-automation")}><h3 id="set-automation">始终允许的程序</h3>
+          {automationCardShown(isDesktop, trustedCallers.length) && <section className="settings-card" aria-labelledby="set-automation" hidden={hideSection("security", "set-automation")}><h3 id="set-automation">始终允许的程序</h3>
             <AutomationTrustRows list={trustedCallers} />
             <p className="settings-note">「始终允许」按程序文件所在的位置认人。同一台电脑上别的程序也能冒用它，所以只给你信得过的工具。把秘密整份导出时，每次都会问。</p>
           </section>}

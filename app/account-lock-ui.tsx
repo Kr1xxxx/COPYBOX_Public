@@ -163,7 +163,7 @@ export function RecoveryCloseConfirm({ onCancel, onConfirm }: { onCancel: () => 
 type Mode = "idle" | "set" | "upgrade" | "change" | "remove" | "recovery";
 export type LockChange = (mode: LockMode, key: string | null) => void;
 
-// The 「账号页密码」 row in Settings → 数据 → 安全. A password now also encrypts the 账号 data, and comes with a recovery code.
+// The 「账号页密码」 row in Settings → 安全. A password now also encrypts the 账号 data, and comes with a recovery code.
 // onCodeShowing: told whenever a recovery code appears on screen or goes away, so 设置 can ask before closing over it.
 export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCodeShowing }: { mode: LockMode; deviceKey: string; onChanged: LockChange; onCodeShowing?: (showing: boolean) => void }) {
   const [mode, setMode] = useState<Mode>("idle");

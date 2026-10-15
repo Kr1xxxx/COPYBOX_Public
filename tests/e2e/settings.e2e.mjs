@@ -118,7 +118,7 @@ test("回收站 auto-cleanup starts at 7 days", async ({ page }) => {
 test("Settings has two columns: groups on the left, the chosen group on the right, 概览 first", async ({ page }) => {
   const dialog = page.locator(".settings-dialog");
   const tabs = dialog.getByRole("tab");
-  await expect(tabs).toHaveText(["概览", "目录", "数据", "使用排行", "窗口", "AI", "关于"]);
+  await expect(tabs).toHaveText(["概览", "目录", "数据", "安全", "使用排行", "窗口", "AI", "关于"]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   // Only the chosen group is shown.
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeVisible();
@@ -127,11 +127,15 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog.getByText("导入备份")).toBeVisible();
   await expect(dialog.getByRole("radiogroup", { name: "回收站自动清理" })).toBeVisible();
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeHidden();
-  // No jargon in the security note, apart from the one line the owner asked for word for word (2026-10-13).
-  await expect(dialog).not.toContainText(/PBKDF2/);
-  await expect(dialog).toContainText("内容用 AES-256 加密，只保存在这台设备上");
   // Arrow keys move between groups.
   await dialog.getByRole("tab", { name: "数据" }).press("ArrowDown");
+  await expect(dialog.getByRole("tab", { name: "安全" })).toHaveAttribute("aria-selected", "true");
+  // 安全 holds the 账号 page locks (D-070). No jargon in the security note, apart from the one line the owner asked for word for word (2026-10-13).
+  await expect(dialog.getByRole("radiogroup", { name: "账号页自动上锁" })).toBeVisible();
+  await expect(dialog.getByRole("radiogroup", { name: "回收站自动清理" })).toBeHidden();
+  await expect(dialog).not.toContainText(/PBKDF2/);
+  await expect(dialog).toContainText("内容用 AES-256 加密，只保存在这台设备上");
+  await dialog.getByRole("tab", { name: "安全" }).press("ArrowDown");
   await expect(dialog.getByRole("tab", { name: "使用排行" })).toHaveAttribute("aria-selected", "true");
   await dialog.getByRole("tab", { name: "使用排行" }).press("ArrowDown");
   await expect(dialog.getByRole("tab", { name: "窗口" })).toHaveAttribute("aria-selected", "true");

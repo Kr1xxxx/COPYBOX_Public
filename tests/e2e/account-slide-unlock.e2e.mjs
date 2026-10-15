@@ -150,7 +150,7 @@ for (const platform of ["win32", "darwin"]) {
     await seedSnippets(page);
     await page.getByRole("button", { name: /设置/ }).first().click();
     const settings = page.getByRole("dialog", { name: "设置" });
-    await settings.getByRole("tab", { name: "数据" }).click();
+    await settings.getByRole("tab", { name: "安全" }).click();
     const row = settings.locator(".settings-row", { hasText: "打开账号页先滑动解锁" });
     await expect(row).toContainText("没滑开之前，账号内容是模糊的");
     const choice = row.getByRole("radiogroup", { name: "打开账号页先滑动解锁" });
@@ -175,7 +175,7 @@ test("with the 账号页密码 set, only the password screen guards the page: no
   await seedSnippets(page);
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   await settings.getByRole("button", { name: "设置…" }).click();
   await settings.getByLabel("新密码", { exact: true }).fill("abcd1234");
   await settings.getByLabel("再输入一次新密码").fill("abcd1234");
