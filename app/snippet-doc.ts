@@ -67,7 +67,7 @@ export function parseSnippetDocument(markdown: string): { folders: string[]; ite
   return { folders, items };
 }
 
-export const SNIPPET_DOC_EXTENSIONS = /\.(md|markdown|txt)$/i;
+export const SNIPPET_DOC_EXTENSIONS = /\.md$/i;
 export const SNIPPET_DOC_EMPTY = "没有找到话术：目录要用 ## 开头，每条话术的标题用 **标题**";
 
 function signature(item: Pick<SecretItem, "kind" | "label" | "secret">) {

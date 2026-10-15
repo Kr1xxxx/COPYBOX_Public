@@ -185,7 +185,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
               </div>
             )}
             {row("导入备份", "读取话术备份或账号备份文件，可选择合并或覆盖", onImport, "选择文件…")}
-            {row("导入话术表格", "读取表格（.xlsx / .csv）或话术文档（.md / .txt），只在本机解析", onImportSheet, "选择文件…")}
+            {row("导入话术表格", "读取表格（.xlsx / .csv）或话术文档（.md），只在本机解析", onImportSheet, "选择文件…")}
             {row("完整备份", "话术、账号、图片和设置，全部打包成一个带密码的文件", () => setDataMove("export"), "导出…")}
             {row("从完整备份恢复", "读取完整备份文件，替换这里现有的全部内容，替换前会再问你一次", () => setDataMove("import"), "选择文件…")}
             <AutoBackupRows itemCount={itemCount} />

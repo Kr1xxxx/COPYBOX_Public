@@ -1852,7 +1852,7 @@ export default function Home() {
 
   async function prepareSnippetImport(file: File) {
     try {
-      // A 话术 document (.md / .txt, D-067) brings its own folders; a spreadsheet uses the standard ones.
+      // A 话术 document (.md, D-067) brings its own folders; a spreadsheet uses the standard ones.
       const preview = SNIPPET_DOC_EXTENSIONS.test(file.name)
         ? buildSnippetDocImportPreview(await file.text(), itemsRef.current, () => crypto.randomUUID(), timestampNow())
         : buildSnippetImportPreview(await parseSnippetWorkbook(await file.arrayBuffer(), file.name), itemsRef.current, () => crypto.randomUUID(), timestampNow());
@@ -2221,7 +2221,7 @@ export default function Home() {
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
-              <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,.md,.markdown,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
+              <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,.md,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
             </div>
           </aside>
           {menuFolder && <>
