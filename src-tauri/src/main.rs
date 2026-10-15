@@ -5,6 +5,7 @@ mod automation;
 mod backup;
 mod device_key;
 mod flush;
+mod mcp;
 // Windows only; elsewhere just the pure decision logic and its tests (D-046).
 #[cfg_attr(not(windows), allow(dead_code))]
 mod old_autostart;
@@ -39,7 +40,18 @@ fn start_hidden() -> bool {
     std::env::args().any(|a| a == "--hidden")
 }
 
+/// The command an AI tool runs to reach this app (`<this program> --mcp`); shown in 设置 → AI.
+#[tauri::command]
+fn mcp_program_path() -> Option<String> {
+    std::env::current_exe().ok().map(|path| path.to_string_lossy().into_owned())
+}
+
 fn main() {
+    // `Copyboxx --mcp`: a tool such as Codex started us as its MCP server. No window; talk to the running app (D-058).
+    if mcp::is_mcp_launch(&std::env::args().collect::<Vec<_>>()) {
+        mcp::run();
+        return;
+    }
     let app = tauri::Builder::default()
         // A second launch brings the first window back instead of opening another.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| shell::show_window(app, false)))
@@ -87,6 +99,7 @@ fn main() {
             update::install_update,
             automation::automation_ready,
             automation::automation_response,
+            mcp_program_path,
         ])
         .setup(|app| {
             // An older product name's launch-at-login entry would start the old copy at login (D-046).

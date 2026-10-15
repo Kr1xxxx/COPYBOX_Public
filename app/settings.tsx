@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "./arc/motion-tokens";
 import { AiSettingsSection } from "./ai-settings";
 import { ImageCompressSettings } from "./image-compress-settings";
+import { McpConnectRows } from "./mcp-connect-ui";
 import { ArcSegmented } from "./arc/segmented";
 import { formatBuildTime, formatTaipeiDate, type SecretItem } from "./clipbox-core";
 import { UsageSection } from "./usage-section";
@@ -241,6 +242,9 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-ai" hidden={hideSection("ai", "set-ai")}><h3 id="set-ai">AI</h3>
             <AiSettingsSection localAiAvailable={aiAvailable} />
+          </section>
+          <section className="settings-card" aria-labelledby="set-mcp" hidden={hideSection("ai", "set-mcp")}><h3 id="set-mcp">连接 Codex 等工具</h3>
+            <McpConnectRows />
           </section>
           <section className="settings-card" data-solo="" aria-labelledby="set-about" hidden={hideSection("about", "set-about")}><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong>Copyboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>

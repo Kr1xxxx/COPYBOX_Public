@@ -58,9 +58,12 @@ export type ClipboxDesktop = {
   onFocusSearch: (callback: () => void) => () => void;
   onFlushRequest?: (callback: () => void) => () => void;
   flushDone?: () => void;
-  onAutomationCommand: (callback: (request: { requestId: string; command: unknown }) => void) => () => void;
+  // `client` is the name the program gave for itself (e.g. "Codex" through the MCP server); not proven, may be absent.
+  onAutomationCommand: (callback: (request: { requestId: string; command: unknown; client?: string | null }) => void) => () => void;
   respondAutomationCommand: (requestId: string, response: unknown) => void;
   automationReady: () => void;
+  // The program AI tools start as Copyboxx's MCP server (`<path> --mcp`, D-058); older shells lack it.
+  mcpProgramPath?: () => Promise<string | null>;
   setWindowMode?: (mode: WindowMode) => void;
   // 固定在最上层: keeps the full window above other windows (the mini window always is).
   setPinned?: (pinned: boolean) => void;

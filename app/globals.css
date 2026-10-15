@@ -1467,3 +1467,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .guide-menubar { top: 0; }
 .guide-tray-icon { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .guide-shield { position: absolute; bottom: -8px; left: -12px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--ok-bg); color: var(--ok); box-shadow: 0 0 0 2px var(--content); }
+
+/* 设置 → AI → 连接 Codex 等工具: a command to copy (D-058). */
+.settings-row.mcp-connect-row { align-items: start; padding-block: 10px; }
+.settings-row.mcp-connect-row > div { min-width: 0; flex: 1; }
+.mcp-connect-code { margin: 6px 0 0; padding: 6px 8px; border-radius: 6px; background: var(--hover); font: 11.5px/1.5 var(--font-geist-mono), ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
