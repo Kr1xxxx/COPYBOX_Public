@@ -67,9 +67,14 @@ fn display_name(path: &str) -> String {
 }
 
 /// The program that asked, given the processes from the socket's peer upwards (`chain[0]` is the peer itself).
-pub fn pick_caller(chain: &[Proc]) -> Option<Caller> {
+/// `own_exe` is Copyboxx's own executable: a copy of the app that relays for another tool (`Copyboxx --mcp`) is
+/// passed through too, so 「始终允许」 names that tool and never Copyboxx itself.
+pub fn pick_caller(chain: &[Proc], own_exe: Option<&str>) -> Option<Caller> {
     // chain[0] is the `clipbox` command that opened the socket; who started it is the caller.
     for process in chain.iter().skip(1) {
+        if own_exe.is_some_and(|own| own == process.exe) {
+            continue;
+        }
         let exe_name = base_name(&process.exe);
         let started_as = process.args.first().map(|a| base_name(a)).unwrap_or_default();
         if PASS_THROUGH.contains(&exe_name.as_str()) || PASS_THROUGH.contains(&started_as.as_str()) {
@@ -88,7 +93,7 @@ pub fn pick_caller(chain: &[Proc]) -> Option<Caller> {
 }
 
 /// Walks up from `pid` with `read` (one process's details, or None when it cannot be read) and picks the caller.
-pub fn identify_with(pid: u32, read: impl Fn(u32) -> Option<Proc>) -> Option<Caller> {
+pub fn identify_with(pid: u32, own_exe: Option<&str>, read: impl Fn(u32) -> Option<Proc>) -> Option<Caller> {
     let mut chain = Vec::new();
     let mut next = pid;
     while next > 1 && chain.len() < MAX_DEPTH {
@@ -97,7 +102,7 @@ pub fn identify_with(pid: u32, read: impl Fn(u32) -> Option<Proc>) -> Option<Cal
         next = process.parent;
         chain.push(process);
     }
-    pick_caller(&chain)
+    pick_caller(&chain, own_exe)
 }
 
 #[cfg(target_os = "linux")]
@@ -137,7 +142,8 @@ fn read_process(pid: u32) -> Option<Proc> {
 /// The program behind the process `pid`, or None when it cannot be told.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn identify(pid: u32) -> Option<Caller> {
-    identify_with(pid, read_process)
+    let own = std::env::current_exe().ok().map(|path| path.to_string_lossy().into_owned());
+    identify_with(pid, own.as_deref(), read_process)
 }
 
 #[cfg(test)]
@@ -156,7 +162,7 @@ mod tests {
             proc(5, "/usr/bin/sandbox-exec", &["sandbox-exec", "-p", "…"]),
             proc(1, "/opt/homebrew/lib/node_modules/@openai/codex/vendor/aarch64-apple-darwin/codex/codex", &["codex"]),
         ];
-        let caller = pick_caller(&chain).unwrap();
+        let caller = pick_caller(&chain, None).unwrap();
         assert_eq!(caller.name, "codex");
         assert_eq!(caller.id, "/opt/homebrew/lib/node_modules/@openai/codex/vendor/aarch64-apple-darwin/codex/codex");
     }
@@ -169,7 +175,7 @@ mod tests {
             proc(7, "/usr/bin/login", &["login", "-pf", "a"]),
             proc(1, "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", &["Terminal"]),
         ];
-        assert_eq!(pick_caller(&chain).unwrap().name, "Terminal");
+        assert_eq!(pick_caller(&chain, None).unwrap().name, "Terminal");
     }
 
     #[test]
@@ -179,26 +185,38 @@ mod tests {
             proc(8, "/bin/bash", &["bash", "-c", "clipbox secret-get x"]),
             proc(1, "/usr/bin/node", &["node", "--no-warnings", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"]),
         ];
-        let caller = pick_caller(&chain).unwrap();
+        let caller = pick_caller(&chain, None).unwrap();
         assert_eq!(caller.name, "claude-code");
         assert_eq!(caller.id, "/usr/bin/node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js");
         // Another script on the same node is another program.
         let other = [chain[0].clone(), chain[1].clone(), proc(1, "/usr/bin/node", &["node", "/tmp/grab.js"])];
-        let other = pick_caller(&other).unwrap();
+        let other = pick_caller(&other, None).unwrap();
         assert_eq!(other.name, "grab");
         assert_ne!(other.id, caller.id);
         // A runtime with no script (an interactive node) cannot be remembered.
         let bare = [chain[0].clone(), proc(1, "/usr/bin/node", &["node"])];
-        assert_eq!(pick_caller(&bare), None);
+        assert_eq!(pick_caller(&bare, None), None);
         assert_eq!(display_name("/x/@openai/codex/bin/codex.js"), "codex");
         assert!(is_runtime("python3.12") && !is_runtime("pythonista"));
     }
 
     #[test]
+    fn copyboxx_relaying_for_another_tool_is_passed_through() {
+        let own = "/Applications/Copyboxx.app/Contents/MacOS/Copyboxx";
+        let chain = [
+            proc(9, own, &["Copyboxx", "--mcp"]),
+            proc(8, own, &["Copyboxx", "--mcp"]),
+            proc(1, "/Applications/Codex.app/Contents/Resources/codex", &["codex"]),
+        ];
+        assert_eq!(pick_caller(&chain, Some(own)).unwrap().name, "Codex");
+        assert_eq!(pick_caller(&chain[..2], Some(own)), None);
+    }
+
+    #[test]
     fn nothing_is_remembered_when_only_the_system_is_above() {
         let chain = [proc(9, "/usr/bin/node", &["node", "clipbox"]), proc(1, "/bin/sh", &["sh"]), proc(0, "/sbin/launchd", &["launchd"])];
-        assert_eq!(pick_caller(&chain), None);
-        assert_eq!(pick_caller(&chain[..1]), None);
+        assert_eq!(pick_caller(&chain, None), None);
+        assert_eq!(pick_caller(&chain[..1], None), None);
     }
 
     #[test]
@@ -209,9 +227,9 @@ mod tests {
             10 => Some(proc(1, "/Applications/Codex.app/Contents/Resources/codex", &["codex"])),
             _ => None,
         };
-        assert_eq!(identify_with(30, table).unwrap().name, "Codex");
+        assert_eq!(identify_with(30, None, table).unwrap().name, "Codex");
         // A process that vanished half way: nobody is named.
-        assert_eq!(identify_with(30, |pid| if pid == 30 { table(30) } else { None }), None);
+        assert_eq!(identify_with(30, None, |pid| if pid == 30 { table(30) } else { None }), None);
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]

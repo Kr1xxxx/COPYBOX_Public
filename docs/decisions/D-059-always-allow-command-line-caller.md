@@ -5,7 +5,7 @@
 - Decision: the question gets a third button 「始终允许」 next to 拒绝 / 允许. The desktop shell works out who asked:
   the socket gives the process id of the `clipbox` command (kernel peer credentials), and the shell walks up its parents
   past shells and launchers (sh, zsh, bash, env, login, sandbox-exec, …) to the first real program
-  (`src-tauri/src/caller.rs`). That program is remembered by the full path of its executable file (from the system,
+  (`src-tauri/src/caller.rs`); a copy of Copyboxx itself that relays for another tool (`Copyboxx --mcp`, D-060) is passed through as well, so Copyboxx is never the one remembered. That program is remembered by the full path of its executable file (from the system,
   not from what the program calls itself), and for node / python / ruby / perl / bun / deno also by the script it runs,
   so another script on the same runtime is still asked. A remembered program reads or checks one 秘密 without the
   question and the window shows 「已自动允许「…」读取秘密」. Exporting all 秘密 (`secret-export`) is always asked and
