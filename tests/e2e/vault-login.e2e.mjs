@@ -28,10 +28,27 @@ test("账号密码: add, hold to show, copy, generate a password, and the 全部
   const dialog = await openVault(page);
   await expect(dialog).toContainText("还没有账号");
   await addLogin(dialog, { name: "Shopify 后台", url: "admin.shopify.com", user: "boss@example.com", pass: "s3cret!Pass" });
-  // The password is hidden until the eye button is held.
+  // The password is hidden; 「按住显示」 shows it only while held, 「显示」 keeps it shown until clicked again.
   await expect(dialog).toContainText("••••••••••");
   await expect(dialog).not.toContainText("s3cret!Pass");
-  const eye = dialog.getByRole("button", { name: "显示密码" });
+  const toggle = dialog.getByRole("button", { name: "显示密码", exact: true });
+  await expect(toggle).toHaveText("显示");
+  await toggle.click();
+  await expect(dialog).toContainText("s3cret!Pass");
+  await page.waitForTimeout(300);
+  await expect(dialog).toContainText("s3cret!Pass");
+  const hideButton = dialog.getByRole("button", { name: "隐藏密码", exact: true });
+  await expect(hideButton).toHaveAttribute("aria-pressed", "true");
+  await hideButton.click();
+  await expect(dialog).not.toContainText("s3cret!Pass");
+  // Left shown, then the entry is folded and opened again: it is hidden again.
+  await toggle.click();
+  await expect(dialog).toContainText("s3cret!Pass");
+  await dialog.getByRole("button", { name: /Shopify 后台/ }).click();
+  await dialog.getByRole("button", { name: /Shopify 后台/ }).click();
+  await expect(dialog).not.toContainText("s3cret!Pass");
+  const eye = dialog.getByRole("button", { name: "按住显示密码" });
+  await expect(eye).toHaveText("按住显示");
   const box = await eye.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();

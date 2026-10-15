@@ -7,6 +7,7 @@ import { parseRecoveryCodes, recoveryProblem } from "./recovery-core";
 import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
 import { detectSite } from "./site-core";
+import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Icon } from "./ui-atoms";
 
 type Draft = { id: string | null; name: string; site: string; codes: string; note: string };
@@ -27,9 +28,9 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
   const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState("");
-  const [shown, setShown] = useState("");
+  const reveal = useReveal();
   const [copiedKey, setCopiedKey] = useState("");
-  const timers = useRef<{ copied?: ReturnType<typeof setTimeout>; shown?: ReturnType<typeof setTimeout> }>({});
+  const timers = useRef<{ copied?: ReturnType<typeof setTimeout> }>({});
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
     store.list().then((list) => { if (live) setItems(list.filter((entry): entry is RecoveryItem => entry.type === "recovery" && !entry.trashedAt)); }).catch((error: Error) => { if (live) setLoadError(error.message); });
     return () => { live = false; };
   }, [deviceKey]);
-  useEffect(() => () => { clearTimeout(timers.current.copied); clearTimeout(timers.current.shown); }, []);
+  useEffect(() => () => { clearTimeout(timers.current.copied); }, []);
   useEffect(() => { if (draft && !draft.id) nameRef.current?.focus(); }, [draft?.id, draft === null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function copy(key: string, text: string, message = "已复制") {
@@ -52,12 +53,6 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
     } catch {
       onToast("复制失败，请重试");
     }
-  }
-
-  function reveal(id: string) {
-    setShown(id);
-    clearTimeout(timers.current.shown);
-    timers.current.shown = setTimeout(() => setShown(""), 5000);
   }
 
   function setField<K extends keyof Draft>(field: K, value: Draft[K]) {
@@ -132,7 +127,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
             const open = openId === item.id;
             return (
               <li key={item.id} className={`pay-item${open ? " open" : ""}`}>
-                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); setShown(""); }}>
+                <button type="button" className="pay-head" aria-expanded={open} onClick={() => { setOpenId(open ? "" : item.id); setDeleteId(""); reveal.hide(); }}>
                   <SiteBadge site={siteOf(item)} />
                   <span className="totp-who"><strong>{item.name}</strong><small>{item.codes.length} 个恢复码</small></span>
                   <Icon name="chevron" className="pay-chevron" />
@@ -145,7 +140,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
                         return (
                           <div key={id} className="pay-field">
                             <dt>{index + 1}</dt>
-                            <dd className="login-pass">{shown === item.id ? code : "••••••••"}</dd>
+                            <dd className="login-pass">{reveal.isShown(item.id) ? code : "••••••••"}</dd>
                             <span className="login-pass-actions">
                               <button type="button" className={`icon-button pay-copy${copiedKey === id ? " copied" : ""}`} onClick={() => void copy(id, code)} aria-label={`复制第 ${index + 1} 个恢复码`} title="复制"><Icon name={copiedKey === id ? "check" : "copy"} /></button>
                             </span>
@@ -156,8 +151,7 @@ export function RecoveryPanel({ deviceKey, onToast, focusId, startAdding }: { de
                     </dl>
                     <p className="pay-meta">上次修改 {whenText(item.updatedAt)}</p>
                     <div className="pay-actions">
-                      <button type="button" className="secondary-button" aria-label="显示恢复码" title="按住显示"
-                        onPointerDown={() => reveal(item.id)} onPointerUp={() => setShown("")} onPointerLeave={() => setShown("")} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") reveal(item.id); }} onKeyUp={() => setShown("")}><Icon name="eye" />按住显示</button>
+                      <RevealButtons reveal={reveal} id={item.id} label="恢复码" className="secondary-button" />
                       <button type="button" className="secondary-button" onClick={() => void copy(`${item.id}:all`, item.codes.join("\n"), "已复制全部恢复码")}>复制全部</button>
                       <button type="button" className="secondary-button" onClick={() => { setDraft({ id: item.id, name: item.name, site: item.site, codes: item.codes.join("\n"), note: item.note }); setErrors({}); }}>修改</button>
                       {deleteId === item.id

@@ -27,7 +27,11 @@ test("API 密钥: service is guessed from the prefix, key is hidden until held, 
   await expect(dialog.getByRole("button", { name: /客服 AI 接口/ })).toContainText("Anthropic · 尾号 1234");
   await expect(dialog).toContainText("••••••••1234");
   await expect(dialog).not.toContainText("ABCDEFGH");
-  const eye = dialog.getByRole("button", { name: "显示密钥" });
+  await dialog.getByRole("button", { name: "显示密钥", exact: true }).click();
+  await expect(dialog).toContainText("sk-ant-api03-ABCDEFGH1234");
+  await dialog.getByRole("button", { name: "隐藏密钥", exact: true }).click();
+  await expect(dialog).not.toContainText("ABCDEFGH");
+  const eye = dialog.getByRole("button", { name: "按住显示密钥" });
   const box = await eye.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
