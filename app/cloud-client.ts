@@ -103,6 +103,15 @@ export function createCloudApi(transport: CloudTransport) {
       if (typeof body.version !== "number") throw new CloudError("server", MESSAGES.server);
       return body.version;
     },
+    // Company 话术 for this email's domain (bound on the server), in a 同步码 library's format; nulls when none.
+    async getLibrary(token: string) {
+      const body = await call(transport, { method: "GET", path: "/api/library", token });
+      const domain = typeof body.domain === "string" && body.domain.trim() ? body.domain.trim() : null;
+      const library = body.library;
+      // A library object or a bare list of entries (both read by parseSharedLibrary).
+      const text = library && typeof library === "object" ? JSON.stringify(library) : null;
+      return { domain, text };
+    },
     async logout(token: string) {
       await call(transport, { method: "POST", path: "/api/auth/logout", token });
     },

@@ -11,11 +11,12 @@ const BASE: &str = "https://copyboxx.com";
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// The page refuses to upload more than 5 MB; a little room for the JSON around it.
 const MAX_BYTES: usize = 6 * 1024 * 1024;
-const PATHS: [(&str, &str); 6] = [
+const PATHS: [(&str, &str); 7] = [
     ("POST", "/api/auth/code"),
     ("POST", "/api/auth/verify"),
     ("GET", "/api/vault"),
     ("PUT", "/api/vault"),
+    ("GET", "/api/library"),
     ("POST", "/api/auth/logout"),
     ("DELETE", "/api/account"),
 ];
@@ -87,7 +88,8 @@ mod tests {
         assert!(is_allowed("POST", "/api/auth/code"));
         assert!(is_allowed("PUT", "/api/vault"));
         assert!(is_allowed("DELETE", "/api/account"));
-        for (method, path) in [("GET", "/api/account"), ("POST", "/api/vault/../x"), ("GET", "https://evil.example/api/vault"), ("GET", "//evil.example/api/vault"), ("PATCH", "/api/vault"), ("GET", "")] {
+        assert!(is_allowed("GET", "/api/library"));
+        for (method, path) in [("GET", "/api/account"), ("POST", "/api/vault/../x"), ("GET", "https://evil.example/api/vault"), ("GET", "//evil.example/api/vault"), ("PATCH", "/api/vault"), ("PUT", "/api/library"), ("GET", "/api/library/../vault"), ("GET", "")] {
             assert!(!is_allowed(method, path), "{method} {path}");
         }
     }
