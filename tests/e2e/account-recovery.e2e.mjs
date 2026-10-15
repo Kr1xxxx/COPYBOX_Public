@@ -7,7 +7,7 @@ const CODE = /^[A-Z2-9]{4}(-[A-Z2-9]{4}){4}$/;
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   return settings;
 }
 

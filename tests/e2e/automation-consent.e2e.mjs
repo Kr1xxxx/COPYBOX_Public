@@ -69,7 +69,7 @@ test("macOS: with a 账号 password set, a 秘密 request is refused without ask
   await withAutomation(page);
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   await settings.getByRole("button", { name: "设置…" }).click();
   await settings.getByLabel("新密码", { exact: true }).fill("abcd1234");
   await settings.getByLabel("再输入一次新密码").fill("abcd1234");
@@ -142,7 +142,7 @@ test("macOS: 始终允许 lets the same program read a 秘密 without asking, ot
 
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   const list = settings.getByRole("list", { name: "始终允许的程序" });
   await expect(list).toContainText("codex");
   await expect(list).toContainText("/opt/homebrew/bin/codex");
@@ -161,6 +161,6 @@ test("Windows: there is no 始终允许的程序 card in 设置", async ({ page 
   await seedSnippets(page);
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   await expect(settings.getByRole("heading", { name: "始终允许的程序" })).toHaveCount(0);
 });

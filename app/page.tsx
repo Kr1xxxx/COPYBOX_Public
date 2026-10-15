@@ -95,6 +95,8 @@ import { type LockMode, isAccountLockSet, lockMode } from "./account-lock";
 import { AccountLockScreen } from "./account-lock-ui";
 import { AccountVeil } from "./account-veil";
 import { readSlideUnlockOn, writeSlideUnlockOn } from "./slide-unlock";
+import { autoLockRunning, readAutoLockSeconds, writeAutoLockSeconds, AUTO_LOCK_DEFAULT, type AutoLockSeconds } from "./account-auto-lock";
+import { useAccountAutoLock } from "./account-auto-lock-ui";
 import { AccountPage, type AddRequest } from "./account-page";
 import { countByKind, useAccountEntries, type LegacySecret } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
@@ -487,6 +489,12 @@ export default function Home() {
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
+  // D-070: once opened, the 账号 page closes again after this many seconds without activity (0 = 不上锁).
+  const [autoLockSeconds, setAutoLockSeconds] = useState<AutoLockSeconds>(() => (typeof window === "undefined" ? AUTO_LOCK_DEFAULT : readAutoLockSeconds()));
+  const autoLockOn = autoLockRunning({ seconds: autoLockSeconds, accountMode, lockSet, unlocked: accountUnlocked, slideOn: slideUnlockOn, slidOpen: accountSlidOpen, fullWindow: windowMode === "full" });
+  useAccountAutoLock(autoLockOn, autoLockSeconds, () => {
+    if (lockSet) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); } else setAccountSlidOpen(false);
+  });
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
@@ -2388,6 +2396,7 @@ export default function Home() {
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
         slideUnlock={{ on: slideUnlockOn, onChange: (on) => { writeSlideUnlockOn(on); setSlideUnlockOn(on); } }}
+        autoLock={{ seconds: autoLockSeconds, onChange: (seconds) => { writeAutoLockSeconds(seconds); setAutoLockSeconds(seconds); } }}
         accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { if (mode === "none" && accountMode) setAccountSlidOpen(true); setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}
         accountLocked={accountLocked}
         onImport={() => { setSettingsOpen(false); fileRef.current?.click(); }}

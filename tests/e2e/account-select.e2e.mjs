@@ -64,7 +64,7 @@ test("a locked 账号 page shows no 收起 or 选择", async ({ page }) => {
   await seedSnippets(page);
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   await settings.getByRole("button", { name: "设置…" }).click();
   await settings.getByLabel("新密码", { exact: true }).fill("abcd1234");
   await settings.getByLabel("再输入一次新密码").fill("abcd1234");

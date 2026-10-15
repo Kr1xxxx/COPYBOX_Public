@@ -8,9 +8,12 @@ export const FIRST_RUN_GUIDE_KEY = "clipbox.first-run-guide.v1";
 // The 账号 page is frosted until slid open (D-051, on by default). The shared state turns that off, so tests about the
 // 账号 content reach it at once; tests about the slide itself use `test.use({ storageState: SLIDE_UNLOCK_ON })`.
 export const SLIDE_UNLOCK_KEY = "clipbox.account-slide-unlock.v1";
-export function guideSeenState(baseURL, { slideUnlock = false } = {}) {
+export const AUTO_LOCK_KEY = "clipbox.account-auto-lock.v1";
+// Tests start with the 账号 auto-lock off (D-070) so a slow step never closes the page under them; its own tests set it.
+export function guideSeenState(baseURL, { slideUnlock = false, autoLock = "0" } = {}) {
   const localStorage = [{ name: FIRST_RUN_GUIDE_KEY, value: "1" }];
   if (!slideUnlock) localStorage.push({ name: SLIDE_UNLOCK_KEY, value: "0" });
+  if (autoLock !== null) localStorage.push({ name: AUTO_LOCK_KEY, value: autoLock });
   return { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage }] };
 }
 // Guide seen, slide unlock left at its default (on), as on a real install.

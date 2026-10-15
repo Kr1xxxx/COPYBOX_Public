@@ -4,7 +4,7 @@ import { asDesktop, seedSnippets } from "./helpers.mjs";
 async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
   const settings = page.getByRole("dialog", { name: "设置" });
-  await settings.getByRole("tab", { name: "数据" }).click();
+  await settings.getByRole("tab", { name: "安全" }).click();
   return settings;
 }
 
@@ -94,6 +94,7 @@ test("a short password is refused, and the account backup cannot be exported whi
   await settings.getByRole("button", { name: "关闭设置" }).click();
   await setPassword(page, "abcd1234");
   settings = await openSettings(page);
+  await settings.getByRole("tab", { name: "数据" }).click();
   await expect(settings).toContainText("先打开账号页、输入密码，才能导出");
   await expect(settings.locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button")).toBeDisabled();
 });
