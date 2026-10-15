@@ -37,8 +37,8 @@ Statuses: Accepted / Superseded / Deprecated.
 ## Index of `docs/decisions/` (D-025 onwards)
 
 Kept up to date by the coordinator, not by feature PRs. Links are written `[D-NNN](…)` on purpose: the uniqueness test in
-`tests/docs-structure.test.mjs` counts only plain `| D-NNN |` rows, so these do not clash with the files. D-054 (update
-signing, PR #168) is listed once it merges.
+`tests/docs-structure.test.mjs` counts only plain `| D-NNN |` rows, so these do not clash with the files. D-054 was
+reserved for update signing (PR #168); the owner dropped signing and closed the PR, so the number stays unused.
 
 | # | Decision | Status |
 | --- | --- | --- |

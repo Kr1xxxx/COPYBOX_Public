@@ -12,7 +12,7 @@
   encryption format, releases, anything irreversible) wait for the owner's 合并.
 - Workflow (`CLAUDE.md`): coordinator on Opus high effort; workers Opus medium (`.claude/agents/worker.md`).
 - Decisions: `docs/DECISIONS.md` table holds D-001…D-024; **D-025 onwards are files in `docs/decisions/`**, listed in a
-  linked index under the table (coordinator keeps it current). D-054 is taken by the signing PR #168. Next free: D-056.
+  linked index under the table (coordinator keeps it current). D-054 stays unused (signing dropped, PR #168 closed); D-057 is PR #175. Next free: D-058.
 - `app/page.tsx` is ~2330 lines; keep splitting it. Verification: `docs/features.json` (browser only, D-014).
 
 ## Web preview (网页测试版)
@@ -52,8 +52,8 @@ website proxy (owner dropped the proxy before merge). The owner revoked the old 
 
 ## Reviews of 2026-10-14 (outside the repo, in the project's shared files)
 
-- Audit: `audit/2026-10-14-audit.md`. Severe: S1 auto-update trusts copyboxx.com only, installer unsigned (update
-  signing in progress, `src-tauri/src/update.rs`); S2 no forced HTTPS / HSTS (fixed in PR #165: HTTPS only with HSTS).
+- Audit: `audit/2026-10-14-audit.md`. Severe: S1 auto-update trusts copyboxx.com only, installer unsigned (owner
+  dropped signing, PR #168 closed); S2 no forced HTTPS / HSTS (fixed in PR #165: HTTPS only with HSTS).
 - Advisor list: `advice/2026-10-14-improvements.md` (29 items). Owner picked 1, 2, 3, 10 (done), 11 (mini window copies
   the first block of a 话术 with unfilled 【变量】) and 13 (hide settings staff do not need) — 11 and 13 in v1.80 (PR #164).
 - Content sync plan: `plans/content-sync-plan.md`. Phase 1 done (D-052); phase 2 (team code) and 3 (accounts without
@@ -67,11 +67,10 @@ website proxy (owner dropped the proxy before merge). The owner revoked the old 
   in the app (45 s, then refused) and are refused while the 账号 page is locked.
 - Done: Windows device key in Credential Manager (D-053, PR #170, supersedes D-015 on Windows); TinyPNG keys out of
   the repo and out of the installer (D-055); preview passphrase removed with the site preview (PR #165).
-- Waiting on the owner: update signing (S1, PR #168, D-054) needs the key pair the owner generates.
+- Update signing (S1, PR #168): dropped by the owner, PR closed.
 
 ## Waiting on the owner
 
-- Update signing key pair (PR #168).
 - Real-device checks never done (D-014): slide unlock, settings home, 企业同步码, first-run onboarding, own TinyPNG
   keys, the 秘密 允许 question on a Mac, the Credential Manager key.
 - Before auto-update works on a machine, the owner installs the new Copyboxx by hand once (quit from the tray,
@@ -81,7 +80,7 @@ website proxy (owner dropped the proxy before merge). The owner revoked the old 
 
 - The vault and its device key are stored together (D-015): a copied data folder can be decrypted, except 账号 data
   under a 账号页密码 (D-040).
-- Auto-update (D-047) checks a sha256 from the same site as the installer; unsigned (D-013) until signing lands.
+- Auto-update (D-047) checks a sha256 from the same site as the installer; unsigned (D-013); the owner dropped signing (PR #168 closed).
 - main-flows collapse e2e test is flaky (fallback timer); CI retries once and can hide it.
 - Many unit tests assert on source text and break on refactors; `tests/e2e/` is the reference for behaviour.
 - The task board (rows 1–27) was frozen on 2026-10-09 and is history: see git history of this file.
