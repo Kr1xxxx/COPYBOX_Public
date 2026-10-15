@@ -6,6 +6,10 @@
 // The app calls from Rust, not from a browser page, so /api sends no CORS headers: browsers cannot read its answers.
 // Errors are { error: <stable code for the app>, message: <plain Chinese> }.
 // Only functions may be named exports of a Worker module (see worker.mjs), so constants stay private.
+// GET /api/library gives a signed-in user the company 话术 library bound to their email domain (KV key domains/<domain>
+// holds a 同步码, written by sync.mjs --link-domain); free-mail domains never get one.
+
+import { isFreeMailDomain, normalizeDomain } from "./free-mail.mjs";
 
 const hour = 60 * 60 * 1000;
 const codeLifetime = 10 * 60 * 1000;
@@ -435,12 +439,48 @@ async function deleteAccount(env, auth) {
   return json({ ok: true });
 }
 
+// The text after the last "@" of an email, lower-cased and trimmed, or null when it is not a plausible domain.
+export function emailDomain(email) {
+  if (typeof email !== "string" || !email.includes("@")) return null;
+  return normalizeDomain(email.slice(email.lastIndexOf("@") + 1));
+}
+
+// { domain, library } for the user's email domain, or both null: no FILES binding, no or free-mail domain, no binding,
+// a bound code whose library is missing, or a library that is not valid JSON. Read on every request (no cache), so
+// unbinding a domain takes effect on the next sync. A KV read that throws is a 500, so the app keeps what it has.
+async function getLibrary(env, auth) {
+  const none = () => json({ domain: null, library: null });
+  if (!env.FILES) return none();
+  const user = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
+  const domain = emailDomain(user?.email);
+  if (!domain || isFreeMailDomain(domain)) return none();
+  let source;
+  try {
+    const bound = await env.FILES.get(`domains/${domain}`);
+    const code = typeof bound === "string" ? bound.trim().toUpperCase() : "";
+    if (!/^[A-Z0-9-]{6,40}$/.test(code)) return none();
+    source = await env.FILES.get(`sync/${code}/snippets.json`);
+  } catch {
+    return fail(500, "storage_error");
+  }
+  if (typeof source !== "string") return none();
+  let library;
+  try {
+    library = JSON.parse(source);
+  } catch {
+    return none();
+  }
+  if (library === null || typeof library !== "object") return none();
+  return json({ domain, library });
+}
+
 const routes = {
   "/api/auth/code": { POST: "code" },
   "/api/auth/verify": { POST: "verify" },
   "/api/auth/logout": { POST: "logout" },
   "/api/vault": { GET: "getVault", PUT: "putVault" },
   "/api/account": { DELETE: "deleteAccount" },
+  "/api/library": { GET: "getLibrary" },
 };
 
 // Answers every request under /api/. `now` is for tests.
@@ -462,5 +502,6 @@ export async function handleApi(request, env, now = Date.now()) {
   if (action === "logout") return logout(env, auth);
   if (action === "getVault") return getVault(env, auth);
   if (action === "putVault") return putVault(request, env, auth, now);
+  if (action === "getLibrary") return getLibrary(env, auth);
   return deleteAccount(env, auth);
 }

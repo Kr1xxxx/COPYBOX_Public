@@ -32,6 +32,7 @@ Source files in this folder:
 | `icons/`, `images/` | Committed icons and screenshots, made by hand when the icon or the UI changes |
 | `build.mjs`, `deploy.mjs`, `worker.mjs`, `wrangler.jsonc` | Build, upload, the Worker and its config |
 | `api.mjs`, `schema.sql` | The account and sync API under `/api/` and its D1 tables (see 账号与同步接口 below; wrangler bundles `api.mjs` into the Worker) |
+| `free-mail.mjs` | Free-mail domains that are never bound to a company library (used by `api.mjs` and `sync.mjs`, see 话术同步) |
 | `admin.mjs` | The owner's read-only user list at `/admin/` (see 后台 below, D-065) |
 
 The repo is private, so the public cannot download from GitHub; that is why the site hosts the installer.
@@ -66,7 +67,17 @@ NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json 
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --snippets file.json --notice notice.txt  # upload with the 更新通知 the owner approved (D-071)
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --code XS-… --rollback                     # put the previous version back
 NODE_USE_ENV_PROXY=1 npm run sync:publish -- --list-codes                               # agents only
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --link-domain company.com --code XS-… [--dry-run]  # everyone signed in at company.com gets XS-…'s library
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --unlink-domain company.com [--dry-run]    # remove that binding
+NODE_USE_ENV_PROXY=1 npm run sync:publish -- --list-domains                             # domain → code, agents only
 ```
+
+**By email domain.** A domain bound to a code (KV key `domains/<domain>`, value the code in upper case) gives everyone
+who signs in to the app with an address there (`a@company.com`) that code's library through `GET /api/library` (see
+账号与同步接口). Domain only, exact match, no per-address binding and no admin page. `--link-domain` refuses an invalid
+domain, a free-mail domain (`free-mail.mjs`: gmail.com, qq.com, 163.com, outlook.com, … and copyboxx.com; anyone can get
+an address there) and a code without a library, and prints the old and new binding. **Bind only after the owner says
+发布 in the thread.** `domains/` keys are never served as files and `website:deploy` never deletes them.
 
 The file is checked with the app's own `parseSharedLibrary` and refused if the app would skip any entry. Before an
 upload, the version online is copied to `sync/<CODE>/history/snippets-<UTC ISO>.json`. `--rollback` restores the newest
@@ -94,6 +105,7 @@ are `{ "error": <code>, "message": <plain Chinese> }`.
 | `GET /api/vault` (Bearer) | `200 {version, updatedAt, data}` (`data` is the JSON object last uploaded), or `{version:0, updatedAt:null, data:null}` |
 | `PUT /api/vault` (Bearer) `{baseVersion, data}` | `200 {version}` (old + 1). `409 {error:"version_conflict", version}` when `baseVersion` is not the current version; `400 bad_data` when `data` is not an object; `413 too_large` over 5 MB of request, or over 1.9 MB of data while the blobs live in D1 |
 | `DELETE /api/account` (Bearer) | `200 {ok:true}`; deletes the user, all sessions, any code and the blob |
+| `GET /api/library` (Bearer) | `200 {domain, library}`: the company 话术 library bound to the account's email domain (KV `domains/<domain>` → code → `sync/<CODE>/snippets.json`, parsed). `{domain:null, library:null}` when the domain is not bound (exact match only, `sales.company.com` does not match `company.com`), is free mail, the code's library is missing or not valid JSON, or `FILES` is not bound. Read on every request, so unbinding takes effect on the next sync. `500 storage_error` when a KV read fails |
 | other `/api/*` | `404 not_found`; a known path with another method `405 method_not_allowed` |
 
 A missing, unknown or expired token is `401 unauthorized`; a token ended by a newer sign-in is `401 device_limit` (D1
