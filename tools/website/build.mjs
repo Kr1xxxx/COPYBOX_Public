@@ -21,7 +21,7 @@ const previewDir = join(repo, "tools/preview");
 
 export const siteUrl = "https://copyboxx.com";
 export const installerPath = "download/Copyboxx-Setup.exe";
-const releasesApi = "https://api.github.com/repos/Kr1xxxx/Clipbox/releases?per_page=20";
+const releasesApi = "https://api.github.com/repos/Kr1xxxx/COPYBOX_Public/releases?per_page=20";
 // The small file the Tauri workflow puts next to the installer in every test release (D-048): the app version the
 // installer carries, the preview number it was built from, the branch and the commit. The site takes the version it
 // advertises from this file, never from the checkout, so latest.json can never name a version the installer is not.
