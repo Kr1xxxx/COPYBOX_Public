@@ -6,6 +6,7 @@ mod automation;
 #[cfg_attr(not(unix), allow(dead_code))]
 mod caller;
 mod backup;
+mod cloud;
 mod device_key;
 mod flush;
 mod mcp;
@@ -98,6 +99,7 @@ fn main() {
             ai::ai_clear,
             ai::ai_request,
             shared_library::fetch_shared_library,
+            cloud::cloud_request,
             site_icon::fetch_site_icon,
             tinify::compress_image,
             site_icon::get_build_time,

@@ -56,6 +56,10 @@ export type ClipboxDesktop = {
   aiClear?: () => Promise<{ hasKey: boolean; origin: string }>;
   aiRequest?: (payload: { url: string; body?: unknown; method?: "GET" | "POST" }) => Promise<{ ok: boolean; status: number; text: string }>;
   fetchSharedLibrary?: (url: string) => Promise<string>;
+  // 登录同步 (D-064): one request to https://copyboxx.com/api/…, sent by the shell. Older shells lack it.
+  cloudRequest?: (request: { method: "GET" | "POST" | "PUT" | "DELETE"; path: string; body?: unknown; token?: string }) => Promise<{ status: number; text: string }>;
+  // Only the web preview (and tests) set this: 登录同步 then talks to a pretend server in the page (cloud-demo.ts).
+  cloudDemo?: boolean;
   // The site's own small icon as a data: URL, or "" when it has none.
   fetchSiteIcon?: (host: string) => Promise<string>;
   relaunch: () => void;

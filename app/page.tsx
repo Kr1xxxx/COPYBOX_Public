@@ -112,6 +112,8 @@ import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
+import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
+import { isSyncedSnippet, mergeAccounts, mergeSnippets, syncPolicy, tooManyRemovals } from "./cloud-sync-core";
 import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
 import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLanguage, type SnippetFillState } from "./fill-panel";
@@ -156,6 +158,9 @@ type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?:
 const NO_LEGACY_SECRETS: LegacySecret[] = [];
 const NO_FOLDERS: string[] = [];
 const DETAIL_CLOSE_MS = 220;
+// 登录同步: one sync that would delete most of what is here is refused (cloud-sync-core.ts tooManyRemovals).
+const CLOUD_TOO_MANY_REMOVALS = "云端的内容比这台电脑少了很多，为了安全这次没有同步，这台电脑上的内容没有变化";
+const CLOUD_NOTHING_TO_WRITE = new Error("nothing to write");
 const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
@@ -651,6 +656,39 @@ export default function Home() {
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+
+  // 登录同步 (D-064): the cloud's 话术 and 账号 are merged in inside the same save queues as every other change.
+  const cloudPlatform = typeof window === "undefined" ? undefined : window.clipboxDesktop?.platform;
+  const cloudSync = useCloudSync({
+    ready: !loading && Boolean(deviceKey),
+    platform: cloudPlatform,
+    changeSignal: items,
+    onIncoming: (text) => showToast(text, { ms: 3600 }),
+    mergers: {
+      snippets: (remote, base) => enqueueVaultTask(async () => {
+        const current = readVault();
+        const merged = mergeSnippets({ items: current.items, folders: current.folders.snippet, sharedSeen: current.sharedSeen ?? [] }, remote, base);
+        if (tooManyRemovals(merged.counts, current.items.filter(isSyncedSnippet).length)) throw new Error(CLOUD_TOO_MANY_REMOVALS);
+        if (merged.changed) await writeVault({ ...current, items: merged.items, folders: { ...current.folders, snippet: merged.folders }, sharedSeen: merged.sharedSeen });
+        return { cloud: merged.cloud, base: merged.base, counts: merged.counts };
+      }),
+      accounts: accountKey ? async (remote, base) => {
+        const policy = syncPolicy(cloudPlatform);
+        let result: ReturnType<typeof mergeAccounts> | null = null;
+        try {
+          await openSecretItemsStore(accountKey).update((current) => {
+            result = mergeAccounts(current, remote, base, policy);
+            if (tooManyRemovals(result.counts, current.length)) throw new Error(CLOUD_TOO_MANY_REMOVALS);
+            if (!result.changed) throw CLOUD_NOTHING_TO_WRITE;
+            return result.items;
+          });
+        } catch (error) { if (error !== CLOUD_NOTHING_TO_WRITE) throw error; }
+        const done = result as ReturnType<typeof mergeAccounts> | null;
+        if (!done) throw new Error("账号同步没有成功，内容没有变化");
+        return { cloud: done.cloud, base: done.base, counts: done.counts };
+      } : null,
+    },
+  });
 
   // 输入企业同步码 on the empty list: Settings opens on its home page, where the field sits; put the cursor in it.
   function openSyncCode() {
@@ -2346,7 +2384,7 @@ export default function Home() {
         onReload={() => { setSettingsOpen(false); void refreshLocalVault(); }}
         usageItems={items}
         onShowItem={showItemInList}
-        syncCode={<SyncCodeRow onApply={applySharedLibraryText} />}
+        syncCode={<><CloudAccountRows cloud={cloudSync} platform={cloudPlatform} accountsLocked={!accountKey} /><SyncCodeRow onApply={applySharedLibraryText} /></>}
         sharedLibrary={<SharedLibrarySection onApply={applySharedLibraryText} onExport={exportSharedFile} />}
         onMini={() => { setSettingsOpen(false); requestWindowMode("mini"); }}
         onShowGuide={() => { setSettingsOpen(false); guide.show(); }}
