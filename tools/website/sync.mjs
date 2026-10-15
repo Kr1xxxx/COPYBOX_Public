@@ -56,7 +56,7 @@ export function normalizeCode(code) {
 export const libraryKey = (code) => `sync/${code}/snippets.json`;
 export const domainPrefix = "domains/";
 export const domainKey = (domain) => `${domainPrefix}${domain}`;
-export const historyPrefix =(code) => `sync/${code}/history/`;
+export const historyPrefix = (code) => `sync/${code}/history/`;
 const stamp = (now) => new Date(now).toISOString();
 export const historyKey = (code, now) => `${historyPrefix(code)}snippets-${stamp(now)}.json`;
 export const replacedKey = (code, now) => `${historyPrefix(code)}replaced-${stamp(now)}.json`;
