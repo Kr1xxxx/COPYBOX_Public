@@ -9,32 +9,10 @@ const ENDPOINT: &str = "https://api.tinify.com/shrink";
 const HOST: &str = "api.tinify.com";
 const TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_BYTES: usize = 10 * 1024 * 1024;
-/// The page names a key built into the installer as "builtin:N"; the key itself never reaches the page.
-const BUILTIN_PREFIX: &str = "builtin:";
-
-/// Keys built into the installer from the CLIPBOX_TINIFY_KEYS secret at compile time (comma-separated). The repo holds none.
-fn builtin_keys() -> Vec<&'static str> {
-    parse_keys(option_env!("CLIPBOX_TINIFY_KEYS").unwrap_or(""))
-}
-
-pub fn parse_keys(value: &str) -> Vec<&str> {
-    value.split(',').map(str::trim).filter(|key| !key.is_empty()).collect()
-}
-
-/// The key to send for what the page asked: its own key as given, or the Nth built-in one.
-pub fn resolve_key(asked: &str, builtin: &[&str]) -> Option<String> {
+/// The key the person filled in 设置 (D-055: no key is built into the installer); an empty one means none.
+pub fn resolve_key(asked: &str) -> Option<String> {
     let asked = asked.trim();
-    match asked.strip_prefix(BUILTIN_PREFIX) {
-        Some(index) => index.parse::<usize>().ok().and_then(|i| builtin.get(i)).map(|key| key.to_string()),
-        None if asked.is_empty() => None,
-        None => Some(asked.to_string()),
-    }
-}
-
-/// How many keys are built in, so the page knows whether it can compress without a key of its own.
-#[tauri::command]
-pub fn tinify_builtin_count() -> usize {
-    builtin_keys().len()
+    if asked.is_empty() { None } else { Some(asked.to_string()) }
 }
 
 /// What a TinyPNG answer other than "created" means for the page.
@@ -59,7 +37,7 @@ pub async fn compress_image(request: Request<'_>) -> Result<Response, String> {
         _ => return Err("input".into()),
     };
     let asked = request.headers().get("x-tinify-key").and_then(|value| value.to_str().ok()).unwrap_or("");
-    let key = resolve_key(asked, &builtin_keys()).ok_or_else(|| "key".to_string())?;
+    let key = resolve_key(asked).ok_or_else(|| "key".to_string())?;
     let client = reqwest::Client::builder()
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
@@ -95,15 +73,11 @@ mod tests {
     }
 
     #[test]
-    fn keys_resolve_to_own_or_built_in() {
-        let builtin = parse_keys(" a1 , ,b2,");
-        assert_eq!(builtin, vec!["a1", "b2"]);
-        assert_eq!(resolve_key(" mine ", &builtin).as_deref(), Some("mine"));
-        assert_eq!(resolve_key("builtin:1", &builtin).as_deref(), Some("b2"));
-        for bad in ["", "  ", "builtin:2", "builtin:x", "builtin:"] {
-            assert_eq!(resolve_key(bad, &builtin), None, "{bad}");
+    fn only_the_persons_own_key_is_sent() {
+        assert_eq!(resolve_key(" mine ").as_deref(), Some("mine"));
+        for bad in ["", "  "] {
+            assert_eq!(resolve_key(bad), None, "{bad:?}");
         }
-        assert_eq!(resolve_key("builtin:0", &[]), None);
     }
 
     #[test]

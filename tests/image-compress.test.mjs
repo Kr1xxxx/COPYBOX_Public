@@ -129,7 +129,7 @@ test("with two own keys the first is used, and once it is refused the second tak
   assert.deepEqual(sent, ["one"]);
 });
 
-test("own keys never fall back to the built-in ones, and a network error does not switch keys", async () => {
+test("a refused second key gives up (nothing else to try), and a network error does not switch keys", async () => {
   const storage = memoryStorage({ [TINIFY_KEY_STORAGE]: "one", [TINIFY_KEY2_STORAGE]: "two" });
   const sent = [];
   const refused = await compressForUpload(png(100), { bridge: okBridge(sent, { one: "key", two: "limit" }), storage, now: october });
@@ -159,25 +159,16 @@ test("only a second key set still works, and saving a new key clears its refusal
   assert.deepEqual(customKeyStatus(storage, october), { active: null, refused: [] });
 });
 
-const builtInBridge = (sent, count, fail = {}) => ({
-  compressBuiltInCount: async () => count,
-  compressImage: async (bytes, key) => { sent.push(key); return fail[key] ? { ok: false, reason: fail[key] } : { ok: true, bytes: bytes.slice(0, 10) }; },
+const recordingBridge = (sent) => ({
+  compressImage: async (bytes, key) => { sent.push(key); return { ok: true, bytes: bytes.slice(0, 10) }; },
 });
 
-test("keys built into the installer are named builtin:N, take turns, and a refused one is skipped for the month", async () => {
-  const storage = memoryStorage();
+test("only the person's own keys are ever sent; with none, nothing goes out (D-055)", async () => {
   const sent = [];
-  for (let i = 0; i < 3; i++) await compressForUpload(png(100), { bridge: builtInBridge(sent, 2), storage, now: october });
-  assert.deepEqual(sent, ["builtin:0", "builtin:1", "builtin:0"]);
-  sent.length = 0;
-  await compressForUpload(png(100), { bridge: builtInBridge(sent, 2, { "builtin:1": "limit" }), storage, now: october });
-  await compressForUpload(png(100), { bridge: builtInBridge(sent, 2), storage, now: october });
-  assert.deepEqual(sent, ["builtin:1", "builtin:0", "builtin:0"]);
-  assert.equal(readCompressUsage(storage, october), 5);
-});
-
-test("own keys come before the built-in ones", async () => {
-  const sent = [];
-  await compressForUpload(png(100), { bridge: builtInBridge(sent, 2), storage: withKey(), now: october });
+  const none = await compressForUpload(png(100), { bridge: recordingBridge(sent), storage: memoryStorage(), now: october });
+  assert.equal(none.failed, true);
+  assert.equal(none.notice, COMPRESS_NO_KEY_NOTICE);
+  assert.deepEqual(sent, []);
+  await compressForUpload(png(100), { bridge: recordingBridge(sent), storage: withKey(), now: october });
   assert.deepEqual(sent, ["mine"]);
 });

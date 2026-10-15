@@ -87,18 +87,10 @@ test("compressImage hands the bytes and the key to the shell and turns a failure
   assert.equal(failed.result.reason, "limit");
 });
 
-test("built-in TinyPNG keys come only from the CLIPBOX_TINIFY_KEYS secret at build time, never from the repo", () => {
-  const tinify = read("src-tauri/src/tinify.rs");
-  assert.match(tinify, /option_env!\("CLIPBOX_TINIFY_KEYS"\)/);
-  assert.match(read("src-tauri/src/main.rs"), /tinify::tinify_builtin_count/);
-  assert.match(read("src-tauri/bridge.js"), /invoke\("tinify_builtin_count"\)/);
-  assert.match(read(".github/workflows/tauri.yml"), /CLIPBOX_TINIFY_KEYS: \$\{\{ secrets\.CLIPBOX_TINIFY_KEYS \}\}/);
-});
-
-test("a published build without TinyPNG keys is blocked unless the owner opts in for that run", () => {
-  const workflow = read(".github/workflows/tauri.yml");
-  assert.match(workflow, /allow_missing_tinify_keys:\n(?:.*\n){1,2}\s+type: boolean\n\s+default: false/);
-  assert.match(workflow, /elif \[ "\$PUBLISH" = "true" \] && \[ "\$ALLOW_MISSING" != "true" \]; then\n.*exit 1/);
+test("no TinyPNG key is built into the installer: the shell only sends the key the person filled in (D-055)", () => {
+  for (const file of ["src-tauri/src/tinify.rs", "src-tauri/src/main.rs", "src-tauri/bridge.js", ".github/workflows/tauri.yml", "app/image-compress.ts"]) {
+    assert.doesNotMatch(read(file), /CLIPBOX_TINIFY_KEYS|tinify_builtin_count|compressBuiltInCount|builtin:/i, file);
+  }
 });
 
 test("the top band moves the window: the bridge starts a drag and the capability allows it", () => {
