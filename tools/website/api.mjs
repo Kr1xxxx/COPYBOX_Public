@@ -47,7 +47,7 @@ export function normalizeEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
-function json(body, status = 200, extra = {}) {
+export function json(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extra },
@@ -69,7 +69,7 @@ export function deviceName(value) {
   return name || null;
 }
 
-function bytesToBase64Url(bytes) {
+export function bytesToBase64Url(bytes) {
   let text = "";
   for (const byte of bytes) text += String.fromCharCode(byte);
   return btoa(text).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
@@ -80,12 +80,12 @@ function base64ToBytes(text) {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0));
 }
 
-async function sha256Hex(text) {
+export async function sha256Hex(text) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function sameText(a, b) {
+export function sameText(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -101,7 +101,7 @@ export function randomCode() {
   return String(box[0] % 1000000).padStart(6, "0");
 }
 
-function codeHash(email, code) {
+export function codeHash(email, code) {
   return sha256Hex(`${email}:${code}`);
 }
 
@@ -133,7 +133,7 @@ async function readText(request, limit) {
 }
 
 // { body } with the parsed JSON object, or { status } (413 too large, 400 not a JSON object).
-async function readJson(request, limit) {
+export async function readJson(request, limit) {
   const text = await readText(request, limit);
   if (text === null) return { status: 413 };
   try {
@@ -147,12 +147,12 @@ async function readJson(request, limit) {
 
 // ---- storage (D1) ----
 
-function changes(result) {
+export function changes(result) {
   return result?.meta?.changes ?? result?.changes ?? 0;
 }
 
 // Counts one request against `key`; false when the hour's limit is already reached.
-async function allowRequest(db, key, limit, now) {
+export async function allowRequest(db, key, limit, now) {
   const row = await db.prepare("SELECT window_start, count FROM rate_limits WHERE key = ?").bind(key).first();
   if (!row || row.window_start <= now - hour) {
     await db.prepare("INSERT OR REPLACE INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)").bind(key, now).run();
@@ -262,7 +262,7 @@ async function unsealVault(key, userId, bytes) {
 
 // ---- endpoints ----
 
-async function sendCodeMail(env, email, code) {
+export async function sendCodeMail(env, email, code) {
   const text = `你的 Copyboxx 验证码是：${code}\n\n10 分钟内有效。如果不是你本人操作，请忽略这封邮件。`;
   const html = `<p>你的 Copyboxx 验证码是：</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p><p>10 分钟内有效。如果不是你本人操作，请忽略这封邮件。</p>`;
   try {
