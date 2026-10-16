@@ -59,6 +59,7 @@ test("worker: lookup keys, content types and cache rules", () => {
   assert.equal(candidateKeys("/%E0%A4%A"), null);
   assert.equal(contentTypeFor("a/b.html"), "text/html; charset=utf-8");
   assert.equal(contentTypeFor("x.exe"), "application/x-msdownload");
+  assert.equal(contentTypeFor("download/private-x/Copyboxx-macOS-arm64.zip"), "application/zip");
   assert.equal(contentTypeFor("x.woff2"), "font/woff2");
   assert.equal(contentTypeFor("README"), "application/octet-stream");
   assert.equal(cacheControlFor("download/index.html"), "no-cache");

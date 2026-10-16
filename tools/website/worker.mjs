@@ -27,6 +27,7 @@ const types = {
   xml: "application/xml; charset=utf-8",
   webmanifest: "application/manifest+json",
   exe: "application/x-msdownload",
+  zip: "application/zip",
 };
 
 // Icons at the site root and the screenshots under images/ keep their names across releases: cache them for a day

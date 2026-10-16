@@ -33,13 +33,33 @@ for (const platform of ["win32", "darwin"]) test(`a newer version shows a banner
   await expect(banner).toContainText("修复复制图片");
   // A shell without installUpdate (older version, or the Mac) keeps the browser download.
   await expect(banner.getByRole("button", { name: "立即更新" })).toHaveCount(0);
-  await banner.getByRole("button", { name: "下载" }).click();
-  expect(await page.evaluate(() => window.__opened)).toBe(1);
+  await expect(banner.getByRole("button", { name: "下载" })).toBeVisible();
   await banner.getByRole("button", { name: "稍后" }).click();
   await expect(banner).toHaveCount(0);
   await page.reload();
   await page.waitForSelector(".app-shell");
   await expect(page.locator(".update-banner")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__opened)).toBe(0);
+});
+
+// D-073: the Mac cannot replace itself, so 下载 opens the new version in the browser and the banner says how to finish.
+for (const platform of ["darwin", "win32"]) test(`下载 opens the browser and says how to install by hand (${platform})`, async ({ page }) => {
+  await withUpdate(page, { status: "available", version: "2.0.4", notes: ["新功能"], installable: false }, platform);
+  await seedSnippets(page);
+  const banner = page.locator(".update-banner");
+  await banner.getByRole("button", { name: "下载" }).click();
+  expect(await page.evaluate(() => window.__opened)).toBe(1);
+  await expect(banner).toContainText("正在浏览器里下载新版本 2.0.4");
+  await expect(banner).toContainText(platform === "darwin" ? "把 Copyboxx 拖进「应用程序」替换旧版" : "打开安装文件装上");
+  if (platform === "darwin") await expect(banner).toContainText("隐私与安全性");
+  await expect(banner).toContainText("内容都会保留");
+  await expect(banner.getByRole("button", { name: "下载" })).toHaveCount(0);
+  // 知道了 hides it for now only: the next launch reminds again until the new version is installed.
+  await banner.getByRole("button", { name: "知道了" }).click();
+  await expect(banner).toHaveCount(0);
+  await page.reload();
+  await page.waitForSelector(".app-shell");
+  await expect(page.locator(".update-banner")).toContainText("有新版本 2.0.4");
 });
 
 test("no banner when the app is up to date", async ({ page }) => {
