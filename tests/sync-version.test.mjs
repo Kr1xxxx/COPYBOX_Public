@@ -8,12 +8,15 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 test("the app version is the trial version with .0 added", () => {
   assert.equal(appVersionFrom("1.43"), "1.43.0");
   assert.equal(appVersionFrom("1.43\n"), "1.43.0");
-  assert.equal(appVersionFrom(" 2.5 "), "2.5.0");
-  // 1.99 → 2.00: no leading zero in an app version, and the order still goes up.
+  // From 2.00 the hundredths go in the last part, so the installer reads like the preview: 2.03 → 2.0.3.
   assert.equal(appVersionFrom("2.00"), "2.0.0");
-  assert.equal(appVersionFrom("2.05"), "2.5.0");
-  assert.equal(appVersionFrom("2.10"), "2.10.0");
-  for (const preview of ["1.43", "1.99", "2.00", "2.05", "2.10"]) assert.equal(previewFromApp(appVersionFrom(preview)), preview);
+  assert.equal(appVersionFrom("2.03"), "2.0.3");
+  assert.equal(appVersionFrom("2.10"), "2.0.10");
+  assert.equal(appVersionFrom(" 2.5 "), "2.0.50");
+  assert.equal(appVersionFrom("3.00"), "3.0.0");
+  for (const preview of ["1.43", "1.99", "2.00", "2.03", "2.10", "2.99", "3.01"]) assert.equal(previewFromApp(appVersionFrom(preview)), preview);
+  // The one private build that used the earlier 2.x scheme still maps back.
+  assert.equal(previewFromApp("2.3.0"), "2.03");
   assert.throws(() => appVersionFrom("1.43.2"), /must look like/);
   assert.throws(() => appVersionFrom("v1"), /must look like/);
 });

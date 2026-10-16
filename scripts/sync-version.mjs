@@ -1,5 +1,6 @@
 // The app version follows the trial version: tools/preview/VERSION "1.43" → app "1.43.0" (D-036).
-// From 2.00 on the minor part loses its leading zero ("2.00" → "2.0.0", "2.05" → "2.5.0"): an app version may not have one.
+// From 2.00 on the hundredths go in the last part, so the installer reads like the preview (owner, 2026-10-16):
+// "2.00" → "2.0.0", "2.03" → "2.0.3", "2.10" → "2.0.10". An app version needs three numbers without leading zeros.
 // Only the preview publisher (【話術】) changes VERSION; builds run this so package.json, Cargo.toml and
 // Cargo.lock carry the same number as the installer. Run: node scripts/sync-version.mjs
 import { readFileSync, writeFileSync } from "node:fs";
@@ -8,14 +9,19 @@ import { fileURLToPath } from "node:url";
 export function appVersionFrom(trialVersion) {
   const match = /^(\d+)\.(\d+)$/.exec(String(trialVersion).trim());
   if (!match) throw new Error(`tools/preview/VERSION must look like 1.43, got "${String(trialVersion).trim()}"`);
-  return `${Number(match[1])}.${Number(match[2])}.0`;
+  const major = Number(match[1]);
+  if (major < 2) return `${major}.${Number(match[2])}.0`;
+  return `${major}.0.${Number(match[2].padEnd(2, "0"))}`;
 }
 
-// The other way round, for an installer that only says its app version: "1.67.0" → "1.67", "2.0.0" → "2.00".
+// The other way round, for an installer that only says its app version: "1.67.0" → "1.67", "2.0.3" → "2.03".
+// A 2.x version with a non-zero middle part ("2.3.0", one private build on 2026-10-16) still reads the old way: "2.03".
 export function previewFromApp(appVersion) {
-  const match = /^(\d+)\.(\d+)\.\d+$/.exec(String(appVersion).trim());
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(appVersion).trim());
   if (!match) throw new Error(`an app version looks like 1.67.0, got "${String(appVersion).trim()}"`);
-  return `${match[1]}.${match[2].padStart(2, "0")}`;
+  const [, major, minor, patch] = match;
+  if (Number(major) >= 2 && Number(minor) === 0) return `${major}.${patch.padStart(2, "0")}`;
+  return `${major}.${minor.padStart(2, "0")}`;
 }
 
 // Replaces the first `version = "…"` that follows `anchor` (a pattern for the [package] header or the clipbox entry in Cargo.lock).
