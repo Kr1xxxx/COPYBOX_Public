@@ -224,6 +224,11 @@ test("each remembered value has a six-dot handle; tapping it offers 上移 and �
   await expect(page.getByRole("menuitem", { name: "下移" })).toBeDisabled();
   await page.keyboard.press("Escape");
 });
+
+// The last value in the strip can sit partly under its 收起 tail. Right-click a value's left part, as a person would:
+// a click on the covered middle makes Playwright scroll the strip first, and that scroll closes the menu at once.
+const RIGHT_CLICK_LEFT_PART = { button: "right", position: { x: 20, y: 8 } };
+
 test("a right-click on a remembered value offers 固定, 解锁 and 删除; holding and moving one changes its place", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
@@ -252,7 +257,7 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   // dropping did not count as a click: nothing was filled or copied
   await expect(name).toHaveValue("Cara");
   // pin Bella, then unpin her again from the menu
-  await options.filter({ hasText: "Bella" }).click({ button: "right" });
+  await options.filter({ hasText: "Bella" }).click(RIGHT_CLICK_LEFT_PART);
   await page.getByRole("menuitem", { name: "固定" }).click();
   await expect(options.filter({ hasText: "Bella" })).toHaveAttribute("data-pinned", "");
   await expect(options.first()).toHaveText("Bella");
@@ -261,17 +266,17 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   // bring the list fully into view first: a scroll after the menu opened would close it
   await options.first().scrollIntoViewIfNeeded();
   await settle(page);
-  await options.first().click({ button: "right" });
+  await options.first().click(RIGHT_CLICK_LEFT_PART);
   await expect(page.getByRole("menuitem", { name: "固定" })).toBeDisabled();
   await page.getByRole("menuitem", { name: "解锁" }).click();
   await expect(options.filter({ hasText: "Bella" })).not.toHaveAttribute("data-pinned", "");
   // delete Cara
-  await options.filter({ hasText: "Cara" }).click({ button: "right" });
+  await options.filter({ hasText: "Cara" }).click(RIGHT_CLICK_LEFT_PART);
   await page.getByRole("menuitem", { name: "删除" }).click();
   await expect(options).toHaveCount(2);
   await expect(options.filter({ hasText: "Cara" })).toHaveCount(0);
   // Escape closes the menu without doing anything
-  await options.first().click({ button: "right" });
+  await options.first().click(RIGHT_CLICK_LEFT_PART);
   await page.keyboard.press("Escape");
   await expect(page.locator(".var-menu")).toHaveCount(0);
 });
