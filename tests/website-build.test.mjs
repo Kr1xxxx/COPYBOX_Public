@@ -109,7 +109,7 @@ test("website build writes every page, the stylesheet, icons, images, installer 
   for (const name of iconFiles) assert.equal(read(name), `icon ${name}`);
   for (const name of imageFiles) assert.equal(read(`images/${name}`), `image ${name}`);
   const latest = JSON.parse(read("download/latest.json"));
-  assert.match(latest.version, /^\d+\.\d+\.0$/);
+  assert.equal(latest.version, localInstallerVersion);
   assert.equal(latest.url, "https://copyboxx.com/download/Copyboxx-Setup.exe");
   assert.equal(latest.size, installer.length);
   assert.equal(latest.sha256, createHash("sha256").update(installer).digest("hex"));
