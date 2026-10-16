@@ -9,7 +9,9 @@ type Phase =
   | { kind: "idle" }
   | { kind: "downloading"; received: number; total: number }
   | { kind: "installing" }
-  | { kind: "error"; reason: string };
+  | { kind: "error"; reason: string }
+  // 下载 opened the new version in the browser; the person installs it by hand (the Mac, D-073; older Windows shells).
+  | { kind: "opened" };
 
 function readDismissed() {
   try { return localStorage.getItem(DISMISSED_KEY) || ""; } catch { return ""; }
@@ -31,12 +33,21 @@ function megabytes(bytes: number) {
   return (Math.max(0, bytes) / (1024 * 1024)).toFixed(1);
 }
 
+// How to finish a download by hand. The Mac app is unsigned, so the first open of a new copy may be stopped (D-073).
+export function manualInstallHint(platform: string | undefined) {
+  return platform === "darwin"
+    ? "下载好后打开它，把 Copyboxx 拖进「应用程序」替换旧版，内容都会保留。被拦住时，到「系统设置 › 隐私与安全性」点「仍要打开」。"
+    : "下载好后打开安装文件装上，内容都会保留。";
+}
+
 // Asks the desktop shell for a newer version on launch and then once a day. 「立即更新」 downloads it with a progress bar
-// and installs it over this app (Windows, D-047); an older shell only offers 「下载」 in the browser. 「稍后」 hides that version only.
+// and installs it over this app (Windows, D-047); the Mac and older shells offer 「下载」 in the browser and then say how
+// to install it (D-073). 「稍后」 hides that version only; 「知道了」 hides it until the app opens again.
 export function UpdateNotice() {
   const [update, setUpdate] = useState<{ version: string; notes: string[]; installable: boolean } | null>(null);
   const [dismissed, setDismissed] = useState(readDismissed);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [closedFor, setClosedFor] = useState("");
 
   useEffect(() => {
     const desktop = window.clipboxDesktop;
@@ -68,7 +79,7 @@ export function UpdateNotice() {
   }, []);
 
   const busy = phase.kind === "downloading" || phase.kind === "installing";
-  if (!update || (update.version === dismissed && !busy)) return null;
+  if (!update || ((update.version === dismissed || update.version === closedFor) && !busy)) return null;
 
   const desktop = window.clipboxDesktop;
   const canInstall = Boolean(desktop?.installUpdate) && update.installable;
@@ -79,8 +90,11 @@ export function UpdateNotice() {
     setDismissed(update.version);
   }
 
-  function openSite() {
-    void window.clipboxDesktop?.openUpdate?.();
+  // From the error state the banner stays as it is, so 重试 is still there.
+  function openSite(showHint = false) {
+    void window.clipboxDesktop?.openUpdate?.()
+      .then((opened) => { if (opened && showHint) setPhase({ kind: "opened" }); })
+      .catch(() => undefined);
   }
 
   function install() {
@@ -125,7 +139,19 @@ export function UpdateNotice() {
           <span>{phase.reason === "unavailable" ? `去网站下载新版本 ${update.version}` : `可以重试，或去网站下载新版本 ${update.version}`}</span>
         </div>
         {phase.reason !== "unavailable" && <button type="button" className="primary-button" onClick={install}>重试</button>}
-        <button type="button" className={phase.reason === "unavailable" ? "primary-button" : "ghost-button"} onClick={openSite}>去网站下载</button>
+        <button type="button" className={phase.reason === "unavailable" ? "primary-button" : "ghost-button"} onClick={() => openSite()}>去网站下载</button>
+      </div>
+    );
+  }
+
+  if (phase.kind === "opened") {
+    return (
+      <div className="update-banner update-banner-opened" role="status" data-phase="opened">
+        <div className="update-text">
+          <strong>正在浏览器里下载新版本 {update.version}</strong>
+          <span>{manualInstallHint(desktop?.platform)}</span>
+        </div>
+        <button type="button" className="ghost-button" onClick={() => setClosedFor(update.version)}>知道了</button>
       </div>
     );
   }
@@ -138,7 +164,7 @@ export function UpdateNotice() {
       </div>
       {canInstall
         ? <button type="button" className="primary-button" onClick={install}>立即更新</button>
-        : <button type="button" className="primary-button" onClick={openSite}>下载</button>}
+        : <button type="button" className="primary-button" onClick={() => openSite(true)}>下载</button>}
       <button type="button" className="ghost-button" onClick={later}>稍后</button>
     </div>
   );

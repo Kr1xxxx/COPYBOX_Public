@@ -1048,6 +1048,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .update-banner-progress { padding-right: 12px; }
 .update-banner[data-phase="installing"] .update-bar i { animation: update-pulse 1.4s ease-in-out infinite; }
 .update-banner-error strong { color: var(--danger); }
+/* 下载 by hand (D-073): the install hint wraps instead of being cut off. */
+.update-banner-opened .update-text span { white-space: normal; overflow: visible; }
 @keyframes update-in { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
 @keyframes update-pulse { 50%{opacity:.55} }
 @media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } .update-bar i { transition: none; } .update-banner[data-phase="installing"] .update-bar i { animation: none; } }

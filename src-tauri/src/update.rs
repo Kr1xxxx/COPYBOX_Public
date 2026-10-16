@@ -1,5 +1,5 @@
 // Looks up the newest published version and, on Windows, can download that installer and install it over this app
-// (D-023, D-047). Same version rules as desktop/update-check.cjs.
+// (D-023, D-047); the Mac only offers the download (D-073). Same version rules as desktop/update-check.cjs.
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -19,9 +19,27 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(100);
 const MAX_INSTALLER_BYTES: u64 = 200 * 1024 * 1024;
 const PROGRESS_EVENT: &str = "clipbox:update-progress";
 
-/// Where the app looks for the newest version: a small JSON file {"version","notes","url","size","sha256"} (D-047).
-/// Only Windows looks: the website has no Mac installer. CLIPBOX_UPDATE_URL overrides it (for testing).
-const DEFAULT_UPDATE_URL: &str = if cfg!(target_os = "windows") { "https://copyboxx.com/download/latest.json" } else { "" };
+/// The folder that holds the update files {"version","notes","url","size","sha256"} (D-047). The staff build points
+/// this at its own folder; both platforms follow it. CLIPBOX_UPDATE_URL overrides the whole address (for testing).
+const UPDATE_FOLDER: &str = "https://copyboxx.com/download/";
+
+/// Which file in that folder this platform reads: Windows the installer's, the Mac the zipped app's (D-073). Linux
+/// has no build to offer.
+const MANIFEST_NAME: &str = if cfg!(target_os = "windows") {
+    "latest.json"
+} else if cfg!(target_os = "macos") {
+    "latest-mac.json"
+} else {
+    ""
+};
+
+/// Where the app looks for the newest version; empty means it never looks.
+pub fn default_update_url(folder: &str, name: &str) -> String {
+    if folder.is_empty() || name.is_empty() {
+        return String::new();
+    }
+    format!("{}/{name}", folder.trim_end_matches('/'))
+}
 
 /// The only host an installer may come from.
 const DOWNLOAD_HOST: &str = "copyboxx.com";
@@ -205,7 +223,7 @@ pub fn evaluate_manifest(manifest: &serde_json::Value, current: &str) -> (Update
 
 #[tauri::command]
 pub async fn check_update(app: AppHandle, state: tauri::State<'_, Updates>) -> Result<UpdateInfo, String> {
-    let url = std::env::var("CLIPBOX_UPDATE_URL").unwrap_or_else(|_| DEFAULT_UPDATE_URL.to_string());
+    let url = std::env::var("CLIPBOX_UPDATE_URL").unwrap_or_else(|_| default_update_url(UPDATE_FOLDER, MANIFEST_NAME));
     if url.is_empty() {
         return Ok(UpdateInfo::status("disabled"));
     }
@@ -435,6 +453,26 @@ mod tests {
         assert_eq!(compare_versions("0.2.9", "0.2.24"), Some(-1));
         assert_eq!(compare_versions("abc", "0.2.24"), None);
         assert_eq!(compare_versions("1.2", "0.2.24"), None);
+    }
+
+    #[test]
+    fn each_platform_reads_its_own_file_in_the_update_folder() {
+        assert_eq!(default_update_url("https://copyboxx.com/download/", "latest.json"), "https://copyboxx.com/download/latest.json");
+        assert_eq!(default_update_url("https://copyboxx.com/download/private-x", "latest-mac.json"), "https://copyboxx.com/download/private-x/latest-mac.json");
+        assert_eq!(default_update_url("https://copyboxx.com/download/", ""), "");
+        assert_eq!(default_update_url("", "latest.json"), "");
+        let expected = if cfg!(target_os = "windows") { "latest.json" } else if cfg!(target_os = "macos") { "latest-mac.json" } else { "" };
+        assert_eq!(MANIFEST_NAME, expected);
+        assert!(is_safe_download_url(&default_update_url(UPDATE_FOLDER, "latest.json")));
+    }
+
+    #[test]
+    fn a_mac_download_link_is_accepted_but_never_installed_by_the_app() {
+        let manifest = json!({"version": "0.3.0", "url": "https://copyboxx.com/download/Copyboxx-macOS-arm64.zip", "notes": ["新功能"]});
+        let (info, release) = evaluate_manifest(&manifest, "0.2.24");
+        assert_eq!(info.status, "available");
+        assert_eq!(info.installable, Some(false));
+        assert_eq!(release.map(|r| r.url).as_deref(), Some("https://copyboxx.com/download/Copyboxx-macOS-arm64.zip"));
     }
 
     #[test]
