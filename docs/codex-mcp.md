@@ -28,7 +28,8 @@ Copyboxx 自带一个本机接口（MCP）。Codex、Claude Code、Cursor 这类
 - 启动方式：`<Copyboxx 程序> --mcp`，标准输入输出上的 MCP（JSON-RPC，一行一条），代码在 `src-tauri/src/mcp.rs`。
 - 工具：`copyboxx_status`、`list_snippets`、`get_snippet`、`add_snippet`、`update_snippet`、`move_snippet`、
   `delete_snippet`、`get_secret`、`verify_secret`。每次调用变成一条和 `clipbox` 命令行一样的命令。
-- 批量工具：`list_snippet_folders`、`get_snippets`、`update_snippets`。
+- 话术目录工具：`list_snippet_folders`、`create_snippet_folder`、`rename_snippet_folder`。
+- 批量工具：`get_snippets`、`update_snippets`。
 - 图片工具：`list_images`、`import_images`、`get_image_thumbnail`、`update_images`、`list_image_folders`、
   `create_image_folder`、`rename_image_folder`。
 - 通道：Mac/Linux 是 `~/Library/Application Support/Clipbox/automation.sock`；Windows 是命名管道
@@ -45,7 +46,23 @@ Copyboxx 自带一个本机接口（MCP）。Codex、Claude Code、Cursor 这类
 ```
 
 整个话术批次先校验再保存一次；任何编号不存在、版本过期或内容不合法，整批都不写入。遇到 `CONFLICT`
-应重新读取并核对变更，不能盲目覆盖。目录沿用现有话术规则；不通过此接口新建任意话术目录。
+应重新读取并核对变更，不能盲目覆盖。
+
+`create_snippet_folder` 用 `name` 创建自定义目录；首尾空格会去除，名称需要 1–30 个字符。
+同名目录已经存在时返回 `created: false`，不重复创建。`rename_snippet_folder` 用 `from`、`to` 改名；
+标准话术目录不能改名，目标不能与其他目录重名。改名会保留目录内话术的归类、目录颜色、简称和本机置顶。
+新增、移动、批量修改话术均可使用已存在的自定义目录，不会隐式创建拼错的目录。
+
+```json
+{"name":"客户回访"}
+```
+
+```json
+{"from":"客户回访","to":"售后回访"}
+```
+
+配置了工具白名单的客户端需要加入 `create_snippet_folder`、`rename_snippet_folder`，再重新连接。
+这些能力需要包含本次改动的应用版本；仅更新客户端配置不会给旧应用增加工具。
 
 ## 导入和整理图片
 

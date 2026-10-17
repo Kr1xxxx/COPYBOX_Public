@@ -59,3 +59,69 @@ test("bounded batch inputs reject duplicates, extra fields and missing conflict 
 test("a failed persist is reported as failure, never a successful batch", async () => {
   await assert.rejects(run({ action: "update-many", updates: [{ number: "CB-0001", expectedUpdatedAt: 1000, title: "Edited" }] }, vault(), async () => { throw new Error("synthetic write failure"); }), /synthetic write failure/);
 });
+
+test("MCP creates a trimmed custom folder once without touching accounts or the source", async () => {
+  const data = vault(); const before = structuredClone(data); const saved = [];
+  const result = await run({ action: "snippet-folder-create", name: "  自定义话术  " }, data, async (next) => saved.push(next));
+  assert.deepEqual(result, { action: "snippet-folder-create", name: "自定义话术", created: true });
+  assert.equal(saved.length, 1);
+  assert.ok(saved[0].folders.snippet.includes("自定义话术"));
+  assert.deepEqual(saved[0].items, before.items);
+  assert.deepEqual(data, before);
+  assert.equal((await run({ action: "snippet-folder-create", name: "自定义话术" }, saved[0], async (next) => saved.push(next))).created, false);
+  assert.equal(saved.length, 1);
+});
+
+test("MCP custom folder can receive new, moved and batch-edited snippets", async () => {
+  const { applySnippetAutomationCommand } = await import("../app/clipbox-automation.ts");
+  let data = vault(); const save = async (next) => { data = next; };
+  await run({ action: "snippet-folder-create", name: "自定义话术" }, data, save);
+  for (const command of [
+    { action: "add", title: "New", content: "Synthetic reply", folder: "自定义话术" },
+    { action: "move", number: "CB-0001", folder: "自定义话术" },
+  ]) data = applySnippetAutomationCommand(data, command, runtime).data;
+  await run({ action: "update-many", updates: [{ number: "CB-0002", expectedUpdatedAt: 1000, folder: "自定义话术" }] }, data, save);
+  assert.equal((await run({ action: "snippet-folders" }, data)).folders.find((f) => f.name === "自定义话术").count, 3);
+  assert.throws(() => applySnippetAutomationCommand(data, { action: "move", number: "CB-0001", folder: "不存在" }, runtime), { code: "INVALID_FOLDER" });
+});
+
+test("MCP rename moves active and trashed snippets, colors and short names while preserving accounts", async () => {
+  const data = vault(); data.folders.snippet.push("自定义话术");
+  data.items[0].folder = "自定义话术";
+  data.items[1].folder = "自定义话术"; data.items[1].deletedAt = 1500;
+  data.items[2].folder = "自定义话术"; data.folders.secret.push("自定义话术");
+  data.folderColors = { snippet: { 自定义话术: "#ffcfa8" } };
+  data.folderShortNames = { snippet: { 自定义话术: "自定" } };
+  const before = structuredClone(data); const saved = [];
+  const result = await run({ action: "snippet-folder-rename", from: "自定义话术", to: "  新的目录  " }, data, async (next) => saved.push(next));
+  assert.deepEqual(result, { action: "snippet-folder-rename", from: "自定义话术", name: "新的目录" });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0].items.slice(0, 2).map((x) => x.folder), ["新的目录", "新的目录"]);
+  assert.equal(saved[0].items[1].deletedAt, 1500);
+  assert.deepEqual(saved[0].items[2], before.items[2]);
+  assert.equal(saved[0].folderColors.snippet["新的目录"], "#ffcfa8");
+  assert.equal(saved[0].folderShortNames.snippet["新的目录"], "自定");
+  assert.equal(saved[0].folders.snippet.includes("自定义话术"), false);
+  assert.deepEqual(data, before);
+});
+
+test("MCP folder validation and save failures never report success", async () => {
+  const data = vault(); data.folders.snippet.push("Custom", "Other");
+  for (const command of [
+    { action: "snippet-folder-create", name: " " },
+    { action: "snippet-folder-create", name: "字".repeat(31) },
+    { action: "snippet-folder-create", name: "Custom", extra: true },
+    { action: "snippet-folder-rename", from: STANDARD_SNIPPET_FOLDERS[0], to: "Changed" },
+    { action: "snippet-folder-rename", from: "Missing", to: "Changed" },
+    { action: "snippet-folder-rename", from: "Custom", to: "Other" },
+    { action: "snippet-folder-rename", from: "Custom", to: " " },
+    { action: "snippet-folder-rename", from: "Custom", to: "字".repeat(31) },
+  ]) {
+    let writes = 0;
+    await assert.rejects(run(command, data, async () => { writes++; }));
+    assert.equal(writes, 0);
+  }
+  for (const command of [{ action: "snippet-folder-create", name: "New" }, { action: "snippet-folder-rename", from: "Custom", to: "New" }]) {
+    await assert.rejects(run(command, data, async () => { throw new Error("synthetic write failure"); }), /synthetic write failure/);
+  }
+});

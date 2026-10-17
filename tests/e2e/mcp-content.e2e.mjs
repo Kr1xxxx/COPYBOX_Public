@@ -91,3 +91,23 @@ test("MCP imports locally before image tab opens, deduplicates, organizes and re
   expect(await send(page, { action: "image-folder-rename", from: "MCP samples", to: "MCP renamed" })).toMatchObject({ ok: true });
   expect((await send(page, { action: "image-folders" })).folders).toEqual([{ name: "MCP renamed", count: 0 }]);
 });
+
+
+test("MCP creates usable snippet folders and renames them with pins preserved after reload", async ({ page }) => {
+  await setup(page);
+  expect(await send(page, { action: "snippet-folder-create", name: "MCP custom" })).toMatchObject({ ok: true, created: true });
+  const added = await send(page, { action: "add", title: "Synthetic custom reply", content: "Synthetic reply", folder: "MCP custom" });
+  expect(added.ok).toBe(true);
+  await page.evaluate(() => localStorage.setItem("clipbox.folder-pins.v1", JSON.stringify({ snippet: ["MCP custom"] })));
+  await page.reload(); await page.waitForFunction(() => typeof window.__mcpSend === "function");
+  await page.locator(".directory-main").filter({ hasText: "MCP custom" }).click();
+  expect(await send(page, { action: "snippet-folder-rename", from: "MCP custom", to: "MCP renamed" })).toMatchObject({ ok: true, name: "MCP renamed" });
+  await expect(page.locator(".directory-row.active")).toContainText("MCP renamed");
+  expect((await send(page, { action: "get", number: added.item.number })).item.folder).toBe("MCP renamed");
+  await page.reload(); await page.waitForFunction(() => typeof window.__mcpSend === "function");
+  const folders = (await send(page, { action: "snippet-folders" })).folders;
+  expect(folders).toContainEqual({ name: "MCP renamed", count: 1 });
+  expect(folders.some((folder) => folder.name === "MCP custom")).toBe(false);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.folder-pins.v1")).snippet)).toEqual(["MCP renamed"]);
+  expect((await send(page, { action: "get", number: added.item.number })).item.content).toBe("Synthetic reply");
+});

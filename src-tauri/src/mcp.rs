@@ -35,7 +35,7 @@ struct ToolSpec {
 const NUMBER: (&str, &str, bool) = ("number", "Snippet number, e.g. CB-0001", true);
 const REFERENCE: &str = "Secret reference, e.g. clipbox://secret/abc or clipbox://apikey/abc";
 const FIELD: &str = "For an API entry with several secret fields: the field's label (e.g. Secret, Client ID) or its position counted from 1";
-const FOLDER_CHOICE: &str = "Folder name (目录); must be one of the app's standard snippet folders";
+const FOLDER_CHOICE: &str = "Folder name (目录); must already exist; use list_snippet_folders to find standard and custom folders";
 
 const TOOLS: &[ToolSpec] = &[
     ToolSpec { name: "copyboxx_status", action: "status", title: "Copyboxx status", description: "Check that Copyboxx is open and count its snippets.", fields: &[], read_only: true, destructive: false },
@@ -101,6 +101,8 @@ const TOOLS: &[ToolSpec] = &[
         read_only: true,
         destructive: false,
     },
+    ToolSpec { name: "create_snippet_folder", action: "snippet-folder-create", title: "Create snippet folder", description: "Create a custom snippet folder with a 1–30 character name. An existing name is a no-op.", fields: &[], read_only: false, destructive: false },
+    ToolSpec { name: "rename_snippet_folder", action: "snippet-folder-rename", title: "Rename snippet folder", description: "Rename an existing custom snippet folder and move its snippets to the new name. Standard folders cannot be renamed.", fields: &[], read_only: false, destructive: false },
     ToolSpec { name: "list_snippet_folders", action: "snippet-folders", title: "List snippet folders", description: "List valid snippet folders before assigning a folder.", fields: &[], read_only: true, destructive: false },
     ToolSpec { name: "get_snippets", action: "get-many", title: "Get snippets", description: "Get 1 to 100 distinct snippets with full content and updatedAt.", fields: &[], read_only: true, destructive: false },
     ToolSpec { name: "update_snippets", action: "update-many", title: "Update snippets", description: "Update 1 to 100 snippets. Each update requires the current updatedAt as expectedUpdatedAt; omitted fields stay unchanged.", fields: &[], read_only: false, destructive: false },
@@ -148,8 +150,8 @@ fn extended_schema(action: &str) -> Option<Value> {
         "image-update-many" => object_schema(json!({"updates":batch_schema(object_schema(json!({
             "id":text, "expectedUpdatedAt":timestamp, "title":text, "folder":{"type":["string","null"]}
         }), &["id", "expectedUpdatedAt"]), 100)}), &["updates"]),
-        "image-folder-create" => object_schema(json!({"name":text}), &["name"]),
-        "image-folder-rename" => object_schema(json!({"from":text,"to":text}), &["from","to"]),
+        "snippet-folder-create" | "image-folder-create" => object_schema(json!({"name":text}), &["name"]),
+        "snippet-folder-rename" | "image-folder-rename" => object_schema(json!({"from":text,"to":text}), &["from","to"]),
         _ => return None,
     })
 }
@@ -483,7 +485,7 @@ mod tests {
         let tools = list["result"]["tools"].as_array().unwrap();
         let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
         assert_eq!(&names[..9], ["copyboxx_status", "list_snippets", "get_snippet", "add_snippet", "update_snippet", "move_snippet", "delete_snippet", "get_secret", "verify_secret"]);
-        assert_eq!(names.len(), 19);
+        assert_eq!(names.len(), 21);
         let add = &tools[3];
         assert_eq!(add["inputSchema"]["required"], json!(["title", "content"]));
         assert_eq!(add["inputSchema"]["additionalProperties"], false);
@@ -526,6 +528,8 @@ mod tests {
             ("get_image_thumbnail", "image-thumbnail", json!({"id":"image-1"})),
             ("update_images", "image-update-many", json!({"updates":[{"id":"image-1","expectedUpdatedAt":1,"folder":null}]})),
             ("list_image_folders", "image-folders", json!({})),
+            ("create_snippet_folder", "snippet-folder-create", json!({"name":"Custom"})),
+            ("rename_snippet_folder", "snippet-folder-rename", json!({"from":"Custom","to":"Renamed"})),
             ("create_image_folder", "image-folder-create", json!({"name":"Samples"})),
             ("rename_image_folder", "image-folder-rename", json!({"from":"Samples","to":"New"})),
         ] {
@@ -540,6 +544,10 @@ mod tests {
         assert_eq!(command_for("import_images", &json!({"files":[{"path":"relative.png"}]})).unwrap(),
             json!({"action":"image-import","files":[{"path":"relative.png"}]}));
         for (name, args) in [
+            ("create_snippet_folder", json!({})),
+            ("create_snippet_folder", json!({"name":1})),
+            ("rename_snippet_folder", json!({"from":"Custom"})),
+            ("rename_snippet_folder", json!({"from":"Custom","to":null})),
             ("get_snippets", json!({"numbers":[]})),
             ("get_snippets", json!({"numbers":["CB-0001","CB-0001"]})),
             ("get_snippets", json!({"numbers":[1]})),

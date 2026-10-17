@@ -1019,6 +1019,12 @@ export default function Home() {
             const result = await runMcpSnippetCommand(readVault(), command, { createId: () => crypto.randomUUID(), now: timestampNow }, writeVault);
             window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: true, ...result });
             if (result.action === "update-many") showToast("外部任务已更新话术");
+            if (result.action === "snippet-folder-create") showToast(result.created ? "外部任务已新建话术目录" : "话术目录已存在");
+            if (result.action === "snippet-folder-rename") {
+              renameFolderPin("snippet", result.from, result.name);
+              if (activeKind === "snippet") setActiveFolder((current) => current === `folder:${result.from}` ? `folder:${result.name}` : current);
+              showToast("外部任务已重命名话术目录");
+            }
             return;
           }
           if (isMcpImageCommand(command)) {
@@ -1122,7 +1128,7 @@ export default function Home() {
     });
     window.clipboxDesktop.automationReady();
     return remove;
-  }, [deviceKey, enqueueVaultTask, loading, readVault, writeVault, showToast, askAutomationConsent]);
+  }, [activeKind, deviceKey, enqueueVaultTask, loading, readVault, writeVault, showToast, askAutomationConsent]);
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);

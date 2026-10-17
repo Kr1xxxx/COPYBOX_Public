@@ -157,7 +157,7 @@ export function parseSecretExportCommand(value: unknown): SecretExportCommand | 
   return { action: "secret-export", password, confirmed: true };
 }
 
-export function parseAutomationCommand(value: unknown): AutomationCommand {
+export function parseAutomationCommand(value: unknown, customFolders: readonly string[] = []): AutomationCommand {
   const record = recordValue(value);
   const action = record.action;
   if (typeof action !== "string" || !(action in COMMAND_FIELDS)) {
@@ -202,7 +202,7 @@ export function parseAutomationCommand(value: unknown): AutomationCommand {
   const summary = stringValue(record, "summary");
   const folderValue = stringValue(record, "folder", typedAction === "move");
   let folder = folderValue === undefined ? undefined : normalizeFolderName(folderValue);
-  if (folder !== undefined) {
+  if (folder !== undefined && !customFolders.includes(folder)) {
     try {
       folder = requireStandardSnippetFolder(folder);
     } catch (error) {
@@ -327,7 +327,7 @@ export function applySnippetAutomationCommand(
   commandValue: AutomationCommand | unknown,
   runtime: AutomationRuntime,
 ): AutomationOutcome {
-  const command = parseAutomationCommand(commandValue);
+  const command = parseAutomationCommand(commandValue, vault.folders.snippet);
   if (command.action === "status") {
     return { data: vault, changed: false, result: { action: "status", ready: true, snippetCount: snippetItems(vault).length } };
   }

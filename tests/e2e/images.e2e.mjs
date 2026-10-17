@@ -383,7 +383,7 @@ test("the mini window lists images and copies with one click", async ({ browser 
   await expect(page.locator(".mini-row")).toHaveCount(2);
   await page.getByPlaceholder("搜索图片").fill("photo");
   await expect(page.locator(".mini-row")).toHaveCount(1);
-  await page.getByRole("button", { name: "复制 sample-photo" }).click();
+  await page.getByRole("button", { name: "图片 sample-photo，点击复制" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual(PNG_SIGNATURE);
   await expect(page.locator(".status-bar")).toContainText("1 张");
   await context.close();
