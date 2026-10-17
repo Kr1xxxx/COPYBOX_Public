@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { ArcMenu } from "./arc/menu";
 import { Icon } from "./ui-atoms";
 import { ReorderHandle } from "./reorder-handle";
+import { folderGroupNeighbour, pinnedFirst, reorderFolderPins, sameFolderGroup, toggleFolderPin, useFolderPins } from "./folder-pins";
 import { usePointerReorder } from "./use-pointer-reorder";
 import { useSortFlipAnimation } from "./use-sort-flip-animation";
 import {
@@ -62,16 +63,26 @@ export function ImageMoveMenu({ folders, colors, current, up, onMove }: {
 // Mini window: a select next to the search box, like the 话术 mini window.
 // Sidebar in the 图片 view: 全部图片, the folders, 未分类. 设置 stays in the page's footer.
 export function ImageFolderNav({ library }: { library: ImageLibrary }) {
-  const { folders, filter, setFilter } = library;
-  const counts = useMemo(() => countImagesByFolder(library.images ?? [], folders), [library.images, folders]);
+  const { filter, setFilter } = library;
+  // Pinned folders (目录置顶) come first, in pin order; only this device remembers them.
+  const pins = useFolderPins("image");
+  const folders = useMemo(() => pinnedFirst(library.folders, pins, (folder) => folder.name), [library.folders, pins]);
+  const counts = useMemo(() => countImagesByFolder(library.images ?? [], library.folders), [library.images, library.folders]);
   const pinnedCount = useMemo(() => countPinnedImages(library.images ?? []), [library.images]);
-  const colors = useMemo(() => imageFolderColors(folders), [folders]);
+  const colors = useMemo(() => imageFolderColors(library.folders), [library.folders]);
   const { prepareSortAnimation } = useSortFlipAnimation();
   const reorder = usePointerReorder({
     enabled: true,
     scope: "image-folder",
-    onDrop: (source, target) => { prepareSortAnimation("image-folder"); void library.reorderFolder(source, target); },
+    onDrop: (source, target) => moveFolderTo(source, target),
   });
+  // Folders only swap inside their own group: pinned ones change the pin order, the rest the saved folder order.
+  function moveFolderTo(source: string, target: string) {
+    if (!target || source === target || !sameFolderGroup(pins, source, target)) return;
+    prepareSortAnimation("image-folder");
+    if (pins.includes(source)) reorderFolderPins("image", source, target);
+    else void library.reorderFolder(source, target);
+  }
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ from: string; value: string } | null>(null);
   const [menu, setMenu] = useState("");
@@ -154,8 +165,8 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
     const isRenaming = renaming?.from === name;
     const order = folders.map((entry) => entry.name);
     return (
-      <div key={name} data-sort-scope="image-folder" data-sort-id={name} className={`directory-row ${active ? "active" : ""} ${reorder.draggingId === name ? "dragging" : ""} ${reorder.overId === name && reorder.draggingId !== name ? "drag-over" : ""}`}>
-        {!isRenaming && <ReorderHandle className="folder-drag-handle" label={`拖动目录 ${name}`} title="按住拖动，点一下可上移下移" canMoveUp={order.indexOf(name) > 0} canMoveDown={order.indexOf(name) < order.length - 1} onBeginDrag={(event) => reorder.beginPointerDrag(event, name)} onMove={(delta) => { const neighbour = order[order.indexOf(name) + delta]; if (neighbour) { prepareSortAnimation("image-folder"); void library.reorderFolder(name, neighbour); } }}><Icon name="grip" /></ReorderHandle>}
+      <div key={name} data-sort-scope="image-folder" data-sort-id={name} className={`directory-row ${active ? "active" : ""} ${reorder.draggingId === name ? "dragging" : ""} ${reorder.overId === name && reorder.draggingId !== name ? "drag-over" : ""} ${pins.includes(name) ? "pinned" : ""}`}>
+        {!isRenaming && <ReorderHandle className="folder-drag-handle" label={`拖动目录 ${name}`} title="按住拖动，点一下可上移下移" canMoveUp={Boolean(folderGroupNeighbour(order, pins, name, -1))} canMoveDown={Boolean(folderGroupNeighbour(order, pins, name, 1))} onBeginDrag={(event) => reorder.beginPointerDrag(event, name)} onMove={(delta) => moveFolderTo(name, folderGroupNeighbour(order, pins, name, delta))}><Icon name="grip" /></ReorderHandle>}
         {isRenaming ? (
           <form className="directory-rename" onSubmit={(event) => { event.preventDefault(); void submitRename(); }}>
             <i className="directory-color-marker" aria-hidden="true" style={{ background: colors[name] }} />
@@ -167,10 +178,10 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
         ) : (
           <button type="button" className="nav-item directory-main" onClick={() => setFilter(imageFolderFilter(name))} title={name} aria-current={active ? "page" : undefined}>
             <span className="nav-icon"><i className="directory-color-marker" aria-hidden="true" style={{ background: colors[name] }} /></span>
-            <span className="nav-label">{name}</span><b>{counts.byFolder[name] ?? 0}</b>
+            <span className="nav-label">{name}</span>{pins.includes(name) && <span className="directory-pin" title="已置顶"><Icon name="pin" /></span>}<b>{counts.byFolder[name] ?? 0}</b>
           </button>
         )}
-        {!isRenaming && <button type="button" className="folder-more" aria-label={`管理目录 ${name}`} aria-haspopup="menu" aria-expanded={menu === name} title="重命名、颜色、删除"
+        {!isRenaming && <button type="button" className="folder-more" aria-label={`管理目录 ${name}`} aria-haspopup="menu" aria-expanded={menu === name} title="置顶、重命名、颜色、删除"
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
             setDeleteArm("");
@@ -219,6 +230,7 @@ export function ImageFolderNav({ library }: { library: ImageLibrary }) {
         <>
           <div className="menu-scrim" role="presentation" onMouseDown={() => { setMenu(""); setDeleteArm(""); }} />
           <div className="dropdown folder-menu" role="menu" aria-label={`管理目录 ${menuFolder}`} style={{ top: menuPos.top, left: menuPos.left }}>
+            <button type="button" role="menuitem" onClick={() => { setMenu(""); prepareSortAnimation("image-folder"); toggleFolderPin("image", menuFolder); }}>{pins.includes(menuFolder) ? "取消置顶" : "置顶"}</button>
             <button type="button" role="menuitem" onClick={() => { setMenu(""); setRenaming({ from: menuFolder, value: menuFolder }); }}>重命名</button>
             <p className="menu-label">颜色</p>
             <div className="swatches" role="group" aria-label="目录颜色">
