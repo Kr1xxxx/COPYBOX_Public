@@ -88,7 +88,9 @@ import { folderShortName } from "./folder-short-name";
 import { FirstRunGuide, useFirstRunGuide } from "./first-run-guide";
 import { countImagesByFolder, IMAGE_FILTER_ALL, IMAGE_FILTER_PINNED, IMAGE_FILTER_RECENT, IMAGE_FILTER_TRASH, IMAGE_FILTER_UNCATEGORIZED, imageFilterTitle, imageFolderColors, imageFolderFilter } from "./image-folders-core";
 import { IMAGE_FOLDER_NAME_MAX, type ImageMeta } from "./image-store";
-import { useImageLibrary } from "./image-library";
+import { loadStore as loadImageStore, useImageLibrary } from "./image-library";
+import { isMcpImageCommand, runMcpImageCommand } from "./mcp-images";
+import { isMcpSnippetCommand, runMcpSnippetCommand } from "./mcp-snippets";
 import { ImageSection, type ImageCounts, type ImageSectionHandle } from "./image-section";
 import { ArcSegmented } from "./arc/segmented";
 import { type LockMode, isAccountLockSet, lockMode } from "./account-lock";
@@ -278,6 +280,9 @@ export default function Home() {
   const pendingLegacyOpen = useRef("");
   // Images and folders are shared by the sidebar, the list and Settings → 目录; nothing is read until one of them opens.
   const imageLibrary = useImageLibrary(deviceKey, imageView || settingsOpen, flashToast);
+  const imageLibraryRef = useRef(imageLibrary);
+  const mcpImageTaskRef = useRef<Promise<void> | null>(null);
+  useEffect(() => { imageLibraryRef.current = imageLibrary; }, [imageLibrary]);
   // 选择 belongs to the folder it was started in: moving to another folder (or the 回收站) ends it.
   const imageSelecting = imageView && imageSelectKey === imageLibrary.filter && imageLibrary.filter !== IMAGE_FILTER_TRASH;
   const setImageSelecting = (next: boolean | ((value: boolean) => boolean)) => setImageSelectKey((key) => (typeof next === "function" ? next(key === imageLibrary.filter) : next) ? imageLibrary.filter : "\u0000");
@@ -972,6 +977,7 @@ export default function Home() {
       await writer.flush();
       await persistQueueRef.current;
       await drainAll();
+      await mcpImageTaskRef.current;
       await waitForImageWrites();
     };
     const removeFlushRequest = window.clipboxDesktop?.onFlushRequest?.(() => {
@@ -997,6 +1003,18 @@ export default function Home() {
     const remove = window.clipboxDesktop.onAutomationCommand(({ requestId, command, caller }) => {
       const execute = async () => {
         try {
+          if (isMcpSnippetCommand(command)) {
+            const result = await runMcpSnippetCommand(readVault(), command, { createId: () => crypto.randomUUID(), now: timestampNow }, writeVault);
+            window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: true, ...result });
+            if (result.action === "update-many") showToast("外部任务已更新话术");
+            return;
+          }
+          if (isMcpImageCommand(command)) {
+            assertWritesOpen();
+            const result = await runMcpImageCommand(command, { store: await loadImageStore(deviceKey), library: imageLibraryRef.current });
+            window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: true, ...result });
+            return;
+          }
           const secretExport = parseSecretExportCommand(command);
           if (secretExport) {
             const currentData = {
@@ -1059,6 +1077,17 @@ export default function Home() {
           showToast("外部修改失败", { tone: "error", ms: 2400 });
         }
       };
+      // Long local image decoding must not hold the vault queue or leave image writes waiting after a timeout.
+      if (isMcpImageCommand(command)) {
+        if (mcpImageTaskRef.current) {
+          window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: false, error: { code: "IMAGE_BUSY", message: "图片任务正在进行，请完成后重试" } });
+          return;
+        }
+        const task = execute();
+        mcpImageTaskRef.current = task;
+        void task.finally(() => { if (mcpImageTaskRef.current === task) mcpImageTaskRef.current = null; });
+        return;
+      }
       const secretAction = secretAutomationAction(command);
       if (!secretAction) {
         void enqueueVaultTask(execute);
@@ -1081,7 +1110,7 @@ export default function Home() {
     });
     window.clipboxDesktop.automationReady();
     return remove;
-  }, [deviceKey, enqueueVaultTask, loading, writeVault, showToast, askAutomationConsent]);
+  }, [deviceKey, enqueueVaultTask, loading, readVault, writeVault, showToast, askAutomationConsent]);
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);

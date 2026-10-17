@@ -24,13 +24,17 @@ const READ_TIMEOUT: Duration = Duration::from_secs(10);
 const LINGER: Duration = Duration::from_secs(2);
 /// A command that hands out a 秘密 waits for the person at the app to allow it (the page gives up after 45 s).
 const SECRET_TIMEOUT: Duration = Duration::from_secs(60);
+/// Local image batches need time for decoding and encryption in the page.
+const IMAGE_IMPORT_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub fn is_secret_command(command: &Value) -> bool {
     matches!(command["action"].as_str(), Some("secret-get" | "secret-verify" | "secret-export"))
 }
 
 fn timeout_for(command: &Value) -> Duration {
-    if is_secret_command(command) { SECRET_TIMEOUT } else { TIMEOUT }
+    if is_secret_command(command) { SECRET_TIMEOUT }
+    else if command["action"] == "image-import" { IMAGE_IMPORT_TIMEOUT }
+    else { TIMEOUT }
 }
 /// The command line script the app installs next to the user's other tools.
 #[cfg(unix)]
@@ -285,6 +289,11 @@ impl Bridge {
             let _ = window.show();
             let _ = window.set_focus();
         }
+        let command = if command["action"] == "image-import" {
+            tauri::async_runtime::spawn_blocking(move || crate::mcp_images::prepare(command))
+                .await
+                .map_err(|_| ("INVALID_IMAGE_IMPORT".into(), "图片导入准备失败".into()))??
+        } else { command };
         let (entry, rx) = self.register();
         if window.emit("clipbox:automation-command", json!({ "requestId": entry.id, "command": command, "caller": caller })).is_err() {
             return Err(("COMMAND_FAILED".into(), "命令执行失败".into()));
@@ -461,6 +470,14 @@ mod tests {
         for action in ["status", "list", "get", "add", "secret"] {
             assert!(!is_secret_command(&json!({ "action": action })), "{action}");
             assert_eq!(timeout_for(&json!({ "action": action })), TIMEOUT);
+        }
+    }
+
+    #[test]
+    fn only_image_import_gets_extra_time_for_local_decoding_and_encryption() {
+        assert_eq!(timeout_for(&json!({"action":"image-import"})), Duration::from_secs(60));
+        for action in ["image-list", "image-thumbnail", "image-update-many", "update-many"] {
+            assert_eq!(timeout_for(&json!({"action":action})), TIMEOUT);
         }
     }
 
