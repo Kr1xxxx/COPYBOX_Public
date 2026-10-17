@@ -508,7 +508,7 @@ export function setFolderColor(data: VaultData, kind: ItemKind, folder: string, 
   return normalizeVaultData({ ...data, folderColors: { secret: {}, snippet: {}, ...data.folderColors, [kind]: nextColors } });
 }
 
-// "" or null goes back to the default (the first two characters); a value that is too long is refused, never cut.
+// "" or null goes back to the default (the first four characters, D-074); a value that is too long is refused, never cut.
 export function setFolderShortName(data: VaultData, kind: ItemKind, folder: string, raw: string | null): { data: VaultData; error?: string } {
   if (!data.folders[kind].includes(folder)) return { data, error: "目录不存在" };
   if (isStandardSnippetFolder(kind, folder)) return { data, error: "标准话术目录的简称是固定的" };
