@@ -4,6 +4,7 @@
 // the images, the folders and the selected folder filter, so the two never disagree.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { removeFolderPin, renameFolderPin } from "./folder-pins";
 import { activeImages, expiredTrashedImages, IMAGE_FILTER_ALL, resolveImageFilter, trashedImages, type ImageFilter } from "./image-folders-core";
 import { normalizeFolderName, openImageStore, type ImageFolder, type ImageMeta, type ImageStore } from "./image-store";
 
@@ -208,6 +209,7 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
       setImages((current) => current?.map((meta) => meta.folder === from ? { ...meta, folder: name } : meta) ?? current);
       // Keep the folder selected under its new name.
       setRawFilter((current) => current === `folder:${from}` ? `folder:${name}` : current);
+      renameFolderPin("image", from, name);
       if (name !== from) toast("目录已重命名");
       return name;
     } catch (error) {
@@ -252,6 +254,7 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
       setFolders(await (await loadStore(deviceKey)).deleteFolder(name));
       setImages((current) => current?.map((meta) => meta.folder === name ? { ...meta, folder: undefined } : meta) ?? current);
       setRawFilter((current) => current === `folder:${name}` ? IMAGE_FILTER_ALL : current);
+      removeFolderPin("image", name);
       toast(`已删除目录「${name}」`);
       return true;
     } catch (error) {

@@ -126,6 +126,7 @@ import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLang
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
 import { useDropdownDismiss, useRowMenuPlacement } from "./dropdown-menus";
 import { useValueOptionDrag } from "./value-option-drag";
+import { folderGroupNeighbour, pinnedFirst, removeFolderPin, renameFolderPin, reorderFolderPins, sameFolderGroup, toggleFolderPin, useFolderPins } from "./folder-pins";
 import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, quickFillValues, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
@@ -457,6 +458,9 @@ export default function Home() {
 
   // 账号 has no 目录 (owner, 2026-10-15): it is sorted by 分类 only. Old entries keep their stored folder, it is just not shown.
   const activeFolders = useMemo(() => (activeKind === "secret" ? NO_FOLDERS : folders[activeKind]), [activeKind, folders]);
+  // Pinned folders (目录置顶) come first in the sidebar and the mini window; only this device remembers them.
+  const folderPins = useFolderPins(activeKind);
+  const sidebarFolders = useMemo(() => pinnedFirst(activeFolders, folderPins, (folder) => folder), [activeFolders, folderPins]);
   const categoryColors = useMemo(() => ({ ...buildCategoryColorMap(activeFolders), ...(folderColors?.[activeKind] || {}) }), [activeFolders, folderColors, activeKind]);
   const activeKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "active"), [items, activeKind]);
   const legacySecrets = useMemo(() => (PLAIN_NOTES ? NO_LEGACY_SECRETS : selectItemsByTrashState(items, "secret", "active").map((item) => ({ id: item.id, label: item.label, secret: item.secret, pinned: item.pinned, lastUsedAt: item.lastUsedAt }))), [items]);
@@ -631,8 +635,16 @@ export default function Home() {
   const folderReorder = usePointerReorder({
     enabled: !backgroundInert,
     scope: "folder",
-    onDrop: (source, target) => persistFolderOrder((latest) => reorderNames(latest, source, target), "目录顺序已更新", true),
+    onDrop: (source, target) => moveFolderTo(source, target),
   });
+  // Folders only swap inside their own group: pinned ones change the pin order, the rest the saved folder order.
+  function moveFolderTo(source: string, target: string) {
+    if (!target || source === target || !sameFolderGroup(folderPins, source, target)) return;
+    if (!folderPins.includes(source)) { void persistFolderOrder((latest) => reorderNames(latest, source, target), "目录顺序已更新", true); return; }
+    prepareSortAnimation("folder");
+    reorderFolderPins(activeKind, source, target);
+    showToast("目录顺序已更新", { ms: 1800 });
+  }
   const cancelCardDrag = cardReorder.cancelPointerDrag;
   const cancelFolderDrag = folderReorder.cancelPointerDrag;
 
@@ -1386,6 +1398,7 @@ export default function Home() {
     if (trimmed === from) { setRenamingFolder(null); return; }
     const error = await commitFolderChange((data) => renameFolder(data, kind, from, value), "目录已重命名");
     if (error) { setRenamingFolder({ from, value, error }); return; }
+    renameFolderPin(kind, from, trimmed);
     if (activeFolder === `folder:${from}`) setActiveFolder(`folder:${trimmed}`);
     setRenamingFolder(null);
   }
@@ -1395,6 +1408,7 @@ export default function Home() {
     setFolderMenu("");
     setFolderDeleteArm("");
     const error = await commitFolderChange((data) => deleteFolder(data, kind, folder), `已删除目录「${folder}」`);
+    if (!error) removeFolderPin(kind, folder);
     if (!error && activeFolder === `folder:${folder}`) selectFolder("all");
   }
 
@@ -1414,6 +1428,7 @@ export default function Home() {
   async function settingsFolderRename(kind: SettingsFolderKind, from: string, to: string) {
     if (kind === "image") return imageFolderTask((onError) => imageLibrary.renameFolder(from, to, onError));
     const error = await commitFolderChange((data) => renameFolder(data, kind, from, to), "目录已重命名");
+    if (!error) renameFolderPin(kind, from, normalizeFolderName(to));
     if (!error && activeKind === kind && activeFolder === `folder:${from}`) setActiveFolder(`folder:${normalizeFolderName(to)}`);
     return error;
   }
@@ -1421,6 +1436,7 @@ export default function Home() {
   async function settingsFolderDelete(kind: SettingsFolderKind, folder: string) {
     if (kind === "image") return imageFolderTask((onError) => imageLibrary.deleteFolder(folder, onError));
     const error = await commitFolderChange((data) => deleteFolder(data, kind, folder), `已删除目录「${folder}」`);
+    if (!error) removeFolderPin(kind, folder);
     if (!error && activeKind === kind && activeFolder === `folder:${folder}`) selectFolder("all");
     return error;
   }
@@ -2010,7 +2026,7 @@ export default function Home() {
   };
   const miniFolderTabs: MiniTab[] = imageView
     ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name, folder.shortName)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
-    : [...activeFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder]))];
+    : [...sidebarFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder]))];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
   const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   // The 账号 section's content goes inside the veil (it stays mounted, so sliding open shows it at once); other sections are left as they are.
@@ -2048,7 +2064,8 @@ export default function Home() {
   const isStandardFolder = (folder: string) => Boolean(folderEditBlocker(activeKind, folder));
 
   // Every folder, the standard 话术 ones too (D-035), can move to any other place in the list.
-  const canMoveFolder = (folder: string, delta: -1 | 1) => Boolean(activeFolders[activeFolders.indexOf(folder) + delta]);
+  // Pinned folders move among the pinned ones, the others among the others.
+  const canMoveFolder = (folder: string, delta: -1 | 1) => Boolean(folderGroupNeighbour(sidebarFolders, folderPins, folder, delta));
   // Pinned and unpinned cards sort apart, so a card only swaps with a neighbour of its own group.
   const canMoveCard = (item: SecretItem, delta: -1 | 1) => Boolean(cardMoves.get(item.id)?.[delta < 0 ? "up" : "down"]);
   const renderFolderRow = (folder: string) => {
@@ -2082,7 +2099,8 @@ export default function Home() {
         onBeginDrag={(event) => folderReorder.beginPointerDrag(event, folder)}
         canMoveUp={canMoveFolder(folder, -1)}
         canMoveDown={canMoveFolder(folder, 1)}
-        onMove={(delta) => { void persistFolderOrder((latest) => moveName(latest, folder, delta), "目录顺序已更新", true); }}
+        pinned={folderPins.includes(folder)}
+        onMove={(delta) => moveFolderTo(folder, folderGroupNeighbour(sidebarFolders, folderPins, folder, delta))}
       />
     );
   };
@@ -2282,7 +2300,7 @@ export default function Home() {
               <button ref={folderCreateButtonRef} type="button" onClick={startNewFolder} aria-label="新建目录" title="新建目录"><Icon name="plus" /></button>
             </div>
             <div className="nav-scroll directory-list">
-              {activeFolders.map(renderFolderRow)}
+              {sidebarFolders.map(renderFolderRow)}
               {newFolder && (
                 <form className="directory-new" onSubmit={(event) => { event.preventDefault(); void submitNewFolder(); }}>
                   <i className="directory-color-marker hollow" aria-hidden="true" />
@@ -2307,6 +2325,7 @@ export default function Home() {
           {menuFolder && <>
             <div className="menu-scrim" role="presentation" onMouseDown={() => { setFolderMenu(""); setFolderDeleteArm(""); }} />
             <div className="dropdown folder-menu" role="menu" aria-label={`管理目录 ${menuFolder}`} style={{ top: folderMenuPos.top, left: folderMenuPos.left }}>
+              <button type="button" role="menuitem" onClick={() => { setFolderMenu(""); prepareSortAnimation("folder"); toggleFolderPin(activeKind, menuFolder); }}>{folderPins.includes(menuFolder) ? "取消置顶" : "置顶"}</button>
               <button type="button" role="menuitem" disabled={isStandardFolder(menuFolder)} title={isStandardFolder(menuFolder) ? "标准话术目录不能改名" : undefined} onClick={() => { setFolderMenu(""); setRenamingFolder({ from: menuFolder, value: menuFolder, error: "" }); }}>重命名</button>
               <p className="menu-label">颜色</p>
               <div className="swatches" role="group" aria-label="目录颜色">{CATEGORY_PALETTE.map((color) => <button key={color} type="button" aria-label={`颜色 ${color}`} aria-pressed={categoryColors[menuFolder]?.toLowerCase() === color.toLowerCase()} className={categoryColors[menuFolder]?.toLowerCase() === color.toLowerCase() ? "on" : ""} style={{ background: color }} onClick={() => { setFolderMenu(""); chooseFolderColor(menuFolder, color); }} />)}</div>
