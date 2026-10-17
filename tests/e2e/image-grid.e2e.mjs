@@ -163,6 +163,9 @@ test("rename, move to a folder and delete all work from the card", async ({ page
   await addSix(page, ["图一", "图二", "图三", "图四"]);
 
   await tile(page, "图一").getByRole("button", { name: "展开 图一" }).click();
+  // The card grows and then scrolls into view (smooth); a click while it moves can focus 改名 without clicking it.
+  await expect(card(page).getByRole("button", { name: "删除", exact: true })).toBeInViewport({ ratio: 1 });
+  await settle(page);
   await card(page).getByRole("button", { name: "改名", exact: true }).click();
   const input = card(page).getByRole("textbox", { name: "图片标题", exact: true });
   await expect(input).toBeFocused();
