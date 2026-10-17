@@ -1,5 +1,7 @@
 // Encrypted image store for the 图片 section (docs/specs/image-section.md, "Storage").
 // Lives in IndexedDB `clipbox-images`; never touches the vault (`clipbox.vault.v1`).
+import { serialFor } from "./store-queue.ts";
+import { assertWritesOpen } from "./write-gate.ts";
 import { FOLDER_SHORT_NAME_ERROR, normalizeFolderShortName } from "./folder-short-name.ts";
 
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -85,12 +87,17 @@ type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 const pendingWrites = new Set<Promise<void>>();
 const WRITE_METHODS = ["add", "rename", "remove", "trash", "restore", "markUsed", "moveImage", "setPinned", "createFolder", "renameFolder", "reorderFolders", "setFolderColor", "setFolderShortName", "deleteFolder"] as const satisfies readonly (keyof ImageStore)[];
 
-function trackWrites(store: ImageStore): ImageStore {
+function trackWrites(store: ImageStore, factory: IDBFactory): ImageStore {
+  // Separate connections to the same database must share the read/modify/write queue.
+  const serial = serialFor(factory, DB_NAME);
   const tracked: Record<string, unknown> = { ...store };
   for (const name of WRITE_METHODS) {
     const write = store[name] as (...args: unknown[]) => Promise<unknown>;
     tracked[name] = (...args: unknown[]) => {
-      const work = write(...args);
+      const work = serial(async () => {
+        assertWritesOpen();
+        return write(...args);
+      });
       const settled = work.then(() => undefined, () => undefined);
       pendingWrites.add(settled);
       void settled.then(() => pendingWrites.delete(settled));
@@ -214,6 +221,7 @@ async function readOrCreateSalt(db: IDBDatabase): Promise<Uint8Array<ArrayBuffer
   if (existing) {
     salt = base64ToBytes(existing.salt);
   } else {
+    assertWritesOpen();
     salt = crypto.getRandomValues(new Uint8Array(16));
     store.put({ id: SETTINGS_ID, salt: bytesToBase64(salt) } satisfies SettingsRecord);
   }
@@ -300,6 +308,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
 
   async function writeMeta(meta: ImageMeta) {
     const record = await sealMeta(meta);
+    assertWritesOpen();
     const tx = db.transaction("meta", "readwrite");
     const done = finished(tx);
     tx.objectStore("meta").put(record);
@@ -329,6 +338,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
 
   // Encrypt everything first, then put it all in one transaction (it would commit while awaiting encryption).
   async function writeMetaRecords(records: MetaRecord[]) {
+    assertWritesOpen();
     const tx = db.transaction("meta", "readwrite");
     const done = finished(tx);
     const store = tx.objectStore("meta");
@@ -402,6 +412,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       // Encrypt before opening the transaction: IndexedDB commits a transaction that waits on other promises.
       const metaRecord = await sealMeta(meta);
       const blobRecord: BlobRecord = await seal(key, "blobs", meta.id, new Uint8Array(await file.arrayBuffer()));
+      assertWritesOpen();
       const tx = db.transaction(["meta", "blobs"], "readwrite");
       const done = finished(tx);
       tx.objectStore("meta").put(metaRecord);
@@ -436,6 +447,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
 
     async remove(id) {
       if (isReservedId(id)) throw new Error("找不到这张图片");
+      assertWritesOpen();
       const tx = db.transaction(["meta", "blobs"], "readwrite");
       const done = finished(tx);
       tx.objectStore("meta").delete(id);
@@ -445,6 +457,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       try {
         const thumbs = await thumbDatabase();
         if (thumbs) {
+          assertWritesOpen();
           const thumbTx = thumbs.transaction("thumbs", "readwrite");
           const thumbDone = finished(thumbTx);
           thumbTx.objectStore("thumbs").delete(id);
@@ -468,6 +481,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
         const thumbs = await thumbDatabase();
         if (thumbs) {
           const bytes = await small.arrayBuffer(); // before the transaction opens: IndexedDB closes it if we wait inside
+          assertWritesOpen();
           const tx = thumbs.transaction("thumbs", "readwrite");
           const done = finished(tx);
           tx.objectStore("thumbs").put({ id: meta.id, bytes, type: small.type } satisfies ThumbRecord);
@@ -562,7 +576,7 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
         ({ folder, ...rest }) => (folder === target.name ? { ...rest, updatedAt: time } : null),
       );
     },
-  });
+  }, factory);
 }
 
 export async function toPngBytes(blob: Blob): Promise<Uint8Array> {

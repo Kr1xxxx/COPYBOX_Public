@@ -1,7 +1,7 @@
 // Restoring a backup replaces the stored data, including the device key and the vault's salt, and then reloads the
 // page. A save from the page that lands after that (a delayed copy count, a retry, an outside command) would encrypt
 // the OLD data with the OLD key over the restored data, and the next start could not open it. So before a restore
-// writes anything, every pending save is finished and the gate closes: from then on the vault and the 账号 stores
+// writes anything, every pending save is finished and the gate closes: from then on the vault, 账号 and image stores
 // refuse to write until the page reloads (or the restore fails and puts the old data back, see reopenWrites).
 import { waitForImageWrites } from "./image-store.ts";
 import { drainAll } from "./store-queue.ts";
