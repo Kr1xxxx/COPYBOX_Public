@@ -2122,6 +2122,7 @@ export default function Home() {
                           <span className="row-title">
                             <strong className={isSnippet ? "snippet-label" : undefined}>{isSnippet ? <SnippetTitle label={item.label} query={query} /> : <Highlight text={item.label} query={query} />}</strong>
                             {isSelected && isSnippet && item.snippetNumber && <b className="row-snippet-number">{displaySnippetNumber(item.snippetNumber)}</b>}
+                            {isSelected && isSnippet && <small className="row-copy-hint" aria-hidden="true">双击复制</small>}
                             {showFolderChip && isSnippet && item.folder && <small className="row-folder">{item.folder}</small>}
                             {isSnippet && sharedMark(item) && <small className="row-shared-mark" data-mark={sharedMark(item)}>{sharedMark(item) === "update" ? "公司版有更新" : "公司已停用"}</small>}
                           </span>
