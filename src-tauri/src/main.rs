@@ -10,6 +10,7 @@ mod cloud;
 mod device_key;
 mod flush;
 mod mcp;
+mod mcp_images;
 // Windows only; elsewhere just the pure decision logic and its tests (D-046).
 #[cfg_attr(not(windows), allow(dead_code))]
 mod old_autostart;

@@ -11,7 +11,7 @@ const MAX_ANSWER_BYTES: usize = 16 * 1024 * 1024;
 
 const NOT_RUNNING: &str = "Copyboxx 没有打开，请先打开 Copyboxx 再试。(Copyboxx is not running: ask the user to open the app.)";
 
-const INSTRUCTIONS: &str = "Copyboxx is the user's local, encrypted copy box of customer-service reply snippets (话术). \
+const INSTRUCTIONS: &str = "Copyboxx is the user's local, encrypted copy box of customer-service reply snippets (话术) and images (图片). \
 Snippets have numbers like CB-0001. The Copyboxx app must be open. Reading a secret (秘密) shows a question in the app \
 and waits until the user clicks 允许 (allow); if they refuse or do not answer within 45 seconds the call fails, so tell \
 the user to look at Copyboxx before calling get_secret or verify_secret.";
@@ -101,7 +101,97 @@ const TOOLS: &[ToolSpec] = &[
         read_only: true,
         destructive: false,
     },
+    ToolSpec { name: "list_snippet_folders", action: "snippet-folders", title: "List snippet folders", description: "List valid snippet folders before assigning a folder.", fields: &[], read_only: true, destructive: false },
+    ToolSpec { name: "get_snippets", action: "get-many", title: "Get snippets", description: "Get 1 to 100 distinct snippets with full content and updatedAt.", fields: &[], read_only: true, destructive: false },
+    ToolSpec { name: "update_snippets", action: "update-many", title: "Update snippets", description: "Update 1 to 100 snippets. Each update requires the current updatedAt as expectedUpdatedAt; omitted fields stay unchanged.", fields: &[], read_only: false, destructive: false },
+    ToolSpec { name: "list_images", action: "image-list", title: "List images", description: "List image metadata with optional folder/search filters and offset/limit pagination. Originals are not returned.", fields: &[], read_only: true, destructive: false },
+    ToolSpec { name: "import_images", action: "image-import", title: "Import local images", description: "Import 1 to 10 local PNG, JPEG, WebP or GIF files by absolute path, up to 10 MiB each and 20 MiB total. Optional folder must already exist.", fields: &[], read_only: false, destructive: false },
+    ToolSpec { name: "get_image_thumbnail", action: "image-thumbnail", title: "Get image thumbnail", description: "Return one small image preview as an MCP image block.", fields: &[], read_only: true, destructive: false },
+    ToolSpec { name: "update_images", action: "image-update-many", title: "Update images", description: "Rename images or move them to an existing folder. Use null for uncategorized. Each update requires the current updatedAt as expectedUpdatedAt.", fields: &[], read_only: false, destructive: false },
+    ToolSpec { name: "list_image_folders", action: "image-folders", title: "List image folders", description: "List image folder names.", fields: &[], read_only: true, destructive: false },
+    ToolSpec { name: "create_image_folder", action: "image-folder-create", title: "Create image folder", description: "Create a named image folder.", fields: &[], read_only: false, destructive: false },
+    ToolSpec { name: "rename_image_folder", action: "image-folder-rename", title: "Rename image folder", description: "Rename an existing image folder and move its images to the new name.", fields: &[], read_only: false, destructive: false },
 ];
+
+fn object_schema(properties: Value, required: &[&str]) -> Value {
+    json!({"type":"object", "properties":properties, "required":required, "additionalProperties":false})
+}
+
+fn batch_schema(items: Value, max: usize) -> Value {
+    json!({"type":"array", "minItems":1, "maxItems":max, "items":items})
+}
+
+/// One schema describes both the advertised inputs and their strict runtime validation.
+fn extended_schema(action: &str) -> Option<Value> {
+    let text = json!({"type":"string"});
+    let timestamp = json!({"type":"integer", "minimum":0, "maximum":9007199254740991_u64});
+    Some(match action {
+        "snippet-folders" | "image-folders" => object_schema(json!({}), &[]),
+        "get-many" => {
+            let mut numbers = batch_schema(text, 100);
+            numbers["uniqueItems"] = json!(true);
+            object_schema(json!({"numbers":numbers}), &["numbers"])
+        }
+        "update-many" => object_schema(json!({"updates":batch_schema(object_schema(json!({
+            "number":text, "expectedUpdatedAt":timestamp, "title":text, "content":text,
+            "summary":text, "folder":text, "chineseText":text
+        }), &["number", "expectedUpdatedAt"]), 100)}), &["updates"]),
+        "image-list" => object_schema(json!({
+            "folder":text, "query":text,
+            "offset":{"type":"integer", "minimum":0, "maximum":9007199254740991_u64},
+            "limit":{"type":"integer", "minimum":1, "maximum":100}
+        }), &[]),
+        "image-import" => object_schema(json!({"files":batch_schema(object_schema(json!({
+            "path":{"type":"string", "description":"Absolute path to a local image file"}, "title":text, "folder":text
+        }), &["path"]), 10)}), &["files"]),
+        "image-thumbnail" => object_schema(json!({"id":text}), &["id"]),
+        "image-update-many" => object_schema(json!({"updates":batch_schema(object_schema(json!({
+            "id":text, "expectedUpdatedAt":timestamp, "title":text, "folder":{"type":["string","null"]}
+        }), &["id", "expectedUpdatedAt"]), 100)}), &["updates"]),
+        "image-folder-create" => object_schema(json!({"name":text}), &["name"]),
+        "image-folder-rename" => object_schema(json!({"from":text,"to":text}), &["from","to"]),
+        _ => return None,
+    })
+}
+
+fn validate_input(value: &Value, schema: &Value, field: &str) -> Result<(), String> {
+    if schema["type"] == json!(["string", "null"]) {
+        return if value.is_string() || value.is_null() { Ok(()) } else { Err(format!("{field} must be text or null")) };
+    }
+    match schema["type"].as_str() {
+        Some("object") => {
+            let given = value.as_object().ok_or_else(|| format!("{field} must be an object"))?;
+            let properties = schema["properties"].as_object().expect("object schema properties");
+            for (key, value) in given {
+                let rule = properties.get(key).ok_or_else(|| format!("{field} does not take {key}"))?;
+                validate_input(value, rule, &format!("{field}.{key}"))?;
+            }
+            for key in schema["required"].as_array().expect("object schema required") {
+                let key = key.as_str().expect("required field name");
+                if !given.contains_key(key) { return Err(format!("{field} needs {key}")); }
+            }
+        }
+        Some("array") => {
+            let items = value.as_array().ok_or_else(|| format!("{field} must be an array"))?;
+            let min = schema["minItems"].as_u64().unwrap_or(0) as usize;
+            let max = schema["maxItems"].as_u64().unwrap_or(100) as usize;
+            if items.len() < min || items.len() > max { return Err(format!("{field} must contain {min} to {max} entries")); }
+            for (index, item) in items.iter().enumerate() {
+                validate_input(item, &schema["items"], &format!("{field}[{index}]"))?;
+                if schema["uniqueItems"] == true && items[..index].contains(item) { return Err(format!("{field} must contain distinct entries")); }
+            }
+        }
+        Some("integer") => {
+            let number = value.as_u64().ok_or_else(|| format!("{field} must be a nonnegative integer"))?;
+            if number < schema["minimum"].as_u64().unwrap_or(0) || number > schema["maximum"].as_u64().unwrap_or(u64::MAX) {
+                return Err(format!("{field} is outside its allowed range"));
+            }
+        }
+        Some("string") if value.is_string() => {}
+        _ => return Err(format!("{field} must be text")),
+    }
+    Ok(())
+}
 
 fn tool_list() -> Value {
     let tools: Vec<Value> = TOOLS
@@ -119,7 +209,7 @@ fn tool_list() -> Value {
                 "name": tool.name,
                 "title": tool.title,
                 "description": tool.description,
-                "inputSchema": { "type": "object", "properties": properties, "required": required, "additionalProperties": false },
+                "inputSchema": extended_schema(tool.action).unwrap_or_else(|| json!({ "type": "object", "properties": properties, "required": required, "additionalProperties": false })),
                 "annotations": { "title": tool.title, "readOnlyHint": tool.read_only, "destructiveHint": tool.destructive, "openWorldHint": false },
             })
         })
@@ -136,6 +226,13 @@ fn command_for(name: &str, arguments: &Value) -> Result<Value, String> {
         Value::Object(map) => map,
         _ => return Err("arguments must be an object".into()),
     };
+    if let Some(schema) = extended_schema(tool.action) {
+        let input = Value::Object(given.clone());
+        validate_input(&input, &schema, name)?;
+        let mut command = given.clone();
+        command.insert("action".into(), json!(tool.action));
+        return Ok(Value::Object(command));
+    }
     let mut command = Map::new();
     command.insert("action".into(), json!(tool.action));
     for (key, value) in given {
@@ -185,7 +282,20 @@ impl<A: FnMut(Value) -> Result<Value, String>> Session<A> {
                 if let Some(map) = answer.as_object_mut() {
                     map.remove("ok");
                 }
-                text_result(serde_json::to_string_pretty(&answer).unwrap_or_default(), false)
+                let mut image = None;
+                if answer["action"] == "image-thumbnail" {
+                    let preview = answer.as_object_mut().and_then(|map| map.remove("preview"));
+                    match preview {
+                        Some(preview) if preview["data"].is_string() && matches!(preview["mimeType"].as_str(), Some("image/png" | "image/jpeg" | "image/webp" | "image/gif")) => {
+                            image = Some(json!({"type":"image", "data":preview["data"], "mimeType":preview["mimeType"]}));
+                        }
+                        _ => return text_result("图片预览无效".into(), true),
+                    }
+                }
+                let mut result = text_result(serde_json::to_string(&answer).unwrap_or_default(), false);
+                result["structuredContent"] = answer;
+                if let Some(image) = image { result["content"].as_array_mut().unwrap().push(image); }
+                result
             }
             Ok(answer) => {
                 let message = answer["error"]["message"].as_str().unwrap_or("命令执行失败");
@@ -362,7 +472,7 @@ mod tests {
         assert!(session.handle_line(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#).is_none());
         let status = session.handle_line(r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"copyboxx_status","arguments":{}}}"#).unwrap();
         assert_eq!(status["result"]["isError"], false);
-        assert!(status["result"]["content"][0]["text"].as_str().unwrap().contains("\"snippetCount\": 2"));
+        assert!(status["result"]["content"][0]["text"].as_str().unwrap().contains("\"snippetCount\":2"));
         assert_eq!(sent.borrow()[0], json!({ "action": "status" }));
     }
 
@@ -372,7 +482,8 @@ mod tests {
         let list = session.handle_line(r#"{"jsonrpc":"2.0","id":"a","method":"tools/list"}"#).unwrap();
         let tools = list["result"]["tools"].as_array().unwrap();
         let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-        assert_eq!(names, ["copyboxx_status", "list_snippets", "get_snippet", "add_snippet", "update_snippet", "move_snippet", "delete_snippet", "get_secret", "verify_secret"]);
+        assert_eq!(&names[..9], ["copyboxx_status", "list_snippets", "get_snippet", "add_snippet", "update_snippet", "move_snippet", "delete_snippet", "get_secret", "verify_secret"]);
+        assert_eq!(names.len(), 19);
         let add = &tools[3];
         assert_eq!(add["inputSchema"]["required"], json!(["title", "content"]));
         assert_eq!(add["inputSchema"]["additionalProperties"], false);
@@ -402,6 +513,87 @@ mod tests {
         assert!(command_for("list_snippets", &json!({ "_client": "Codex" })).is_err());
         assert!(command_for("export_secrets", &json!({})).is_err());
         assert!(command_for("add_snippet", &json!("text")).is_err());
+    }
+
+    #[test]
+    fn extended_tools_validate_and_map_typed_arguments() {
+        for (name, action, args) in [
+            ("list_snippet_folders", "snippet-folders", json!({})),
+            ("get_snippets", "get-many", json!({"numbers": ["CB-0001", "CB-0002"]})),
+            ("update_snippets", "update-many", json!({"updates": [{"number":"CB-0001","expectedUpdatedAt":0,"title":"New"}]})),
+            ("list_images", "image-list", json!({"offset":0,"limit":100,"folder":"Samples","query":"sky"})),
+            ("import_images", "image-import", json!({"files":[{"path":std::env::temp_dir().join("example.png"),"title":"Example","folder":"Samples"}]})),
+            ("get_image_thumbnail", "image-thumbnail", json!({"id":"image-1"})),
+            ("update_images", "image-update-many", json!({"updates":[{"id":"image-1","expectedUpdatedAt":1,"folder":null}]})),
+            ("list_image_folders", "image-folders", json!({})),
+            ("create_image_folder", "image-folder-create", json!({"name":"Samples"})),
+            ("rename_image_folder", "image-folder-rename", json!({"from":"Samples","to":"New"})),
+        ] {
+            let mut expected = args.clone();
+            expected["action"] = json!(action);
+            assert_eq!(command_for(name, &args).unwrap(), expected);
+            let mut extra = args;
+            extra["injected"] = json!(true);
+            assert!(command_for(name, &extra).is_err(), "{name}");
+        }
+        // File-level path validity is reported per file by native preparation.
+        assert_eq!(command_for("import_images", &json!({"files":[{"path":"relative.png"}]})).unwrap(),
+            json!({"action":"image-import","files":[{"path":"relative.png"}]}));
+        for (name, args) in [
+            ("get_snippets", json!({"numbers":[]})),
+            ("get_snippets", json!({"numbers":["CB-0001","CB-0001"]})),
+            ("get_snippets", json!({"numbers":[1]})),
+            ("get_snippets", json!({"numbers": (0..101).map(|n| n.to_string()).collect::<Vec<_>>()})),
+            ("update_snippets", json!({"updates":[{"number":"CB-0001","title":"New"}]})),
+            ("update_snippets", json!({"updates":[{"number":"CB-0001","expectedUpdatedAt":-1}]})),
+            ("update_snippets", json!({"updates":[{"number":"CB-0001","expectedUpdatedAt":1.5}]})),
+            ("update_snippets", json!({"updates":[{"number":"CB-0001","expectedUpdatedAt":1,"title":null}]})),
+            ("list_images", json!({"offset":-1})),
+            ("list_images", json!({"limit":101})),
+            ("list_images", json!({"limit":0})),
+            ("list_images", json!({"offset":"1"})),
+            ("import_images", json!({"files":[]})),
+            ("import_images", json!({"files":[{"path":"/tmp/a.png","data":"injected"}]})),
+            ("import_images", json!({"files":vec![json!({"path":"/tmp/a.png"});11]})),
+            ("update_images", json!({"updates":[{"id":"x","expectedUpdatedAt":0,"folder":1}]})),
+            ("get_image_thumbnail", json!({"id":1})),
+        ] { assert!(command_for(name, &args).is_err(), "{name}: {args}"); }
+    }
+
+    #[test]
+    fn new_schemas_describe_arrays_numbers_and_nullable_folders() {
+        let list = tool_list();
+        let schema = |name: &str| list["tools"].as_array().unwrap().iter().find(|t| t["name"] == name).unwrap()["inputSchema"].clone();
+        assert_eq!(schema("get_snippets")["properties"]["numbers"]["maxItems"], 100);
+        assert_eq!(schema("list_images")["properties"]["limit"]["type"], "integer");
+        assert_eq!(schema("import_images")["properties"]["files"]["maxItems"], 10);
+        assert_eq!(schema("update_images")["properties"]["updates"]["items"]["properties"]["folder"]["type"], json!(["string","null"]));
+    }
+
+    #[test]
+    fn thumbnail_is_an_image_block_without_base64_in_text() {
+        let (mut session, _) = session_with(vec![Ok(json!({"ok":true,"action":"image-thumbnail","id":"sample","preview":{"data":"aGVsbG8=","mimeType":"image/png"}}))]);
+        let result = session.call_tool(&json!({"name":"get_image_thumbnail","arguments":{"id":"sample"}}));
+        assert_eq!(result["content"][1], json!({"type":"image","data":"aGVsbG8=","mimeType":"image/png"}));
+        assert!(!result["content"][0]["text"].as_str().unwrap().contains("aGVsbG8="));
+        assert_eq!(result["structuredContent"]["id"], "sample");
+    }
+
+    #[test]
+    fn invalid_new_inputs_never_reach_the_app_and_bad_previews_never_leak_data() {
+        let (mut session, sent) = session_with(vec![
+            Ok(json!({"ok":true,"action":"image-thumbnail","preview":{"data":"private-bytes","mimeType":"text/html"}})),
+            Ok(json!({"ok":false,"error":{"code":"INVALID_IMAGE_IMPORT","message":"图片文件超过大小限制"}})),
+        ]);
+        let bad = session.call_tool(&json!({"name":"import_images","arguments":{"files":[{"path":"/tmp/a.png","data":"injected"}]}}));
+        assert_eq!(bad["isError"], true);
+        assert!(sent.borrow().is_empty());
+        let preview = session.call_tool(&json!({"name":"get_image_thumbnail","arguments":{"id":"sample"}}));
+        assert_eq!(preview["isError"], true);
+        assert!(!preview.to_string().contains("private-bytes"));
+        let failure = session.call_tool(&json!({"name":"import_images","arguments":{"files":[{"path":std::env::temp_dir().join("sample.png")}]}}));
+        assert_eq!(failure["isError"], true);
+        assert!(failure["content"][0]["text"].as_str().unwrap().contains("INVALID_IMAGE_IMPORT"));
     }
 
     #[test]
