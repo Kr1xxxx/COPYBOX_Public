@@ -335,6 +335,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .native-row.selected .row-title strong { font-size: 14px; }
 .native-row.selected .row-title { gap: 7px; }
 .native-row.selected .row-snippet-number { font-size: 10.5px; }
+.row-copy .row-copy-hint { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; font-weight: 400; opacity: .62; }
 .native-row.selected .row-folder { padding: 0 6px; font-size: 10.5px; }
 .row-detail { display: grid; grid-template-rows: 1fr; animation: detail-open .26s cubic-bezier(.2,.8,.2,1) backwards; }
 .row-detail-inner { min-height: 0; padding: 0 12px 10px 34px; display: grid; gap: 9px; align-content: start; animation: detail-clip .26s cubic-bezier(.2,.8,.2,1); }

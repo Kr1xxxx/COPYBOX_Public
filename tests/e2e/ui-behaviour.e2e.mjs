@@ -26,6 +26,9 @@ test.describe("snippet list", () => {
     await expect(selected.locator(".row-snippet-number")).toHaveCount(1);
     await expect(selected.locator(".row-snippet-number")).toHaveText(/\S+/);
     await expect(page.locator(".row-snippet-number")).toHaveCount(1);
+    // a quiet 双击复制 hint sits right of the number, only on the opened entry
+    await expect(selected.locator(".row-snippet-number + .row-copy-hint")).toHaveText("双击复制");
+    await expect(page.locator(".row-copy-hint")).toHaveCount(1);
 
     await selected.getByRole("button", { name: "编辑" }).click();
     await expect(page.locator(".inline-editor .editor-snippet-number")).toHaveText(/\S+/);
