@@ -37,7 +37,7 @@ export type ImageMeta = {
   deletedAt?: number;
 };
 
-// `shortName`: what the mini window's folder tab shows instead of the first two characters (D-049). Optional, so folder
+// `shortName`: what the mini window's folder tab shows instead of the first four characters (D-049, D-074). Optional, so folder
 // lists saved before it existed need no change; an older app keeps it untouched when it renames or recolours.
 export type ImageFolder = { name: string; color?: string; shortName?: string };
 
@@ -59,7 +59,7 @@ export type ImageStore = {
   createFolder(name: string): Promise<ImageFolder[]>;
   renameFolder(from: string, to: string): Promise<ImageFolder[]>;
   setFolderColor(name: string, color: string): Promise<ImageFolder[]>;
-  // null or "" goes back to the default short name; a value longer than two characters is refused (「最多两个字」).
+  // null or "" goes back to the default short name; a value longer than four characters is refused (「最多四个字」).
   setFolderShortName(name: string, shortName: string | null): Promise<ImageFolder[]>;
   // Moves a folder to another folder's place in the saved order (the folder list is already stored in order).
   reorderFolders(source: string, target: string): Promise<ImageFolder[]>;

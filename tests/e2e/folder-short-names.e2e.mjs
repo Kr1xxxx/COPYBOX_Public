@@ -30,7 +30,7 @@ async function backToFull(page) {
   await page.setViewportSize({ width: 680, height: 620 });
 }
 
-test("an own 话术 folder gets a short name in the mini window; 恢复默认 brings back the first two characters", async ({ page }) => {
+test("an own 话术 folder gets a short name in the mini window; 恢复默认 brings back the whole four-character name", async ({ page }) => {
   await asDesktop(page, "win32");
   await seedSnippets(page);
   const { dialog, group } = await openFolderSettings(page, "话术目录");
@@ -46,13 +46,13 @@ test("an own 话术 folder gets a short name in the mini window; 恢复默认 br
   await expect(panel).toContainText("迷你窗口显示为");
   const input = panel.getByRole("textbox", { name: "迷你窗口显示为 客户跟单" });
   await expect(input).toBeFocused();
-  await expect(input).toHaveAttribute("placeholder", "客户");
+  await expect(input).toHaveAttribute("placeholder", "客户跟单");
 
   // Too long: refused with a plain message, nothing is cut or saved.
-  await input.fill("跟单员");
+  await input.fill("客户跟单员");
   await panel.getByRole("button", { name: "保存" }).click();
-  await expect(panel.getByRole("alert")).toHaveText("最多两个字");
-  await expect(input).toHaveValue("跟单员");
+  await expect(panel.getByRole("alert")).toHaveText("最多四个字");
+  await expect(input).toHaveValue("客户跟单员");
 
   // Esc closes only the panel, not Settings.
   await page.keyboard.press("Escape");
@@ -86,8 +86,12 @@ test("an own 话术 folder gets a short name in the mini window; 恢复默认 br
   await again.dialog.locator(".settings-folder-more").getByRole("button", { name: "恢复默认" }).click();
   await expect(again.dialog.locator(".settings-folder-more")).toHaveCount(0);
   await again.dialog.getByRole("button", { name: "关闭设置" }).click();
-  tab = await miniFolderTab(page, "客户跟单");
-  await expect(tab).toHaveText("客户");
+  await page.getByRole("button", { name: "迷你模式" }).click();
+  await page.setViewportSize({ width: 360, height: 440 });
+  // The default shows the whole four-character name, so the tab needs no tooltip.
+  tab = page.locator(".mini-folders .mini-tab", { hasText: "客户跟单" });
+  await expect(tab).toHaveText("客户跟单");
+  await expect(tab).not.toHaveAttribute("title");
 });
 
 test("only one panel at a time: opening 「⋯」 closes the colours, and the other way round", async ({ page }) => {
@@ -115,7 +119,7 @@ test("an image folder gets a short name the same way", async ({ page }) => {
   await addFolder(page, group, "产品图片");
   await group.getByRole("button", { name: "更多设置 产品图片" }).click();
   const panel = dialog.locator(".settings-folder-more");
-  await expect(panel.getByRole("textbox")).toHaveAttribute("placeholder", "产品");
+  await expect(panel.getByRole("textbox")).toHaveAttribute("placeholder", "产品图片");
   await panel.getByRole("textbox").fill("样品");
   await panel.getByRole("button", { name: "保存" }).click();
   await expect(panel).toHaveCount(0);

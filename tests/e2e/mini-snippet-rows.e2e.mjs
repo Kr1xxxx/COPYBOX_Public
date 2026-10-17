@@ -1,5 +1,5 @@
 // Mini window 话术 rows (owner's request, 2026-10-13): a click opens the row in place with only 「修改」; a floating
-// 「复制」 button on hover copies without opening it. Folder tabs show two-character names.
+// 「复制」 button on hover copies without opening it. Folder tabs show up to four characters (D-074).
 import { test, expect } from "@playwright/test";
 import { asDesktop, openAccountCategory, seedSnippets, openRow } from "./helpers.mjs";
 
@@ -137,12 +137,13 @@ test("mini: with reduced motion the copy button changes state without the pop", 
   expect(await row.locator(".mini-copy").evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 });
 
-test("mini: folder tabs show two-character names with the full name as the tooltip", async ({ page }) => {
+test("mini: folder tabs show four-character names in full (D-074)", async ({ page }) => {
   await openMini(page);
   const tabs = page.locator(".mini-folders .mini-tab");
-  await expect(tabs).toHaveText(["询盘", "产品", "报价", "定制", "跟进", "物流", "售后"]);
-  await expect(tabs.first()).toHaveAttribute("title", "询盘接待");
-  await expect(page.getByRole("button", { name: "物流清关" })).toHaveText("物流");
+  await expect(tabs).toHaveText(["询盘接待", "产品样品", "报价成交", "定制生产", "客户跟进", "物流清关", "售后争议"]);
+  // Shown whole, so there is no tooltip to repeat it.
+  await expect(tabs.first()).not.toHaveAttribute("title");
+  await expect(page.getByRole("button", { name: "物流清关" })).toHaveText("物流清关");
   await tabs.nth(1).click();
   await expect(tabs.nth(1)).toHaveClass(/\bactive\b/);
   await expect(page.locator(".mini-list .mini-row").first()).toBeVisible();
