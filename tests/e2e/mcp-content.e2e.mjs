@@ -2,11 +2,15 @@ import { expect, test } from "@playwright/test";
 import { asDesktop, seedSnippets } from "./helpers.mjs";
 
 async function setup(page) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await asDesktop(page, "darwin");
   await page.addInitScript(() => {
     window.__mcpAnswers = {};
     window.clipboxDesktop.onAutomationCommand = (callback) => { window.__mcpSend = callback; return () => {}; };
     window.clipboxDesktop.respondAutomationCommand = (id, answer) => { window.__mcpAnswers[id] = answer; };
+    window.__mcpFlushHandlers = new Set(); window.__mcpFlushDone = 0;
+    window.clipboxDesktop.onFlushRequest = (handler) => { window.__mcpFlushHandlers.add(handler); return () => window.__mcpFlushHandlers.delete(handler); };
+    window.clipboxDesktop.flushDone = () => { window.__mcpFlushDone += 1; };
   });
   await seedSnippets(page);
   await page.waitForFunction(() => typeof window.__mcpSend === "function");
@@ -58,8 +62,11 @@ test("MCP imports locally before image tab opens, deduplicates, organizes and re
   await page.waitForFunction(() => typeof window.__releaseMcpDecode === "function");
   expect(await send(page, { action: "image-folders" })).toMatchObject({ ok: false, error: { code: "IMAGE_BUSY" } });
   expect(await send(page, { action: "status" })).toMatchObject({ ok: true });
+  await page.evaluate(async () => { for (const handler of window.__mcpFlushHandlers) handler(); await new Promise((resolve) => setTimeout(resolve, 80)); });
+  expect(await page.evaluate(() => window.__mcpFlushDone)).toBe(0);
   await page.evaluate(() => { window.__restoreMcpDecoder(); window.__releaseMcpDecode(); });
   expect((await pending).results[0].status).toBe("imported");
+  await expect.poll(() => page.evaluate(() => window.__mcpFlushDone)).toBe(1);
   const imported = await send(page, { action: "image-import", files: [file, { ...file, path: "/synthetic/bad.png", data: "bm90IGFuIGltYWdl" }] });
   expect(imported.results.map((item) => item.status)).toEqual(["duplicate", "error"]);
   const original = imported.results[0].item;
@@ -76,7 +83,8 @@ test("MCP imports locally before image tab opens, deduplicates, organizes and re
   expect(size).toEqual([320, 200]);
   await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
   await expect(page.getByText("MCP edited image", { exact: true }).first()).toBeVisible();
-  await page.screenshot({ path: "/tmp/copyboxx-mcp-image-verified.png" });
+  await expect.poll(() => page.locator(".image-tile-pic").evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await page.screenshot({ path: "/tmp/copyboxx-mcp-image-verified.png", animations: "disabled" });
   await page.reload(); await page.waitForFunction(() => typeof window.__mcpSend === "function");
   const listed = await send(page, { action: "image-list" });
   expect(listed.total).toBe(1); expect(listed.items[0].title).toBe("MCP edited image");

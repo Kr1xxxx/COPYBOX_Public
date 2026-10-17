@@ -77,10 +77,24 @@ test("MCP rejects bad targets/fields before edits, and reports applied fields on
   assert.equal((await store.list())[0].title, "Changed");
 });
 
+test("MCP rechecks the image after async folder lookup and preserves a newer UI edit", async () => {
+  const { run, store } = await harness();
+  await store.createFolder("Products");
+  const image = await store.add(new Blob([bytes], { type: "image/png" }), "Original");
+  const listFolders = store.listFolders;
+  store.listFolders = async () => { await store.rename(image.id, "Newer UI title"); return listFolders(); };
+  const out = await run({ action: "image-update-many", updates: [{ id: image.id, expectedUpdatedAt: image.updatedAt, title: "Stale title", folder: "Products" }] });
+  assert.equal(out.results[0].error.code, "CONFLICT");
+  assert.deepEqual(out.results[0].appliedFields, []);
+  assert.equal((await store.list())[0].title, "Newer UI title");
+});
+
 test("MCP thumbnail cannot fall back to original bytes and refuses trashed images", async () => {
   const { run, store, deps } = await harness();
   const a = await store.add(new Blob([bytes], { type: "image/png" }), "A");
   assert.equal((await run({ action: "image-thumbnail", id: a.id })).preview.mimeType, "image/png");
+  deps.thumbnail = async () => new Blob([new Uint8Array(512 * 1024 + 1)], { type: "image/png" });
+  await assert.rejects(run({ action: "image-thumbnail", id: a.id }), /预览/);
   deps.thumbnail = async () => null;
   await assert.rejects(run({ action: "image-thumbnail", id: a.id }), /预览/);
   await store.trash(a.id);

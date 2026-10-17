@@ -4,7 +4,7 @@
 
 **Approved scope:** Public repository only. MCP schemas, validation, adapters to existing application operations, and their tests/docs. No UI redesign, storage/encryption format or key changes, migrations, account tools expansion, installed-app replacement, or release.
 
-**Architecture:** Keep stdio MCP → private local socket/named pipe → existing application write queue. Add isolated TypeScript command handlers and a bounded native image-file reader. Reuse existing snippet mutations and image-library operations. Never read application databases directly.
+**Architecture:** Keep stdio MCP → private local socket/named pipe → application adapters. Snippets use the existing vault queue. MCP image tasks run independently, refuse overlapping image requests, and participate in flush/restore waiting so long imports neither block snippets nor outlive a flush acknowledgement. Reuse existing snippet mutations and image-library operations. Never read application databases directly.
 
 **Execution:** Inline integration with one isolated Rust implementer, followed by independent specification and quality review. Publish an explicit file allowlist against the verified public GitHub base; the local snapshot preparation commit is never pushed.
 
@@ -31,8 +31,10 @@
 - [ ] Add `tests/e2e/mcp-content.e2e.mjs`: invoke the automation callback on a clean browser profile with synthetic records, confirm snippet changes persist after reload, import a generated image, organize its folder, confirm duplicate suppression and obtain a small preview.
 - [ ] Run `node --test tests/mcp-*.test.mjs`, `npm run typecheck`, `npm run lint`, `npm test`, and `npm run test:e2e`; use CI for macOS and Windows Rust builds if no local toolchain is available. Inspect browser results using only synthetic fixtures.
 - [ ] Update `docs/codex-mcp.md` with tool inputs, limits, transaction semantics, conflicts, private-socket troubleshooting and the boundary that local transport does not prevent an AI client from processing requested content.
-- [ ] Add one `docs/log/2026-10-17-mcp-snippets-images.md` note, independently review the scoped diff, create a public branch/PR and attach it to this chat. Add `major` and `mac-check`. Do not merge changes that touch the save path without the owner's explicit merge instruction.
+- [ ] Add one `docs/log/2026-10-17-mcp-content.md` note, independently review the scoped diff, create a public branch/PR and attach it to this chat. Add `major` and `mac-check`. Do not merge changes that touch the save path without the owner's explicit merge instruction.
 
 ## Acceptance
 
 MCP clients can discover all new tools, make bounded batch snippet edits, import local images and organize their folders. UI reflects saved changes and reload preserves them. Invalid/stale snippet batches do not write. Image batches report individual outcomes without hiding partial success. New tools expose no accounts, original image data in list results, or arbitrary file contents. No production/private data is used for testing or committed.
+
+Execution evidence and any remaining platform limits are recorded in the PR and its handoff note; the checklist above describes the original execution sequence.
