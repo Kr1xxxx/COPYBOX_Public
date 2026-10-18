@@ -300,14 +300,14 @@ test("create, rename, recolour and delete folders with Chinese messages", async 
   }
 });
 
-test("folder short names (D-049, D-074): set, kept on rename and recolour, cleared, dropped with the folder, and too long is refused", async () => {
+test("folder short names (D-049): set, kept on rename and recolour, cleared, dropped with the folder, and too long is refused", async () => {
   const { open } = setup();
   const store = await open();
   await store.createFolder("产品图片");
   await store.createFolder("Logo");
   assert.deepEqual(await store.setFolderShortName("产品图片", " 产品 "), [{ name: "产品图片", shortName: "产品" }, { name: "Logo" }]);
-  await assert.rejects(store.setFolderShortName("产品图片", "产品图片集"), { message: "最多四个字" });
-  await assert.rejects(store.setFolderShortName("Logo", "LOGOSHEET"), { message: "最多四个字" });
+  await assert.rejects(store.setFolderShortName("产品图片", "产品图"), { message: "最多两个字" });
+  await assert.rejects(store.setFolderShortName("Logo", "LOGOS"), { message: "最多两个字" });
   await assert.rejects(store.setFolderShortName("没有", "无"), { message: "找不到这个目录" });
   assert.equal((await store.listFolders())[0].shortName, "产品", "a refused value changes nothing");
 
