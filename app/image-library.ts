@@ -204,13 +204,16 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
   async function renameFolder(from: string, to: string, onError = toast) {
     const name = normalizeFolderName(to);
     try {
-      const next = await (await loadStore(deviceKey)).renameFolder(from, to);
+      const store = await loadStore(deviceKey);
+      const wanted = normalizeFolderName(from).toLowerCase();
+      const original = (await store.listFolders()).find((folder) => folder.name.toLowerCase() === wanted)?.name ?? from;
+      const next = await store.renameFolder(original, to);
       setFolders(next);
-      setImages((current) => current?.map((meta) => meta.folder === from ? { ...meta, folder: name } : meta) ?? current);
+      setImages((current) => current?.map((meta) => meta.folder === original ? { ...meta, folder: name } : meta) ?? current);
       // Keep the folder selected under its new name.
-      setRawFilter((current) => current === `folder:${from}` ? `folder:${name}` : current);
-      renameFolderPin("image", from, name);
-      if (name !== from) toast("目录已重命名");
+      setRawFilter((current) => current === `folder:${original}` ? `folder:${name}` : current);
+      renameFolderPin("image", original, name);
+      if (name !== original) toast("目录已重命名");
       return name;
     } catch (error) {
       onError(readableMessage(error, "重命名失败，请重试"));
