@@ -512,8 +512,8 @@ const set = (data, kind, folder, value) => {
 test("folder short names: set, clear, rejected when too long, never for standard 话术 folders", () => {
   const vault = set(set(baseVault(), "snippet", "自定义", " 跟单 "), "secret", "GitHub", "GH");
   assert.deepEqual(vault.folderShortNames, { snippet: { 自定义: "跟单" }, secret: { GitHub: "GH" } });
-  const tooLong = core.setFolderShortName(vault, "snippet", "自定义", "客户跟单员");
-  assert.equal(tooLong.error, "最多四个字");
+  const tooLong = core.setFolderShortName(vault, "snippet", "自定义", "跟单员");
+  assert.equal(tooLong.error, "最多两个字");
   assert.equal(tooLong.data, vault, "nothing changes");
   assert.match(core.setFolderShortName(vault, "snippet", "询盘接待", "新客").error, /固定/);
   assert.match(core.setFolderShortName(vault, "snippet", "没有", "新客").error, /目录不存在/);
@@ -528,7 +528,7 @@ test("folder short names: invalid stored values are dropped on load; a vault wit
     ...baseVault(),
     folderShortNames: {
       snippet: { 自定义: "跟单", 询盘接待: "新客", 没有这个目录: "无", 未分类: "未" },
-      secret: { AWS: "云服务器集", GitHub: "  ", "": "空" },
+      secret: { AWS: "云服务器", GitHub: "  ", "": "空" },
       other: { x: "y" },
     },
   });

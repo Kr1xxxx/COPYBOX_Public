@@ -1460,7 +1460,7 @@ export default function Home() {
     void commitFolderChange((data) => ({ data: setFolderColor(data, kind, folder, color) }), "颜色已更新");
   }
 
-  // Short name on the mini window's folder tab (D-049). "" or null goes back to the first four characters (D-074).
+  // Short name on the mini window's folder tab (D-049). "" or null goes back to the first two characters.
   async function settingsFolderShortName(kind: SettingsFolderKind, folder: string, shortName: string | null) {
     if (kind === "image") return imageFolderTask((onError) => imageLibrary.setFolderShortName(folder, shortName, onError));
     return commitFolderChange((data) => setFolderShortName(data, kind, folder, shortName), shortName?.trim() ? "简称已保存" : "已恢复默认简称");
@@ -2025,7 +2025,7 @@ export default function Home() {
   const miniTopTabs: MiniTab[] = imageView
     ? [{ id: IMAGE_FILTER_ALL, label: "全部" }, { id: IMAGE_FILTER_PINNED, label: "收藏" }, { id: IMAGE_FILTER_RECENT, label: "最近" }]
     : [{ id: "all", label: "全部" }, { id: "pinned", label: "收藏" }, { id: "recent", label: "最近" }];
-  // Folder tabs show up to four characters (folder-short-name.ts, D-074); a shortened name has the whole name as the tooltip.
+  // Folder tabs show a two-character name (folder-short-name.ts); the whole name is the tooltip.
   const miniFolderTab = (id: string, name: string, override?: string): MiniTab => {
     const label = folderShortName(name, override);
     return label === name.trim() ? { id, label } : { id, label, fullName: name };

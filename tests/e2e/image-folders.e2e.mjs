@@ -463,9 +463,9 @@ test("the mini window has folder tabs in the top row", async ({ browser }) => {
   await page.setViewportSize({ width: 360, height: 440 });
   const tab = (name) => page.locator(".mini-top .mini-tab, .mini-folders .mini-tab", { hasText: name });
   await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
-  // Folder tabs show up to four characters (folder-short-name.ts, D-074); the full name is the tooltip and accessible name.
-  await expect(page.locator(".mini-folders .mini-tab")).toHaveText(["收款码", "价目表", "未分类"]);
-  await expect(page.locator(".mini-folders .mini-tab").first()).not.toHaveAttribute("title");
+  // Folder tabs show two-character names (folder-short-name.ts); the full name is the tooltip and accessible name.
+  await expect(page.locator(".mini-folders .mini-tab")).toHaveText(["收款", "价目", "未分类"]);
+  await expect(page.locator(".mini-folders .mini-tab").first()).toHaveAttribute("title", "收款码");
   await expect(page.locator(".mini-row")).toHaveCount(4);
   await expect(page.locator(".status-bar")).toContainText("4 张");
 
