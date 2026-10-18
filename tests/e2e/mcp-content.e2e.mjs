@@ -112,6 +112,18 @@ test("MCP creates usable snippet folders and renames them with pins preserved af
   expect((await send(page, { action: "get", number: added.item.number })).item.content).toBe("Synthetic reply");
 });
 
+test("switching sections keeps the same outside command listener, and a rename still follows the open folder", async ({ page }) => {
+  await setup(page);
+  expect(await send(page, { action: "snippet-folder-create", name: "MCP door" })).toMatchObject({ ok: true, created: true });
+  await page.evaluate(() => { window.__mcpFirst = window.__mcpSend; });
+  // The real bridge subscribes asynchronously: a fresh listener per section switch leaves a gap where commands are lost.
+  for (const section of ["图片", "账号", "话术"]) await page.locator(".kind-switch").getByRole("button", { name: section }).click();
+  expect(await page.evaluate(() => window.__mcpSend === window.__mcpFirst)).toBe(true);
+  await page.locator(".directory-main").filter({ hasText: "MCP door" }).click();
+  expect(await send(page, { action: "snippet-folder-rename", from: "MCP door", to: "MCP door renamed" })).toMatchObject({ ok: true, name: "MCP door renamed" });
+  await expect(page.locator(".directory-row.active")).toContainText("MCP door renamed");
+});
+
 for (const [canonical, supplied] of [["Products", "products"], ["产品资料", " 产品资料 "]]) {
   test(`MCP image folder rename keeps selection and counts for alias ${supplied}`, async ({ page }) => {
     await setup(page);

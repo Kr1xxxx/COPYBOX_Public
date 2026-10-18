@@ -482,6 +482,10 @@ export default function Home() {
   accountLockedRef.current = accountLocked;
   const accountKeyRef = useRef(accountKey);
   accountKeyRef.current = accountKey;
+  // Read by an outside 话术目录 rename. Subscribing the command door again on every section switch would drop a
+  // command that arrives while the new listener is still being set up.
+  const activeKindRef = useRef(activeKind);
+  activeKindRef.current = activeKind;
   const automationConsent = useAutomationConsent();
   const askAutomationConsent = automationConsent.ask;
   // 账号 slide-to-unlock (D-051): frosted until slid open; closes again on leaving the section or when the window hides.
@@ -1022,7 +1026,7 @@ export default function Home() {
             if (result.action === "snippet-folder-create") showToast(result.created ? "外部任务已新建话术目录" : "话术目录已存在");
             if (result.action === "snippet-folder-rename") {
               renameFolderPin("snippet", result.from, result.name);
-              if (activeKind === "snippet") setActiveFolder((current) => current === `folder:${result.from}` ? `folder:${result.name}` : current);
+              if (activeKindRef.current === "snippet") setActiveFolder((current) => current === `folder:${result.from}` ? `folder:${result.name}` : current);
               showToast("外部任务已重命名话术目录");
             }
             return;
@@ -1128,7 +1132,7 @@ export default function Home() {
     });
     window.clipboxDesktop.automationReady();
     return remove;
-  }, [activeKind, deviceKey, enqueueVaultTask, loading, readVault, writeVault, showToast, askAutomationConsent]);
+  }, [deviceKey, enqueueVaultTask, loading, readVault, writeVault, showToast, askAutomationConsent]);
 
   async function finishCopy(item: SecretItem, copied: string) {
     await copyTextWithExpiry(copied);
