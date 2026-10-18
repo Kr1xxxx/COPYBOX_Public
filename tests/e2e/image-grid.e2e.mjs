@@ -63,17 +63,20 @@ test("the default view is a grid of square tiles, four to a row (16 tiles = 4 fu
   await expect(page.locator(".section-count")).toHaveText("6");
 });
 
-test("the copy button on a tile puts a PNG on the clipboard", async ({ page }) => {
+test("the copy button on a tile puts a PNG on the clipboard", async ({ page }, testInfo) => {
   await recordChanges(page, ".image-tile");
   await openImages(page);
   await addSix(page);
   const first = tile(page, "图一");
   const copy = first.getByRole("button", { name: "复制 图一" });
+  await expect(copy).toHaveText("复制");
   // Owner: the whole picture stays visible, so the button appears only on hover or keyboard focus.
   await page.mouse.move(2, 2);
   await expect(copy).toHaveCSS("opacity", "0");
   await first.locator(".image-tile-thumb").hover();
   await expect(copy).toHaveCSS("opacity", "1");
+  expect(await page.evaluate(() => window.__copiedImage)).toBeUndefined();
+  await page.screenshot({ path: testInfo.outputPath("hover-copy-main.png") });
   const corner = await copy.boundingBox();
   const box = await first.locator(".image-tile-thumb").boundingBox();
   expect(corner.x + corner.width).toBeGreaterThan(box.x + box.width - 14);
@@ -319,7 +322,7 @@ test("extreme pictures neither overflow the window nor the opened card", async (
   }
 });
 
-test("the mini window shows a four-column grid, no switch, and a click copies", async ({ browser }) => {
+test("the mini window shows a four-column grid, no switch, and a click copies", async ({ browser }, testInfo) => {
   const context = await browser.newContext({ viewport: { width: 680, height: 620 }, locale: "zh-CN" });
   const page = await context.newPage();
   await openImages(page);
@@ -340,7 +343,15 @@ test("the mini window shows a four-column grid, no switch, and a click copies", 
   expect(Number.parseFloat(await page.locator(".mini-tile .image-tile-title").first().evaluate((title) => getComputedStyle(title).fontSize))).toBe(11);
   await page.getByPlaceholder("搜索图片").fill("图三");
   await expect(page.locator(".mini-tile")).toHaveCount(1);
-  await page.getByRole("button", { name: "复制 图三" }).click();
+  const copy = page.locator(".mini-tile .image-tile-copy");
+  await page.mouse.move(2, 2);
+  await expect(copy).toHaveCSS("opacity", "0");
+  await page.locator(".mini-tile").hover();
+  await expect(copy).toHaveCSS("opacity", "1");
+  await expect(copy).toHaveText("复制");
+  expect(await page.evaluate(() => window.__copiedImage)).toBeUndefined();
+  await page.screenshot({ path: testInfo.outputPath("hover-copy-mini.png") });
+  await copy.click();
   await expect.poll(() => page.evaluate(() => window.__copiedImage)).toEqual(PNG_SIGNATURE);
   await expect(page.locator(".image-card")).toHaveCount(0);
   await context.close();

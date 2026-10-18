@@ -1,11 +1,17 @@
 import { applySnippetAutomationCommand, type AutomationItem, type AutomationRuntime } from "./clipbox-automation.ts";
-import { isTrashedItem, type VaultData } from "./clipbox-core.ts";
+import { addFolder, isTrashedItem, renameFolder, type VaultData } from "./clipbox-core.ts";
 import { STANDARD_SNIPPET_FOLDERS } from "./snippet-folders.ts";
 import { batch, distinct, hasAction, integer, mcpError, record, text } from "./mcp-input.ts";
 
-const ACTIONS = ["snippet-folders", "get-many", "update-many"];
+const ACTIONS = ["snippet-folder-create", "snippet-folder-rename", "snippet-folders", "get-many", "update-many"];
 const EDIT_FIELDS = ["number", "expectedUpdatedAt", "title", "content", "summary", "folder", "chineseText"];
 export const isMcpSnippetCommand = (value: unknown) => hasAction(value, ACTIONS);
+
+function folderName(value: unknown): string {
+  const name = text(value, "目录名称").trim();
+  if (!name || Array.from(name).length > 30) mcpError("INVALID_FOLDER", "目录名称需要 1–30 个字符");
+  return name;
+}
 
 function number(value: unknown) {
   const result = text(value, "编号").trim().toUpperCase();
@@ -22,17 +28,33 @@ function get(data: VaultData, id: string, runtime: AutomationRuntime): Automatio
 // The caller holds the existing vault queue for the whole operation. Validation happens before a single persist.
 export async function runMcpSnippetCommand(data: VaultData, input: unknown, runtime: AutomationRuntime, persist: (next: VaultData) => Promise<void>) {
   const action = (input as { action?: unknown })?.action;
+  if (action === "snippet-folder-create") {
+    const command = record(input, ["action", "name"]);
+    const name = folderName(command.name);
+    const added = addFolder(data.folders, "snippet", name);
+    if (added.created) await persist({ ...data, folders: added.folders });
+    return { action, name, created: added.created } as const;
+  }
+  if (action === "snippet-folder-rename") {
+    const command = record(input, ["action", "from", "to"]);
+    const from = folderName(command.from);
+    const name = folderName(command.to);
+    const renamed = renameFolder(data, "snippet", from, name);
+    if (renamed.error) mcpError("INVALID_FOLDER", renamed.error);
+    if (from !== name) await persist(renamed.data);
+    return { action, from, name } as const;
+  }
   if (action === "snippet-folders") {
     record(input, ["action"]);
     const active = data.items.filter((item) => item.kind === "snippet" && !isTrashedItem(item));
     const names = [...new Set([...STANDARD_SNIPPET_FOLDERS, ...data.folders.snippet, ...active.flatMap((item) => item.folder ? [item.folder] : [])])];
-    return { action, folders: names.map((name) => ({ name, count: active.filter((item) => item.folder === name).length })), uncategorizedCount: active.filter((item) => !item.folder).length };
+    return { action, folders: names.map((name) => ({ name, count: active.filter((item) => item.folder === name).length })), uncategorizedCount: active.filter((item) => !item.folder).length } as const;
   }
   if (action === "get-many") {
     const command = record(input, ["action", "numbers"]);
     const numbers = batch(command.numbers).map(number);
     distinct(numbers);
-    return { action, items: numbers.map((id) => get(data, id, runtime)) };
+    return { action, items: numbers.map((id) => get(data, id, runtime)) } as const;
   }
   if (action !== "update-many") mcpError("INVALID_ACTION", "不支持的命令");
   const command = record(input, ["action", "updates"]);
@@ -54,5 +76,5 @@ export async function runMcpSnippetCommand(data: VaultData, input: unknown, runt
     if ("item" in outcome.result) items.push(outcome.result.item);
   }
   await persist(next);
-  return { action, items };
+  return { action, items } as const;
 }

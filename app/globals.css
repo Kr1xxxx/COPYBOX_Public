@@ -995,7 +995,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .image-tile-main:hover .image-tile-thumb { border-color: var(--border); box-shadow: 0 2px 8px rgba(31,30,28,.1); }
 .image-tile.selected .image-tile-thumb { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px var(--ring); }
 .image-tile.selected .image-tile-title { color: var(--ink); font-weight: 600; }
-.image-tile-copy { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--card); color: var(--ink-2); box-shadow: 0 1px 4px rgba(31,30,28,.18); cursor: pointer; opacity: 0; transition: opacity .14s, background .14s, color .14s, transform .14s; }
+.image-tile-copy { position: absolute; top: 6px; right: 6px; z-index: 3; height: 28px; padding: 0 7px; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink-2); font-size: 11px; white-space: nowrap; box-shadow: 0 1px 4px rgba(31,30,28,.18); cursor: pointer; opacity: 0; transition: opacity .14s, background .14s, color .14s, transform .14s; }
 /* Owner: the whole picture must be visible, so the copy button only shows on hover or keyboard focus (always shown on touch screens). */
 .image-tile:hover .image-tile-copy, .image-tile:has(.image-tile-main:focus-visible) .image-tile-copy, .image-tile-copy:hover, .image-tile-copy:focus-visible { opacity: 1; }
 @media (hover: none) { .image-tile-copy { opacity: .85; } }
@@ -1034,6 +1034,7 @@ button { -webkit-tap-highlight-color: transparent; }
 /* Mini window: 4 compact columns, a click copies. */
 .mini-list.image-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 6px 8px 8px; }
 .mini-tile { position: relative; min-width: 0; }
+.mini-tile .image-tile-copy { top: 4px; right: 4px; padding: 0 5px; }
 .mini-tile .image-tile-main { gap: 4px; border-radius: 9px; }
 .mini-tile .image-tile-thumb { border-radius: 8px; }
 .mini-tile .image-tile-title { font-size: 11px; }

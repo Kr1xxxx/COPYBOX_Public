@@ -596,6 +596,11 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
     />
   );
 
+  const tileCopyButton = (meta: ImageMeta) => {
+    const copied = copiedId === meta.id;
+    return <button type="button" className="image-tile-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}><ArcCopyIcon copied={copied} size={15} /><span>{copied ? "已复制" : "复制"}</span></button>;
+  };
+
   let body: React.ReactNode;
   if (loadError) {
     body = <div className="native-empty"><strong>{loadError}</strong><button type="button" className="secondary-button" onClick={library.retry}>重试</button></div>;
@@ -639,10 +644,11 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
   } else if (compact) {
     body = shown.map((meta) => (
       <article key={meta.id} className={`mini-row image-row image-tile mini-tile ${copiedId === meta.id ? "copied" : ""}`}>
-        <button type="button" className="image-tile-main" onClick={() => void copyImage(meta)} aria-label={copiedId === meta.id ? `已复制 ${meta.title}` : `复制 ${meta.title}`}>
+        <button type="button" className="image-tile-main" onClick={() => void copyImage(meta)} aria-label={`图片 ${meta.title}，点击复制`}>
           <span className="image-tile-thumb">{tileImage(meta)}{copiedId === meta.id && <span className="mini-copied">已复制</span>}</span>
           <strong className="image-tile-title">{meta.title}</strong>
         </button>
+        {tileCopyButton(meta)}
         {copiedId === meta.id && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
       </article>
     ));
@@ -666,7 +672,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
             <strong className="image-tile-title">{meta.title}</strong>
           </button>
           <button type="button" className="image-tile-pin" onClick={() => void library.togglePinned(meta.id)} aria-pressed={Boolean(meta.pinned)} aria-label={`${meta.pinned ? "取消收藏" : "收藏"} ${meta.title}`} title={meta.pinned ? "取消收藏" : "收藏"}><Icon name="star" filled={Boolean(meta.pinned)} /></button>
-          <button type="button" className="image-tile-copy" onClick={() => void copyImage(meta)} aria-label={copied ? `已复制 ${meta.title}` : `复制 ${meta.title}`} title={copied ? "已复制" : "复制"}><ArcCopyIcon copied={copied} size={15} /></button>
+          {tileCopyButton(meta)}
           {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
         </div>
       );
