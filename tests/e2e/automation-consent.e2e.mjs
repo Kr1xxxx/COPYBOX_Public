@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { asDesktop, openAccountCategory, seedSnippets } from "./helpers.mjs";
+import { asDesktop, openAccountCategory, seedSnippets, settle } from "./helpers.mjs";
 
 // The Mac command line door: any program running as this user can reach it, so a 秘密 only leaves the app after the
 // person here clicks 允许; a locked 账号 page refuses at once. Ordinary 话术 commands need no question.
@@ -32,6 +32,8 @@ test("macOS: a 秘密 export over the command line waits for 允许, and 拒绝 
   await expect(dialog).toContainText("导出全部秘密");
   await expect(dialog.getByRole("button", { name: "拒绝" })).toBeFocused();
   // Same small card as the delete confirmation (390px), title first with nothing above it, buttons on one row.
+  // Measured once the card has finished sliding in: mid-animation the two buttons are read at different moments.
+  await settle(page);
   const card = await dialog.boundingBox();
   expect(card.width).toBeLessThanOrEqual(400);
   expect(await dialog.locator("header > *").first().evaluate((node) => node.tagName)).toBe("H2");
