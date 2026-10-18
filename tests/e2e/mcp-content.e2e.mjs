@@ -111,3 +111,33 @@ test("MCP creates usable snippet folders and renames them with pins preserved af
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.folder-pins.v1")).snippet)).toEqual(["MCP renamed"]);
   expect((await send(page, { action: "get", number: added.item.number })).item.content).toBe("Synthetic reply");
 });
+
+for (const [canonical, supplied] of [["Products", "products"], ["产品资料", " 产品资料 "]]) {
+  test(`MCP image folder rename keeps selection and counts for alias ${supplied}`, async ({ page }) => {
+    await setup(page);
+    const data = await page.evaluate(() => {
+      const canvas = document.createElement("canvas"); canvas.width = 32; canvas.height = 32;
+      canvas.getContext("2d").fillRect(0, 0, 32, 32);
+      return canvas.toDataURL("image/png").split(",")[1];
+    });
+    expect(await send(page, { action: "image-folder-create", name: canonical })).toMatchObject({ ok: true });
+    const imported = await send(page, { action: "image-import", files: [{ path: "/synthetic/rename.png", sourceName: "rename.png", mimeType: "image/png", data, title: "Synthetic rename image", folder: canonical }] });
+    expect(imported.results[0].status).toBe("imported");
+    await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+    const folder = (name) => page.locator(".sidebar .directory-row").filter({ has: page.locator(".directory-main", { hasText: name }) });
+    await page.getByRole("button", { name: `管理目录 ${canonical}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "置顶", exact: true }).click();
+    await folder(canonical).locator(".directory-main").click();
+    await expect(page.locator(".image-tile")).toHaveCount(1);
+    expect(await send(page, { action: "image-folder-rename", from: supplied, to: "Renamed" })).toMatchObject({ ok: true });
+    await expect(folder("Renamed").locator("b")).toHaveText("1");
+    await expect(folder("Renamed")).toHaveClass(/pinned/);
+    await expect(folder("Renamed").locator(".directory-main")).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".image-tile")).toHaveCount(1);
+    await page.reload();
+    await page.locator(".kind-switch").getByRole("button", { name: "图片" }).click();
+    await expect(folder("Renamed")).toHaveClass(/pinned/);
+    await folder("Renamed").locator(".directory-main").click();
+    await expect(page.locator(".image-tile")).toHaveCount(1);
+  });
+}

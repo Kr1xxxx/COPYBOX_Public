@@ -1,0 +1,8 @@
+# Image writes and folder rename safety
+
+- Date: 2026-10-18 · Thread/agent: Codex / image safety fixes
+- What changed: Image mutations now share the existing per-database save queue, including separate store connections, so background usage updates cannot overwrite image or folder edits. Images obey the existing restore write gate at queue entry and storage commits; late thumbnail caching is skipped too. Folder rename resolves the canonical stored name before updating image rows, selection and pinned folders.
+- User-visible change (plain Chinese, for the preview changelog): 修复图片改名偶尔被覆盖、恢复备份期间旧操作误写入，以及接口修改目录后数量和选中状态未即时更新的问题。
+- Verification: Regression tests failed before the fixes (lost title, accepted old-key write, folder count 0). After the fixes, lint, typecheck, build and 727 unit/source tests pass; focused MCP browser regressions pass for case and whitespace aliases, including pins and reload. Synthetic Chromium checks with real IndexedDB/WebCrypto confirm restored pictures remain readable after a rejected old-key write and no lost titles in eight overlapping rename/use trials. Visually checked the renamed folder at 680×620. Full browser run: 365 passed, 1 existing automation-consent animation geometry failure (the unchanged baseline failed the same assertion); that exact test passes in an isolated follow-up. No assertions or retries were loosened.
+- Not done / risks: No storage format, key, dependency or private configuration changes. No real user data accessed or mutated. Native Windows/macOS install acceptance and release are not performed. This touches save/restore paths and needs owner approval before merge.
+- Next step: Finish CI, then obtain owner 合并 before merging; PR #225 remains independent.
