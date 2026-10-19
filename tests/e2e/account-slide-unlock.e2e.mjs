@@ -80,6 +80,7 @@ for (const platform of ["win32", "darwin"]) {
     // Frosted, the 账号 sidebar cannot switch views (D-076).
     await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeDisabled();
     await expect(page.getByRole("navigation", { name: "快捷入口" }).getByRole("button").first()).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^回收站/ })).toBeDisabled();
     await expect(page.locator(".slide-unlock-label")).toHaveText("向右滑动解锁");
     await expect(knob(page)).toHaveAttribute("aria-valuemin", "0");
     await expect(knob(page)).toHaveAttribute("aria-valuemax", "100");
