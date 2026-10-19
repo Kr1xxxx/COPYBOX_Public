@@ -77,7 +77,7 @@ import { FolderRow } from "./folder-row";
 import { ListEmptyState } from "./list-empty-state";
 import { HIDDEN_ACCOUNT_KINDS, PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { RevealButtons, useReveal } from "./reveal-buttons";
-import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
+import { Highlight, Icon, ParagraphCopy, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
 import { DEFAULT_TRASH_DAYS, PASTE_BACK_REPEAT_OPTIONS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type PasteBackRepeat, type ThemeChoice } from "./preferences";
@@ -115,7 +115,7 @@ import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
-import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview } from "./snippet-doc";
+import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview, snippetShareDocument, snippetShareText } from "./snippet-doc";
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
 import { isSyncedSnippet, mergeAccounts, mergeSnippets, syncPolicy, tooManyRemovals } from "./cloud-sync-core";
@@ -128,7 +128,7 @@ import { useDropdownDismiss, useRowMenuPlacement } from "./dropdown-menus";
 import { useValueOptionDrag } from "./value-option-drag";
 import { usePanScroll } from "./pan-scroll";
 import { folderGroupNeighbour, pinnedFirst, removeFolderPin, renameFolderPin, reorderFolderPins, sameFolderGroup, toggleFolderPin, useFolderPins } from "./folder-pins";
-import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, quickFillValues, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
+import { PINNED_KEY, quickOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, quickFillValues, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
 import { UpdateNotice } from "./update-notice";
 import { WhatsNewDialog, useWhatsNew } from "./whats-new-dialog";
@@ -321,6 +321,7 @@ export default function Home() {
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkExportOpen, setBulkExportOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => readStoredChoice<ThemeChoice>(THEME_KEY, THEME_OPTIONS, "system"));
   const [lastBackupAt, setLastBackupAt] = useState(() => {
     try { return Number(localStorage.getItem(LAST_BACKUP_KEY)) || 0; } catch { return 0; }
@@ -870,11 +871,11 @@ export default function Home() {
     resolvePostCommitFocusTarget(pending, modalOpen, backgroundInert, searchRef.current)?.focus();
   }, [modalOpen, backgroundInert]);
 
-  // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu close on a click or touch anywhere outside them, and on Esc.
-  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || Boolean(folderMenu);
+  // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 / 导出 menus and the folder menu close on a click or touch anywhere outside them, and on Esc.
+  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || bulkExportOpen || Boolean(folderMenu);
   useDropdownDismiss(dropdownOpen, {
-    all: () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
-    rowAndBulk: () => { setRowMenuId(""); setBulkMoveOpen(false); },
+    all: () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
+    rowAndBulk: () => { setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); },
     product: () => setProductMenuOpen(false),
   });
   useRowMenuPlacement(rowMenuId);
@@ -885,7 +886,7 @@ export default function Home() {
       if (event.key === "Escape" && newFolder && !auxiliaryDialogOpen) { event.preventDefault(); cancelNewFolder(); return; }
       if (!homeShortcutsEnabled) return;
       if (event.key === "Escape" && !inlineEditing && !auxiliaryDialogOpen) {
-        if (bulkMode) { setBulkMode(false); setBulkIds([]); setBulkMoveOpen(false); return; }
+        if (bulkMode) { setBulkMode(false); setBulkIds([]); setBulkMoveOpen(false); setBulkExportOpen(false); return; }
         setQuery("");
         setMenuOpen(false);
         setProductMenuOpen(false);
@@ -1142,9 +1143,11 @@ export default function Home() {
     return remove;
   }, [deviceKey, enqueueVaultTask, loading, readVault, writeVault, showToast, askAutomationConsent]);
 
-  async function finishCopy(item: SecretItem, copied: string) {
+  // One paragraph of a long 话术 (`part`) ticks only its own small button, not the whole card's copy button.
+  async function finishCopy(item: SecretItem, copied: string, part = false) {
     await copyTextWithExpiry(copied);
     void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? recordCopy(value, timestampNow()) : value) })).catch(() => showToast("已复制，但使用记录保存失败", { tone: "error" }));
+    if (part) { window.clipboxDesktop?.didCopy(); return; }
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
@@ -1167,21 +1170,21 @@ export default function Home() {
   }
 
   // A snippet with variables copies what is typed into its highlighted blocks; the first empty block gets the cursor instead of a half-filled copy.
-  async function copyPrepared(item: SecretItem, pickedValues?: Record<string, string>, pickedName?: string) {
+  // `part` is one paragraph of a long 话术: only its own blocks need a value. Resolves true when something was copied.
+  async function copyPrepared(item: SecretItem, pickedValues?: Record<string, string>, pickedName?: string, part?: string) {
     const state = pickedValues ? { ...fillFor(item), values: pickedValues } : fillFor(item);
-    const source = resolveSnippetCopySource(item, state.language);
-    if (!source) return;
-    const readiness = snippetCopyReadiness(item, state.values, state.language);
-    if (!readiness.ready) {
+    const source = part ?? resolveSnippetCopySource(item, state.language);
+    if (!source) return false;
+    const missing = part ? extractPlaceholders(part).filter((name) => !state.values[name]?.trim()) : snippetCopyReadiness(item, state.values, state.language).missingPlaceholders;
+    if (missing.length > 0) {
       const index = filtered.findIndex((value) => value.id === item.id);
       if (index >= 0 && index !== expandedIndex) selectRow(index);
-      const missing = readiness.missingPlaceholders;
       showToast(`先填写：${missing.join("、")}`, { tone: "ok" });
       window.setTimeout(() => {
         const row = document.querySelector(`[data-sort-id="${CSS.escape(item.id)}"]`);
-        Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => !input.value.trim())?.focus();
+        Array.from(row?.querySelectorAll<HTMLInputElement>("input[data-var]") || []).find((input) => missing.includes(input.dataset.var || "") && !input.value.trim())?.focus();
       }, 60);
-      return;
+      return false;
     }
     // Values carried over from an earlier copy are shown first: the person must see them once before they go out.
     const unseen = state.remembered.filter((name) => name !== pickedName && extractPlaceholders(source).includes(name));
@@ -1190,10 +1193,11 @@ export default function Home() {
       if (index >= 0 && index !== expandedIndex) selectRow(index);
       setFill({ ...state, values: state.values, remembered: [] });
       showToast(`带入了上次的${unseen.map((name) => `${name}（${state.values[name]}）`).join("、")}，确认没错再复制一次`, { tone: "ok", ms: 3600 });
-      return;
+      return false;
     }
-    await finishCopy(item, fillSnippetTemplate(source, state.values).text);
+    await finishCopy(item, fillSnippetTemplate(source, state.values).text, part !== undefined);
     setValueMemory((current) => rememberValues(current, state.values, pinnedValues));
+    return true;
   }
 
   // Right-click on a block (or on one of its remembered values) pins the value: a pinned value is not pushed out by new ones.
@@ -1264,16 +1268,18 @@ export default function Home() {
 
   // The mini window has no place to fill highlighted blocks: an unfilled block goes out as its pinned value, its default
   // or its own word (owner, 2026-10-14), never as 「[Name]」 with brackets, and a short message says what was used.
-  async function copyMini(item: SecretItem) {
-    const source = resolveSnippetCopySource(item, "en");
+  async function copyMini(item: SecretItem, part?: string) {
+    const source = part ?? resolveSnippetCopySource(item, "en");
     const names = item.kind === "snippet" ? extractPlaceholders(source) : [];
-    if (!source || names.length === 0) { await copyRaw(item); return; }
+    if (!source) return false;
+    if (names.length === 0) { await finishCopy(item, source, part !== undefined); return true; }
     // What was typed in the main window is not reused: it cannot be seen here and is often the last customer's name.
     const { values, used } = quickFillValues(names, {}, pinnedValues);
-    await finishCopy(item, fillSnippetTemplate(source, values).text);
+    await finishCopy(item, fillSnippetTemplate(source, values).text, part !== undefined);
     // Short enough for the 360px window: one block is named, several are counted.
     if (used.length === 1) showToast(`已复制，${used[0].name} 用了「${used[0].value.length > 12 ? `${used[0].value.slice(0, 12)}…` : used[0].value}」`, { ms: 2600 });
     else if (used.length > 1) showToast(`已复制，${used.length} 处没填，用了默认值`, { ms: 2600 });
+    return true;
   }
 
   // Mini window: a click on a 话术 row opens it in place (one at a time); a second click closes it.
@@ -1574,6 +1580,7 @@ export default function Home() {
     setBulkMode(false);
     setBulkIds([]);
     setBulkMoveOpen(false);
+    setBulkExportOpen(false);
   }
 
   function toggleBulk(id: string) {
@@ -1593,6 +1600,22 @@ export default function Home() {
     } catch {
       showToast("移动失败，条目保持原位", { tone: "error" });
     }
+    exitBulk();
+  }
+
+  // 导出: a .md 话术 document a colleague imports with 导入话术表格 (fill-in blocks kept), or plain text.
+  function bulkExport(asDocument: boolean) {
+    const targets = filtered.filter((item) => bulkIds.includes(item.id));
+    setBulkExportOpen(false);
+    if (targets.length === 0) return;
+    const blob = new Blob([asDocument ? snippetShareDocument(targets) : snippetShareText(targets)], { type: asDocument ? "text/markdown" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `copyboxx-share-${new Date().toISOString().slice(0, 10)}.${asDocument ? "md" : "txt"}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showToast(asDocument ? `已导出 ${targets.length} 条话术，同事在 设置 → 导入话术表格 里导入` : `已导出 ${targets.length} 条话术`);
     exitBulk();
   }
 
@@ -2199,7 +2222,7 @@ export default function Home() {
                     </div>
                     {(isSelected || closing) && <div className={`row-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
                       {isSnippet && sharedMark(item) && <SharedNotice item={item} onAccept={() => void resolveShared(item.id, acceptSharedUpdate)} onKeep={() => void resolveShared(item.id, keepMySharedVersion)} />}
-                      {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
+                      {isSnippet ? (hasPreparedCopy(item) ? <SnippetFill item={item} state={fillFor(item)} onState={updateFill(item)} renderText={(text) => <Highlight text={text} query={query} />} renderBody={(text, renderPart) => <ParagraphCopy text={text} lang={fillFor(item).language} render={renderPart} onCopy={(part) => copyPrepared(item, undefined, undefined, part)} />} onSubmit={() => void copy(item)} onActive={(name) => { setActiveVar(name ? { id: item.id, name } : null); if (!name) setValueMenu(null); }} onFocusChange={setTypingVariable} onPin={(name) => pinValue(item, name)} isPinned={(name) => isPinned(pinnedValues, name, (fillFor(item).values[name] || "").trim())} /> : <ParagraphCopy text={item.secret} lang="en" render={(part) => <SnippetContent text={part} query={query} />} onCopy={async (part) => { await finishCopy(item, part, true); return true; }} />) : PLAIN_NOTES ? <p className="row-content"><Highlight text={item.secret} query={query} /></p> : (
                         <div className={`row-secret ${revealed ? "revealed" : ""}`}>
                           <span className="row-secret-value">{revealed ? item.secret : "••••••••••••••••"}</span>
                           <RevealButtons reveal={secretReveal} id={item.id} label="内容" className="ghost-button reveal-button" />
@@ -2209,7 +2232,7 @@ export default function Home() {
                           <button type="button" className="primary-button copy-main" aria-label={copiedId === item.id ? "已复制" : isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"} data-copied={copiedId === item.id ? "" : undefined} onClick={() => void copy(item)}><span className="copy-main-icon" aria-hidden="true"><Icon name="copy" /><Icon name="check" className="copy-tick" /></span><span className="copy-main-label"><span>{isSnippet && fillFor(item).language === "zh" ? "复制中文" : "复制"}</span><span>已复制</span></span></button>
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
-                          {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
+                          {isSnippet && !closing && activeVar?.id === item.id && quickOptions(activeVar.name, fillFor(item).language).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={quickOptions(activeVar.name, fillFor(item).language)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
                           {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值" {...panValues}>
                             {valuesCollapsed ? <button type="button" className="var-collapse" aria-expanded="false" aria-label="展开常用值" title="展开常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>常用值<Icon name="chevronDown" /></button> : <>
                             {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="group" aria-label={`${name} 最近用过的`}>
@@ -2288,7 +2311,7 @@ export default function Home() {
                       <span className="mini-copy-label" aria-hidden="true"><span>复制</span><span>已复制</span></span>
                     </button>
                     {(open || closing) && <div className={`row-detail mini-detail ${closing ? "closing" : ""}`} inert={closing} aria-hidden={closing || undefined}><div className="row-detail-inner">
-                      <p className="row-content" lang="en"><SnippetContent text={item.secret} query={query} /></p>
+                      <ParagraphCopy text={item.secret} lang="en" render={(part) => <SnippetContent text={part} query={query} />} onCopy={(part) => copyMini(item, part)} />
                       <div className="mini-actions"><button type="button" className="ghost-button" onClick={() => openEditor(item)} aria-label={`修改 ${item.label}`}>修改</button></div>
                     </div></div>}
                     {copied && <span className="copy-status" role="status" aria-live="polite">已复制</span>}
@@ -2453,9 +2476,16 @@ export default function Home() {
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>
               <span className="spacer" />
               {activeFolders.length > 0 && <div className="menu-wrap">
-                <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => setBulkMoveOpen((value) => !value)}>移动到<Icon name="chevron" /></button>
+                <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => { setBulkExportOpen(false); setBulkMoveOpen((value) => !value); }}>移动到<Icon name="chevron" /></button>
                 <AnimatePresence>{bulkMoveOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
                   {activeFolders.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void bulkMoveTo(folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
+                </ArcMenu>}</AnimatePresence>
+              </div>}
+              {activeKind === "snippet" && <div className="menu-wrap">
+                <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkExportOpen} onClick={() => { setBulkMoveOpen(false); setBulkExportOpen((value) => !value); }}>导出<Icon name="chevron" /></button>
+                <AnimatePresence>{bulkExportOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
+                  <button type="button" role="menuitem" onClick={() => bulkExport(true)}>话术文档（可导入）</button>
+                  <button type="button" role="menuitem" onClick={() => bulkExport(false)}>纯文本</button>
                 </ArcMenu>}</AnimatePresence>
               </div>}
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>

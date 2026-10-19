@@ -10,9 +10,31 @@ export const NAME_OPTIONS = FIXED_OPTIONS.Name;
 export function fixedOptions(name: string): readonly string[] { return FIXED_OPTIONS[name] || []; }
 export const DEFAULT_VALUES: Record<string, string> = { Name: "Friend" };
 
-// A fixed option never takes a place in the recent list.
+// A date block ([日期], [Date], [Start Date] …) offers 今天 / 明天 / 3 天后 / 下周一 on the Taipei calendar, written the way its text is:
+// "Oct 20" in English, "10月20日" in Chinese. Worked out when the block is opened, so they never go stale like a remembered date would.
+export function isDateVariable(name: string): boolean { return /日期|date/i.test(name); }
+export function dateOptions(language: "en" | "zh", now = Date.now()): { label: string; value: string }[] {
+  const part = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric" })
+    .formatToParts(now).map((entry) => [entry.type, Number(entry.value)]));
+  const today = Date.UTC(part.year, part.month - 1, part.day);
+  const weekday = new Date(today).getUTCDay();
+  const write = (days: number) => {
+    const day = new Date(today + days * 86_400_000);
+    return language === "zh" ? `${day.getUTCMonth() + 1}月${day.getUTCDate()}日` : day.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+  };
+  return [["今天", 0], ["明天", 1], ["3 天后", 3], ["下周一", (8 - weekday) % 7 || 7]].map(([label, days]) => ({ label: label as string, value: write(days as number) }));
+}
+
+// What the popup above a focused block offers: a date block's quick dates, else the block's fixed options.
+export function quickOptions(name: string, language: "en" | "zh", now = Date.now()): { label?: string; value: string }[] {
+  return isDateVariable(name) ? dateOptions(language, now) : fixedOptions(name).map((value) => ({ value }));
+}
+
+// A fixed option never takes a place in the recent list; nor does today's quick date (it would be wrong tomorrow).
 export function isFixedOption(name: string, value: string): boolean {
-  return fixedOptions(name).some((option) => option.toLowerCase() === value.trim().toLowerCase());
+  const wanted = value.trim().toLowerCase();
+  return fixedOptions(name).some((option) => option.toLowerCase() === wanted)
+    || (isDateVariable(name) && (["en", "zh"] as const).some((language) => dateOptions(language).some((option) => option.value.toLowerCase() === wanted)));
 }
 
 export type ValueMemory = Record<string, string[]>;
