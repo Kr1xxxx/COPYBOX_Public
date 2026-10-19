@@ -1614,7 +1614,15 @@ button { -webkit-tap-highlight-color: transparent; }
 :root:not(.brand-off) :is(.backup-actions, .snippet-dialog-actions, .delete-confirm-actions) button.primary:hover:not(:disabled), :root:not(.brand-off) .guide-dialog .primary-button:hover { background: var(--dlg-primary-hover); border-color: var(--dlg-primary-hover); }
 :root:not(.brand-off) :is(.backup-dialog, .delete-confirm-dialog, .snippet-import-dialog, .snippet-copy-dialog, .guide-dialog) :is(button, input):focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
 :root:not(.brand-off) .import-folder-list span { background: var(--dlg-line); color: var(--dlg-ink); }
-:root:not(.brand-off) .tips-dialog .tips-good { background: color-mix(in srgb, var(--brand-green) 18%, var(--dlg-surface)); color: var(--dlg-ink); }
+/* Tips: warm orange instead of the black slab (owner 2026-10-19 「这个配色改下」). Light uses a deeper orange so
+   white-on-orange text stays readable; dark uses the brand orange with dark text. The right way gets a green bar. */
+:root { --tips-accent: #b25638; --tips-accent-hover: #a14d31; --tips-on-accent: var(--brand-light); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tips-accent: var(--brand-orange); --tips-accent-hover: #e38d70; --tips-on-accent: var(--brand-dark); } }
+:root[data-theme="dark"] { --tips-accent: var(--brand-orange); --tips-accent-hover: #e38d70; --tips-on-accent: var(--brand-dark); }
+:root:not(.brand-off) .tips-dialog .backup-head p { color: var(--tips-accent); }
+:root:not(.brand-off) .tips-dialog .tips-good { border-left: 3px solid var(--brand-green); border-radius: 3px 8px 8px 3px; background: color-mix(in srgb, var(--brand-green) 11%, var(--dlg-surface)); color: var(--dlg-ink); }
+:root:not(.brand-off) .tips-dialog .backup-actions button.primary { background: var(--tips-accent); border-color: var(--tips-accent); color: var(--tips-on-accent); }
+:root:not(.brand-off) .tips-dialog .backup-actions button.primary:hover { background: var(--tips-accent-hover); border-color: var(--tips-accent-hover); }
 :root:not(.brand-off) .guide-dots button.active::after { background: var(--brand-orange); }
 :root:not(.brand-off) .copy-fields input:focus { border-color: var(--brand-orange); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-orange) 18%, transparent); }
 
