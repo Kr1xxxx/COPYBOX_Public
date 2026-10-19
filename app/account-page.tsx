@@ -19,10 +19,10 @@ type Panel = { tab: EntryKind; focusId: string; adding: boolean; n: number };
 
 // The 账号 page (Mac): the list of everything, or one entry's panel (to open, change or add). The category and the search
 // text come from the page (sidebar and toolbar); `legacyView` is the old 秘密 list that the 「其他」 category shows.
-export function AccountPage({ deviceKey, entries, trashed, marks, error, category, view, query, addRequest, onOpenLegacy, onPinLegacy, onTrashLegacy, onToast, legacyView, selecting, folded, onSelectingChange }: {
+export function AccountPage({ deviceKey, entries, trashed, marks, error, category, view, query, addRequest, onOpenLegacy, onPinLegacy, onTrashLegacy, onToast, legacyView, selecting, folded, onSelectingChange, onAdd }: {
   deviceKey: string; entries: AccountEntry[] | null; trashed: AccountEntry[]; marks: Record<string, MarkItem>; error: string; category: EntryKind | "all"; view: AccountView; query: string;
   addRequest: AddRequest | null; onOpenLegacy: (id: string) => void; onPinLegacy: (id: string) => void; onTrashLegacy: (ids: string[]) => Promise<void>; onToast: (message: string) => void; legacyView: ReactNode;
-  selecting: boolean; folded: boolean; onSelectingChange: (selecting: boolean) => void;
+  selecting: boolean; folded: boolean; onSelectingChange: (selecting: boolean) => void; onAdd?: () => void;
 }) {
   const [panel, setPanel] = useState<Panel | null>(null);
   // Changing category or asking for 新增 from outside changes what is shown (set while rendering, no effect needed).
@@ -61,7 +61,7 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
   } else if (error) body = <p className="settings-note" role="alert">{error}</p>;
   else if (entries === null) body = <p className="settings-note">正在读取…</p>;
   else {
-    const list = <div className="vault-panel"><AccountList deviceKey={deviceKey} entries={entries} trashed={trashed} marks={marks} category={category} view={view} query={query} selecting={selecting} folded={folded} onSelectingChange={onSelectingChange} onOpen={open} onPinLegacy={onPinLegacy} onTrashLegacy={onTrashLegacy} onToast={onToast} /></div>;
+    const list = <div className="vault-panel"><AccountList deviceKey={deviceKey} entries={entries} trashed={trashed} marks={marks} category={category} view={view} query={query} selecting={selecting} folded={folded} onSelectingChange={onSelectingChange} onOpen={open} onPinLegacy={onPinLegacy} onTrashLegacy={onTrashLegacy} onToast={onToast} onAdd={onAdd} /></div>;
     // The 回收站 also holds the old entries that were deleted, shown by the old list under the new ones.
     body = view === "trash" ? <>{list}{legacyView}</> : list;
   }

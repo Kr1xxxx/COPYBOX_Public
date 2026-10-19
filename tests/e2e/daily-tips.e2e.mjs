@@ -222,3 +222,11 @@ test("the Tips dialog has 上一条 / 下一条 too; they move the card along, a
   await expect(page.locator(".daily-tips-title")).toHaveText("一点就复制");
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.tips.v1") || "{}").shownId)).toBe("T-002");
 });
+
+test("popup fonts are loaded at start, so the first Tips does not jump from a fallback font", async ({ page }) => {
+  await asDesktop(page, "win32");
+  await page.goto("/");
+  await page.waitForSelector(".app-shell");
+  await expect.poll(() => page.evaluate(() => ["400 1em Lora", "600 1em Poppins", "400 1em MiSans"].every((face) => document.fonts.check(face, "Aa中")))).toBe(true);
+  await expect(page.locator(".tips-dialog")).toHaveCount(0);
+});

@@ -11,7 +11,8 @@ import { VAULT_CHANGED_EVENT, openSecretItemsStore, type VaultItem } from "./sec
 import { detectSite, paymentSite, type Site } from "./site-core";
 import { accountTitle, generateTotp } from "./totp-core";
 import { openTotpStore } from "./totp-store";
-import { SAMPLES_DONE_KEY, restoreSampleEntries } from "./vault-samples";
+import { HIDDEN_ACCOUNT_KINDS } from "./platform";
+import { SAMPLES_DONE_KEY, clearSampleEntries, restoreSampleEntries } from "./vault-samples";
 
 export type LegacySecret = { id: string; label: string; secret: string; pinned?: boolean; lastUsedAt?: number };
 
@@ -42,10 +43,16 @@ export function useAccountEntries(deviceKey: string, legacySecrets: LegacySecret
       if (!seeded.current) {
         seeded.current = true;
         try {
-          if (localStorage.getItem(SAMPLES_DONE_KEY) !== "1") {
+          // "1" = 范例 added; "2" = added, and the kinds this platform has no category for (D-038) removed again.
+          const done = localStorage.getItem(SAMPLES_DONE_KEY);
+          if (done !== "1" && done !== "2") {
             // Added beside whatever is already there (old 秘密, earlier 验证码): only the missing 范例 go in, nothing is changed.
-            await restoreSampleEntries(deviceKey);
-            localStorage.setItem(SAMPLES_DONE_KEY, "1");
+            await restoreSampleEntries(deviceKey, localStorage, HIDDEN_ACCOUNT_KINDS);
+            localStorage.setItem(SAMPLES_DONE_KEY, "2");
+          } else if (done === "1" && HIDDEN_ACCOUNT_KINDS.length > 0) {
+            // Up to 2.05 Windows also got the Mac-only 范例 (接口密钥, 恢复码), reachable from no category: untouched ones go.
+            await clearSampleEntries(deviceKey, localStorage, HIDDEN_ACCOUNT_KINDS);
+            localStorage.setItem(SAMPLES_DONE_KEY, "2");
           }
         } catch {
           // Examples are a nicety: if anything is unreadable nothing is written and the page opens as it is.

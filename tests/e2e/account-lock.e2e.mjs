@@ -159,7 +159,7 @@ test("setting a password keeps every account entry, leaves a deletable backup, a
   await page.waitForSelector(".app-shell");
   const kinds = page.locator(".kind-switch");
   await kinds.getByRole("button", { name: "账号" }).click();
-  await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(5);
+  await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(3);
   await kinds.getByRole("button", { name: "话术" }).click();
   await setPassword(page, "abcd1234");
   let settings = await openSettings(page);
@@ -176,7 +176,7 @@ test("setting a password keeps every account entry, leaves a deletable backup, a
   await expect(settings).toContainText("未设置");
   await settings.getByRole("button", { name: "关闭设置" }).click();
   await kinds.getByRole("button", { name: "账号" }).click();
-  await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(5);
+  await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(3);
 });
 
 test("忘记密码 without a recovery email still offers the recovery code", async ({ page }) => {
