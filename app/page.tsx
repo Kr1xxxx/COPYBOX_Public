@@ -1145,7 +1145,7 @@ export default function Home() {
   async function finishCopy(item: SecretItem, copied: string, part = false) {
     await copyTextWithExpiry(copied);
     void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? recordCopy(value, timestampNow()) : value) })).catch(() => showToast("已复制，但使用记录保存失败", { tone: "error" }));
-    if (part) { window.clipboxDesktop?.didCopy(); return; }
+    if (part) return;
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
