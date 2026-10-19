@@ -1,5 +1,6 @@
-// Looks up the newest published version and, on Windows, can download that installer and install it over this app
-// (D-023, D-047); the Mac only offers the download (D-073). Same version rules as desktop/update-check.cjs.
+// Looks up the newest published version and can download it and install it over this app: Windows runs the installer
+// (D-023, D-047), the Mac swaps its app bundle for the one in the zip and restarts (D-078). Same version rules as
+// desktop/update-check.cjs.
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const CHUNK_TIMEOUT: Duration = Duration::from_secs(30);
 /// The page gets at most about ten progress messages a second.
 const PROGRESS_EVERY: Duration = Duration::from_millis(100);
-/// No installer is this big (today about 2–5 MB); a manifest that says so is wrong.
+/// No installer or zipped app is this big (today about 2–15 MB); a manifest that says so is wrong.
 const MAX_INSTALLER_BYTES: u64 = 200 * 1024 * 1024;
 const PROGRESS_EVENT: &str = "clipbox:update-progress";
 
@@ -23,8 +24,8 @@ const PROGRESS_EVENT: &str = "clipbox:update-progress";
 /// this at its own folder; both platforms follow it. CLIPBOX_UPDATE_URL overrides the whole address (for testing).
 const UPDATE_FOLDER: &str = "https://copyboxx.com/download/";
 
-/// Which file in that folder this platform reads: Windows the installer's, the Mac the zipped app's (D-073). Linux
-/// has no build to offer.
+/// Which file in that folder this platform reads: Windows the installer's, the Mac the zipped app's (D-073, D-078).
+/// Linux has no build to offer.
 const MANIFEST_NAME: &str = if cfg!(target_os = "windows") {
     "latest.json"
 } else if cfg!(target_os = "macos") {
@@ -43,6 +44,11 @@ pub fn default_update_url(folder: &str, name: &str) -> String {
 
 /// The only host an installer may come from.
 const DOWNLOAD_HOST: &str = "copyboxx.com";
+
+/// Whether this platform can install what it downloads: Windows an .exe installer, the Mac a .zip of the app (made with
+/// `ditto -c -k --keepParent`, as the build does). Linux can only open the link.
+const CAN_INSTALL: bool = cfg!(any(target_os = "windows", target_os = "macos"));
+const DOWNLOAD_EXT: &str = if cfg!(target_os = "windows") { ".exe" } else { ".zip" };
 
 /// NSIS installer switches (Tauri's template, D-047): /P small progress window and no questions, /R start the app
 /// again when done, /UPDATE install over the old version without uninstalling it first (keeps launch at login).
@@ -78,7 +84,7 @@ pub struct UpdateInfo {
     version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     notes: Option<Vec<String>>,
-    /// Whether 「立即更新」 can download and install it here (Windows, with size and checksum in the manifest).
+    /// Whether 「立即更新」 can download and install it here (Windows or the Mac, with size and checksum in the manifest).
     #[serde(skip_serializing_if = "Option::is_none")]
     installable: Option<bool>,
 }
@@ -152,15 +158,16 @@ pub fn sha256_matches(expected: &str, digest: &[u8]) -> bool {
     digest.len() == 32 && parse_sha256(expected).is_some_and(|e| e == to_hex(digest))
 }
 
-/// The installer's file name, taken from the link (the product name may change); a safe fallback otherwise.
-pub fn installer_file_name(url: &str) -> String {
+/// The download's file name, taken from the link (the product name may change) when it ends in `ext`; a safe fallback
+/// otherwise.
+pub fn installer_file_name(url: &str, ext: &str) -> String {
     let last = url::Url::parse(url).ok().and_then(|u| u.path_segments().and_then(|mut s| s.next_back().map(str::to_string))).unwrap_or_default();
     let safe = !last.is_empty()
         && last.len() <= 80
-        && last.to_ascii_lowercase().ends_with(".exe")
+        && last.to_ascii_lowercase().ends_with(ext)
         && !last.starts_with('.')
         && last.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
-    if safe { last } else { "update-setup.exe".to_string() }
+    if safe { last } else { format!("update-setup{ext}") }
 }
 
 /// Lets a progress message through at most once per `every`; the caller always sends the last one.
@@ -214,7 +221,7 @@ pub fn evaluate_manifest(manifest: &serde_json::Value, current: &str) -> (Update
                 status: "available",
                 version: Some(version.trim().trim_start_matches('v').to_string()),
                 notes: Some(notes),
-                installable: Some(cfg!(target_os = "windows") && release.installable()),
+                installable: Some(CAN_INSTALL && release.installable()),
             };
             (info, Some(release))
         }
@@ -252,8 +259,9 @@ pub fn open_update(app: AppHandle, state: tauri::State<Updates>) -> Result<bool,
     Ok(true)
 }
 
-/// Downloads the installer the last check found, checks it, and then quits the normal way (the page saves first)
-/// and starts the installer, which opens the new version when it is done.
+/// Downloads the file the last check found, checks it, and then quits the normal way (the page saves first) and
+/// installs it: Windows starts the installer, which opens the new version when it is done; the Mac swaps its app bundle
+/// and restarts itself.
 #[tauri::command]
 pub async fn install_update(app: AppHandle, state: tauri::State<'_, Updates>) -> Result<InstallResult, String> {
     if state.installing.swap(true, Ordering::SeqCst) {
@@ -261,7 +269,7 @@ pub async fn install_update(app: AppHandle, state: tauri::State<'_, Updates>) ->
     }
     let release = state.release.lock().unwrap().clone();
     let outcome = match release {
-        Some(release) if cfg!(target_os = "windows") && release.installable() => download(&app, &release).await,
+        Some(release) if CAN_INSTALL && release.installable() => download(&app, &release).await,
         _ => Err("unavailable"),
     };
     let path = match outcome {
@@ -271,19 +279,20 @@ pub async fn install_update(app: AppHandle, state: tauri::State<'_, Updates>) ->
             return Ok(InstallResult::error(reason));
         }
     };
-    // The installer replaces this app's files, so the page must have saved before it starts. Same order as 退出
-    // and 重启: ask the page to save (flush.rs, 1.5 s at most), then start the installer, then exit.
+    // The install replaces this app's files, so the page must have saved before it starts. Same order as 退出 and
+    // 重启: ask the page to save (flush.rs, 1.5 s at most), then install, then exit (Windows: the installer reopens
+    // the new version) or restart (the Mac has the new bundle in place already).
     let (sender, receiver) = tokio::sync::oneshot::channel();
     begin_quit(&app);
     crate::flush::then_after_flush(&app, move |app| {
         let started = start_installer(&path);
+        let _ = sender.send(started.is_ok());
         if started.is_ok() {
-            app.exit(0);
+            if cfg!(target_os = "macos") { app.restart() } else { app.exit(0) }
         } else {
             let _ = std::fs::remove_file(&path);
             cancel_quit(app);
         }
-        let _ = sender.send(started.is_ok());
     });
     if receiver.await.unwrap_or(false) {
         Ok(InstallResult::ok("installing"))
@@ -312,7 +321,7 @@ async fn download(app: &AppHandle, release: &Release) -> Result<PathBuf, &'stati
     let (Some(size), Some(sha256)) = (release.size, release.sha256.as_deref()) else { return Err("unavailable") };
     let folder = download_folder();
     std::fs::create_dir_all(&folder).map_err(|_| "disk")?;
-    let path = folder.join(installer_file_name(&release.url));
+    let path = folder.join(installer_file_name(&release.url, DOWNLOAD_EXT));
     let _ = std::fs::remove_file(&path);
     let result = fetch_to_file(app, &release.url, size, sha256, &path).await;
     if result.is_err() {
@@ -383,9 +392,53 @@ fn start_installer(path: &Path) -> std::io::Result<()> {
         .map(|_| ())
 }
 
-#[cfg(not(target_os = "windows"))]
+/// Unzips the new app next to the download and swaps it for the running bundle (D-078). The old bundle is moved into
+/// the download folder first and put back if the swap fails, so the Mac is never left without an app. The zip was
+/// written by this app, not a browser, so it carries no quarantine mark and macOS opens the unsigned new version as it
+/// did the old one. An app that does not run from a bundle (cargo run) or from a read-only place reports `start`.
+#[cfg(target_os = "macos")]
+fn start_installer(path: &Path) -> std::io::Result<()> {
+    use std::io::{Error, ErrorKind};
+    let bundle = current_bundle()?;
+    let unpacked = path.with_extension("unpacked");
+    let _ = std::fs::remove_dir_all(&unpacked);
+    let status = std::process::Command::new("/usr/bin/ditto").args(["-x", "-k"]).arg(path).arg(&unpacked).status()?;
+    if !status.success() {
+        return Err(Error::new(ErrorKind::InvalidData, "the zip could not be unpacked"));
+    }
+    let new_app = std::fs::read_dir(&unpacked)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
+        .ok_or_else(|| Error::new(ErrorKind::NotFound, "no app in the zip"))?;
+    let previous = unpacked.join("previous.app");
+    std::fs::rename(&bundle, &previous)?;
+    if let Err(err) = std::fs::rename(&new_app, &bundle) {
+        let _ = std::fs::rename(&previous, &bundle);
+        return Err(err);
+    }
+    let _ = std::fs::remove_dir_all(&unpacked);
+    // A new change time makes Finder and Launch Services read the new bundle (Tauri's updater does the same).
+    let _ = std::fs::File::open(&bundle).and_then(|f| f.set_modified(std::time::SystemTime::now()));
+    Ok(())
+}
+
+/// The running app bundle: `…/Copyboxx.app` from `…/Copyboxx.app/Contents/MacOS/Copyboxx`.
+#[cfg(target_os = "macos")]
+fn current_bundle() -> std::io::Result<PathBuf> {
+    let exe = std::env::current_exe()?;
+    bundle_of(&exe).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Unsupported, "not running from an app bundle"))
+}
+
+/// The `.app` three levels above the executable, if the path is laid out like a bundle.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub fn bundle_of(exe: &Path) -> Option<PathBuf> {
+    exe.ancestors().nth(3).filter(|p| p.extension().is_some_and(|e| e == "app")).map(Path::to_path_buf)
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn start_installer(_path: &Path) -> std::io::Result<()> {
-    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "only the Windows installer can update itself"))
+    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "only Windows and the Mac can update themselves"))
 }
 
 /// SHA-256 from Windows' own crypto library (BCrypt), fed chunk by chunk while the file downloads.
@@ -421,8 +474,39 @@ mod sha {
     }
 }
 
+/// SHA-256 from the Mac's own crypto library (CommonCrypto in libSystem, no new dependency), fed chunk by chunk.
+#[cfg(target_os = "macos")]
+mod sha {
+    /// CC_SHA256_CTX: count[2], hash[8], wbuf[16].
+    #[repr(C)]
+    struct Context([u32; 26]);
+
+    #[link(name = "System")]
+    extern "C" {
+        fn CC_SHA256_Init(ctx: *mut Context) -> i32;
+        fn CC_SHA256_Update(ctx: *mut Context, data: *const u8, len: u32) -> i32;
+        fn CC_SHA256_Final(digest: *mut u8, ctx: *mut Context) -> i32;
+    }
+
+    pub struct Sha256(Context);
+
+    impl Sha256 {
+        pub fn new() -> Option<Self> {
+            let mut ctx = Context([0; 26]);
+            (unsafe { CC_SHA256_Init(&mut ctx) } == 1).then_some(Sha256(ctx))
+        }
+        pub fn update(&mut self, data: &[u8]) -> bool {
+            data.chunks(u32::MAX as usize).all(|chunk| unsafe { CC_SHA256_Update(&mut self.0, chunk.as_ptr(), chunk.len() as u32) } == 1)
+        }
+        pub fn finish(mut self) -> Option<[u8; 32]> {
+            let mut digest = [0u8; 32];
+            (unsafe { CC_SHA256_Final(digest.as_mut_ptr(), &mut self.0) } == 1).then_some(digest)
+        }
+    }
+}
+
 /// Elsewhere there is nothing to install, so there is nothing to hash either.
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 mod sha {
     pub struct Sha256;
     impl Sha256 {
@@ -467,12 +551,29 @@ mod tests {
     }
 
     #[test]
-    fn a_mac_download_link_is_accepted_but_never_installed_by_the_app() {
-        let manifest = json!({"version": "0.3.0", "url": "https://copyboxx.com/download/Copyboxx-macOS-arm64.zip", "notes": ["新功能"]});
+    fn a_mac_zip_with_size_and_checksum_is_installable_on_windows_and_the_mac_only() {
+        let zip = "https://copyboxx.com/download/Copyboxx-macOS-arm64.zip";
+        let manifest = json!({"version": "0.3.0", "url": zip, "notes": ["新功能"], "size": 12_000_000, "sha256": ABC_SHA256});
         let (info, release) = evaluate_manifest(&manifest, "0.2.24");
         assert_eq!(info.status, "available");
-        assert_eq!(info.installable, Some(false));
-        assert_eq!(release.map(|r| r.url).as_deref(), Some("https://copyboxx.com/download/Copyboxx-macOS-arm64.zip"));
+        assert_eq!(info.installable, Some(cfg!(any(target_os = "windows", target_os = "macos"))));
+        assert_eq!(release.map(|r| r.url).as_deref(), Some(zip));
+        let without = json!({"version": "0.3.0", "url": zip, "notes": ["新功能"]});
+        assert_eq!(evaluate_manifest(&without, "0.2.24").0.installable, Some(false));
+    }
+
+    #[test]
+    fn each_platform_downloads_its_own_kind_of_file() {
+        assert_eq!(DOWNLOAD_EXT, if cfg!(target_os = "windows") { ".exe" } else { ".zip" });
+        assert_eq!(CAN_INSTALL, cfg!(any(target_os = "windows", target_os = "macos")));
+    }
+
+    #[test]
+    fn the_bundle_is_three_levels_above_the_mac_executable() {
+        assert_eq!(bundle_of(Path::new("/Applications/Copyboxx.app/Contents/MacOS/Copyboxx")), Some(PathBuf::from("/Applications/Copyboxx.app")));
+        assert_eq!(bundle_of(Path::new("/Users/me/Copyboxx.app/Contents/MacOS/Copyboxx")), Some(PathBuf::from("/Users/me/Copyboxx.app")));
+        assert_eq!(bundle_of(Path::new("/Users/me/target/release/clipbox")), None);
+        assert_eq!(bundle_of(Path::new("Copyboxx")), None);
     }
 
     #[test]
@@ -497,7 +598,7 @@ mod tests {
         assert_eq!(info.status, "available");
         assert_eq!(info.version.as_deref(), Some("0.3.0"));
         assert_eq!(info.notes.unwrap(), vec!["快了", "稳了"]);
-        assert_eq!(info.installable, Some(cfg!(target_os = "windows")));
+        assert_eq!(info.installable, Some(CAN_INSTALL));
         assert_eq!(release, Some(Release { url: SITE.to_string(), size: Some(2_400_000), sha256: Some(ABC_SHA256.to_string()) }));
     }
 
@@ -554,14 +655,16 @@ mod tests {
     }
 
     #[test]
-    fn the_installer_keeps_the_name_from_the_link() {
-        assert_eq!(installer_file_name(SITE), "Copyboxx-Setup.exe");
-        assert_eq!(installer_file_name("https://copyboxx.com/download/Clipboxx-Setup.exe?x=1"), "Clipboxx-Setup.exe");
-        assert_eq!(installer_file_name("https://copyboxx.com/download/"), "update-setup.exe");
-        assert_eq!(installer_file_name("https://copyboxx.com/download/setup.msi"), "update-setup.exe");
-        assert_eq!(installer_file_name("https://copyboxx.com/download/..%5C..%5Cevil.exe"), "update-setup.exe");
-        assert_eq!(installer_file_name("https://copyboxx.com/download/a%20b.exe"), "update-setup.exe");
-        assert_eq!(installer_file_name("nonsense"), "update-setup.exe");
+    fn the_download_keeps_the_name_from_the_link() {
+        assert_eq!(installer_file_name(SITE, ".exe"), "Copyboxx-Setup.exe");
+        assert_eq!(installer_file_name("https://copyboxx.com/download/Clipboxx-Setup.exe?x=1", ".exe"), "Clipboxx-Setup.exe");
+        assert_eq!(installer_file_name("https://copyboxx.com/download/", ".exe"), "update-setup.exe");
+        assert_eq!(installer_file_name("https://copyboxx.com/download/setup.msi", ".exe"), "update-setup.exe");
+        assert_eq!(installer_file_name("https://copyboxx.com/download/..%5C..%5Cevil.exe", ".exe"), "update-setup.exe");
+        assert_eq!(installer_file_name("https://copyboxx.com/download/a%20b.exe", ".exe"), "update-setup.exe");
+        assert_eq!(installer_file_name("nonsense", ".exe"), "update-setup.exe");
+        assert_eq!(installer_file_name("https://copyboxx.com/download/Copyboxx-macOS-arm64.zip", ".zip"), "Copyboxx-macOS-arm64.zip");
+        assert_eq!(installer_file_name(SITE, ".zip"), "update-setup.zip");
     }
 
     #[test]
@@ -588,9 +691,9 @@ mod tests {
         assert_eq!(serde_json::to_value(Progress { received: 5, total: 9 }).unwrap(), json!({"received": 5, "total": 9}));
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     #[test]
-    fn windows_hashes_in_chunks() {
+    fn the_platform_hashes_in_chunks() {
         let mut hasher = sha::Sha256::new().unwrap();
         assert!(hasher.update(b"a"));
         assert!(hasher.update(b"bc"));
