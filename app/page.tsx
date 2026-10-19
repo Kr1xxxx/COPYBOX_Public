@@ -1605,10 +1605,10 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `分享话术-${new Date().toISOString().slice(0, 10)}.${asDocument ? "md" : "txt"}`;
+    anchor.download = `copyboxx-share-${new Date().toISOString().slice(0, 10)}.${asDocument ? "md" : "txt"}`;
     anchor.click();
     URL.revokeObjectURL(url);
-    showToast(`已导出 ${targets.length} 条话术`);
+    showToast(asDocument ? `已导出 ${targets.length} 条话术，同事在 设置 → 导入话术表格 里导入` : `已导出 ${targets.length} 条话术`);
     exitBulk();
   }
 
@@ -2457,7 +2457,7 @@ export default function Home() {
               {activeKind === "snippet" && <div className="menu-wrap">
                 <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkExportOpen} onClick={() => { setBulkMoveOpen(false); setBulkExportOpen((value) => !value); }}>导出<Icon name="chevron" /></button>
                 <AnimatePresence>{bulkExportOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
-                  <button type="button" role="menuitem" onClick={() => bulkExport(true)}>话术文档（同事可导入）</button>
+                  <button type="button" role="menuitem" onClick={() => bulkExport(true)}>话术文档（可导入）</button>
                   <button type="button" role="menuitem" onClick={() => bulkExport(false)}>纯文本</button>
                 </ArcMenu>}</AnimatePresence>
               </div>}
