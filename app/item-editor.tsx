@@ -229,12 +229,12 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
           {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{displaySnippetNumber(item.snippetNumber)}</b>}
           {kind === "secret" && !PLAIN_NOTES && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
         </div>
-        <span className="inline-editor-hint">{kind === "secret" ? (PLAIN_NOTES ? "加密保存在这台电脑上" : "加密保存在这台设备上") : structured ? "中英文和使用规则一起加密保存" : "小提示只给自己看；内容可用 AI 润色或整理"}</span>
+        <span className="inline-editor-hint">{kind === "secret" ? (PLAIN_NOTES ? "加密保存在这台电脑上" : "加密保存在这台设备上") : "内容可用 AI 润色或整理"}</span>
       </header>
       <form ref={formRef} onSubmit={submit}>
           <div className="editor-body">
             <div className={`editor-meta-grid ${kind === "snippet" ? "" : "single"}`}>
-              <label className="native-field"><span>{structured ? "具体场景" : "标题"}</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? (PLAIN_NOTES ? "例如 常用地址" : "例如 prod-ssh") : "例如 售后夸赞"} maxLength={60} /></div></label>
+              <label className="native-field"><span>标题</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? (PLAIN_NOTES ? "例如 常用地址" : "例如 prod-ssh") : "例如 售后夸赞"} maxLength={60} /></div></label>
               {/* 账号 has no 目录 (sorted by 分类 only); an old entry keeps the folder it was saved with. */}
               {kind === "snippet" && <label className="native-field folder-field">
                 <span>目录 <small>必选</small></span>
@@ -257,15 +257,17 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
             {kind === "snippet" && <label className="native-field chinese-field"><span>中文翻译 <small>可选，自己写，不会被自动改</small></span><div className="soft-textarea compact"><textarea ref={chineseRef} value={chineseText} onChange={(event) => setChineseText(event.target.value)} rows={3} placeholder="复制时点「中文」就会复制这里的内容" lang="zh" /></div></label>}
             {kind === "snippet" && aiNotice && <small className="ai-notice" role="status">{aiNotice}</small>}
 
-            {kind === "snippet" && <div className="native-field summary-field">
-              <label htmlFor="summary-input">{structured ? "核心动作" : "小提示"} {!structured && <small>可选，最多 {SNIPPET_NOTE_MAX} 字</small>}</label>
+            {kind === "snippet" && !structured && <div className="native-field summary-field">
+              <label htmlFor="summary-input">小提示 <small>可选，最多 {SNIPPET_NOTE_MAX} 字</small></label>
               <div className="summary-control">
-                <input id="summary-input" value={summary} onChange={(event) => setSummary(structured ? event.target.value : limitChars(event.target.value, SNIPPET_NOTE_MAX))} placeholder={structured ? "例如 发送睫毛报价" : "例如 售后夸赞时用"} />
+                <input id="summary-input" value={summary} onChange={(event) => setSummary(limitChars(event.target.value, SNIPPET_NOTE_MAX))} placeholder="例如 售后夸赞时用" />
               </div>
             </div>}
+            {/* Fields only imported 话术 have, folded away so both editors look the same (UI review 2026-10-19, E). */}
             {structured && <details className="structured-details">
-              <summary>使用规则</summary>
+              <summary>更多</summary>
               <div className="structured-fields">
+                <label className="native-field"><span>核心动作</span><div className="soft-input"><input id="summary-input" value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="例如 发送睫毛报价" /></div></label>
                 <label className="native-field"><span>产品 / 业务</span><div className="soft-input"><input value={rawProduct} onChange={(event) => setRawProduct(event.target.value)} /></div></label>
                 <label className="native-field"><span>使用备注</span><div className="soft-textarea compact note"><textarea value={usageNote} onChange={(event) => setUsageNote(event.target.value)} rows={3} /></div></label>
               </div>

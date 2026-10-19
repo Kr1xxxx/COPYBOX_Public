@@ -79,3 +79,32 @@ test("a clear running at the same moment as a save keeps the saved entry", async
   assert.deepEqual((await openTotpStore(KEY, storage).list()).map((entry) => entry.id), ["u-totp"]);
   assert.deepEqual((await openSecretItemsStore(KEY, storage).list()).map((item) => item.id), ["u-login"]);
 });
+
+// Windows has no category for API 密钥 / 恢复码 (D-038): those 范例 are left out there, and an install that already
+// got them (up to 2.05) loses the untouched ones only; edited ones and the user's own entries of those kinds stay.
+const WINDOWS_HIDDEN = ["other", "apikey", "recovery"];
+
+test("the examples of kinds a platform has no category for are left out when restoring", async () => {
+  assert.deepEqual(sampleVaultData(1, WINDOWS_HIDDEN).items.map((item) => item.type).sort(), ["login", "payment"]);
+  const storage = memory();
+  assert.equal((await restoreSampleEntries(KEY, storage, WINDOWS_HIDDEN)).added, 3);
+  assert.deepEqual((await openSecretItemsStore(KEY, storage).list()).map((item) => item.id).sort(), ["sample-login", "sample-payment"]);
+  assert.deepEqual((await openTotpStore(KEY, storage).list()).map((entry) => entry.id), ["sample-totp"]);
+});
+
+test("a clear limited to the hidden kinds removes only those untouched examples", async () => {
+  const storage = memory();
+  const mine = userData();
+  const samples = sampleVaultData(5);
+  const editedRecovery = { ...samples.items.find((item) => item.type === "recovery"), updatedAt: 9 };
+  await openSecretItemsStore(KEY, storage).replaceAll([...mine.items, ...samples.items.filter((item) => item.type !== "recovery"), editedRecovery]);
+  await openTotpStore(KEY, storage).replaceAll([...mine.totp, ...samples.totp]);
+  const result = await clearSampleEntries(KEY, storage, WINDOWS_HIDDEN);
+  assert.equal(result.removed, 1);
+  assert.equal(result.keptEdited, 1);
+  const ids = (await openSecretItemsStore(KEY, storage).list()).map((item) => item.id).sort();
+  assert.deepEqual(ids, ["sample-login", "sample-payment", "sample-recovery", "u-api", "u-login", "u-pay", "u-rec"]);
+  assert.deepEqual((await openTotpStore(KEY, storage).list()).map((entry) => entry.id).sort(), ["sample-totp", "u-totp"]);
+  // Nothing of those kinds left to take: the store is not rewritten.
+  assert.equal((await clearSampleEntries(KEY, storage, WINDOWS_HIDDEN)).removed, 0);
+});
