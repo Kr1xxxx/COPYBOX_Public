@@ -256,6 +256,17 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await expect(options).toHaveText(["Amanda", "Cara", "Bella"]);
   // dropping did not count as a click: nothing was filled or copied
   await expect(name).toHaveValue("Cara");
+  // holding the value text itself drags too (Krix 2026-10-19): Amanda moves behind Cara, and the drop fills nothing
+  // (the first value is used: the last one sits partly under the sticky 收起 tail, where a press would hit that button)
+  await settle(page);
+  const textFrom = await options.nth(0).locator(".var-memory-pick").boundingBox();
+  const textTo = await options.nth(1).boundingBox();
+  await page.mouse.move(textFrom.x + textFrom.width / 2, textFrom.y + textFrom.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(textTo.x + textTo.width / 2, textTo.y + textTo.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await expect(options).toHaveText(["Cara", "Amanda", "Bella"]);
+  await expect(name).toHaveValue("Cara");
   // pin Bella, then unpin her again from the menu
   await options.filter({ hasText: "Bella" }).click(RIGHT_CLICK_LEFT_PART);
   await page.getByRole("menuitem", { name: "固定" }).click();

@@ -1207,7 +1207,7 @@ export default function Home() {
     setPinnedValues(outcome.pins);
     showToast(`已删除「${value}」`, { ms: 2000 });
   }
-  const { startOptionDrag } = useValueOptionDrag(valueMemory, pinnedValues, setValueMemory, setPinnedValues);
+  const { startOptionDrag, dragMoved } = useValueOptionDrag(valueMemory, pinnedValues, setValueMemory, setPinnedValues);
   // The menu on a value's handle moves it one place; pinned values only change places among themselves.
   function stepOption(name: string, value: string, step: -1 | 1) {
     const options = memoryOptions(valueMemory, pinnedValues, name);
@@ -2193,7 +2193,7 @@ export default function Home() {
                             {/* mousedown is stopped so the block keeps focus until the click lands */}
                             {memoryOptions(valueMemory, pinnedValues, name).map((option) => <span key={option} role="presentation" data-selected={option === fillFor(item).values[name] ? "" : undefined} data-pinned={isPinned(pinnedValues, name, option) ? "" : undefined} className="var-memory-option" onMouseDown={(event) => event.preventDefault()} data-option-value={option} onContextMenu={(event) => { event.preventDefault(); setValueMenu({ name, value: option, x: event.clientX, y: event.clientY }); }}>
                               <ReorderHandle className="var-grip" label={`拖动排序 ${option}`} title="按住拖动，点一下可上移或下移" canMoveUp={canStepOption(name, option, -1)} canMoveDown={canStepOption(name, option, 1)} onBeginDrag={(event) => startOptionDrag(event, name, option)} onMove={(delta) => stepOption(name, option, delta)}><span className="grip-pill" aria-hidden="true"><Icon name="grip" /></span></ReorderHandle>
-                              <button type="button" className="var-memory-pick" title={`${option}（右键：固定 / 解锁 / 删除）`} onClick={() => pickRemembered(item, name, option)}>{option}</button>
+                              <button type="button" className="var-memory-pick" title={`${option}（按住拖动排序；右键：固定 / 解锁 / 删除）`} onPointerDown={(event) => startOptionDrag(event, name, option)} onClick={() => { if (!dragMoved()) pickRemembered(item, name, option); }}>{option}</button>
                             </span>)}
                             </span>)}
                             <span className="var-tail"><button type="button" className="var-collapse" aria-expanded="true" aria-label="收起常用值" title="收起常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>收起<Icon name="chevronUp" /></button>
