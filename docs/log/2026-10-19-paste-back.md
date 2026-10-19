@@ -7,7 +7,8 @@
   `src-tauri/src/paste_back.rs`, `set_paste_back` command, `setPasteBack` on the bridge; `app/page.tsx` (settings
   state next to 迷你窗口复制后) and `app/settings.tsx` (one row in 窗口).
 - User-visible change (plain Chinese, for the preview changelog): 设置 → 窗口 新增「复制后贴到刚才的窗口」开关（默认关）：开了以后，在迷你窗口点复制，会自动回到刚才的聊天窗口并替你粘贴一次；Mac 第一次要允许「辅助功能」
-- Not done / risks: not tried on real Windows / Mac; 微信、钉钉、千牛 each need one real try, a few apps may ignore a
+  同一条话术在同一个聊天窗口只贴一遍；接着贴另一条时自动另起一行
+- Not done / risks: the line break stays on the clipboard, so a manual paste right after also starts with it. Not tried on real Windows / Mac; 微信、钉钉、千牛 each need one real try, a few apps may ignore a
   synthetic paste. A minimized chat window is brought forward but stays minimized, so nothing pastes. Mac: if 辅助功能
   is refused, the copy still works and the settings pane opens once.
 - Next step: try it on Krix's Windows PC and a Mac with 微信; then decide whether the hide setting should default to

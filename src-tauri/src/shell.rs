@@ -196,7 +196,8 @@ pub fn set_mini_hide_policy(state: tauri::State<Shell>, policy: String) {
 #[tauri::command]
 pub fn did_copy(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {
     if paste_back.enabled() && mode.is_mini() {
-        std::thread::spawn(crate::paste_back::paste_into_front);
+        let app = app.clone();
+        std::thread::spawn(move || crate::paste_back::paste_into_front(app));
     }
     let policy = shell.settings.lock().unwrap().mini_hide;
     if !hides_after_copy(policy, mode.is_mini(), mode.mini_auto_hide()) {

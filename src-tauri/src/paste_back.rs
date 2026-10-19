@@ -2,7 +2,14 @@
 // The shell keeps track of the last window that was in front (not ours, not the taskbar or desktop), and after a
 // copy brings it back and presses paste once for them. Off unless the setting is on; never a global shortcut (D-005).
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use tauri::AppHandle;
+use tauri_plugin_clipboard_manager::ClipboardExt;
+
+/// What the last paste put where: (window, text). Same text to the same window again is skipped; a different
+/// text to the same window goes on its own line (owner, 2026-10-19).
+static LAST_PASTE: Mutex<Option<(u64, String)>> = Mutex::new(None);
+const NEWLINE: &str = if cfg!(target_os = "windows") { "\r\n" } else { "\n" };
 
 #[derive(Default)]
 pub struct PasteBack {
@@ -27,6 +34,16 @@ pub fn set_paste_back(state: tauri::State<PasteBack>, enabled: bool) {
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn is_shell_class(class: &str) -> bool {
     matches!(class, "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "Progman" | "WorkerW")
+}
+
+/// None: do not paste (same text to the same window as last time). Some(true): paste on a new line (another text
+/// into the window that already got one). Some(false): paste as is. Pictures (no text) always paste as is.
+fn paste_plan(last: Option<&(u64, String)>, target: u64, text: Option<&str>) -> Option<bool> {
+    match (last, text) {
+        (Some((window, pasted)), Some(text)) if *window == target && pasted == text => None,
+        (Some((window, _)), Some(_)) if *window == target => Some(true),
+        _ => Some(false),
+    }
 }
 
 /// `{unix id, name}` as osascript prints it: "1234, WeChat".
@@ -77,12 +94,18 @@ mod os {
         }
     }
 
-    pub fn paste() {
-        let hwnd = HWND(LAST.load(Ordering::Relaxed) as *mut core::ffi::c_void);
+    /// Brings the remembered window to the front; its id, or None when it is gone.
+    pub fn activate() -> Option<u64> {
+        let raw = LAST.load(Ordering::Relaxed);
+        let hwnd = HWND(raw as *mut core::ffi::c_void);
         if hwnd.is_invalid() || !unsafe { IsWindow(Some(hwnd)) }.as_bool() || !unsafe { SetForegroundWindow(hwnd) }.as_bool() {
-            return;
+            return None;
         }
         std::thread::sleep(Duration::from_millis(80));
+        Some(raw as u64)
+    }
+
+    pub fn send_paste() {
         let keys = [key(VK_CONTROL, false), key(VK_V, false), key(VK_V, true), key(VK_CONTROL, true)];
         unsafe { SendInput(&keys, std::mem::size_of::<INPUT>() as i32) };
     }
@@ -119,13 +142,19 @@ mod os {
         }
     }
 
-    pub fn paste() {
+    /// Brings the remembered app to the front; its process id, or None when it is gone.
+    pub fn activate() -> Option<u64> {
         let pid = LAST.load(Ordering::Relaxed);
         if pid == 0 {
-            return;
+            return None;
         }
-        let script = format!("tell application \"System Events\"\nset frontmost of (first process whose unix id is {pid}) to true\ndelay 0.15\nkeystroke \"v\" using command down\nend tell");
-        if osascript(&[&script]).is_none() && !SETTINGS_OPENED.swap(true, Ordering::Relaxed) {
+        osascript(&[&format!("tell application \"System Events\" to set frontmost of (first process whose unix id is {pid}) to true")])?;
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        Some(pid as u64)
+    }
+
+    pub fn send_paste() {
+        if osascript(&["tell application \"System Events\" to keystroke \"v\" using command down"]).is_none() && !SETTINGS_OPENED.swap(true, Ordering::Relaxed) {
             // No 辅助功能 permission yet: show the pane once per run so the person can allow Copyboxx there.
             let _ = Command::new("open").arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility").status();
         }
@@ -136,7 +165,10 @@ mod os {
 mod os {
     pub fn start() {}
     pub fn remember_front() {}
-    pub fn paste() {}
+    pub fn activate() -> Option<u64> {
+        None
+    }
+    pub fn send_paste() {}
 }
 
 /// Call once from the main thread when the app starts.
@@ -150,8 +182,17 @@ pub fn remember_front() {
 }
 
 /// Bring the remembered window back and paste into it (after the copy has landed on the clipboard).
-pub fn paste_into_front() {
-    os::paste();
+pub fn paste_into_front(app: AppHandle) {
+    let mut last = LAST_PASTE.lock().unwrap();
+    let Some(target) = os::activate() else { return };
+    let text = app.clipboard().read_text().ok();
+    let Some(own_line) = paste_plan(last.as_ref(), target, text.as_deref()) else { return };
+    if own_line {
+        // The chat box still holds the earlier text: start this one on a fresh line (stays so on the clipboard).
+        let _ = app.clipboard().write_text(format!("{NEWLINE}{}", text.as_deref().unwrap_or_default()));
+    }
+    os::send_paste();
+    *last = text.map(|text| (target, text));
 }
 
 #[cfg(test)]
@@ -163,6 +204,17 @@ mod tests {
         assert!(is_shell_class("Shell_TrayWnd"));
         assert!(is_shell_class("WorkerW"));
         assert!(!is_shell_class("WeChatMainWndForPC"));
+    }
+
+    #[test]
+    fn same_text_to_same_window_pastes_once_and_another_text_gets_its_own_line() {
+        let last = Some((7, "你好".to_string()));
+        assert_eq!(paste_plan(None, 7, Some("你好")), Some(false));
+        assert_eq!(paste_plan(last.as_ref(), 7, Some("你好")), None);
+        assert_eq!(paste_plan(last.as_ref(), 7, Some("再见")), Some(true));
+        // Another window starts fresh; a picture has no text to compare.
+        assert_eq!(paste_plan(last.as_ref(), 8, Some("你好")), Some(false));
+        assert_eq!(paste_plan(last.as_ref(), 7, None), Some(false));
     }
 
     #[test]
