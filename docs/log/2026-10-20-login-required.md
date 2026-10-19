@@ -9,7 +9,7 @@
   remain). Pretend server (`cloud-demo.ts`) knows the activation code `AAAA-BBBB-CCCC-DDDD` and binds example.com.
   Tauri CSP allows `https://challenges.cloudflare.com` for script, frame and connect. Preview VERSION 2.33. Windows smoke
   test: with the `test-hooks` feature and `CLIPBOX_TEST_CLOUD_DEMO=1` the bridge sets `cloudDemo` so the real app signs
-  in against the page's pretend server; `smoke.mjs` signs in at the login page on the first start.
+  in against the page's pretend server; `smoke.mjs` signs in at the login page on the first start with a non-company email and the pretend activation code (a company email would receive the pretend 话术 library and the list would not be empty).
 - User-visible change (plain Chinese, for the preview changelog): 打开软件先登录：填邮箱、过人机验证、收验证码；不是公司邮箱的还要填激活码。登录过的电脑没网也能用；退出登录或被别的电脑顶掉后要重新登录
 - Not done / risks: not tried in the real Windows / Mac app (Turnstile on `tauri://localhost` is the open question,
   D-085). The server side (Turnstile check, activation codes, /admin list) is the website thread's PR #242 and must be
