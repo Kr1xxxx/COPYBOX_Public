@@ -1,7 +1,7 @@
 # Mini window sticks to the screen edge (Windows); Mac window size limit, no full screen
 
 - Date: 2026-10-19 · Thread/agent: 【窗口】迷你窗貼邊與 Mac 尺寸上限
-- What changed: D-078. Windows: new 设置 → 窗口 → 「迷你窗口贴边收起」 switch (off by default); with it on, the mini window
+- What changed: D-079. Windows: new 设置 → 窗口 → 「迷你窗口贴边收起」 switch (off by default); with it on, the mini window
   sticks to the screen's left or right edge, folds away to a 16 px strip when the mouse leaves and slides out when the
   mouse touches it or the window gets the focus (`window_mode.rs` settle/fold, `window_state.rs` `mini_dock`). macOS: the
   full window is capped at 1000×800, the green button is off and the View menu (进入全屏) is removed (`main.rs`).

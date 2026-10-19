@@ -31,7 +31,7 @@ export type ClipboxDesktop = {
   backupImagePrune?: (keep: string[]) => Promise<void>;
   didCopy: () => void;
   setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
-  // Windows only (D-078): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
+  // Windows only (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
   setMiniEdgeSnap?: (on: boolean) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;
   getLaunchAtLogin?: () => Promise<boolean>;

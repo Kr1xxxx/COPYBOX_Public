@@ -1,4 +1,4 @@
-// D-078: the 贴边 switch reaches the shell, and the Mac size limit is wired into the window code.
+// D-079: the 贴边 switch reaches the shell, and the Mac size limit is wired into the window code.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

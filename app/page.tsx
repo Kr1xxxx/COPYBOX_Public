@@ -1639,7 +1639,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Windows 贴边 (D-078): off until the person turns it on, so the mini window never folds away unexpectedly.
+  // Windows 贴边 (D-079): off until the person turns it on, so the mini window never folds away unexpectedly.
   const [miniEdgeSnap, setMiniEdgeSnap] = useState(() => readStoredChoice(MINI_EDGE_KEY, ["1"], "") === "1");
   useEffect(() => {
     if (miniEdgeSnap) window.clipboxDesktop?.setMiniEdgeSnap?.(true);

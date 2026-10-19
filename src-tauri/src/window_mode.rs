@@ -17,7 +17,7 @@ struct Inner {
     /// 固定在最上层 in the full window (the page remembers it and sends it on start).
     pinned: bool,
     normal: Option<Bounds>,
-    /// Windows 贴边 (D-078): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
+    /// Windows 贴边 (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
     edge_snap: bool,
     dock: Option<(Edge, Point)>,
     folded: bool,
@@ -62,7 +62,7 @@ fn work_areas(app: &AppHandle) -> Vec<Bounds> {
 pub fn saved_full_bounds(app: &AppHandle) -> Option<Bounds> {
     let saved = ws::read_json::<Bounds>(&data_file(app, FILE_FULL)?);
     let b = ws::normalize_bounds(saved, &work_areas(app))?;
-    // A window saved before the Mac size limit (D-078) opens at the limit.
+    // A window saved before the Mac size limit (D-079) opens at the limit.
     let (w, h) = ws::full_max_size().unwrap_or((b.width, b.height));
     Some(Bounds { width: b.width.min(w), height: b.height.min(h), ..b })
 }
@@ -239,7 +239,7 @@ impl WindowMode {
         }
         let pinned = self.inner.lock().unwrap().pinned;
         let _ = window.set_always_on_top(stays_on_top(false, pinned));
-        // macOS (D-078): the full window keeps its size limit and its zoom button stays off, so no full screen.
+        // macOS (D-079): the full window keeps its size limit and its zoom button stays off, so no full screen.
         let _ = window.set_max_size(full_max_size());
         let _ = window.set_maximizable(ws::full_max_size().is_none());
         let _ = window.set_min_size(Some(LogicalSize::new(ws::MIN_WIDTH, ws::MIN_HEIGHT)));
@@ -256,7 +256,7 @@ fn mouse_over(app: &AppHandle, window: &WebviewWindow) -> bool {
     c.x >= p.x as f64 && c.x < (p.x + s.width as i32) as f64 && c.y >= p.y as f64 && c.y < (p.y + s.height as i32) as f64
 }
 
-/// Windows 贴边 (D-078): a docked mini window folds away half a second after the mouse leaves it and slides out
+/// Windows 贴边 (D-079): a docked mini window folds away half a second after the mouse leaves it and slides out
 /// as soon as the mouse touches the strip or the window gets the focus (the tray's 快速搜索).
 pub fn watch_mouse(app: AppHandle, mode: WindowMode) {
     if !cfg!(target_os = "windows") {

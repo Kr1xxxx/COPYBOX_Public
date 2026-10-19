@@ -1,4 +1,4 @@
-### D-078 Windows mini window sticks to the screen edge; the Mac window has a size limit and no full screen (2026-10-19)
+### D-079 Windows mini window sticks to the screen edge; the Mac window has a size limit and no full screen (2026-10-19)
 - Context (owner, 2026-10-19, answering item B of the desktop audit): 「只做 Windows, 再把 mac 改成无法全屏, 最大限定一个尺寸,
   不会拖到窗口边上后自适应变大(我们的软件不需要那么大) 反而经常会在窗口最边上等待复制」.
 - Decision, Windows (`src-tauri/src/window_mode.rs`, `window_state.rs`):

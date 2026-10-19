@@ -9,10 +9,10 @@ pub const DEFAULT_WIDTH: f64 = 680.0;
 pub const DEFAULT_HEIGHT: f64 = 620.0;
 pub const MINI_WIDTH: f64 = 360.0;
 pub const MINI_HEIGHT: f64 = 440.0;
-/// macOS (D-078): the full window never grows past this, so it cannot fill or tile the screen.
+/// macOS (D-079): the full window never grows past this, so it cannot fill or tile the screen.
 pub const MAC_MAX_WIDTH: f64 = 1000.0;
 pub const MAC_MAX_HEIGHT: f64 = 800.0;
-/// Windows 贴边 (D-078): a mini window let go this close to a screen's left or right edge sticks to it...
+/// Windows 贴边 (D-079): a mini window let go this close to a screen's left or right edge sticks to it...
 pub const SNAP_DISTANCE: f64 = 24.0;
 /// ...and, once the mouse leaves, folds away until only this much of it shows.
 pub const STRIP_WIDTH: f64 = 16.0;

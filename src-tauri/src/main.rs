@@ -126,7 +126,7 @@ fn main() {
                 Some(b) => builder.inner_size(b.width, b.height).position(b.x, b.y),
                 None => builder.inner_size(window_state::DEFAULT_WIDTH, window_state::DEFAULT_HEIGHT).center(),
             };
-            // macOS (D-078): never bigger than MAC_MAX, no zoom and no full screen; staff park it at the screen edge.
+            // macOS (D-079): never bigger than MAC_MAX, no zoom and no full screen; staff park it at the screen edge.
             #[cfg(target_os = "macos")]
             let builder = builder
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
@@ -142,7 +142,7 @@ fn main() {
                 _ => builder,
             };
             let window = builder.build()?;
-            // Without a View menu there is no 进入全屏 (⌃⌘F) either (D-078).
+            // Without a View menu there is no 进入全屏 (⌃⌘F) either (D-079).
             #[cfg(target_os = "macos")]
             {
                 let menu = tauri::menu::Menu::default(app.handle())?;
