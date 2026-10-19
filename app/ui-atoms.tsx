@@ -1,4 +1,5 @@
-import { splitSearchHighlight } from "./clipbox-core";
+import { useState, type ReactNode } from "react";
+import { splitParagraphs, splitSearchHighlight } from "./clipbox-core";
 import { SnippetVariableText } from "./fill-panel";
 
 // Small presentational pieces shared across the main page (moved out of page.tsx unchanged).
@@ -49,6 +50,27 @@ export function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 // A variable shows as a highlighted block without its brackets (the same block the open card types into).
+// A 话术 with blank lines between its parts shows each part with its own small copy button, so it can go out as several
+// short messages. A copied part keeps its tick until the card closes. One part only: the text shows as before.
+export function ParagraphCopy({ text, lang, render, onCopy }: { text: string; lang: string; render: (part: string) => ReactNode; onCopy: (part: string) => Promise<boolean> }) {
+  const [copied, setCopied] = useState<string[]>([]);
+  const parts = splitParagraphs(text);
+  if (parts.length < 2) return <p className="row-content" lang={lang}>{render(text)}</p>;
+  return (
+    <div className="row-content row-paragraphs" lang={lang}>
+      {parts.map((part, index) => {
+        const done = copied.includes(part);
+        return (
+          <div key={index} className="row-paragraph" data-copied={done ? "" : undefined}>
+            <span className="row-paragraph-text">{render(part)}</span>
+            <button type="button" className="paragraph-copy" aria-label={done ? `第 ${index + 1} 段已复制` : `复制第 ${index + 1} 段`} title={done ? "这段已复制" : "复制这段"} onClick={() => void onCopy(part).then((ok) => { if (ok) setCopied((list) => list.includes(part) ? list : [...list, part]); })}><Icon name={done ? "check" : "copy"} /></button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SnippetContent({ text, query = "" }: { text: string; query?: string }) {
   return <SnippetVariableText text={text} renderText={(part) => <Highlight text={part} query={query} />} />;
 }

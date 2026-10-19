@@ -108,3 +108,27 @@ test("mini window: an unfilled block copies its pinned value, then its default, 
   assert.deepEqual(quickFillValues(["Name"], {}, { Name: ["Lovely"] }).values, { Name: "Lovely" });
   assert.deepEqual(quickFillValues(["Name"], { Name: "Anna" }, { Name: ["Lovely"] }), { values: { Name: "Anna" }, used: [] });
 });
+
+test("date blocks offer today, tomorrow, in 3 days and next Monday on the Taipei calendar", async () => {
+  const { dateOptions, isDateVariable, quickOptions } = await import("../app/variable-memory.ts");
+  // 2026-10-19 23:30 in Taipei is a Monday; the same instant is still Sunday in UTC.
+  const now = Date.UTC(2026, 9, 19, 15, 30);
+  assert.deepEqual(dateOptions("en", now), [
+    { label: "今天", value: "Oct 19" }, { label: "明天", value: "Oct 20" }, { label: "3 天后", value: "Oct 22" }, { label: "下周一", value: "Oct 26" },
+  ]);
+  assert.deepEqual(dateOptions("zh", Date.UTC(2026, 11, 30, 4)).map((option) => option.value), ["12月30日", "12月31日", "1月2日", "1月4日"]);
+  assert.equal(isDateVariable("日期"), true);
+  assert.equal(isDateVariable("放假日期"), true);
+  assert.equal(isDateVariable("Start Date"), true);
+  assert.equal(isDateVariable("天数"), false);
+  assert.deepEqual(quickOptions("Name", "en"), [{ value: "Beautiful" }, { value: "Friend" }, { value: "Lovely" }]);
+  assert.deepEqual(quickOptions("Company", "en"), []);
+});
+
+test("today's quick dates stay out of the recent list; other dates are remembered", async () => {
+  const { dateOptions } = await import("../app/variable-memory.ts");
+  const today = dateOptions("en")[0].value;
+  assert.equal(isFixedOption("日期", today), true);
+  assert.equal(isFixedOption("Company", today), false);
+  assert.deepEqual(rememberValues({}, { 日期: today, Date: "next spring" }), { Date: ["next spring"] });
+});
