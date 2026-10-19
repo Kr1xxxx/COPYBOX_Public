@@ -4,8 +4,6 @@ import { useLayoutEffect, useRef, type Dispatch, type SetStateAction } from "rea
 import { moveOption, type PinnedValues, type ValueMemory } from "./variable-memory";
 
 export function useValueOptionDrag(valueMemory: ValueMemory, pinnedValues: PinnedValues, setValueMemory: Dispatch<SetStateAction<ValueMemory>>, setPinnedValues: Dispatch<SetStateAction<PinnedValues>>) {
-  // Whether the last press became a drag: the value text is a button that fills on click, and a drop must not fill.
-  const lastMoved = useRef(false);
   const dragOption = useRef<{ name: string; value: string; startX: number; startLeft: number; moved: boolean; grab: number; element: HTMLElement } | null>(null);
   // Holding a listed value and moving it drags it to another place in the list.
   // The other values slide to their new places while one is dragged (first, last, invert, play).
@@ -26,7 +24,6 @@ export function useValueOptionDrag(valueMemory: ValueMemory, pinnedValues: Pinne
   function startOptionDrag(event: React.PointerEvent<HTMLButtonElement>, name: string, value: string) {
     const element = event.currentTarget.closest<HTMLElement>(".var-memory-option");
     if (event.button !== 0 || !element) return;
-    lastMoved.current = false;
     dragOption.current = { name, value, startX: event.clientX, startLeft: element.offsetLeft, moved: false, grab: event.clientX - element.getBoundingClientRect().left, element };
     event.currentTarget.setPointerCapture(event.pointerId);
     // Reordering moves the value in the page, which can drop the pointer capture; the window still hears the move and the release.
@@ -62,9 +59,8 @@ export function useValueOptionDrag(valueMemory: ValueMemory, pinnedValues: Pinne
       element.style.transform = "";
       window.setTimeout(() => { element.style.transition = ""; }, 200);
     }
-    lastMoved.current = Boolean(held?.moved);
     dragOption.current = null;
   }
 
-  return { startOptionDrag, dragMoved: () => lastMoved.current };
+  return { startOptionDrag };
 }
