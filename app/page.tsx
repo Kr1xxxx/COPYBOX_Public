@@ -475,7 +475,7 @@ export default function Home() {
   // 账号 header: 选择 (tick entries, 删除) and 收起 (fold every website card to its title).
   const [acctSelecting, setAcctSelecting] = useState(false);
   const [acctFolded, setAcctFolded] = useState(false);
-  const accountLocked = lockSet && !(accountMode && accountUnlocked);
+  const accountLocked = lockSet && !accountUnlocked;
   const lockedHere = accountMode && lockSet && !accountUnlocked;
   // Read by the command line door when it asks for a 秘密 (a locked 账号 page refuses it at once).
   const accountLockedRef = useRef(accountLocked);
@@ -488,17 +488,19 @@ export default function Home() {
   activeKindRef.current = activeKind;
   const automationConsent = useAutomationConsent();
   const askAutomationConsent = automationConsent.ask;
-  // 账号 slide-to-unlock (D-051): frosted until slid open; closes again on leaving the section or when the window hides.
+  // 账号 slide-to-unlock (D-051): frosted until slid open; closes again by the auto-lock timer or when the window hides.
   // The 账号页密码 screen, when set, is the only gate. The mini window is left as it was.
   const [slideUnlockOn, setSlideUnlockOn] = useState(() => typeof window === "undefined" || readSlideUnlockOn());
   const [accountSlidOpen, setAccountSlidOpen] = useState(false);
-  // Leaving the 账号 section locks it again (state adjusted while rendering, not in an effect).
+  // Leaving the 账号 section ends a selection but does not lock it: only the auto-lock timer does (D-076).
   const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
   if (seenAccountMode !== accountMode) {
     setSeenAccountMode(accountMode);
-    if (!accountMode) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); setAccountSlidOpen(false); }
+    if (!accountMode) setAcctSelecting(false);
   }
   const accountVeiled = accountMode && windowMode === "full" && slideUnlockOn && !lockSet && !accountSlidOpen;
+  // While locked, the 账号 sidebar (全部 / 收藏 / 最近 / 回收站 and 分类) cannot switch views (D-076).
+  const accountNavLocked = lockedHere || accountVeiled;
   useEffect(() => {
     const onVisibility = () => { if (document.visibilityState === "hidden") setAccountSlidOpen(false); };
     document.addEventListener("visibilitychange", onVisibility);
@@ -506,7 +508,7 @@ export default function Home() {
   }, []);
   // D-070: once opened, the 账号 page closes again after this many seconds without activity (0 = 不上锁).
   const [autoLockSeconds, setAutoLockSeconds] = useState<AutoLockSeconds>(() => (typeof window === "undefined" ? AUTO_LOCK_DEFAULT : readAutoLockSeconds()));
-  const autoLockOn = autoLockRunning({ seconds: autoLockSeconds, accountMode, lockSet, unlocked: accountUnlocked, slideOn: slideUnlockOn, slidOpen: accountSlidOpen, fullWindow: windowMode === "full" });
+  const autoLockOn = autoLockRunning({ seconds: autoLockSeconds, lockSet, unlocked: accountUnlocked, slideOn: slideUnlockOn, slidOpen: accountSlidOpen, fullWindow: windowMode === "full" });
   useAccountAutoLock(autoLockOn, autoLockSeconds, () => {
     if (lockSet) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); } else setAccountSlidOpen(false);
   });
@@ -2038,7 +2040,7 @@ export default function Home() {
     ? [...imageLibrary.folders.map((folder) => miniFolderTab(imageFolderFilter(folder.name), folder.name, folder.shortName)), { id: IMAGE_FILTER_UNCATEGORIZED, label: "未分类" }]
     : [...sidebarFolders.map((folder) => miniFolderTab(`folder:${folder}`, folder, folderShortNames?.[activeKind]?.[folder]))];
   const miniTabActive = imageView ? imageLibrary.filter : activeFolder;
-  const selectMiniTab = (id: string) => { if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
+  const selectMiniTab = (id: string) => { if (lockedHere) return; if (imageView) imageLibrary.setFilter(id); else selectFolder(id); };
   // The 账号 section's content goes inside the veil (it stays mounted, so sliding open shows it at once); other sections are left as they are.
   const wrapAccountVeil = (content: ReactNode) => (accountMode && slideUnlockOn ? <AccountVeil veiled={accountVeiled} onUnlock={() => setAccountSlidOpen(true)}>{content}</AccountVeil> : content);
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
@@ -2295,13 +2297,13 @@ export default function Home() {
               {directoryShortcuts.map((shortcut) => {
                 const accountAll = accountMode && shortcut.id === "all";
                 const active = activeFolder === shortcut.id && (!accountAll || vaultCat === "all");
-                return <button key={shortcut.id} type="button" className={`nav-item ${active ? "active" : ""}`} onClick={() => { selectFolder(shortcut.id); if (accountAll) setVaultCat("all"); }}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{accountMode && account.entries ? (shortcut.id === "all" ? account.entries.length : shortcut.id === "pinned" ? account.entries.filter((entry) => entry.pinned).length : shortcut.id === "recent" ? Math.min(20, account.entries.filter((entry) => entry.lastUsedAt).length) : shortcut.count) : shortcut.count}</b></button>;
+                return <button key={shortcut.id} type="button" disabled={accountMode && accountNavLocked} className={`nav-item ${active ? "active" : ""}`} onClick={() => { selectFolder(shortcut.id); if (accountAll) setVaultCat("all"); }}><span className="nav-icon"><Icon name={shortcut.id === "pinned" ? "star" : shortcut.id === "recent" ? "clock" : "grid"} className={shortcut.id === "all" ? "accent" : undefined} /></span><span className="nav-label">{shortcut.id === "all" ? "全部" : shortcut.label}</span><b>{accountMode && account.entries ? (shortcut.id === "all" ? account.entries.length : shortcut.id === "pinned" ? account.entries.filter((entry) => entry.pinned).length : shortcut.id === "recent" ? Math.min(20, account.entries.filter((entry) => entry.lastUsedAt).length) : shortcut.count) : shortcut.count}</b></button>;
               })}
             </nav>
             {accountMode && <>
               <div className="nav-heading"><span>分类</span></div>
               <nav className="nav-list account-categories" aria-label="分类">
-                {categoryList.map((id) => <button key={id} type="button" className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "note" ? "note" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
+                {categoryList.map((id) => <button key={id} type="button" disabled={accountNavLocked} className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "note" ? "note" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
               </nav>
             </>}
             {!accountMode && <>

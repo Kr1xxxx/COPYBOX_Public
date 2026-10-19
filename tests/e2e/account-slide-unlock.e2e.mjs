@@ -77,6 +77,9 @@ for (const platform of ["win32", "darwin"]) {
     await seedSnippets(page);
     await openAccounts(page);
     await expectVeiled(page);
+    // Frosted, the 账号 sidebar cannot switch views (D-076).
+    await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeDisabled();
+    await expect(page.getByRole("navigation", { name: "快捷入口" }).getByRole("button").first()).toBeDisabled();
     await expect(page.locator(".slide-unlock-label")).toHaveText("向右滑动解锁");
     await expect(knob(page)).toHaveAttribute("aria-valuemin", "0");
     await expect(knob(page)).toHaveAttribute("aria-valuemax", "100");
@@ -102,17 +105,18 @@ for (const platform of ["win32", "darwin"]) {
     const full = await slide(page, 1);
     await full.release();
     await expectOpen(page);
+    await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeEnabled();
     await addButton(page).click();
     await expect(page.getByRole("menuitem").first()).toBeVisible();
     await page.locator(".menu-scrim").click({ position: { x: 5, y: 5 } });
     await expect(page.getByRole("menuitem")).toHaveCount(0);
 
-    // Leaving the section and coming back frosts it again.
+    // Leaving the section and coming back keeps it open: only the auto-lock timer frosts it again (D-076).
     await kinds(page).getByRole("button", { name: "话术" }).click();
     await expect(knob(page)).toHaveCount(0);
     await expect(page.locator(".native-row").first()).toBeVisible();
     await openAccounts(page);
-    await expectVeiled(page);
+    await expectOpen(page);
   });
 
   test(`${platform}: the focused knob opens with its own keys, and hiding the window frosts the page again`, async ({ page }) => {
@@ -124,19 +128,19 @@ for (const platform of ["win32", "darwin"]) {
     await expectOpen(page);
 
     // Minimised or closed to the tray: the page hides, and the 账号 page is frosted when it shows again.
-    await page.evaluate(() => {
+    const hideAndShow = () => page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
       document.dispatchEvent(new Event("visibilitychange"));
       Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
       document.dispatchEvent(new Event("visibilitychange"));
     });
+    await hideAndShow();
     await expectVeiled(page);
     for (const key of ["Enter", " ", "End"]) {
       await knob(page).focus();
       await page.keyboard.press(key);
       await expectOpen(page);
-      await kinds(page).getByRole("button", { name: "话术" }).click();
-      await openAccounts(page);
+      await hideAndShow();
       await expectVeiled(page);
     }
     // Keys elsewhere do nothing to it: no shortcut opens the page (D-005).
