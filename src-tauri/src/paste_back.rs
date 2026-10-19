@@ -1,19 +1,27 @@
 // 复制后贴到刚才的窗口 (D-081): a copy in the mini window can go straight into the chat window the person came from.
 // The shell keeps track of the last window that was in front (not ours, not the taskbar or desktop), and after a
 // copy brings it back and presses paste once for them. Off unless the setting is on; never a global shortcut (D-005).
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use tauri::AppHandle;
+use std::time::Instant;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
-/// What the last paste put where: (window, text). Same text to the same window again is skipped; a different
-/// text to the same window goes on its own line (owner, 2026-10-19).
-static LAST_PASTE: Mutex<Option<(u64, String)>> = Mutex::new(None);
+/// What the last paste put where and when: (window, text, time). Within 「同一条隔多久可以再贴」 seconds of it, the
+/// same text to the same window is skipped and a different text to that window goes on its own line; after that a
+/// paste starts fresh (owner, 2026-10-19 「隔 6秒就允许再贴」).
+static LAST_PASTE: Mutex<Option<(u64, String, Instant)>> = Mutex::new(None);
 const NEWLINE: &str = if cfg!(target_os = "windows") { "\r\n" } else { "\n" };
 
-#[derive(Default)]
 pub struct PasteBack {
     enabled: AtomicBool,
+    repeat_after_secs: AtomicU64,
+}
+
+impl Default for PasteBack {
+    fn default() -> Self {
+        PasteBack { enabled: AtomicBool::new(false), repeat_after_secs: AtomicU64::new(6) }
+    }
 }
 
 impl PasteBack {
@@ -23,8 +31,9 @@ impl PasteBack {
 }
 
 #[tauri::command]
-pub fn set_paste_back(state: tauri::State<PasteBack>, enabled: bool) {
+pub fn set_paste_back(state: tauri::State<PasteBack>, enabled: bool, repeat_after: u64) {
     state.enabled.store(enabled, Ordering::Relaxed);
+    state.repeat_after_secs.store(repeat_after, Ordering::Relaxed);
     if enabled {
         remember_front();
     }
@@ -38,10 +47,10 @@ fn is_shell_class(class: &str) -> bool {
 
 /// None: do not paste (same text to the same window as last time). Some(true): paste on a new line (another text
 /// into the window that already got one). Some(false): paste as is. Pictures (no text) always paste as is.
-fn paste_plan(last: Option<&(u64, String)>, target: u64, text: Option<&str>) -> Option<bool> {
-    match (last, text) {
-        (Some((window, pasted)), Some(text)) if *window == target && pasted == text => None,
-        (Some((window, _)), Some(_)) if *window == target => Some(true),
+fn paste_plan(recent: Option<(u64, &str)>, target: u64, text: Option<&str>) -> Option<bool> {
+    match (recent, text) {
+        (Some((window, pasted)), Some(text)) if window == target && pasted == text => None,
+        (Some((window, _)), Some(_)) if window == target => Some(true),
         _ => Some(false),
     }
 }
@@ -183,16 +192,18 @@ pub fn remember_front() {
 
 /// Bring the remembered window back and paste into it (after the copy has landed on the clipboard).
 pub fn paste_into_front(app: AppHandle) {
+    let window = std::time::Duration::from_secs(app.state::<PasteBack>().repeat_after_secs.load(Ordering::Relaxed));
     let mut last = LAST_PASTE.lock().unwrap();
     let Some(target) = os::activate() else { return };
     let text = app.clipboard().read_text().ok();
-    let Some(own_line) = paste_plan(last.as_ref(), target, text.as_deref()) else { return };
+    let recent = last.as_ref().filter(|(_, _, at)| at.elapsed() < window).map(|(window, text, _)| (*window, text.as_str()));
+    let Some(own_line) = paste_plan(recent, target, text.as_deref()) else { return };
     if own_line {
         // The chat box still holds the earlier text: start this one on a fresh line (stays so on the clipboard).
         let _ = app.clipboard().write_text(format!("{NEWLINE}{}", text.as_deref().unwrap_or_default()));
     }
     os::send_paste();
-    *last = text.map(|text| (target, text));
+    *last = text.map(|text| (target, text, Instant::now()));
 }
 
 #[cfg(test)]
@@ -208,13 +219,14 @@ mod tests {
 
     #[test]
     fn same_text_to_same_window_pastes_once_and_another_text_gets_its_own_line() {
-        let last = Some((7, "你好".to_string()));
+        let last = Some((7, "你好"));
+        // Nothing recent (first paste, or the last one is older than the setting): paste as is.
         assert_eq!(paste_plan(None, 7, Some("你好")), Some(false));
-        assert_eq!(paste_plan(last.as_ref(), 7, Some("你好")), None);
-        assert_eq!(paste_plan(last.as_ref(), 7, Some("再见")), Some(true));
+        assert_eq!(paste_plan(last, 7, Some("你好")), None);
+        assert_eq!(paste_plan(last, 7, Some("再见")), Some(true));
         // Another window starts fresh; a picture has no text to compare.
-        assert_eq!(paste_plan(last.as_ref(), 8, Some("你好")), Some(false));
-        assert_eq!(paste_plan(last.as_ref(), 7, None), Some(false));
+        assert_eq!(paste_plan(last, 8, Some("你好")), Some(false));
+        assert_eq!(paste_plan(last, 7, None), Some(false));
     }
 
     #[test]

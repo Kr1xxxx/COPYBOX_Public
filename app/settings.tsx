@@ -15,7 +15,7 @@ import { DataMoveDialog } from "./data-move";
 import { AccountLockSettings, RecoveryCloseConfirm, type LockChange } from "./account-lock-ui";
 import type { LockMode } from "./account-lock";
 import { PLAIN_NOTES, SECRET_WORD } from "./platform";
-import { TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { PASTE_BACK_REPEAT_OPTIONS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type PasteBackRepeat, type ThemeChoice } from "./preferences";
 import { SettingsFolders, type SettingsFolderGroup, type SettingsFolderKind } from "./settings-folders";
 import { BrandWordmark } from "./brand-wordmark";
 import { TipsImportRow } from "./tips-import";
@@ -34,7 +34,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, pasteBack, onPasteBack, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, pasteBack, onPasteBack, pasteBackRepeat, onPasteBackRepeat, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   // Shown only with testTools (the browser and the web preview), never in the installed app: employees don't need them.
   testTools?: boolean; onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
@@ -42,6 +42,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
   pasteBack: boolean; onPasteBack: (on: boolean) => void;
+  pasteBackRepeat: PasteBackRepeat; onPasteBackRepeat: (seconds: PasteBackRepeat) => void;
   folderGroups: SettingsFolderGroup[];
   onFolderAdd: (kind: SettingsFolderKind, name: string) => Promise<string>;
   onFolderRename: (kind: SettingsFolderKind, from: string, to: string) => Promise<string>;
@@ -242,6 +243,10 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
               <ArcSegmented className="settings-segment" mode="radio" label="复制后贴到刚才的窗口" value={pasteBack ? "on" : "off"} onSelect={(value) => onPasteBack(value === "on")}
                 options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
             </div>
+            {pasteBack && <div className="settings-row"><div><strong>同一条隔多久可以再贴</strong><small>{`${pasteBackRepeat} 秒内在同一个窗口重复复制同一条，只贴一遍；接着复制另一条会另起一行`}</small></div>
+              <ArcSegmented className="settings-segment" mode="radio" label="同一条隔多久可以再贴" value={String(pasteBackRepeat)} onSelect={(value) => onPasteBackRepeat(Number(value) as PasteBackRepeat)}
+                options={PASTE_BACK_REPEAT_OPTIONS.map((seconds) => ({ value: String(seconds), label: `${seconds} 秒` }))} />
+            </div>}
             {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录系统后自动启动，并安静地收在托盘里</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="开机自动启动" value={launchAtLogin ? "on" : "off"}
                 onSelect={(value) => { void window.clipboxDesktop?.setLaunchAtLogin?.(value === "on").then(setLaunchAtLogin).catch(() => undefined); }}

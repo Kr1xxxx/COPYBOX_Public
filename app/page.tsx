@@ -80,7 +80,7 @@ import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { DEFAULT_TRASH_DAYS, PASTE_BACK_REPEAT_OPTIONS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type PasteBackRepeat, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
@@ -176,6 +176,7 @@ const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
 const PASTE_BACK_KEY = "clipbox.paste-back";
+const PASTE_BACK_REPEAT_KEY = "clipbox.paste-back-repeat";
 // 固定在最上层 for the full window: "1" when on, absent when off.
 const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
@@ -1656,15 +1657,22 @@ export default function Home() {
 
   // 复制后贴到刚才的窗口 (D-081): off until the person turns it on; the shell does the pasting.
   const [pasteBack, setPasteBack] = useState(() => readStoredChoice(PASTE_BACK_KEY, ["0", "1"], "0") === "1");
+  // Same text to the same window again only after this many seconds (owner, 2026-10-19: 6).
+  const [pasteBackRepeat, setPasteBackRepeat] = useState<PasteBackRepeat>(() => readStoredChoice<PasteBackRepeat>(PASTE_BACK_REPEAT_KEY, PASTE_BACK_REPEAT_OPTIONS, 6));
   useEffect(() => {
-    if (pasteBack) window.clipboxDesktop?.setPasteBack?.(true);
-    // Sent once on start; later changes go through choosePasteBack.
+    if (pasteBack) window.clipboxDesktop?.setPasteBack?.(true, pasteBackRepeat);
+    // Sent once on start; later changes go through choosePasteBack / choosePasteBackRepeat.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function choosePasteBack(on: boolean) {
     setPasteBack(on);
     writeStoredChoice(PASTE_BACK_KEY, on ? "1" : "0");
-    window.clipboxDesktop?.setPasteBack?.(on);
+    window.clipboxDesktop?.setPasteBack?.(on, pasteBackRepeat);
+  }
+  function choosePasteBackRepeat(seconds: PasteBackRepeat) {
+    setPasteBackRepeat(seconds);
+    writeStoredChoice(PASTE_BACK_REPEAT_KEY, seconds);
+    window.clipboxDesktop?.setPasteBack?.(pasteBack, seconds);
   }
 
   function chooseTrashDays(days: number) {
@@ -2501,6 +2509,8 @@ export default function Home() {
         onMiniHidePolicy={chooseMiniHidePolicy}
         pasteBack={pasteBack}
         onPasteBack={choosePasteBack}
+        pasteBackRepeat={pasteBackRepeat}
+        onPasteBackRepeat={choosePasteBackRepeat}
         folderGroups={buildSettingsFolderGroups()}
         onFolderAdd={settingsFolderAdd}
         onFolderRename={settingsFolderRename}

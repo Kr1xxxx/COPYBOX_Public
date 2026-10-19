@@ -12,10 +12,12 @@
     window loses focus (the Finder never counts), and later activates it and sends ⌘V. The first use shows the
     system's own permission question; without 「辅助功能」 the paste fails quietly (the copy still happened) and the
     Accessibility pane opens once per run so the person can allow Copyboxx.
-  - Same text, same window: only once (owner, 2026-10-19 「同话术只能一遍,不切窗口的情况下」). The shell remembers what it
-    last pasted where; the same text to the same window again only brings the window forward. A different text into the
-    window that already got one starts on its own line (「自动换一行」): a line break is put in front of it on the
-    clipboard, so a manual paste right after also carries that line break. Pictures always paste as they are.
+  - Same text, same window: only once within 「同一条隔多久可以再贴」 seconds (3 / 6 / 10 / 30, default 6; owner,
+    2026-10-19 「同话术只能一遍,不切窗口的情况下」, 「隔 6秒就允许再贴,这个写设置里」; `clipbox.paste-back-repeat`). The
+    shell remembers what it last pasted where and when; within that time the same text to the same window only brings
+    the window forward, and a different text into that window starts on its own line (「自动换一行」): a line break is put
+    in front of it on the clipboard, so a manual paste right after also carries that line break. After that time a
+    paste starts fresh. Pictures always paste as they are.
   - It is the program pressing one key for the person, not a shortcut for the person: D-005 (no keyboard shortcuts)
     is untouched. No window is ever read, only activated.
 - Not verified on real Windows / Mac yet; some chat apps may block synthetic paste (`src-tauri/src/paste_back.rs`).

@@ -8,6 +8,7 @@
   state next to 迷你窗口复制后) and `app/settings.tsx` (one row in 窗口).
 - User-visible change (plain Chinese, for the preview changelog): 设置 → 窗口 新增「复制后贴到刚才的窗口」开关（默认关）：开了以后，在迷你窗口点复制，会自动回到刚才的聊天窗口并替你粘贴一次；Mac 第一次要允许「辅助功能」
   同一条话术在同一个聊天窗口只贴一遍；接着贴另一条时自动另起一行
+  开关下面多一行「同一条隔多久可以再贴」（3 / 6 / 10 / 30 秒，默认 6 秒）
 - Not done / risks: the line break stays on the clipboard, so a manual paste right after also starts with it. Not tried on real Windows / Mac; 微信、钉钉、千牛 each need one real try, a few apps may ignore a
   synthetic paste. A minimized chat window is brought forward but stays minimized, so nothing pastes. Mac: if 辅助功能
   is refused, the copy still works and the settings pane opens once.

@@ -31,7 +31,7 @@
     didCopy: function () { fireAndForget("did_copy"); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
     setMiniHidePolicy: function (policy) { fireAndForget("set_mini_hide_policy", { policy: policy }); },
-    setPasteBack: function (enabled) { fireAndForget("set_paste_back", { enabled: Boolean(enabled) }); },
+    setPasteBack: function (enabled, repeatAfter) { fireAndForget("set_paste_back", { enabled: Boolean(enabled), repeatAfter: Number(repeatAfter) || 6 }); },
     getLaunchAtLogin: function () { return invoke("get_launch_at_login"); },
     setLaunchAtLogin: function (enabled) { return invoke("set_launch_at_login", { enabled: Boolean(enabled) }); },
     openDataFolder: function () { return invoke("open_data_folder"); },
