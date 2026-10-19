@@ -34,7 +34,7 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, pasteBack, onPasteBack, pasteBackRepeat, onPasteBackRepeat, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onExportAccountSheet, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, pasteBack, onPasteBack, pasteBackRepeat, onPasteBackRepeat, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onExportAccountSheet, onImportAccountSheet, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   // Shown only with testTools (the browser and the web preview), never in the installed app: employees don't need them.
   testTools?: boolean; onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
@@ -54,7 +54,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
   closeBehavior: CloseBehavior; onCloseBehavior: (behavior: CloseBehavior) => void;
   trashDays: number; onTrashDays: (days: number) => void; onEmptyTrash: () => Promise<void>;
   theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void; lastBackupAt: number; onOpenDataFolder: () => void;
-  onClose: () => void; onExport: () => void; onExportSecret: () => void; onExportAccountSheet: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; slideUnlock: { on: boolean; onChange: (on: boolean) => void }; autoLock: { seconds: AutoLockSeconds; onChange: (seconds: AutoLockSeconds) => void }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
+  onClose: () => void; onExport: () => void; onExportSecret: () => void; onExportAccountSheet: () => void; onImportAccountSheet: () => void; accountLock: { mode: LockMode; deviceKey: string; onChanged: LockChange }; slideUnlock: { on: boolean; onChange: (on: boolean) => void }; autoLock: { seconds: AutoLockSeconds; onChange: (seconds: AutoLockSeconds) => void }; accountLocked: boolean; onImport: () => void; onImportSheet: () => void; onReload: () => void; onMini: () => void; onShowGuide: () => void;
   // Settings home → 账号: close Settings and show the 账号 page.
   onOpenAccount: () => void;
   syncCode: ReactNode;
@@ -187,6 +187,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
                 ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmSheet(false)}>取消</button><button type="button" className="secondary-button danger" onClick={() => { setConfirmSheet(false); onExportAccountSheet(); }}>仍然导出</button></div>
                 : <button type="button" className="secondary-button" disabled={accountLocked} onClick={() => setConfirmSheet(true)}>导出…</button>}
             </div>
+            {row(`导入${SECRET_WORD}表格`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导入` : "读取「导出账号表格」的文件（.csv / .xlsx），已有的不会重复，也不会被覆盖", onImportAccountSheet, "选择文件…", accountLocked)}
             {testTools && onImportTest && row("导入测试内容", `放入一批带「范例」标记的假内容（话术${PLAIN_NOTES ? "" : `、${SECRET_WORD}`}），重复导入不会重复`, () => void onImportTest(), "导入")}
             {testTools && onClearTest && (
               <div className="settings-row"><div><strong>清除测试内容</strong><small>只清带「范例」标记、你没改过的内容，其他内容不动；话术会先进回收站</small>

@@ -108,7 +108,9 @@ import { applyImportSampleSnippets, planClearSampleSnippets, planImportSampleSni
 import { decryptVaultBox, encryptVaultBox, isSaneIterationCount, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
-import { accountCsv } from "./account-health";
+import { accountCsv, accountRows, accountsFromSheet } from "./account-health";
+import { readSpreadsheet } from "./spreadsheet-read";
+import { useCheckupDot } from "./password-checkup";
 import { ArcMenu } from "./arc/menu";
 import { ReorderHandle } from "./reorder-handle";
 import { AnimatePresence } from "motion/react";
@@ -359,6 +361,7 @@ export default function Home() {
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const spreadsheetFileRef = useRef<HTMLInputElement>(null);
+  const accountSheetRef = useRef<HTMLInputElement>(null);
   const folderCreateButtonRef = useRef<HTMLButtonElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
   const editorTriggerRef = useRef<HTMLElement | null>(null);
@@ -525,6 +528,7 @@ export default function Home() {
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => CATEGORY_ORDER.filter((id) => !HIDDEN_ACCOUNT_KINDS.includes(id)), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
+  const checkupDot = useCheckupDot(accountMode ? accountKey : "", account.entries);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
   const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
@@ -1930,6 +1934,24 @@ export default function Home() {
     }
   }
 
+  // 导入账号表格: a table made by 导出账号表格 comes back as new entries; rows already here are skipped, nothing is replaced.
+  async function importAccountSheet(file: File) {
+    try {
+      const [table] = await readSpreadsheet(await file.arrayBuffer(), file.name);
+      const itemsStore = openSecretItemsStore(accountKey);
+      const totpStore = openTotpStore(accountKey);
+      const [vaultItems, totps] = await Promise.all([itemsStore.list(), totpStore.list()]);
+      const found = accountsFromSheet(table?.rows ?? [], accountRows(vaultItems, totps, legacySecrets), HIDDEN_ACCOUNT_KINDS, Date.now(), () => crypto.randomUUID());
+      if (vaultItems.length + found.items.length > 200) throw new Error("账号最多保存 200 条，表格里的太多了，请先删掉一些再导入");
+      if (found.items.length) await itemsStore.update((current) => [...current, ...found.items]);
+      if (found.totps.length) await totpStore.update((current) => [...current, ...found.totps]);
+      const added = found.items.length + found.totps.length;
+      showToast([`已导入 ${added} 条`, found.skipped && `跳过 ${found.skipped} 条已有的`, found.unreadable && `${found.unreadable} 行读不出来`].filter(Boolean).join("，"), { ms: 4000 });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "导入没有成功，账号没有改动", { tone: "error", ms: 5000 });
+    }
+  }
+
   async function exportVault(password: string, scope: BackupScope) {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, folderShortNames: folderShortNamesRef.current, sharedSeen: sharedSeenRef.current };
     const scopedData = vaultDataForBackupScope(currentData, scope);
@@ -2400,6 +2422,7 @@ export default function Home() {
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
+              <input ref={accountSheetRef} className="hidden-input" type="file" accept=".csv,.xlsx,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importAccountSheet(file); event.target.value = ""; }} />
               <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,.md,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
             </div>
           </aside>
@@ -2449,7 +2472,7 @@ export default function Home() {
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
                 {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
-                {activeFolder !== "trash" && !acctSelecting && !accountVeiled && account.entries?.some((entry) => entry.tab === "login") && <button type="button" className="ghost-button select-toggle" title="只在本机检查：重复使用、太短、一年以上没改的密码" onClick={() => setAcctCheckup((n) => n + 1)}>密码体检</button>}
+                {activeFolder !== "trash" && !acctSelecting && !accountVeiled && account.entries?.some((entry) => entry.tab === "login") && <button type="button" className="ghost-button select-toggle" title="只在本机检查：重复使用、太短、一年以上没改的密码" onClick={() => { checkupDot.markSeen(); setAcctCheckup((n) => n + 1); }}>密码体检{checkupDot.dot && <span className="checkup-dot" role="img" aria-label="有需要处理的密码" />}</button>}
                 {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
                 {canLockAccountNow
                   ? <button type="button" className="ghost-button select-toggle" title="内容用本机密钥加密保存。点一下马上上锁。" onClick={lockAccountNow}><Icon name="lock" />上锁</button>
@@ -2582,6 +2605,7 @@ export default function Home() {
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
         onExportAccountSheet={() => void exportAccountSheet()}
+        onImportAccountSheet={() => { setSettingsOpen(false); accountSheetRef.current?.click(); }}
         slideUnlock={{ on: slideUnlockOn, onChange: (on) => { writeSlideUnlockOn(on); setSlideUnlockOn(on); } }}
         autoLock={{ seconds: autoLockSeconds, onChange: (seconds) => { writeAutoLockSeconds(seconds); setAutoLockSeconds(seconds); } }}
         accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { if (mode === "none" && accountMode) setAccountSlidOpen(true); setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}
