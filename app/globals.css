@@ -1799,3 +1799,27 @@ html[data-mini-fold="left"] body::after { right: 0; border-radius: 0 10px 10px 0
 .row-paragraph[data-copied] .paragraph-copy { color: var(--ok); }
 .row-paragraph[data-copied] .row-paragraph-text { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .paragraph-copy { transition: none; } .paragraph-copy:active { scale: 1; } }
+
+/* 登录页 (app/login-gate.tsx, D-085): the same card look as the brand dialogs, alone on the window. */
+.login-gate { min-height: 100vh; padding: 24px 16px; display: grid; place-items: center; background: var(--bg); overflow: auto; }
+.login-card { width: min(380px, 100%); box-sizing: border-box; padding: 26px 26px 22px; display: grid; gap: 8px; border: 1px solid var(--dlg-line); border-radius: 20px; background: var(--dlg-surface); color: var(--dlg-ink); font-family: var(--brand-font-body); box-shadow: 0 28px 70px rgba(20, 20, 19, .18); animation: dialog-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.login-wordmark { width: 150px; height: auto; margin-bottom: 14px; color: var(--dlg-ink); }
+.login-card h1 { margin: 0; font-family: var(--brand-font-heading); font-size: 21px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.login-card > p { margin: 0 0 10px; color: var(--dlg-soft); font-size: 12.5px; line-height: 1.55; }
+.login-card label { font-size: 12px; font-weight: 600; }
+.login-card input { box-sizing: border-box; width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--dlg-edge); border-radius: 11px; background: var(--dlg-well); color: var(--dlg-ink); font: inherit; font-size: 14px; }
+.login-card input::placeholder { color: var(--dlg-soft); opacity: .7; }
+.login-card input:focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 1px; }
+.login-captcha { margin-top: 4px; display: grid; gap: 4px; min-height: 65px; }
+.login-captcha small, .login-resend, .login-demo { color: var(--dlg-soft); font-size: 11.5px; line-height: 1.5; }
+.login-link { padding: 0; border: 0; background: none; color: var(--brand-orange); font: inherit; text-decoration: underline; cursor: pointer; }
+.login-link:disabled { opacity: .5; cursor: default; }
+.login-error { margin: 2px 0 0; padding: 8px 10px; border-radius: 9px; background: var(--danger-bg); color: var(--danger); font-size: 12px; font-weight: 600; line-height: 1.4; }
+.login-actions { margin-top: 14px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+.login-actions button { height: 40px; padding: 0 0 1px; border: 1px solid var(--dlg-edge); border-radius: 11px; background: transparent; color: var(--dlg-ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.login-actions .login-primary { border-color: var(--dlg-primary); background: var(--dlg-primary); color: var(--dlg-on-primary); }
+.login-actions .login-primary:hover { background: var(--dlg-primary-hover); border-color: var(--dlg-primary-hover); }
+.login-actions .login-secondary:hover { background: var(--dlg-well); }
+.login-actions button:active { transform: scale(.97); }
+.login-actions button:disabled { opacity: .5; cursor: default; }
+.login-actions button:focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }

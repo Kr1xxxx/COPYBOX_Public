@@ -20,13 +20,39 @@ export function guideSeenState(baseURL, { slideUnlock = false, autoLock = "0" } 
 export const SLIDE_UNLOCK_ON = async ({ baseURL }, provide) => { await provide(guideSeenState(baseURL, { slideUnlock: true })); };
 export const GUIDE_UNSEEN = { cookies: [], origins: [] };
 
+// Through the login page (app/login-gate.tsx, D-085) against the pretend server (window.clipboxDesktop.cloudDemo):
+// the code is 123456, and an email outside example.com also needs the pretend activation code.
+export const DEMO_ACTIVATION = "AAAA-BBBB-CCCC-DDDD";
+export async function signInAtGate(page, email) {
+  await page.goto("/");
+  await page.getByLabel("邮箱").fill(email);
+  await page.getByRole("button", { name: "发送验证码" }).click();
+  await page.getByLabel("验证码", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "登录", exact: true }).click();
+  // An email outside example.com that never redeemed a code is asked for the activation code first.
+  const activation = page.getByLabel("激活码", { exact: true });
+  await page.locator(".app-shell").or(activation).first().waitFor();
+  if (await activation.isVisible()) {
+    await activation.fill(DEMO_ACTIVATION);
+    await page.getByRole("button", { name: "激活" }).click();
+  }
+  await page.waitForSelector(".app-shell");
+}
+
 // Imports the 37-row sample sheet (2 invalid rows, 1 duplicate) → 34 snippets.
 export async function seedSnippets(page) {
   await page.goto("/");
   await page.waitForSelector(".app-shell");
+  // The empty list offers the import; a list that already has 话术 (after a sync) imports from Settings → 数据.
+  let importButton = page.getByRole("button", { name: /导入话术表格/ }).first();
+  if (!await importButton.isVisible()) {
+    await page.getByRole("button", { name: /设置/ }).first().click();
+    await page.locator(".settings-dialog").getByRole("tab", { name: "数据" }).click();
+    importButton = page.locator(".settings-row").filter({ hasText: "导入话术表格" }).getByRole("button");
+  }
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
-    page.getByRole("button", { name: /导入话术表格/ }).first().click(),
+    importButton.click(),
   ]);
   await chooser.setFiles(SAMPLE_CSV);
   await page.locator("[role=dialog]").getByRole("button", { name: /导入 \d+ 条/ }).click();

@@ -11,15 +11,17 @@ test("the app version has one source: package.json (Tauri reads it, Cargo must m
   assert.match(read("src-tauri/Cargo.toml"), new RegExp(`^version = "${version.replaceAll(".", "\\.")}"$`, "m"));
 });
 
-test("the page may only load its own files; network access goes through Rust commands", () => {
+test("the page may only load its own files, plus Cloudflare's 人机验证 widget (D-085); network access goes through Rust commands", () => {
   const csp = conf().app.security.csp;
   assert.equal(typeof csp, "string");
   const directive = (name) => (csp.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) || "").split(/\s+/).slice(1);
-  assert.deepEqual(directive("script-src"), ["'self'"]);
+  const turnstile = "https://challenges.cloudflare.com";
+  assert.deepEqual(directive("script-src"), ["'self'", turnstile]);
+  assert.deepEqual(directive("frame-src"), [turnstile]);
   assert.deepEqual(directive("default-src"), ["'self'"]);
   assert.deepEqual(directive("object-src"), ["'none'"]);
   assert.ok(!/unsafe-eval/.test(csp));
-  assert.ok(!directive("connect-src").some((source) => /^https?:\/\/(?!ipc\.localhost)/.test(source) || source === "*"));
+  assert.ok(!directive("connect-src").some((source) => /^https?:\/\/(?!ipc\.localhost)/.test(source) && source !== turnstile || source === "*"));
 });
 
 test("the Tauri bridge offers every method the page expects from window.clipboxDesktop", () => {

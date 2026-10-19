@@ -1,11 +1,10 @@
 "use client";
 
-// Settings home → 账号与同步 → 登录同步 (D-064): sign in with an email code, then 话术 and 账号 follow the person to their
-// other computers. Shown only where the server can be reached (cloud-client.ts); the preview uses a pretend server.
+// 登录同步 (D-064): the app opens only after an email-code sign-in (login-gate.tsx, D-085); then 话术 and 账号 follow the
+// person to their other computers. Settings home → 账号与同步 shows who is signed in. Only where the server can be
+// reached (cloud-client.ts); the preview uses a pretend server.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { maskEmail } from "./account-lock";
-import { CloudError, MAX_DEVICES, clearSessionToken, cloudTransport, createCloudApi, deviceName, looksLikeEmail, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeSessionToken, type CloudAccount } from "./cloud-client";
-import { DEMO_CODE } from "./cloud-demo";
+import { CloudError, MAX_DEVICES, clearSessionToken, cloudTransport, createCloudApi, deviceName, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeSessionToken, type CloudAccount } from "./cloud-client";
 import { describeCounts } from "./cloud-sync-core";
 import { domainLibraryLine } from "./domain-library";
 import { clearSyncBase, readSyncBase, syncOnce, writeSyncBase, type SyncSteps } from "./cloud-sync";
@@ -15,7 +14,6 @@ import { VAULT_CHANGED_EVENT } from "./secret-items-store";
 // Besides on start and right after changes, a sync every 10 minutes picks up what other computers changed.
 const SYNC_EVERY_MS = 10 * 60 * 1000;
 const AFTER_CHANGE_MS = 8000;
-const RESEND_AFTER_S = 60;
 
 export type CloudMergers = {
   snippets: SyncSteps["snippets"];
@@ -39,6 +37,8 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
   // After signing in here made the oldest computer sign out (more than MAX_DEVICES).
   const [notice, setNotice] = useState("");
   const tokenRef = useRef<string | null>(null);
+  // A sign-in that still needs an activation code (D-085): kept here, not on the computer, until activate() succeeds.
+  const pendingRef = useRef<{ token: string; email: string; signedOut: string[] } | null>(null);
   const mergersRef = useRef(mergers);
   const onIncomingRef = useRef(onIncoming);
   const running = useRef<Promise<void> | null>(null);
@@ -76,7 +76,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
         setError("");
         if (changed && !manual) onIncomingRef.current(`已从其他电脑同步：${next.lastResult}`);
       } catch (failure) {
-        if (failure instanceof CloudError && (failure.code === "signed_out" || failure.code === "replaced")) {
+        if (failure instanceof CloudError && (failure.code === "signed_out" || failure.code === "replaced" || failure.code === "not_activated")) {
           await forget(); setError(failure.message); setNotice("");
           // Said out loud too: this computer stopped syncing because another one signed in.
           if (failure.code === "replaced" && !manual) onIncomingRef.current(failure.message);
@@ -117,14 +117,29 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     return () => window.clearTimeout(timer);
   }, [changeSignal, accountRev, ready, signedIn, sync]);
 
-  async function sendCode(email: string) {
+  async function sendCode(email: string, turnstile = "") {
     if (!api.current) return;
-    await api.current.sendCode(email);
+    await api.current.sendCode(email, turnstile);
   }
 
+  // True when signed in; false when the email still needs an activation code (then activate()).
   async function signIn(email: string, code: string) {
-    if (!api.current) return;
+    if (!api.current) return true;
     const result = await api.current.verify(email, code, deviceName(platform));
+    if (!result.activated) { pendingRef.current = result; return false; }
+    await finish(result);
+    return true;
+  }
+
+  async function activate(code: string) {
+    const pending = pendingRef.current;
+    if (!api.current || !pending) throw new Error("登录已超时，请重新登录");
+    await api.current.activate(pending.token, code);
+    pendingRef.current = null;
+    await finish(pending);
+  }
+
+  async function finish(result: { token: string; email: string; signedOut: string[] }) {
     await writeSessionToken(result.token);
     tokenRef.current = result.token;
     clearSyncBase();
@@ -161,7 +176,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     setNotice("");
   }
 
-  return { available: Boolean(transport), demo: Boolean(transport && typeof window !== "undefined" && window.clipboxDesktop?.cloudDemo), account, busy, error, notice, sendCode, signIn, syncNow: () => sync(true), getLibrary, signOut, deleteAccount };
+  return { available: Boolean(transport), demo: Boolean(transport && typeof window !== "undefined" && window.clipboxDesktop?.cloudDemo), account, busy, error, notice, sendCode, signIn, activate, syncNow: () => sync(true), getLibrary, signOut, deleteAccount };
 }
 
 export type CloudSync = ReturnType<typeof useCloudSync>;
@@ -172,96 +187,18 @@ function signedOutNotice(names: string[]) {
   return `已超过 ${MAX_DEVICES} 台，最早登录的${who}已自动退出登录`;
 }
 
-function errorText(failure: unknown) {
+export function errorText(failure: unknown) {
   return failure instanceof Error ? failure.message : "没有成功，请再试一次";
 }
 
+// Signed-out is never shown here: without a sign-in the login page covers the app (login-gate.tsx).
 export function CloudAccountRows({ cloud, platform, accountsLocked, companyDomain = "" }: { cloud: CloudSync; platform: string | undefined; accountsLocked: boolean; companyDomain?: string }) {
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [sentTo, setSentTo] = useState("");
-  const [wait, setWait] = useState(0);
-  const [working, setWorking] = useState(false);
-  const [formError, setFormError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const codeRef = useRef<HTMLInputElement>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (wait <= 0) return;
-    const timer = window.setTimeout(() => setWait((value) => value - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [wait]);
-
-  useEffect(() => { if (open && !sentTo) emailRef.current?.focus(); }, [open, sentTo]);
-  useEffect(() => { if (sentTo) codeRef.current?.focus(); }, [sentTo]);
-
-  if (!cloud.available) return null;
-
-  function close() {
-    setOpen(false); setSentTo(""); setCode(""); setFormError(""); setWait(0);
-  }
-
-  async function send() {
-    if (!looksLikeEmail(email)) { setFormError("邮箱格式不对，请检查一下"); return; }
-    setWorking(true); setFormError("");
-    try {
-      await cloud.sendCode(email);
-      setSentTo(normalizeEmail(email));
-      setCode("");
-      setWait(RESEND_AFTER_S);
-    } catch (failure) { setFormError(errorText(failure)); }
-    setWorking(false);
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (working) return;
-    if (!sentTo) { await send(); return; }
-    if (!/^\d{6}$/.test(code.trim())) { setFormError("验证码是 6 位数字"); return; }
-    setWorking(true); setFormError("");
-    try {
-      await cloud.signIn(sentTo, code);
-      close();
-    } catch (failure) { setFormError(errorText(failure)); }
-    setWorking(false);
-  }
+  if (!cloud.available || !cloud.account) return null;
 
   const mac = platform === "darwin";
   const scope = mac ? "话术和账号会自动同步；账号里的密码、API 密钥和恢复码只存在这台 Mac 上" : "话术和账号（包括密码）会在你登录的电脑之间自动同步";
   const limit = `一个账号最多同时登录 ${MAX_DEVICES} 台电脑。`;
-
-  if (!cloud.account) {
-    return (
-      <>
-        {!open ? (
-          <div className="settings-row"><div><strong>登录同步</strong><small>用邮箱验证码登录，换电脑也能用自己的话术和账号</small></div>
-            <button type="button" className="secondary-button" onClick={() => setOpen(true)}>登录…</button></div>
-        ) : (
-          <form className="settings-row cloud-login" onSubmit={(event) => void submit(event)} noValidate>
-            <div>
-              <label htmlFor="cloud-email"><strong>邮箱</strong></label>
-              <input ref={emailRef} id="cloud-email" type="email" autoComplete="email" spellCheck={false} placeholder="填你的工作邮箱" value={email} disabled={Boolean(sentTo)}
-                onChange={(event) => { setEmail(event.target.value); setFormError(""); }} />
-              {sentTo && <>
-                <label htmlFor="cloud-code"><strong>验证码</strong></label>
-                <input ref={codeRef} id="cloud-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6 位数字" value={code}
-                  onChange={(event) => { setCode(event.target.value.replace(/\D/g, "")); setFormError(""); }} />
-                <small>验证码已发到 {maskEmail(sentTo)}，10 分钟内有效 · {wait > 0 ? `${wait} 秒后可重新发送` : <button type="button" className="cloud-resend" onClick={() => void send()}>重新发送</button>}</small>
-              </>}
-            </div>
-            <div className="settings-inline-actions">
-              <button type="button" className="secondary-button" onClick={close} disabled={working}>取消</button>
-              <button type="submit" className="secondary-button" disabled={working}>{working ? (sentTo ? "登录中…" : "发送中…") : sentTo ? "登录" : "发送验证码"}</button>
-            </div>
-          </form>
-        )}
-        {open && cloud.demo && <p className="settings-note">测试版不会真的发邮件，验证码填 {DEMO_CODE}</p>}
-        {(formError || (!open && cloud.error)) && <p className="settings-note shared-error" role="alert">{formError || cloud.error}</p>}
-      </>
-    );
-  }
 
   const last = cloud.account.lastSyncAt ? `最后同步 ${formatTaipeiDate(cloud.account.lastSyncAt, true)}` : "还没有同步过";
   return (
@@ -272,7 +209,7 @@ export function CloudAccountRows({ cloud, platform, accountsLocked, companyDomai
           <button type="button" className="secondary-button" onClick={() => void cloud.signOut()}>退出登录</button>
         </div></div>
       {companyDomain && <p className="settings-note cloud-domain-library">{domainLibraryLine(companyDomain)}</p>}
-      <p className="settings-note">{scope}。{limit}{accountsLocked ? "账号页上了锁，打开账号页解锁后才会同步账号。" : ""}退出登录后，这台电脑上的内容不变。</p>
+      <p className="settings-note">{scope}。{limit}{accountsLocked ? "账号页上了锁，打开账号页解锁后才会同步账号。" : ""}退出登录后要重新登录才能用，这台电脑上的内容不变。</p>
       {cloud.notice && <p className="settings-note cloud-notice" role="status">{cloud.notice}</p>}
       {cloud.error && <p className="settings-note shared-error" role="alert">{cloud.error}</p>}
       {!cloud.error && cloud.account.lastResult && <p className="settings-note cloud-result" role="status">上次同步：{cloud.account.lastResult}</p>}

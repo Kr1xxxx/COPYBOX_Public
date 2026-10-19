@@ -69,7 +69,7 @@ function findInstalledExe() {
 function launch(tag) {
   const outFile = fs.openSync(path.join(OUT, `app-${tag}.log`), "a");
   const env = { ...process.env };
-  if (UI) env.CLIPBOX_TEST_DEBUG_PORT = String(PORT);
+  if (UI) { env.CLIPBOX_TEST_DEBUG_PORT = String(PORT); env.CLIPBOX_TEST_CLOUD_DEMO = "1"; }
   child = spawn(exe, [], {
     env,
     stdio: ["ignore", outFile, outFile],
@@ -89,7 +89,7 @@ async function connect(timeoutMs = 90000) {
         const context = browser.contexts()[0];
         for (let i = 0; i < 60; i += 1) {
           const page = context.pages().find((candidate) => !candidate.url().startsWith("devtools:"));
-          if (page) { await page.waitForSelector(".app-shell", { timeout: 30000 }); return page; }
+          if (page) { await page.waitForSelector(".app-shell, .login-card", { timeout: 30000 }); await signInIfAsked(page); return page; }
           await sleep(500);
         }
         throw new Error("no page appeared in the app window");
@@ -99,6 +99,23 @@ async function connect(timeoutMs = 90000) {
   }
   diagnose();
   throw new Error(`the app page never answered on port ${PORT}: ${lastError}`);
+}
+
+// The app opens only after a sign-in (D-085). With CLIPBOX_TEST_CLOUD_DEMO the app talks to the page's pretend
+// server, so the first start signs in with its code; later starts find the sign-in kept on this computer.
+// A non-company email (not example.com) is used on purpose: example.com would receive the pretend company 话术 and
+// the list would no longer be empty for the import step. It needs the pretend activation code.
+async function signInIfAsked(page) {
+  const gate = page.locator(".login-card");
+  if (!await gate.isVisible()) return;
+  await gate.getByLabel("邮箱").fill("smoke@smoke.test");
+  await gate.getByRole("button", { name: "发送验证码" }).click();
+  await gate.getByLabel("验证码", { exact: true }).fill("123456");
+  await gate.getByRole("button", { name: "登录", exact: true }).click();
+  await gate.getByLabel("激活码", { exact: true }).fill("AAAA-BBBB-CCCC-DDDD");
+  await gate.getByRole("button", { name: "激活" }).click();
+  await page.waitForSelector(".app-shell", { timeout: 30000 });
+  log("signed in through the login page (pretend server, with the activation code)");
 }
 
 // Printed into the job log when the page cannot be reached, so the cause is visible without opening the artifact.

@@ -5,6 +5,8 @@
 import type { CloudRequest, CloudResponse } from "./cloud-client.ts";
 
 export const DEMO_CODE = "123456";
+// Emails outside DEMO_DOMAIN need an activation code (D-085); the pretend server takes this one, any number of times.
+export const DEMO_ACTIVATION = "AAAA-BBBB-CCCC-DDDD";
 export const CLOUD_DEMO_KEY = "clipbox.cloud-demo.v1";
 
 // Company 话术 by email domain: the pretend server binds example.com to this small library; every other domain has none.
@@ -26,6 +28,7 @@ type DemoState = {
   // Optional (older saved states lack them): each session's device name, and tokens a newer sign-in ended.
   devices?: Record<string, string>;
   ended?: Record<string, true>;
+  activated?: Record<string, true>;
 };
 const MAX_DEVICES = 3;
 
@@ -69,7 +72,8 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
       return name;
     });
     save(state);
-    return reply(200, { token, email, signedOut });
+    const activated = email.endsWith(`@${DEMO_DOMAIN}`) || Boolean(state.activated?.[email]);
+    return reply(200, { token, email, signedOut, activated });
   }
   const owner = request.token ? state.sessions[request.token] : undefined;
   if (!owner) return reply(401, { error: request.token && state.ended?.[request.token] ? "device_limit" : "unauthorized" });
@@ -89,6 +93,13 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
   if (request.path === "/api/library" && request.method === "GET") {
     const domain = owner.slice(owner.lastIndexOf("@") + 1).toLowerCase();
     return reply(200, domain === DEMO_DOMAIN ? { domain, library: DEMO_DOMAIN_LIBRARY } : { domain: null, library: null });
+  }
+  if (request.path === "/api/activate" && request.method === "POST") {
+    const code = typeof body.code === "string" ? body.code.replace(/[^0-9a-z]/gi, "").toUpperCase() : "";
+    if (code !== DEMO_ACTIVATION.replace(/-/g, "")) return reply(400, { error: "bad_activation_code" });
+    state.activated = { ...state.activated, [owner]: true };
+    save(state);
+    return reply(200, { activated: true });
   }
   if (request.path === "/api/auth/logout" && request.method === "POST") {
     delete state.sessions[request.token!];

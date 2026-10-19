@@ -122,6 +122,12 @@ fn main() {
             shell::guard_launch_at_login(app.handle());
             shell::watch_launch_at_login(app.handle().clone());
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
+            // The Windows smoke test signs in against the page's pretend server (app/cloud-demo.ts), not copyboxx.com.
+            #[cfg(all(feature = "test-hooks", target_os = "windows"))]
+            let bridge = match std::env::var("CLIPBOX_TEST_CLOUD_DEMO") {
+                Ok(on) if on == "1" => format!("{bridge}\nwindow.clipboxDesktop.cloudDemo = true;"),
+                _ => bridge,
+            };
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Copyboxx")
                 .min_inner_size(window_state::MIN_WIDTH, window_state::MIN_HEIGHT)

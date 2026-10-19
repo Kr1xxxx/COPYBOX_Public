@@ -16,7 +16,7 @@ export function cloudTransport(desktop: ClipboxDesktop | undefined = typeof wind
   return null;
 }
 
-export type CloudErrorCode = "signed_out" | "replaced" | "bad_code" | "bad_email" | "rate_limited" | "mail_failed" | "conflict" | "too_large" | "unavailable" | "network" | "server";
+export type CloudErrorCode = "signed_out" | "replaced" | "bad_code" | "bad_email" | "captcha" | "bad_activation" | "not_activated" | "rate_limited" | "mail_failed" | "conflict" | "too_large" | "unavailable" | "network" | "server";
 
 export class CloudError extends Error {
   readonly code: CloudErrorCode;
@@ -37,6 +37,10 @@ const MESSAGES: Record<CloudErrorCode, string> = {
   replaced: `这个账号在别的电脑上登录了。一个账号最多同时登录 ${MAX_DEVICES} 台电脑，这台电脑已退出登录，要同步请重新登录`,
   bad_code: "验证码不对或已过期，请重新输入",
   bad_email: "邮箱格式不对，请检查一下",
+  captcha: "请先完成人机验证",
+  bad_activation: "激活码不对或已经用过",
+  // The email signed in before the rule that an outside email needs an activation code (D-085): sign in again.
+  not_activated: "这个邮箱还没激活，请重新登录并填写激活码",
   rate_limited: "发送太频繁了，请过一会儿再试",
   mail_failed: "验证码邮件没有发出去，请稍后再试",
   conflict: "另一台电脑刚同步过，请再同步一次",
@@ -59,6 +63,9 @@ async function call(transport: CloudTransport, request: CloudRequest): Promise<R
   const body = parse(response.text);
   if (response.status >= 200 && response.status < 300) return body;
   const code = typeof body.error === "string" ? body.error : "";
+  if (code === "captcha") throw new CloudError("captcha", MESSAGES.captcha);
+  if (code === "bad_activation_code") throw new CloudError("bad_activation", MESSAGES.bad_activation);
+  if (code === "not_activated") throw new CloudError("not_activated", MESSAGES.not_activated);
   if (response.status === 401 && request.token) throw code === "device_limit" ? new CloudError("replaced", MESSAGES.replaced) : new CloudError("signed_out", MESSAGES.signed_out);
   if (response.status === 409) throw new CloudError("conflict", MESSAGES.conflict, typeof body.version === "number" ? body.version : undefined);
   if (response.status === 429 || code === "rate_limited") throw new CloudError("rate_limited", MESSAGES.rate_limited);
@@ -85,14 +92,19 @@ export function deviceName(platform: string | undefined) {
 
 export function createCloudApi(transport: CloudTransport) {
   return {
-    async sendCode(email: string) {
-      await call(transport, { method: "POST", path: "/api/auth/code", body: { email: normalizeEmail(email) } });
+    // `turnstile`: the 人机验证 token from the login page (D-085); the pretend server has no widget and gets none.
+    async sendCode(email: string, turnstile = "") {
+      await call(transport, { method: "POST", path: "/api/auth/code", body: { email: normalizeEmail(email), ...(turnstile ? { turnstile } : {}) } });
     },
     async verify(email: string, code: string, device: string) {
       const body = await call(transport, { method: "POST", path: "/api/auth/verify", body: { email: normalizeEmail(email), code: code.trim(), device } });
       if (typeof body.token !== "string" || !body.token) throw new CloudError("server", MESSAGES.server);
       const signedOut = Array.isArray(body.signedOut) ? body.signedOut.filter((name): name is string => typeof name === "string") : [];
-      return { token: body.token, email: typeof body.email === "string" ? body.email : normalizeEmail(email), signedOut };
+      // activated: false = an outside email that still needs an activation code (D-085); an older server never says so.
+      return { token: body.token, email: typeof body.email === "string" ? body.email : normalizeEmail(email), signedOut, activated: body.activated !== false };
+    },
+    async activate(token: string, code: string) {
+      await call(transport, { method: "POST", path: "/api/activate", token, body: { code: code.trim() } });
     },
     async getVault(token: string) {
       const body = await call(transport, { method: "GET", path: "/api/vault", token });
