@@ -31,6 +31,8 @@ export type ClipboxDesktop = {
   backupImagePrune?: (keep: string[]) => Promise<void>;
   didCopy: () => void;
   setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
+  // 复制后贴到刚才的窗口 (D-081): the shell pastes a mini-window copy into the window the person came from.
+  setPasteBack?: (enabled: boolean, repeatAfter: number) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;
   getLaunchAtLogin?: () => Promise<boolean>;
   setLaunchAtLogin?: (enabled: boolean) => Promise<boolean>;
