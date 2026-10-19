@@ -1218,8 +1218,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .pay-form label .totp-error{margin-top:2px}
 /* API 密钥: several hidden fields per entry (name + value rows) and a 备注 shown as written */
 .apikey-fields{margin:0;padding:0;border:0;display:grid;gap:6px;min-width:0}
-.apikey-fields legend{padding:0;margin-bottom:4px;color:var(--muted);font-size:11.5px}
-.apikey-fields legend small{margin-left:4px;font-size:11px;opacity:.8}
+.apikey-fields-title{margin-bottom:-2px;color:var(--muted);font-size:11.5px}
+.apikey-fields-title small{margin-left:4px;font-size:11px;opacity:.8}
 .apikey-field-row{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,12fr) 28px;align-items:center;gap:6px}
 .apikey-field-row .totp-error,.apikey-field-row .pay-hint{grid-column:1 / -1}
 .apikey-field-value{font-variant-numeric:tabular-nums}
