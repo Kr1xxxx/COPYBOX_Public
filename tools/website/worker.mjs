@@ -5,7 +5,7 @@
 // installer cannot be swapped on the way (audit S2, 2026-10-14). The site no longer hosts the web preview (owner,
 // 2026-10-14): /preview/ is an ordinary 404. /api/* is the account and sync API (api.mjs, D-063);
 // /admin is the owner's read-only user list (admin.mjs, D-065). POST /staff/download sends a staff installer after the
-// company password (secret STAFF_PASSWORD) is checked here, never in the page (D-078).
+// company password (secret STAFF_PASSWORD) is checked here, never in the page (D-080).
 
 import { handleAdmin, isAdminPath } from "./admin.mjs";
 import { allowRequest, handleApi, isApiPath, sameText, sha256Hex } from "./api.mjs";
@@ -155,7 +155,7 @@ async function syncResponse(request, env, pathname) {
   return new Response(request.method === "HEAD" ? null : file.value, { status: 200, headers });
 }
 
-// Staff installers (D-078): the private builds live under download/private-<token>/ (uploaded by the packaging
+// Staff installers (D-080): the private builds live under download/private-<token>/ (uploaded by the packaging
 // thread; the token is only in the staff app's update check). The /staff/ page posts the company password and which
 // file; the password is compared here with the secret STAFF_PASSWORD (both hashed, so the compare is constant-time
 // and leaks no length), at most 20 tries per IP and hour through the API's rate_limits table, and only then the file

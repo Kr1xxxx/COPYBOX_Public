@@ -286,7 +286,7 @@ test("worker: domain bindings (domains/<domain> → 同步码) are never served 
   assert.ok(!env.reads.some((key) => key.startsWith("domains")), env.reads.join(", "));
 });
 
-// Staff installers behind the company password (D-078): the password is checked in the Worker, the file is only
+// Staff installers behind the company password (D-080): the password is checked in the Worker, the file is only
 // streamed after a match, and the page's own source never names the file's address.
 const staffFiles = {
   ...files,

@@ -1,4 +1,4 @@
-### D-078 The staff installers are on copyboxx.com behind the company password (2026-10-19)
+### D-080 The staff installers are on copyboxx.com behind the company password (2026-10-19)
 - Context (owner, 2026-10-19: 「官网给我推送吧,但是输入密码后才能下载」). Until now the private (staff) builds were only reachable
   through their unlisted update address, never from the site (owner, 2026-10-15 「只给员工」); the public download page stays
   on the keyless public build (1.83.0, frozen) and is not touched by this decision.
