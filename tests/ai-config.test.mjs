@@ -65,7 +65,7 @@ test("settings saved with the old built-in prompts pick up the new defaults; own
   assert.equal(read.polishPrompt, DEFAULT_AI_PROMPTS.polish);
   assert.equal(read.organizePrompt, DEFAULT_AI_PROMPTS.organize);
   assert.equal(readAiSettings(storage({ ...old, polishPrompt: "我自己的提示词" })).polishPrompt, "我自己的提示词");
-  for (const prompt of Object.values(DEFAULT_AI_PROMPTS)) assert.match(prompt, /\[方括号\].*\{花括号\}/);
+  for (const prompt of Object.values(DEFAULT_AI_PROMPTS)) assert.match(prompt, /原样保留所有 \[ \] 填空/);
 });
 
 test("every preset has a valid address and the model list address is derived from it", async () => {
