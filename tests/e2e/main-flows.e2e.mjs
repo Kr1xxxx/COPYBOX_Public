@@ -281,6 +281,32 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await expect(page.locator(".var-menu")).toHaveCount(0);
 });
 
+test("holding the 常用值 row and moving sideways slides it to the values cut off at the right; the release fills nothing", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  const company = row.locator("input[data-var=Company]");
+  // six long values make the row wider than the card
+  for (const value of ["Alexandria Montgomery", "Bartholomew Kingsley", "Clementine Fairweather"]) { await company.fill(value); await name.fill(value + " Co"); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  const bar = row.locator(".var-memory");
+  const option = bar.locator(".var-memory-option").first();
+  await settle(page);
+  expect(await bar.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(40);
+  const from = await option.locator(".var-memory-pick").boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 - 120, from.y + from.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBeGreaterThan(40);
+  // the value under the pointer was not picked, and the order is unchanged
+  await expect(name).toHaveValue("Clementine Fairweather Co");
+  await expect(option).toHaveText("Clementine Fairweather Co");
+  // a plain click still fills
+  await bar.locator(".var-memory-option .var-memory-pick", { hasText: "Alexandria Montgomery Co" }).click();
+  await expect(name).toHaveValue("Alexandria Montgomery Co");
+});
+
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await openRow(page, page.locator(".native-row", { hasText: "需要整理的文本" }).first().locator(".row-main"));

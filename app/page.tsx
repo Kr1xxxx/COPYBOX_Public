@@ -126,6 +126,7 @@ import { SnippetFill, VariableMenu, VariablePopup, emptyFillState, type CopyLang
 import { readRefreshedImageView, readStoredChoice, writeStoredChoice } from "./stored-choice";
 import { useDropdownDismiss, useRowMenuPlacement } from "./dropdown-menus";
 import { useValueOptionDrag } from "./value-option-drag";
+import { usePanScroll } from "./pan-scroll";
 import { folderGroupNeighbour, pinnedFirst, removeFolderPin, renameFolderPin, reorderFolderPins, sameFolderGroup, toggleFolderPin, useFolderPins } from "./folder-pins";
 import { PINNED_KEY, fixedOptions, deleteValue, isPinned, latestValues, memoryOptions, moveOption, parsePinned, quickFillValues, rememberValues, togglePin, type PinnedValues, type ValueMemory } from "./variable-memory";
 import { searchSnippets, searchSnippetsEnglish } from "./snippet-search";
@@ -1208,6 +1209,7 @@ export default function Home() {
     showToast(`已删除「${value}」`, { ms: 2000 });
   }
   const { startOptionDrag } = useValueOptionDrag(valueMemory, pinnedValues, setValueMemory, setPinnedValues);
+  const panValues = usePanScroll();
   // The menu on a value's handle moves it one place; pinned values only change places among themselves.
   function stepOption(name: string, value: string, step: -1 | 1) {
     const options = memoryOptions(valueMemory, pinnedValues, name);
@@ -2186,7 +2188,7 @@ export default function Home() {
                           {!isSnippet && !PLAIN_NOTES && <button type="button" className="secondary-button" onClick={() => void copySecretReference(item)} title={`只复制编号，${SECRET_WORD}本身不会出现在聊天或日志里`}><Icon name={copiedReferenceId === item.id ? "check" : "link"} />{copiedReferenceId === item.id ? "引用已复制" : "复制引用"}</button>}
                           <button type="button" className="ghost-button" onClick={() => openEditor(item)}>编辑</button>
                           {isSnippet && !closing && activeVar?.id === item.id && fixedOptions(activeVar.name).length > 0 && <VariablePopup rowId={item.id} name={activeVar.name} options={fixedOptions(activeVar.name)} current={fillFor(item).values[activeVar.name] || ""} onPick={(value) => pickRemembered(item, activeVar.name, value)} />}
-                          {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值">
+                          {isSnippet && !closing && variableNames(item).some((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0) && <span className="var-memory" aria-label="常用值" {...panValues}>
                             {valuesCollapsed ? <button type="button" className="var-collapse" aria-expanded="false" aria-label="展开常用值" title="展开常用值" onMouseDown={(event) => event.preventDefault()} onClick={toggleValuesCollapsed}>常用值<Icon name="chevronDown" /></button> : <>
                             {variableNames(item).map((name) => memoryOptions(valueMemory, pinnedValues, name).length > 0 && <span key={name} className="var-memory-group" role="group" aria-label={`${name} 最近用过的`}>
                             {variableNames(item).length > 1 && <span className="var-memory-name" aria-hidden="true">{name}</span>}
