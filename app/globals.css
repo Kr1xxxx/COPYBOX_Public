@@ -1738,3 +1738,37 @@ button { -webkit-tap-highlight-color: transparent; }
 /* One hairline between rows: a row's own bottom line and the next row's top line used to stack into a thick one. */
 .settings-body > .settings-card > .settings-row { border-bottom: 0; }
 .settings-body > .settings-card > .settings-row + .settings-note { border-top: 1px solid var(--line-soft); }
+
+/* One type scale for every popup, taken from the 设置 window (owner 2026-10-19 「弹窗和设置里的风格有点不同，是不是字体太大了」).
+   Before, each popup had its own numbers: titles 20–25px, body text 9–13px, buttons and fields 40–48px tall, corners
+   19–22px. Now: title 18px (between the 设置 window title 17px and its page title 21px), text 12.5–13.5px like a settings
+   row, buttons 36px and fields 34px with 8px corners, popup corners 16px, buttons and fields in the heading font like
+   the settings buttons. Sizes and spacing only; colours and layout stay. Later in the file than the popup rules it replaces. */
+:root:not(.brand-off) :is(.backup-dialog, .delete-confirm-dialog, .snippet-import-dialog, .whats-new-dialog, .guide-dialog) { border-radius: 16px; }
+:root:not(.brand-off) :is(.backup-dialog, .delete-confirm-dialog, .snippet-import-dialog, .whats-new-dialog) :is(button, input) { font-family: var(--brand-font-heading); }
+:root:not(.brand-off) :is(.backup-head h2, .delete-confirm-dialog h2, .snippet-dialog-head h2, .whats-new-head h2, .guide-text h2) { margin: 0 0 4px; font-size: 18px; line-height: 1.3; }
+:root:not(.brand-off) :is(.backup-head, .snippet-dialog-head) { padding: 20px 22px 14px; }
+:root:not(.brand-off) .backup-head p { margin-bottom: 5px; font-size: 11.5px; }
+:root:not(.brand-off) .backup-form { gap: 14px; padding: 0 22px 20px; }
+:root:not(.brand-off) .delete-confirm-dialog header { padding: 18px 20px 14px; }
+:root:not(.brand-off) .delete-confirm-dialog form { gap: 10px; padding: 14px 18px 16px; }
+:root:not(.brand-off) .whats-new-dialog { padding: 22px 22px 18px; }
+:root:not(.brand-off) .snippet-import-body { padding: 14px 22px; }
+/* Body text: 12.5px like a settings row's second line. */
+:root:not(.brand-off) :is(.backup-intro, .backup-note, .backup-error, .delete-confirm-dialog header p, .delete-confirm-error, .whats-new-head p, .import-privacy, .import-errors p, .snippet-dialog-head small, .consent-note, .tips-dialog .tips-source) { font-size: 12.5px; line-height: 1.55; }
+:root:not(.brand-off) :is(.backup-field, .backup-strategy legend, .import-section h3, .import-errors h3) { font-size: 12.5px; font-weight: 600; }
+:root:not(.brand-off) :is(.delete-confirm-item strong, .backup-strategy strong, .import-preview-list strong) { font-size: 13.5px; font-weight: 600; }
+:root:not(.brand-off) :is(.delete-confirm-item small, .backup-strategy small, .import-preview-list span, .import-metrics span, .import-errors small) { font-size: 12px; line-height: 1.4; }
+:root:not(.brand-off) .tips-dialog .tips-text { font-size: 13.5px; line-height: 1.6; }
+:root:not(.brand-off) .import-metrics strong { font-size: 17px; }
+:root:not(.brand-off) .import-folder-list span { font-size: 12px; }
+/* Wells and cards: 10px corners, one step under the popup's 16px. */
+:root:not(.brand-off) :is(.delete-confirm-item, .import-metrics div, .import-preview-list, .import-errors, .backup-error, .delete-confirm-error, .consent-note) { border-radius: 10px; }
+:root:not(.brand-off) .delete-confirm-item { padding: 10px 12px; }
+:root:not(.brand-off) .backup-strategy button { min-height: 60px; padding: 10px 12px; border-radius: 10px; }
+/* Fields and buttons: the settings sizes (fields 34px, buttons 32px there; 36px here because they stand alone in a row). */
+:root:not(.brand-off) .backup-field input { height: 34px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
+:root:not(.brand-off) :is(.backup-actions, .delete-confirm-actions, .snippet-dialog-actions, .whats-new-actions) button { height: 36px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+:root:not(.brand-off) :is(.backup-head > button, .snippet-dialog-head > button) { width: 28px; height: 28px; border-radius: 8px; font-size: 18px; line-height: 1; }
+:root:not(.brand-off) .whats-new-actions { margin-top: 18px; }
+:root:not(.brand-off) .guide-dialog .primary-button { height: 36px; }
