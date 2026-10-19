@@ -9,6 +9,13 @@ pub const DEFAULT_WIDTH: f64 = 680.0;
 pub const DEFAULT_HEIGHT: f64 = 620.0;
 pub const MINI_WIDTH: f64 = 360.0;
 pub const MINI_HEIGHT: f64 = 440.0;
+/// macOS (D-078): the full window never grows past this, so it cannot fill or tile the screen.
+pub const MAC_MAX_WIDTH: f64 = 1000.0;
+pub const MAC_MAX_HEIGHT: f64 = 800.0;
+/// Windows 贴边 (D-078): a mini window let go this close to a screen's left or right edge sticks to it...
+pub const SNAP_DISTANCE: f64 = 24.0;
+/// ...and, once the mouse leaves, folds away until only this much of it shows.
+pub const STRIP_WIDTH: f64 = 16.0;
 const MAX_SIZE: f64 = 10000.0;
 const MIN_VISIBLE_EDGE: f64 = 80.0;
 
@@ -65,6 +72,42 @@ pub fn normalize_mini_position(saved: Option<Point>, areas: &[Bounds]) -> Option
     areas.iter().any(|a| visible_in(&b, a)).then_some(Point { x: b.x, y: b.y })
 }
 
+/// The largest the full window may be, or None where it may grow freely.
+pub fn full_max_size() -> Option<(f64, f64)> {
+    cfg!(target_os = "macos").then_some((MAC_MAX_WIDTH, MAC_MAX_HEIGHT))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Edge {
+    Left,
+    Right,
+}
+
+/// Where a mini window near a screen's outer left or right edge sticks: the edge and the exact spot.
+/// An edge shared with another screen does not count, because the folded window would show up there.
+pub fn mini_dock(p: Point, areas: &[Bounds]) -> Option<(Edge, Point)> {
+    let b = Bounds { x: p.x, y: p.y, width: MINI_WIDTH, height: MINI_HEIGHT };
+    let a = areas.iter().find(|a| visible_in(&b, a))?;
+    let (edge, x) = if (p.x - a.x).abs() <= SNAP_DISTANCE {
+        (Edge::Left, a.x)
+    } else if (p.x + MINI_WIDTH - a.x - a.width).abs() <= SNAP_DISTANCE {
+        (Edge::Right, a.x + a.width - MINI_WIDTH)
+    } else {
+        return None;
+    };
+    let docked = Point { x, y: p.y.clamp(a.y, (a.y + a.height - MINI_HEIGHT).max(a.y)) };
+    let folded = Bounds { x: mini_folded_x(edge, &docked), y: docked.y, width: MINI_WIDTH, height: MINI_HEIGHT };
+    (!areas.iter().any(|o| visible_in(&folded, o))).then_some((edge, docked))
+}
+
+/// The x of a docked mini window folded away so that only a thin strip stays on screen.
+pub fn mini_folded_x(edge: Edge, docked: &Point) -> f64 {
+    match edge {
+        Edge::Left => docked.x - MINI_WIDTH + STRIP_WIDTH,
+        Edge::Right => docked.x + MINI_WIDTH - STRIP_WIDTH,
+    }
+}
+
 pub fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Option<T> {
     serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
 }
@@ -112,6 +155,26 @@ mod tests {
     fn mini_position_must_be_on_screen() {
         assert_eq!(normalize_mini_position(Some(Point { x: 1500.0, y: 40.0 }), &screen()), Some(Point { x: 1500.0, y: 40.0 }));
         assert_eq!(normalize_mini_position(Some(Point { x: 5000.0, y: 40.0 }), &screen()), None);
+    }
+
+    #[test]
+    fn mini_sticks_to_an_outer_edge_only() {
+        // Near the left edge: x snaps to it, y stays.
+        assert_eq!(mini_dock(Point { x: 18.0, y: 300.0 }, &screen()), Some((Edge::Left, Point { x: 0.0, y: 300.0 })));
+        // A little past the right edge: pulled back onto it, y kept inside the screen.
+        assert_eq!(mini_dock(Point { x: 1575.0, y: 700.0 }, &screen()), Some((Edge::Right, Point { x: 1560.0, y: 600.0 })));
+        assert_eq!(mini_dock(Point { x: 500.0, y: 300.0 }, &screen()), None);
+        // Two screens side by side: the edge between them is no place to fold away.
+        let two = vec![screen()[0], Bounds { x: 1920.0, y: 0.0, width: 1920.0, height: 1040.0 }];
+        assert_eq!(mini_dock(Point { x: 1570.0, y: 300.0 }, &two), None);
+        assert_eq!(mini_dock(Point { x: 1930.0, y: 300.0 }, &two), None);
+        assert_eq!(mini_dock(Point { x: 3470.0, y: 300.0 }, &two), Some((Edge::Right, Point { x: 3480.0, y: 300.0 })));
+    }
+
+    #[test]
+    fn folded_mini_leaves_a_strip_on_screen() {
+        assert_eq!(mini_folded_x(Edge::Left, &Point { x: 0.0, y: 10.0 }), -344.0);
+        assert_eq!(mini_folded_x(Edge::Right, &Point { x: 1560.0, y: 10.0 }), 1904.0);
     }
 
     #[test]

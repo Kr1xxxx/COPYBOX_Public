@@ -34,13 +34,14 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, miniEdgeSnap, onMiniEdgeSnap, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   // Shown only with testTools (the browser and the web preview), never in the installed app: employees don't need them.
   testTools?: boolean; onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
+  miniEdgeSnap: boolean; onMiniEdgeSnap: (on: boolean) => void;
   folderGroups: SettingsFolderGroup[];
   onFolderAdd: (kind: SettingsFolderKind, name: string) => Promise<string>;
   onFolderRename: (kind: SettingsFolderKind, from: string, to: string) => Promise<string>;
@@ -236,6 +237,11 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
               <ArcSegmented className="settings-segment" mode="radio" label="迷你窗口复制后" value={miniHidePolicy} onSelect={(value) => onMiniHidePolicy(value as MiniHidePolicy)}
                 options={[["hotkey", "从托盘呼出时收起"], ["always", "总是收起"], ["never", "不收起"]].map(([value, label]) => ({ value, label }))} />
             </div>
+            {/* D-078, Windows only: the mini window sticks to the screen's left or right edge and folds away while the mouse is elsewhere. */}
+            {window.clipboxDesktop?.platform === "win32" && <div className="settings-row"><div><strong>迷你窗口贴边收起</strong><small>{miniEdgeSnap ? "拖到屏幕左右边缘会吸住；鼠标离开后缩成一条，碰一下就滑出来" : "拖到屏幕左右边缘会吸住，鼠标离开后缩成一条"}</small></div>
+              <ArcSegmented className="settings-segment" mode="radio" label="迷你窗口贴边收起" value={miniEdgeSnap ? "on" : "off"} onSelect={(value) => onMiniEdgeSnap(value === "on")}
+                options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
+            </div>}
             {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录系统后自动启动，并安静地收在托盘里</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="开机自动启动" value={launchAtLogin ? "on" : "off"}
                 onSelect={(value) => { void window.clipboxDesktop?.setLaunchAtLogin?.(value === "on").then(setLaunchAtLogin).catch(() => undefined); }}
@@ -245,7 +251,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
               <ArcSegmented className="settings-segment" mode="radio" label="点击窗口关闭按钮时" value={closeBehavior} onSelect={(value) => onCloseBehavior(value as CloseBehavior)}
                 options={[["tray", "收到托盘"], ...(window.clipboxDesktop?.platform === "win32" ? [["taskbar", "缩到任务栏"]] : []), ["quit", "退出"]].map(([value, label]) => ({ value, label }))} />
             </div>}
-            <p className="settings-note">完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。</p>
+            <p className="settings-note">{window.clipboxDesktop?.platform === "darwin" ? "完整窗口 680×620 到 1000×800，不进全屏；迷你窗口固定 360×440。" : "完整窗口最小 680×620，可拖大；迷你窗口固定 360×440。"}</p>
           </section>
           <section className="settings-card" aria-labelledby="set-compress" hidden={hideSection("data", "set-compress")}><h3 id="set-compress">图片压缩</h3>
             <ImageCompressSettings />

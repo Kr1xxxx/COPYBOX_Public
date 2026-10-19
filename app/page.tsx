@@ -175,6 +175,7 @@ const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
+const MINI_EDGE_KEY = "clipbox.mini-edge-snap";
 // 固定在最上层 for the full window: "1" when on, absent when off.
 const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
@@ -1638,6 +1639,20 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Windows 贴边 (D-078): off until the person turns it on, so the mini window never folds away unexpectedly.
+  const [miniEdgeSnap, setMiniEdgeSnap] = useState(() => readStoredChoice(MINI_EDGE_KEY, ["1"], "") === "1");
+  useEffect(() => {
+    if (miniEdgeSnap) window.clipboxDesktop?.setMiniEdgeSnap?.(true);
+    // Sent once on start; later changes go through chooseMiniEdgeSnap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function chooseMiniEdgeSnap(on: boolean) {
+    setMiniEdgeSnap(on);
+    try { if (on) localStorage.setItem(MINI_EDGE_KEY, "1"); else localStorage.removeItem(MINI_EDGE_KEY); } catch { /* keep the in-memory choice for this session */ }
+    window.clipboxDesktop?.setMiniEdgeSnap?.(on);
+  }
+
   const [pinOnTop, setPinOnTop] = useState(() => readStoredChoice(PIN_ON_TOP_KEY, ["1"], "") === "1");
   useEffect(() => {
     window.clipboxDesktop?.setPinned?.(pinOnTop);
@@ -2510,6 +2525,8 @@ export default function Home() {
         itemCount={items.filter((item) => !isTrashedItem(item)).length}
         miniHidePolicy={miniHidePolicy}
         onMiniHidePolicy={chooseMiniHidePolicy}
+        miniEdgeSnap={miniEdgeSnap}
+        onMiniEdgeSnap={chooseMiniEdgeSnap}
         folderGroups={buildSettingsFolderGroups()}
         onFolderAdd={settingsFolderAdd}
         onFolderRename={settingsFolderRename}
