@@ -175,6 +175,7 @@ const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
+const PASTE_BACK_KEY = "clipbox.paste-back";
 // 固定在最上层 for the full window: "1" when on, absent when off.
 const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
@@ -1653,6 +1654,19 @@ export default function Home() {
     window.clipboxDesktop?.setMiniHidePolicy?.(policy);
   }
 
+  // 复制后贴到刚才的窗口 (D-078): off until the person turns it on; the shell does the pasting.
+  const [pasteBack, setPasteBack] = useState(() => readStoredChoice(PASTE_BACK_KEY, ["0", "1"], "0") === "1");
+  useEffect(() => {
+    if (pasteBack) window.clipboxDesktop?.setPasteBack?.(true);
+    // Sent once on start; later changes go through choosePasteBack.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function choosePasteBack(on: boolean) {
+    setPasteBack(on);
+    writeStoredChoice(PASTE_BACK_KEY, on ? "1" : "0");
+    window.clipboxDesktop?.setPasteBack?.(on);
+  }
+
   function chooseTrashDays(days: number) {
     setTrashDays(days);
     writeStoredChoice(TRASH_DAYS_KEY, days);
@@ -2485,6 +2499,8 @@ export default function Home() {
         itemCount={items.filter((item) => !isTrashedItem(item)).length}
         miniHidePolicy={miniHidePolicy}
         onMiniHidePolicy={chooseMiniHidePolicy}
+        pasteBack={pasteBack}
+        onPasteBack={choosePasteBack}
         folderGroups={buildSettingsFolderGroups()}
         onFolderAdd={settingsFolderAdd}
         onFolderRename={settingsFolderRename}

@@ -34,13 +34,14 @@ function backupAgeLabel(at: number) {
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
 
-export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
+export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniHidePolicy, onMiniHidePolicy, pasteBack, onPasteBack, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
   // Shown only with testTools (the browser and the web preview), never in the installed app: employees don't need them.
   testTools?: boolean; onPreviewTest?: () => Promise<TestContentPreview>; onImportTest?: () => Promise<void>; onClearTest?: () => Promise<void>;
   usageItems: SecretItem[]; onShowItem: (item: SecretItem) => void;
   version: string; buildTime?: string; isDesktop: boolean; refreshing: boolean; itemCount: number; trashCount: number;
   miniHidePolicy: MiniHidePolicy; onMiniHidePolicy: (policy: MiniHidePolicy) => void;
+  pasteBack: boolean; onPasteBack: (on: boolean) => void;
   folderGroups: SettingsFolderGroup[];
   onFolderAdd: (kind: SettingsFolderKind, name: string) => Promise<string>;
   onFolderRename: (kind: SettingsFolderKind, from: string, to: string) => Promise<string>;
@@ -235,6 +236,11 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
             <div className="settings-row"><div><strong>迷你窗口复制后</strong><small>{isDesktop ? "选择复制后是否自动收起迷你窗口" : "仅桌面版生效"}</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="迷你窗口复制后" value={miniHidePolicy} onSelect={(value) => onMiniHidePolicy(value as MiniHidePolicy)}
                 options={[["hotkey", "从托盘呼出时收起"], ["always", "总是收起"], ["never", "不收起"]].map(([value, label]) => ({ value, label }))} />
+            </div>
+            {/* D-078: the shell brings back the window the person came from and presses paste for them. */}
+            <div className="settings-row"><div><strong>复制后贴到刚才的窗口</strong><small>{!isDesktop ? "仅桌面版生效" : window.clipboxDesktop?.platform === "darwin" ? "迷你窗口里点复制，自动回到刚才的聊天窗口并粘贴；第一次要在系统询问里允许「辅助功能」" : "迷你窗口里点复制，自动回到刚才的聊天窗口并粘贴"}</small></div>
+              <ArcSegmented className="settings-segment" mode="radio" label="复制后贴到刚才的窗口" value={pasteBack ? "on" : "off"} onSelect={(value) => onPasteBack(value === "on")}
+                options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
             </div>
             {isDesktop && launchAtLogin !== null && <div className="settings-row"><div><strong>开机自动启动</strong><small>登录系统后自动启动，并安静地收在托盘里</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="开机自动启动" value={launchAtLogin ? "on" : "off"}

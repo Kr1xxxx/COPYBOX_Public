@@ -118,6 +118,9 @@ impl Shell {
 pub fn show_window(app: &AppHandle, as_quick_search: bool) {
     let Some(window) = app.get_webview_window("main") else { return };
     let mode = app.state::<WindowMode>();
+    if as_quick_search && app.state::<crate::paste_back::PasteBack>().enabled() {
+        crate::paste_back::remember_front();
+    }
     if as_quick_search {
         mode.enter_mini(&window, true);
     } else {
@@ -188,9 +191,13 @@ pub fn set_mini_hide_policy(state: tauri::State<Shell>, policy: String) {
     state.settings.lock().unwrap().mini_hide = p;
 }
 
-/// The page copied something: the mini window may go away after a moment.
+/// The page copied something: the mini window may paste it into the window the person came from (D-078), and may
+/// go away after a moment.
 #[tauri::command]
-pub fn did_copy(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<WindowMode>) {
+pub fn did_copy(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {
+    if paste_back.enabled() && mode.is_mini() {
+        std::thread::spawn(crate::paste_back::paste_into_front);
+    }
     let policy = shell.settings.lock().unwrap().mini_hide;
     if !hides_after_copy(policy, mode.is_mini(), mode.mini_auto_hide()) {
         return;
