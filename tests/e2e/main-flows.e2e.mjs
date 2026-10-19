@@ -256,17 +256,6 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await expect(options).toHaveText(["Amanda", "Cara", "Bella"]);
   // dropping did not count as a click: nothing was filled or copied
   await expect(name).toHaveValue("Cara");
-  // holding the value text itself drags too (Krix 2026-10-19): Amanda moves behind Cara, and the drop fills nothing
-  // (the first value is used: the last one sits partly under the sticky 收起 tail, where a press would hit that button)
-  await settle(page);
-  const textFrom = await options.nth(0).locator(".var-memory-pick").boundingBox();
-  const textTo = await options.nth(1).boundingBox();
-  await page.mouse.move(textFrom.x + textFrom.width / 2, textFrom.y + textFrom.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(textTo.x + textTo.width / 2, textTo.y + textTo.height / 2, { steps: 12 });
-  await page.mouse.up();
-  await expect(options).toHaveText(["Cara", "Amanda", "Bella"]);
-  await expect(name).toHaveValue("Cara");
   // pin Bella, then unpin her again from the menu
   await options.filter({ hasText: "Bella" }).click(RIGHT_CLICK_LEFT_PART);
   await page.getByRole("menuitem", { name: "固定" }).click();
@@ -290,6 +279,32 @@ test("a right-click on a remembered value offers 固定, 解锁 and 删除; hold
   await options.first().click(RIGHT_CLICK_LEFT_PART);
   await page.keyboard.press("Escape");
   await expect(page.locator(".var-menu")).toHaveCount(0);
+});
+
+test("holding the 常用值 row and moving sideways slides it to the values cut off at the right; the release fills nothing", async ({ page }) => {
+  await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
+  await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
+  const row = page.locator(".native-row.selected");
+  const name = row.locator("input[data-var=Name]");
+  const company = row.locator("input[data-var=Company]");
+  // six long values make the row wider than the card
+  for (const value of ["Alexandria Montgomery", "Bartholomew Kingsley", "Clementine Fairweather"]) { await company.fill(value); await name.fill(value + " Co"); await name.press("Enter"); await expect.poll(() => page.evaluate(() => window.__copied)).toContain(value); }
+  const bar = row.locator(".var-memory");
+  const option = bar.locator(".var-memory-option").first();
+  await settle(page);
+  expect(await bar.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(40);
+  const from = await option.locator(".var-memory-pick").boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 - 120, from.y + from.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBeGreaterThan(40);
+  // the value under the pointer was not picked, and the order is unchanged
+  await expect(name).toHaveValue("Clementine Fairweather Co");
+  await expect(option).toHaveText("Clementine Fairweather Co");
+  // a plain click still fills
+  await bar.locator(".var-memory-option .var-memory-pick", { hasText: "Alexandria Montgomery Co" }).click();
+  await expect(name).toHaveValue("Alexandria Montgomery Co");
 });
 
 test("the Chinese text only asks for its own variables, and a long value stays inside the card", async ({ page }) => {
