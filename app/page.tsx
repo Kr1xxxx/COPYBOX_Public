@@ -2382,7 +2382,7 @@ export default function Home() {
                 <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
               <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
-                legacyView={legacyList} onAdd={() => setAddMenuOpen(true)} />
+                legacyView={legacyList} onAdd={accountVeiled ? undefined : () => setAddMenuOpen(true)} />
             </>}
             {!vaultPage && <div className="section-head">
               <h1>{sectionTitle}</h1>

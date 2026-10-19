@@ -13,6 +13,8 @@ async function open(page, platform) {
 }
 
 for (const platform of ["win32", "darwin"]) {
+  // Windows seeds only the 范例 kinds it has a category for (登录, 收款信息, 验证码); Mac has 5.
+  const SAMPLES = platform === "win32" ? 3 : 5;
   test(`${platform}: 收起 (left of 选择) folds every website card to its title and 展开 brings them back`, async ({ page }) => {
     const region = await open(page, platform);
     const head = page.locator(".section-head");
@@ -21,7 +23,7 @@ for (const platform of ["win32", "darwin"]) {
     await expect(region.locator(".vault-group h3")).toHaveCount(2);
     await expect(region.locator(".vault-entry")).toHaveCount(0);
     await head.getByRole("button", { name: "展开账号" }).click();
-    await expect(region.locator(".vault-entry")).toHaveCount(5);
+    await expect(region.locator(".vault-entry")).toHaveCount(SAMPLES);
   });
 
   test(`${platform}: 选择 ticks entries and 移到回收站 moves them to the 回收站 without asking, where 恢复 brings them back`, async ({ page }) => {
@@ -32,12 +34,12 @@ for (const platform of ["win32", "darwin"]) {
     await expect(bar).toContainText("已选 0 条");
     await expect(bar.getByRole("button", { name: "移到回收站" })).toBeDisabled();
     const boxes = region.getByRole("checkbox");
-    await expect(boxes).toHaveCount(5);
+    await expect(boxes).toHaveCount(SAMPLES);
     await boxes.nth(0).click();
     await region.locator(".vault-entry").nth(1).click();
     await expect(bar).toContainText("已选 2 条");
     await bar.getByRole("button", { name: "移到回收站" }).click();
-    await expect(region.locator(".vault-entry")).toHaveCount(3);
+    await expect(region.locator(".vault-entry")).toHaveCount(SAMPLES - 2);
     await expect(page.getByRole("toolbar", { name: "批量操作" })).toHaveCount(0);
     await page.getByRole("button", { name: /^回收站/ }).click();
     await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(2);
@@ -49,11 +51,11 @@ for (const platform of ["win32", "darwin"]) {
     const region = await open(page, platform);
     await region.getByRole("button", { name: /^更多操作/ }).first().click();
     await region.getByRole("menuitem", { name: "移到回收站" }).click();
-    await expect(region.locator(".vault-entry")).toHaveCount(4);
+    await expect(region.locator(".vault-entry")).toHaveCount(SAMPLES - 1);
     await expect(page.getByText("已移到回收站，可以恢复")).toBeVisible();
     await page.locator(".section-head").getByRole("button", { name: "选择" }).click();
     await page.getByRole("toolbar", { name: "批量操作" }).getByRole("button", { name: "全选" }).click();
-    await expect(page.getByRole("toolbar", { name: "批量操作" })).toContainText("已选 4 条");
+    await expect(page.getByRole("toolbar", { name: "批量操作" })).toContainText(`已选 ${SAMPLES - 1} 条`);
     await page.getByRole("toolbar", { name: "批量操作" }).getByRole("button", { name: "完成" }).click();
     await expect(region.getByRole("checkbox")).toHaveCount(0);
   });
