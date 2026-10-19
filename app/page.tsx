@@ -115,7 +115,7 @@ import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
 import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
-import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview } from "./snippet-doc";
+import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview, snippetShareDocument, snippetShareText } from "./snippet-doc";
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
 import { isSyncedSnippet, mergeAccounts, mergeSnippets, syncPolicy, tooManyRemovals } from "./cloud-sync-core";
@@ -319,6 +319,7 @@ export default function Home() {
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkExportOpen, setBulkExportOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(() => readStoredChoice<ThemeChoice>(THEME_KEY, THEME_OPTIONS, "system"));
   const [lastBackupAt, setLastBackupAt] = useState(() => {
     try { return Number(localStorage.getItem(LAST_BACKUP_KEY)) || 0; } catch { return 0; }
@@ -868,11 +869,11 @@ export default function Home() {
     resolvePostCommitFocusTarget(pending, modalOpen, backgroundInert, searchRef.current)?.focus();
   }, [modalOpen, backgroundInert]);
 
-  // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 menu and the folder menu close on a click or touch anywhere outside them, and on Esc.
-  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || Boolean(folderMenu);
+  // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 / 导出 menus and the folder menu close on a click or touch anywhere outside them, and on Esc.
+  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || bulkExportOpen || Boolean(folderMenu);
   useDropdownDismiss(dropdownOpen, {
-    all: () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
-    rowAndBulk: () => { setRowMenuId(""); setBulkMoveOpen(false); },
+    all: () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
+    rowAndBulk: () => { setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); },
     product: () => setProductMenuOpen(false),
   });
   useRowMenuPlacement(rowMenuId);
@@ -883,7 +884,7 @@ export default function Home() {
       if (event.key === "Escape" && newFolder && !auxiliaryDialogOpen) { event.preventDefault(); cancelNewFolder(); return; }
       if (!homeShortcutsEnabled) return;
       if (event.key === "Escape" && !inlineEditing && !auxiliaryDialogOpen) {
-        if (bulkMode) { setBulkMode(false); setBulkIds([]); setBulkMoveOpen(false); return; }
+        if (bulkMode) { setBulkMode(false); setBulkIds([]); setBulkMoveOpen(false); setBulkExportOpen(false); return; }
         setQuery("");
         setMenuOpen(false);
         setProductMenuOpen(false);
@@ -1577,6 +1578,7 @@ export default function Home() {
     setBulkMode(false);
     setBulkIds([]);
     setBulkMoveOpen(false);
+    setBulkExportOpen(false);
   }
 
   function toggleBulk(id: string) {
@@ -1596,6 +1598,22 @@ export default function Home() {
     } catch {
       showToast("移动失败，条目保持原位", { tone: "error" });
     }
+    exitBulk();
+  }
+
+  // 导出: a .md 话术 document a colleague imports with 导入话术表格 (fill-in blocks kept), or plain text.
+  function bulkExport(asDocument: boolean) {
+    const targets = filtered.filter((item) => bulkIds.includes(item.id));
+    setBulkExportOpen(false);
+    if (targets.length === 0) return;
+    const blob = new Blob([asDocument ? snippetShareDocument(targets) : snippetShareText(targets)], { type: asDocument ? "text/markdown" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `copyboxx-share-${new Date().toISOString().slice(0, 10)}.${asDocument ? "md" : "txt"}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showToast(asDocument ? `已导出 ${targets.length} 条话术，同事在 设置 → 导入话术表格 里导入` : `已导出 ${targets.length} 条话术`);
     exitBulk();
   }
 
@@ -2436,9 +2454,16 @@ export default function Home() {
               <button type="button" className="ghost-button" onClick={() => setBulkIds(bulkCount === filtered.length ? [] : filtered.map((item) => item.id))}>{bulkCount === filtered.length ? "全不选" : "全选"}</button>
               <span className="spacer" />
               {activeFolders.length > 0 && <div className="menu-wrap">
-                <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => setBulkMoveOpen((value) => !value)}>移动到<Icon name="chevron" /></button>
+                <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkMoveOpen} onClick={() => { setBulkExportOpen(false); setBulkMoveOpen((value) => !value); }}>移动到<Icon name="chevron" /></button>
                 <AnimatePresence>{bulkMoveOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
                   {activeFolders.map((folder) => <button type="button" role="menuitem" key={folder || "uncategorized"} onClick={() => void bulkMoveTo(folder)}><i className="menu-dot" aria-hidden="true" style={{ background: folder ? categoryColors[folder] : UNCATEGORIZED_COLOR }} />{folder || "未分类"}</button>)}
+                </ArcMenu>}</AnimatePresence>
+              </div>}
+              {activeKind === "snippet" && <div className="menu-wrap">
+                <button type="button" className="secondary-button" disabled={bulkCount === 0} aria-expanded={bulkExportOpen} onClick={() => { setBulkMoveOpen(false); setBulkExportOpen((value) => !value); }}>导出<Icon name="chevron" /></button>
+                <AnimatePresence>{bulkExportOpen && <ArcMenu className="dropdown bulk-menu" origin="bottom left">
+                  <button type="button" role="menuitem" onClick={() => bulkExport(true)}>话术文档（可导入）</button>
+                  <button type="button" role="menuitem" onClick={() => bulkExport(false)}>纯文本</button>
                 </ArcMenu>}</AnimatePresence>
               </div>}
               <button type="button" className="secondary-button danger-text" disabled={bulkCount === 0} onClick={() => void bulkTrash()}>移到回收站</button>

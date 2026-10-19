@@ -64,3 +64,26 @@ test("Windows line endings and a byte-order mark read the same", async () => {
   const { parseSnippetDocument } = await import("../app/snippet-doc.ts");
   assert.deepEqual(parseSnippetDocument(`\uFEFF${sample.replace(/\n/g, "\r\n")}`), parseSnippetDocument(sample));
 });
+
+test("shared 话术 export round-trips through the 话术 document import, fill-in blocks kept", async () => {
+  const { buildSnippetDocImportPreview, snippetShareDocument, snippetShareText } = await import("../app/snippet-doc.ts");
+  const note = "群发三行以内.";
+  const items = [
+    { label: "新询盘｜通用开场", secret: "Hi [名字] 👋\nPrice is $[金额].", folder: "开场接待", snippetMeta: { usageNote: "" } },
+    { label: "新品通知｜A", secret: "New: [款式 1]", folder: "群发", snippetMeta: { usageNote: note } },
+    { label: "请稍等", secret: "One moment please.", folder: "" },
+  ];
+  const doc = snippetShareDocument(items);
+  assert.match(doc, /^## 03 未分类$/m);
+  assert.match(doc, /^> 群发三行以内\.$/m);
+  const preview = buildSnippetDocImportPreview(doc, [], () => "id", 0);
+  assert.deepEqual(preview.items.map((item) => [item.folder, item.label, item.secret]), [
+    ["开场接待", "新询盘｜通用开场", "Hi [名字] 👋\nPrice is $[金额]."],
+    ["群发", "新品通知｜A", "New: [款式 1]"],
+    ["未分类", "请稍等", "One moment please."],
+  ]);
+  assert.deepEqual(preview.items[0].snippetMeta.placeholders, ["名字", "金额"]);
+  assert.equal(preview.items[1].snippetMeta.usageNote, note);
+  assert.equal(buildSnippetDocImportPreview(doc, preview.items, () => "id", 0).duplicateCount, 3);
+  assert.equal(snippetShareText(items.slice(0, 1)), "新询盘｜通用开场\nHi 名字 👋\nPrice is $金额.\n");
+});

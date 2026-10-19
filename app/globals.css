@@ -765,7 +765,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .bulk-bar { flex: 0 0 auto; margin: 0 10px 8px; padding: 6px 8px 6px 14px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 11px; background: var(--card); box-shadow: 0 6px 20px rgba(31,30,28,.1); animation: detail-in .18s cubic-bezier(.2,.8,.2,1) both; }
 .bulk-bar > strong { margin-right: 4px; font-size: 13px; font-weight: 600; }
 .bulk-bar .spacer { flex: 1 1 auto; }
-.bulk-menu { top: auto; bottom: 36px; min-width: 170px; max-height: 260px; overflow: auto; scrollbar-width: none; }
+.bulk-menu { top: auto; bottom: 36px; min-width: 170px; white-space: nowrap; max-height: 260px; overflow: auto; scrollbar-width: none; }
 .secondary-button.danger-text { color: var(--danger); }
 .secondary-button:disabled, .ghost-button:disabled { opacity: .45; cursor: default; }
 

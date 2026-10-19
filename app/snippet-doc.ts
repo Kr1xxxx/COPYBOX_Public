@@ -104,3 +104,24 @@ export function buildSnippetDocImportPreview(markdown: string, current: SecretIt
   const used = new Set(items.map((item) => item.folder));
   return { totalCount: entries.length, importableCount: items.length, duplicateCount, errorCount: 0, errors: [], folders: folders.filter((name) => used.has(name)), items };
 }
+
+// Selected 话术 as a document the 导入话术表格 import reads back: one numbered ## folder each, **label** + text per 话术.
+// A folder note is kept when every exported 话术 in that folder shares it.
+// shortcut: blank lines inside a 话术 are dropped on import and body lines that look like ##, **…**, > or --- are not escaped; fine for chat replies.
+export function snippetShareDocument(items: SecretItem[]) {
+  const folders = [...new Set(items.map((item) => item.folder || "未分类"))];
+  const lines = ["# 分享话术", ""];
+  folders.forEach((folder, index) => {
+    const inFolder = items.filter((item) => (item.folder || "未分类") === folder);
+    const note = inFolder[0].snippetMeta?.usageNote || "";
+    lines.push(`## ${String(index + 1).padStart(2, "0")} ${folder}`, "");
+    if (note && inFolder.every((item) => item.snippetMeta?.usageNote === note)) lines.push(...note.split("\n").map((line) => `> ${line}`), "");
+    for (const item of inFolder) lines.push(`**${item.label || "未命名"}**`, item.secret.trim(), "");
+  });
+  return lines.join("\n");
+}
+
+// The same 话术 as plain text to paste anywhere: title, then the text with the [ ] of fill-in blocks removed.
+export function snippetShareText(items: SecretItem[]) {
+  return items.map((item) => `${item.label}\n${item.secret.trim().replace(/\[([^\]]+)\]/g, "$1")}`).join("\n\n") + "\n";
+}
