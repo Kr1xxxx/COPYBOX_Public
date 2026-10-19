@@ -100,16 +100,17 @@ are `{ "error": <code>, "message": <plain Chinese> }`.
 
 | Request | Answer |
 | --- | --- |
-| `POST /api/auth/code` `{email}` | `200 {ok:true}` for any well-formed email, registered or not (creates the user on first use; mails the code through Resend). `400 bad_email`, `429 rate_limited`, `503 unavailable` (no `RESEND_API_KEY`), `502 mail_failed` |
-| `POST /api/auth/verify` `{email, code, device?}` | `200 {token, email, signedOut}`; `device` (e.g. "Windows 电脑") is trimmed, cut to 40 characters and kept on the session. At most 3 computers per account (D-069): a 4th sign-in ends the oldest sessions, and `signedOut` lists their device names (`[]` when none). Wrong, expired, used-up or unknown: always `401 bad_code` |
+| `POST /api/auth/code` `{email, turnstile?}` | `200 {ok:true}` for any well-formed email, registered or not (creates the user on first use; mails the code through Resend). `400 bad_email`, `429 rate_limited`, `503 unavailable` (no `RESEND_API_KEY`), `502 mail_failed`. While the secret `TURNSTILE_SECRET` is set (D-086), `turnstile` must be a token the app's Turnstile widget produced, checked with Cloudflare; otherwise `400 captcha` |
+| `POST /api/auth/verify` `{email, code, device?}` | `200 {token, email, signedOut, activated}` (`activated`: the email's domain is a bound company domain, or it redeemed an activation code, D-086); `device` (e.g. "Windows 电脑") is trimmed, cut to 40 characters and kept on the session. At most 3 computers per account (D-069): a 4th sign-in ends the oldest sessions, and `signedOut` lists their device names (`[]` when none). Wrong, expired, used-up or unknown: always `401 bad_code` |
 | `POST /api/auth/logout` (Bearer) | `200 {ok:true}`; ends only that session |
 | `GET /api/vault` (Bearer) | `200 {version, updatedAt, data}` (`data` is the JSON object last uploaded), or `{version:0, updatedAt:null, data:null}` |
 | `PUT /api/vault` (Bearer) `{baseVersion, data}` | `200 {version}` (old + 1). `409 {error:"version_conflict", version}` when `baseVersion` is not the current version; `400 bad_data` when `data` is not an object; `413 too_large` over 5 MB of request, or over 1.9 MB of data while the blobs live in D1 |
 | `DELETE /api/account` (Bearer) | `200 {ok:true}`; deletes the user, all sessions, any code and the blob |
+| `POST /api/activate` (Bearer) `{code}` | `200 {activated:true}` once the code is bound to this email (or the email was already activated); `400 bad_activation_code` for an unknown, malformed or already used code; `429 rate_limited` after 10 tries per IP in an hour. Codes are `XXXX-XXXX-XXXX-XXXX` (Crockford base32; case and dashes do not matter) made on `/admin/` |
 | `GET /api/library` (Bearer) | `200 {domain, library}`: the company 话术 library bound to the account's email domain (KV `domains/<domain>` → code → `sync/<CODE>/snippets.json`, parsed). `{domain:null, library:null}` when the domain is not bound (exact match only, `sales.company.com` does not match `company.com`), is free mail, the code's library is missing or not valid JSON, or `FILES` is not bound. Read on every request, so unbinding takes effect on the next sync. `500 storage_error` when a KV read fails |
 | other `/api/*` | `404 not_found`; a known path with another method `405 method_not_allowed` |
 
-A missing, unknown or expired token is `401 unauthorized`; a token ended by a newer sign-in is `401 device_limit` (D1
+`/api/vault` and `/api/library` answer `403 not_activated` for an email that is neither in a bound company domain nor activated by a code (D-086). A missing, unknown or expired token is `401 unauthorized`; a token ended by a newer sign-in is `401 device_limit` (D1
 `ended_sessions` remembers it until it would have expired). Limits: a code lives 10 minutes and dies after 5 wrong
 tries; at most 5 codes per email and 20 code requests per IP (`CF-Connecting-IP`) each hour; sessions last 90 days.
 
@@ -186,6 +187,7 @@ only asked for a code show 「还没登录过」.
   Removing an address from `ADMIN_EMAILS` ends its sessions at the next request.
 - Page: no inline script, CSP `default-src 'none'` with `'self'` scripts and styles, `X-Frame-Options: DENY`, noindex.
   POSTs must be JSON and from the same origin.
+- Activation codes (D-086): `POST /admin/api/codes {count}` (1–50) makes codes and answers them in plain text once; `GET /admin/api/codes` lists hint, made, redeemed by, when. The user list carries `activated`: `"domain"`, `"code"` or null.
 - Without `DB`, `RESEND_API_KEY` or `ADMIN_EMAILS`, `/admin/api/*` answers 503.
 - First deploy: create the table (`CREATE TABLE IF NOT EXISTS admin_sessions …` from `schema.sql`, D1 query API or
   `wrangler d1 execute`), set `ADMIN_EMAILS`, then `npm run website:deploy`.

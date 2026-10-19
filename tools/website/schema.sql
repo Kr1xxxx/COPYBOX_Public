@@ -60,3 +60,14 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   email TEXT NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+-- Activation codes (D-086): SHA-256 of the code, its first four characters as a hint for the owner's list, and the
+-- email that redeemed it (one code, one email, no expiry; NULL until used).
+CREATE TABLE IF NOT EXISTS activation_codes (
+  code_hash TEXT PRIMARY KEY,
+  hint TEXT,
+  created_at INTEGER,
+  email TEXT,
+  used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS activation_codes_email ON activation_codes (email);

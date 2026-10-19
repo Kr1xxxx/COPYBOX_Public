@@ -38,7 +38,11 @@ const messages = {
   not_found: "找不到这个接口",
   method_not_allowed: "不支持这个操作",
   storage_error: "云端数据读写失败，请稍后再试",
+  captcha: "请先完成人机验证",
+  bad_activation_code: "激活码不对或已经用过",
+  not_activated: "这个邮箱还没激活",
 };
+const activationsPerIpPerHour = 10;
 
 // ---- helpers ----
 
@@ -301,6 +305,73 @@ async function unsealVault(key, userId, bytes) {
   return new TextDecoder().decode(plain);
 }
 
+// ---- 人机验证 (Cloudflare Turnstile) and activation (D-086) ----
+
+// True when Turnstile accepts the widget's response token. Only called while the secret TURNSTILE_SECRET is set.
+export async function verifyTurnstile(env, token, ip) {
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token, remoteip: ip }),
+    });
+    const result = await response.json();
+    return result?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// Activation codes look like 7KQ2-M9AB-X3TD-5RWP: 16 Crockford base32 characters (no I, L, O, U). Typed codes may
+// come in lower case or without dashes; anything else is null.
+const codeAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export function randomActivationCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  // 32 letters divide 256 evenly, so `& 31` is uniform.
+  const text = [...bytes].map((byte) => codeAlphabet[byte & 31]).join("");
+  return text.match(/.{4}/g).join("-");
+}
+
+export function normalizeActivationCode(value) {
+  if (typeof value !== "string") return null;
+  const text = value.toUpperCase().replace(/[^0-9A-Z]/g, "");
+  return text.length === 16 && [...text].every((char) => codeAlphabet.includes(char)) ? text : null;
+}
+
+// An email is activated when it redeemed a code, or when its domain is bound to a company library (KV domains/<domain>,
+// sync.mjs --link-domain); free-mail domains are never bound.
+export async function isActivated(env, email) {
+  const row = await env.DB.prepare("SELECT 1 AS yes FROM activation_codes WHERE email = ? LIMIT 1").bind(email).first();
+  if (row) return true;
+  const domain = emailDomain(email);
+  if (!domain || isFreeMailDomain(domain) || !env.FILES) return false;
+  try {
+    return typeof (await env.FILES.get(`domains/${domain}`)) === "string";
+  } catch {
+    return false;
+  }
+}
+
+// POST /api/activate {code}: binds the code to the signed-in email. A code already bound to another email, an unknown
+// code and a malformed one all answer the same 400. An email that is already activated gets 200 whatever it sends.
+async function activate(request, env, auth, now) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  if (!(await allowRequest(env.DB, `activate:${ip}`, activationsPerIpPerHour, now))) return fail(429, "rate_limited");
+  const parsed = await readJson(request, maxSmallBody);
+  if (parsed.status === 413) return fail(413, "too_large");
+  const user = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
+  if (!user) return fail(401, "unauthorized");
+  if (await isActivated(env, user.email)) return json({ activated: true });
+  const code = normalizeActivationCode(parsed.body?.code);
+  if (!code) return fail(400, "bad_activation_code");
+  const bound = await env.DB.prepare("UPDATE activation_codes SET email = ?, used_at = ? WHERE code_hash = ? AND email IS NULL")
+    .bind(user.email, now, await sha256Hex(code))
+    .run();
+  if (changes(bound) !== 1) return fail(400, "bad_activation_code");
+  return json({ activated: true });
+}
+
 // ---- endpoints ----
 
 export async function sendCodeMail(env, email, code) {
@@ -328,6 +399,11 @@ async function requestCode(request, env, now) {
   if (parsed.status === 413) return fail(413, "too_large");
   const email = normalizeEmail(parsed.body?.email);
   if (!email) return fail(400, "bad_email");
+  // 人机验证 (D-086): enforced once the secret is set, so apps without the widget keep working until then.
+  if (env.TURNSTILE_SECRET) {
+    const token = parsed.body?.turnstile;
+    if (typeof token !== "string" || !token || !(await verifyTurnstile(env, token, ip))) return fail(400, "captcha");
+  }
   if (!(await allowRequest(db, `email:${email}`, codesPerEmailPerHour, now))) return fail(429, "rate_limited");
   await sweep(db, now);
   await ensureUser(db, email, now);
@@ -373,7 +449,7 @@ async function verifyCode(request, env, now) {
     .bind(tokenHash, user.id, now + sessionLifetime, deviceName(parsed.body.device))
     .run();
   const signedOut = await keepNewestSessions(db, user.id, tokenHash, now);
-  return json({ token, email, signedOut });
+  return json({ token, email, signedOut, activated: await isActivated(env, email) });
 }
 
 async function logout(env, auth) {
@@ -481,7 +557,9 @@ const routes = {
   "/api/vault": { GET: "getVault", PUT: "putVault" },
   "/api/account": { DELETE: "deleteAccount" },
   "/api/library": { GET: "getLibrary" },
+  "/api/activate": { POST: "activate" },
 };
+const needsActivation = new Set(["getVault", "putVault", "getLibrary"]);
 
 // Answers every request under /api/. `now` is for tests.
 export async function handleApi(request, env, now = Date.now()) {
@@ -500,6 +578,11 @@ export async function handleApi(request, env, now = Date.now()) {
   if (!auth) return fail(401, "unauthorized");
   if (auth.ended) return fail(401, "device_limit");
   if (action === "logout") return logout(env, auth);
+  if (action === "activate") return activate(request, env, auth, now);
+  if (needsActivation.has(action)) {
+    const user = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
+    if (!user || !(await isActivated(env, user.email))) return fail(403, "not_activated");
+  }
   if (action === "getVault") return getVault(env, auth);
   if (action === "putVault") return putVault(request, env, auth, now);
   if (action === "getLibrary") return getLibrary(env, auth);

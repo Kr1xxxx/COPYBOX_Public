@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { deviceName, emailDomain, handleApi, normalizeEmail, randomCode } from "../tools/website/api.mjs";
+import { deviceName, emailDomain, handleApi, normalizeActivationCode, normalizeEmail, randomActivationCode, randomCode } from "../tools/website/api.mjs";
 import worker from "../tools/website/worker.mjs";
 
 // D1 stand-in on an in-memory SQLite database with the real schema.sql: prepare().bind().first()/run()/all().
@@ -89,12 +89,19 @@ function codeFrom(mail) {
   return /(\d{6})/.exec(mail.body.text)[1];
 }
 
-async function signIn(env, sent, email = "Staff@Example.com ") {
+// Marks the email as activated (D-086) the way a redeemed code does, so the sync tests are not about activation.
+function activateEmail(env, email) {
+  env.DB.sqlite.prepare("INSERT OR IGNORE INTO activation_codes (code_hash, hint, created_at, email, used_at) VALUES (?, 'TEST', ?, ?, ?)")
+    .run(`hash-for-${normalizeEmail(email)}`, clock, normalizeEmail(email), clock);
+}
+
+async function signIn(env, sent, email = "Staff@Example.com ", { activated = true } = {}) {
   const asked = await call(env, "POST", "/api/auth/code", { body: { email } });
   assert.equal(asked.status, 200);
   const code = codeFrom(sent.at(-1));
   const verified = await call(env, "POST", "/api/auth/verify", { body: { email, code, device: "Windows 电脑" } });
   assert.equal(verified.status, 200);
+  if (activated) activateEmail(env, email);
   return (await verified.json()).token;
 }
 
@@ -344,6 +351,7 @@ test("api: logout ends only that session", async (t) => {
 
 async function signInAs(env, sent, device, now) {
   const email = "staff@example.com";
+  activateEmail(env, email);
   assert.equal((await call(env, "POST", "/api/auth/code", { body: { email }, now })).status, 200);
   const verified = await call(env, "POST", "/api/auth/verify", { body: { email, code: codeFrom(sent.at(-1)), device }, now });
   assert.equal(verified.status, 200);
@@ -607,4 +615,148 @@ test("api: GET /api/library needs a sign-in (401), only allows GET (405) and nee
   }
   const unavailable = await call(fakeEnv({ DB: undefined, FILES: env.FILES }), "GET", "/api/library", { token });
   assert.equal(unavailable.status, 503);
+});
+
+// ---- 人机验证 and activation (D-086) ----
+
+// Replaces fetch for Resend and Turnstile: `captcha` says what siteverify answers; returns the calls made.
+function stubMailAndTurnstile(t, captcha = true) {
+  const calls = { mails: [], verifies: [] };
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (url === "https://api.resend.com/emails") {
+      calls.mails.push({ headers: init.headers, body: JSON.parse(init.body) });
+      return new Response("{}", { status: 200 });
+    }
+    assert.equal(url, "https://challenges.cloudflare.com/turnstile/v0/siteverify");
+    calls.verifies.push(Object.fromEntries(new URLSearchParams(init.body)));
+    return new Response(JSON.stringify({ success: captcha }), { status: 200 });
+  };
+  t.after(() => {
+    globalThis.fetch = original;
+  });
+  return calls;
+}
+
+test("api: with TURNSTILE_SECRET set, a code request needs a Turnstile token that Cloudflare accepts", async (t) => {
+  const env = fakeEnv({ TURNSTILE_SECRET: "0x-secret" });
+  const calls = stubMailAndTurnstile(t);
+  for (const body of [{ email: "a@example.com" }, { email: "a@example.com", turnstile: "" }, { email: "a@example.com", turnstile: 7 }]) {
+    const refused = await call(env, "POST", "/api/auth/code", { body });
+    assert.equal(refused.status, 400);
+    assert.deepEqual(await refused.json(), { error: "captcha", message: "请先完成人机验证" });
+  }
+  assert.deepEqual(calls.verifies, []);
+  assert.equal(calls.mails.length, 0);
+
+  const ok = await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com", turnstile: "tok-123" }, ip: "198.51.100.9" });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(calls.verifies, [{ secret: "0x-secret", response: "tok-123", remoteip: "198.51.100.9" }]);
+  assert.equal(calls.mails.length, 1);
+  // A malformed email is refused before Turnstile is asked.
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "nope", turnstile: "tok-456" } })).status, 400);
+  assert.equal(calls.verifies.length, 1);
+});
+
+test("api: a Turnstile token Cloudflare rejects is a 400 and sends no mail; without the secret no token is needed", async (t) => {
+  const rejected = fakeEnv({ TURNSTILE_SECRET: "0x-secret" });
+  const calls = stubMailAndTurnstile(t, false);
+  const refused = await call(rejected, "POST", "/api/auth/code", { body: { email: "a@example.com", turnstile: "tok-bad" } });
+  assert.equal((await refused.json()).error, "captcha");
+  assert.equal(calls.mails.length, 0);
+  assert.equal(count(rejected, "login_codes"), 0);
+
+  const open = fakeEnv();
+  assert.equal((await call(open, "POST", "/api/auth/code", { body: { email: "a@example.com" } })).status, 200);
+  assert.equal(calls.verifies.length, 1);
+  assert.equal(calls.mails.length, 1);
+});
+
+test("api: activation codes are 16 Crockford letters in groups of four; typed codes are cleaned up", () => {
+  const seen = new Set();
+  for (let i = 0; i < 200; i += 1) {
+    const code = randomActivationCode();
+    assert.match(code, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
+    seen.add(code);
+  }
+  assert.equal(seen.size, 200);
+  assert.equal(normalizeActivationCode(" 7kq2-m9ab x3td_5rwp "), "7KQ2M9ABX3TD5RWP");
+  assert.equal(normalizeActivationCode("7KQ2M9ABX3TD5RW"), null);
+  assert.equal(normalizeActivationCode("7KQ2M9ABX3TD5RWI"), null);
+  assert.equal(normalizeActivationCode(12345), null);
+});
+
+// Puts an unused code into the table the way /admin does, and returns the plain code.
+function issueCode(env) {
+  const code = randomActivationCode();
+  const hash = createHash("sha256").update(code.replaceAll("-", "")).digest("hex");
+  env.DB.sqlite.prepare("INSERT INTO activation_codes (code_hash, hint, created_at) VALUES (?, ?, ?)").run(hash, code.slice(0, 4), clock);
+  return code;
+}
+
+test("api: an email outside a company domain is not activated until it redeems a code; sync waits for that", async (t) => {
+  const env = libraryEnv({ "domains/company.com": "XS-7KQ2M9AB", "sync/XS-7KQ2M9AB/snippets.json": JSON.stringify(companyLibrary) });
+  const sent = stubMail(t);
+  await call(env, "POST", "/api/auth/code", { body: { email: "buyer@gmail.com" } });
+  const signedIn = await (await call(env, "POST", "/api/auth/verify", { body: { email: "buyer@gmail.com", code: codeFrom(sent.at(-1)) } })).json();
+  assert.equal(signedIn.activated, false);
+  const { token } = signedIn;
+  for (const [method, path] of [["GET", "/api/vault"], ["PUT", "/api/vault"], ["GET", "/api/library"]]) {
+    const blocked = await call(env, method, path, { token, body: method === "PUT" ? { baseVersion: 0, data: {} } : undefined });
+    assert.equal(blocked.status, 403, path);
+    assert.deepEqual(await blocked.json(), { error: "not_activated", message: "这个邮箱还没激活" });
+  }
+
+  const wrong = await call(env, "POST", "/api/activate", { token, body: { code: "0000-0000-0000-0000" } });
+  assert.equal(wrong.status, 400);
+  assert.deepEqual(await wrong.json(), { error: "bad_activation_code", message: "激活码不对或已经用过" });
+  assert.equal((await call(env, "POST", "/api/activate", { token, body: { code: "short" } })).status, 400);
+  assert.equal((await call(env, "POST", "/api/activate", { token, body: {} })).status, 400);
+
+  const code = issueCode(env);
+  const activated = await call(env, "POST", "/api/activate", { token, body: { code: code.toLowerCase() } });
+  assert.equal(activated.status, 200);
+  assert.deepEqual(await activated.json(), { activated: true });
+  const row = env.DB.sqlite.prepare("SELECT email, used_at FROM activation_codes").get();
+  assert.equal(row.email, "buyer@gmail.com");
+  assert.equal(row.used_at, clock);
+  assert.equal((await call(env, "GET", "/api/vault", { token })).status, 200);
+  assert.deepEqual((await library(env, token)).body, { domain: null, library: null });
+  // The same code again from the same email is fine; from another email it is used up.
+  assert.equal((await call(env, "POST", "/api/activate", { token, body: { code } })).status, 200);
+  await call(env, "POST", "/api/auth/code", { body: { email: "second@gmail.com" } });
+  const second = await (await call(env, "POST", "/api/auth/verify", { body: { email: "second@gmail.com", code: codeFrom(sent.at(-1)) } })).json();
+  assert.equal((await call(env, "POST", "/api/activate", { token: second.token, body: { code } })).status, 400);
+  // A later sign-in of the activated email says so.
+  await call(env, "POST", "/api/auth/code", { body: { email: "buyer@gmail.com" } });
+  const again = await (await call(env, "POST", "/api/auth/verify", { body: { email: "buyer@gmail.com", code: codeFrom(sent.at(-1)) } })).json();
+  assert.equal(again.activated, true);
+});
+
+test("api: a company-domain email is activated by its domain; logout and account deletion never need activation", async (t) => {
+  const env = libraryEnv({ "domains/company.com": "XS-7KQ2M9AB" });
+  const sent = stubMail(t);
+  await call(env, "POST", "/api/auth/code", { body: { email: "staff@company.com" } });
+  const staff = await (await call(env, "POST", "/api/auth/verify", { body: { email: "staff@company.com", code: codeFrom(sent.at(-1)) } })).json();
+  assert.equal(staff.activated, true);
+  assert.equal((await call(env, "GET", "/api/vault", { token: staff.token })).status, 200);
+  assert.equal((await call(env, "POST", "/api/activate", { token: staff.token, body: { code: "x" } })).status, 200);
+
+  await call(env, "POST", "/api/auth/code", { body: { email: "buyer@gmail.com" } });
+  const buyer = await (await call(env, "POST", "/api/auth/verify", { body: { email: "buyer@gmail.com", code: codeFrom(sent.at(-1)) } })).json();
+  assert.equal((await call(env, "POST", "/api/auth/logout", { token: buyer.token })).status, 200);
+  await call(env, "POST", "/api/auth/code", { body: { email: "buyer@gmail.com" } });
+  const back = await (await call(env, "POST", "/api/auth/verify", { body: { email: "buyer@gmail.com", code: codeFrom(sent.at(-1)) } })).json();
+  assert.equal((await call(env, "DELETE", "/api/account", { token: back.token })).status, 200);
+  assert.equal((await call(env, "POST", "/api/activate", { body: { code: "x" } })).status, 401);
+});
+
+test("api: at most 10 activation tries per IP each hour", async (t) => {
+  const env = fakeEnv();
+  const sent = stubMail(t);
+  const token = await signIn(env, sent, "buyer@gmail.com", { activated: false });
+  for (let i = 0; i < 10; i += 1) assert.equal((await call(env, "POST", "/api/activate", { token, body: { code: "0000-0000-0000-0000" } })).status, 400);
+  const limited = await call(env, "POST", "/api/activate", { token, body: { code: issueCode(env) } });
+  assert.equal(limited.status, 429);
+  assert.equal((await call(env, "POST", "/api/activate", { token, body: { code: issueCode(env) }, now: clock + 61 * 60 * 1000 })).status, 200);
 });

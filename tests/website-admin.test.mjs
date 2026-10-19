@@ -146,6 +146,8 @@ test("admin: the user list shows sign-in, sync, devices and size, never content"
   const first = await (await app(env, "POST", "/api/auth/verify", { body: { email: "staff@example.com", code: codeOf(sent.at(-1)), device: "Windows 电脑" } })).json();
   await app(env, "POST", "/api/auth/code", { body: { email: "staff@example.com" }, now: clock + day });
   await app(env, "POST", "/api/auth/verify", { body: { email: "staff@example.com", code: codeOf(sent.at(-1)), device: "<b>Mac</b>" }, now: clock + day });
+  // Sync needs activation (D-086): the staff member redeemed a code.
+  env.DB.sqlite.prepare("INSERT INTO activation_codes (code_hash, hint, created_at, email, used_at) VALUES ('h', 'TEST', ?, 'staff@example.com', ?)").run(clock, clock);
   assert.equal((await app(env, "PUT", "/api/vault", { body: { baseVersion: 0, data: { secret: "客户密码 hunter2" } }, token: first.token, now: clock + day })).status, 200);
   await app(env, "POST", "/api/auth/code", { body: { email: "typo@example.com" }, now: clock + 2 * day });
 
@@ -160,6 +162,8 @@ test("admin: the user list shows sign-in, sync, devices and size, never content"
   const [typo, staff] = users;
   assert.equal(typo.lastSignInAt, null);
   assert.equal(typo.devices, 0);
+  assert.equal(typo.activated, null);
+  assert.equal(staff.activated, "code");
   assert.equal(staff.createdAt, clock);
   assert.equal(staff.lastSignInAt, clock + day);
   assert.equal(staff.lastSyncAt, clock + day);
@@ -215,4 +219,49 @@ test("admin: the worker routes /admin with HSTS and keeps the rest of the site",
   );
   assert.equal(post.status, 200);
   assert.equal((await worker.fetch(new Request("https://copyboxx.com/administrator"), env)).status, 404);
+});
+
+test("admin: the owner makes activation codes, sees them once, and the list shows who redeemed them", async (t) => {
+  const sent = stubMail(t);
+  const env = fakeEnv({ FILES: { async list() { return { keys: [{ name: "domains/company.com" }] }; }, async get(key) { return key === "domains/company.com" ? "XS-7KQ2M9AB" : null; } } });
+  assert.equal((await admin(env, "POST", "/admin/api/codes", { body: { count: 2 } })).status, 401);
+  const cookie = await adminSignIn(env, sent);
+  assert.equal((await admin(env, "POST", "/admin/api/codes", { body: { count: 0 }, cookie })).status, 400);
+  assert.equal((await admin(env, "POST", "/admin/api/codes", { body: { count: 51 }, cookie })).status, 400);
+  const made = await admin(env, "POST", "/admin/api/codes", { body: { count: 2 }, cookie });
+  assert.equal(made.status, 200);
+  const { codes } = await made.json();
+  assert.equal(codes.length, 2);
+  for (const code of codes) assert.match(code, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
+  // Only hashes are stored.
+  const stored = env.DB.sqlite.prepare("SELECT code_hash, hint, email FROM activation_codes").all();
+  assert.equal(stored.length, 2);
+  for (const row of stored) {
+    assert.match(row.code_hash, /^[0-9a-f]{64}$/);
+    assert.ok(codes.some((code) => code.startsWith(row.hint)));
+    assert.equal(row.email, null);
+  }
+  const one = await (await admin(env, "POST", "/admin/api/codes", { body: {}, cookie })).json();
+  assert.equal(one.codes.length, 1);
+
+  // A buyer redeems the first code; a company address needs none.
+  await app(env, "POST", "/api/auth/code", { body: { email: "buyer@gmail.com" } });
+  const buyer = await (await app(env, "POST", "/api/auth/verify", { body: { email: "buyer@gmail.com", code: codeOf(sent.at(-1)) } })).json();
+  assert.equal(buyer.activated, false);
+  assert.equal((await app(env, "POST", "/api/activate", { token: buyer.token, body: { code: codes[0] }, now: clock + day })).status, 200);
+  await app(env, "POST", "/api/auth/code", { body: { email: "staff@company.com" } });
+  await app(env, "POST", "/api/auth/verify", { body: { email: "staff@company.com", code: codeOf(sent.at(-1)) } });
+
+  const listed = await (await admin(env, "GET", "/admin/api/codes", { cookie })).json();
+  assert.equal(listed.codes.length, 3);
+  const redeemed = listed.codes.find((code) => code.email);
+  assert.equal(redeemed.hint, codes[0].slice(0, 4));
+  assert.equal(redeemed.email, "buyer@gmail.com");
+  assert.equal(redeemed.usedAt, clock + day);
+  assert.ok(listed.codes.every((code) => !("code" in code)), "plain codes are never listed");
+
+  const { users } = await (await admin(env, "GET", "/admin/api/users", { cookie })).json();
+  assert.equal(users.find((user) => user.email === "buyer@gmail.com").activated, "code");
+  assert.equal(users.find((user) => user.email === "staff@company.com").activated, "domain");
+  assert.equal(users.find((user) => user.email === "owner@example.com")?.activated ?? null, null);
 });
