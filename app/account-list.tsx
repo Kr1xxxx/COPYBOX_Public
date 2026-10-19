@@ -11,7 +11,7 @@ import { SiteBadge } from "./site-badge";
 import { Icon, VaultMark } from "./ui-atoms";
 import { clearSampleEntries, isSampleId, previewClearSamples } from "./vault-samples";
 
-const KIND_CHOICES: EntryKind[] = ["login", "payment", "apikey", "totp", "recovery", "note", "other"];
+const KIND_CHOICES: EntryKind[] = ["login", "payment", "address", "apikey", "totp", "recovery", "note", "other"];
 
 // The 账号 list: one row style for every type, each row led by its website's logo (the card title carries it only when 收起).
 // The row opens its entry; one button copies the most useful thing;
@@ -43,7 +43,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
   }, [entries, trashed, category, view, query]);
   // 最近使用 and 回收站 are plain lists (newest first); everything else is one card per website.
   const groups = useMemo(() => (view === "recent" || view === "trash" ? (shown.length ? [{ key: "flat", title: view === "recent" ? "最近使用" : "回收站", site: UNKNOWN_SITE, entries: shown }] : []) : groupBySite(shown)), [shown, view]);
-  const siteNames = useMemo(() => [...new Set(entries.map((entry) => entry.site).filter((site) => site.key !== "other" && site.key !== "payment" && site.key !== "note").map((site) => site.name))], [entries]);
+  const siteNames = useMemo(() => [...new Set(entries.map((entry) => entry.site).filter((site) => site.key !== "other" && site.key !== "payment" && site.key !== "address" && site.key !== "note").map((site) => site.name))], [entries]);
   const hasSamples = view === "all" && category === "all" && !query.trim() && entries.some((entry) => !entry.legacy && isSampleId(entry.id));
 
   async function copy(entry: AccountEntry) {
@@ -136,7 +136,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
       <div className="vault-groups">
         {groups.map((group) => (
           <section key={group.key} className="vault-group" aria-label={group.title}>
-            <h3>{folded && !selecting && group.key !== "payment" && group.key !== "note" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
+            <h3>{folded && !selecting && group.key !== "payment" && group.key !== "address" && group.key !== "note" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
             {(!folded || selecting || group.key === "flat") && <ul className="totp-list">
               {group.entries.map((entry) => (
                 <li key={entry.target} className={`vault-entry-row acct-row${selecting ? " selecting" : ""}`}>

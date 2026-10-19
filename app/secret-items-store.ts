@@ -4,7 +4,7 @@
 import { derivePbkdf2AesKey } from "./key-cache.ts";
 import { serialFor } from "./store-queue.ts";
 import { assertWritesOpen } from "./write-gate.ts";
-import type { ApiKeyItem, LoginItem, MarkItem, NoteItem, PaymentItem, RecoveryItem } from "./payment-core.ts";
+import type { AddressItem, ApiKeyItem, LoginItem, MarkItem, NoteItem, PaymentItem, RecoveryItem } from "./payment-core.ts";
 
 // Fired after every write, so the sidebar counts of the 账号 page stay right.
 export const VAULT_CHANGED_EVENT = "clipbox:vault-changed";
@@ -12,7 +12,7 @@ export const SECRET_ITEMS_KEY = "clipbox.vault-items.v1";
 const ITERATIONS = 310_000;
 const LABEL = new TextEncoder().encode("clipbox-vault-items:items");
 
-export type VaultItem = PaymentItem | LoginItem | ApiKeyItem | RecoveryItem | NoteItem | MarkItem;
+export type VaultItem = PaymentItem | AddressItem | LoginItem | ApiKeyItem | RecoveryItem | NoteItem | MarkItem;
 
 type Envelope = { version: 1; salt: string; iv: string; ciphertext: string; iterations: number };
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { addressBlock, addressHint } from "./address-core";
 import { apiKeyHint, apiSecretFields } from "./apikey-core";
-import { type AccountEntry, type EntryKind, NOTE_SITE, UNKNOWN_SITE } from "./account-view";
+import { type AccountEntry, type EntryKind, ADDRESS_SITE, NOTE_SITE, UNKNOWN_SITE } from "./account-view";
 import { noteHint, plainText } from "./note-core";
 import { buildEnglishBlock, paymentHint, type EntryMeta, type MarkItem } from "./payment-core";
 import { classifySecret } from "./secret-classify";
@@ -20,7 +21,7 @@ export function knownSiteOrOther(site: Site): Site {
   return site.key.startsWith("name:") || site.key === "other" ? UNKNOWN_SITE : site;
 }
 
-// Every entry of the 账号 page (all six stored types plus the old 秘密), read from the encrypted stores. It reloads
+// Every entry of the 账号 page (all seven stored types plus the old 秘密), read from the encrypted stores. It reloads
 // whenever a store is written, so the sidebar counts and the list always agree. Examples go in once before the first read.
 export function useAccountEntries(deviceKey: string, legacySecrets: LegacySecret[], enabled: boolean, refreshKey = 0) {
   const [loaded, setLoaded] = useState<{ base: AccountEntry[]; marks: Record<string, MarkItem> } | null>(null);
@@ -68,6 +69,7 @@ export function useAccountEntries(deviceKey: string, legacySecrets: LegacySecret
         else if (item.type === "apikey") add({ id: item.id, tab: "apikey", title: item.name, hint: apiKeyHint(item), site: detectSite({ apiKey: item.key, url: item.endpoint, name: item.service || item.name }), copy: { label: "复制密钥", text: async () => apiSecretFields(item)[0]?.value ?? "" } }, item);
         else if (item.type === "note") add({ id: item.id, tab: "note", title: item.name, hint: noteHint(item.body), search: plainText(item.body), site: NOTE_SITE, copy: { label: "复制笔记", text: async () => item.body } }, item);
         else if (item.type === "recovery") add({ id: item.id, tab: "recovery", title: item.name, hint: `${item.codes.length} 个恢复码`, site: detectSite({ name: item.site || item.name }), copy: { label: "复制全部恢复码", text: async () => item.codes.join("\n") } }, item);
+        else if (item.type === "address") add({ id: item.id, tab: "address", title: item.name, hint: addressHint(item), search: Object.values(item.fields).join(" "), site: ADDRESS_SITE, copy: { label: "复制地址", text: async () => addressBlock(item) } }, item);
         else add({ id: item.id, tab: "payment", title: item.name, hint: paymentHint(item), site: paymentSite(item.kind, item.name), copy: { label: "复制收款信息", text: async () => buildEnglishBlock(item) } }, item);
       }
       for (const account of totps) add({ id: account.id, tab: "totp", title: accountTitle(account), hint: account.name && account.issuer ? account.name : "验证码", site: detectSite({ issuer: account.issuer, name: account.name }), copy: { label: "复制验证码", text: () => generateTotp(account, Date.now()) } }, account);
@@ -92,7 +94,7 @@ export function useAccountEntries(deviceKey: string, legacySecrets: LegacySecret
 }
 
 export function countByKind(entries: AccountEntry[] | null): Record<EntryKind, number> {
-  const counts: Record<EntryKind, number> = { login: 0, payment: 0, apikey: 0, recovery: 0, totp: 0, note: 0, other: 0 };
+  const counts: Record<EntryKind, number> = { login: 0, payment: 0, address: 0, apikey: 0, recovery: 0, totp: 0, note: 0, other: 0 };
   for (const entry of entries ?? []) counts[entry.tab] += 1;
   return counts;
 }

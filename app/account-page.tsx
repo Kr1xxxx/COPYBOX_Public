@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { AccountList, type AccountView } from "./account-list";
+import { AddressPanel } from "./address-panel";
 import type { AccountEntry, EntryKind } from "./account-view";
 import { ApiKeyPanel } from "./apikey-panel";
 import { ListScrollFrame } from "./list-scroll-rail";
@@ -50,6 +51,7 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
         <div><button type="button" className="secondary-button" onClick={back}>‹ 返回列表</button></div>
         {panel.tab === "login" && <LoginPanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "payment" && <PaymentPanel {...common} />}
+        {panel.tab === "address" && <AddressPanel {...common} />}
         {panel.tab === "apikey" && <ApiKeyPanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "recovery" && <RecoveryPanel {...common} />}
         {panel.tab === "note" && <NotePanel {...common} onShowEntry={showEntry} />}

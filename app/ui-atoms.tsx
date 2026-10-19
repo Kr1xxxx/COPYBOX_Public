@@ -22,6 +22,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   note: <><path d="M7 3.5h7.5L19 8v12.5H7z" /><path d="M14 3.5V8h5M10 12.5h6M10 16h4" /></>,
   shield: <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3z" />,
+  place: <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></>,
   chevron: <path d="m6 9 6 6 6-6" />,
   arrowUp: <path d="M12 19V5M6 11l6-6 6 6" />,
   chevronUp: <path d="M6 14l6-6 6 6" />,
