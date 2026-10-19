@@ -1,4 +1,4 @@
-### D-076 The 账号 page locks only by its timer; while locked its sidebar cannot switch (2026-10-19)
+### D-077 The 账号 page locks only by its timer; while locked its sidebar cannot switch (2026-10-19)
 - Context (owner, 2026-10-19: 「切换页面不会导致上锁,还是按照时间来上锁 / 上锁后目录不能点击切换,要解锁才可以」).
 - Decision (both Windows and Mac; changes part of D-051 and D-070):
   - **No lock on leaving.** Switching to 话术 or 图片 and back no longer locks the 账号 page. It locks again only by the

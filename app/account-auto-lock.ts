@@ -22,7 +22,7 @@ export function autoLockLabel(seconds: AutoLockSeconds): string {
 }
 
 // Whether the countdown runs right now: the 账号 page is open and there is a lock to go back to. It keeps running on the
-// other sections too, since switching sections no longer locks the page (D-076).
+// other sections too, since switching sections no longer locks the page (D-077).
 // With 账号页密码 set, the password screen is that lock (in either window); without it, the slide veil is, which only the
 // full window has (D-051).
 export function autoLockRunning(state: { seconds: number; lockSet: boolean; unlocked: boolean; slideOn: boolean; slidOpen: boolean; fullWindow: boolean }): boolean {

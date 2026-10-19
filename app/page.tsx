@@ -492,14 +492,14 @@ export default function Home() {
   // The 账号页密码 screen, when set, is the only gate. The mini window is left as it was.
   const [slideUnlockOn, setSlideUnlockOn] = useState(() => typeof window === "undefined" || readSlideUnlockOn());
   const [accountSlidOpen, setAccountSlidOpen] = useState(false);
-  // Leaving the 账号 section ends a selection but does not lock it: only the auto-lock timer does (D-076).
+  // Leaving the 账号 section ends a selection but does not lock it: only the auto-lock timer does (D-077).
   const [seenAccountMode, setSeenAccountMode] = useState(accountMode);
   if (seenAccountMode !== accountMode) {
     setSeenAccountMode(accountMode);
     if (!accountMode) setAcctSelecting(false);
   }
   const accountVeiled = accountMode && windowMode === "full" && slideUnlockOn && !lockSet && !accountSlidOpen;
-  // While locked, the 账号 sidebar (全部 / 收藏 / 最近 / 回收站 and 分类) cannot switch views (D-076).
+  // While locked, the 账号 sidebar (全部 / 收藏 / 最近 / 回收站 and 分类) cannot switch views (D-077).
   const accountNavLocked = lockedHere || accountVeiled;
   useEffect(() => {
     const onVisibility = () => { if (document.visibilityState === "hidden") setAccountSlidOpen(false); };

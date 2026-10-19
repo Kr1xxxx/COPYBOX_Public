@@ -77,7 +77,7 @@ for (const platform of ["win32", "darwin"]) {
     await seedSnippets(page);
     await openAccounts(page);
     await expectVeiled(page);
-    // Frosted, the 账号 sidebar cannot switch views (D-076).
+    // Frosted, the 账号 sidebar cannot switch views (D-077).
     await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeDisabled();
     await expect(page.getByRole("navigation", { name: "快捷入口" }).getByRole("button").first()).toBeDisabled();
     await expect(page.getByRole("button", { name: /^回收站/ })).toBeDisabled();
@@ -112,7 +112,7 @@ for (const platform of ["win32", "darwin"]) {
     await page.locator(".menu-scrim").click({ position: { x: 5, y: 5 } });
     await expect(page.getByRole("menuitem")).toHaveCount(0);
 
-    // Leaving the section and coming back keeps it open: only the auto-lock timer frosts it again (D-076).
+    // Leaving the section and coming back keeps it open: only the auto-lock timer frosts it again (D-077).
     await kinds(page).getByRole("button", { name: "话术" }).click();
     await expect(knob(page)).toHaveCount(0);
     await expect(page.locator(".native-row").first()).toBeVisible();

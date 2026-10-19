@@ -34,7 +34,7 @@ for (const platform of ["win32", "darwin"]) {
     const lock = page.getByRole("form", { name: "账号页已上锁" });
     await expect(lock).toBeVisible();
     await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
-    // Locked, the 账号 sidebar cannot switch views (D-076).
+    // Locked, the 账号 sidebar cannot switch views (D-077).
     await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeDisabled();
     await lock.getByLabel("账号页密码").fill("wrong-one");
     await lock.getByRole("button", { name: "打开" }).click();
@@ -145,7 +145,7 @@ test("the recovery code reopens the data and sets a new password; the old passwo
   await recover.getByLabel("恢复码").fill(code.toLowerCase());
   await recover.getByRole("button", { name: "用恢复码重设密码" }).click();
   await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(5);
-  // Leaving the section no longer locks it (D-076); opening the app again does.
+  // Leaving the section no longer locks it (D-077); opening the app again does.
   await page.reload();
   await page.waitForSelector(".app-shell");
   await kinds.getByRole("button", { name: "账号" }).click();

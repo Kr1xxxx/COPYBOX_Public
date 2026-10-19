@@ -1,5 +1,5 @@
 // D-070: 设置 → 安全. Once opened, the 账号 page locks again after 10 / 20 / 30 秒 without activity (20 by default),
-// on whichever section is showing (D-076);
+// on whichever section is showing (D-077);
 // 不上锁 asks first. Works with the slide (frost comes back) and with the 账号页密码 (the password screen comes back).
 import { expect, test } from "@playwright/test";
 import { AUTO_LOCK_KEY, asDesktop, guideSeenState, seedSnippets } from "./helpers.mjs";
@@ -47,7 +47,7 @@ for (const platform of ["win32", "darwin"]) {
   });
 }
 
-test("switching to 话术 keeps the 账号 page open; the countdown still runs there (D-076)", async ({ page }) => {
+test("switching to 话术 keeps the 账号 page open; the countdown still runs there (D-077)", async ({ page }) => {
   await page.clock.install();
   await asDesktop(page, "win32");
   await seedSnippets(page);

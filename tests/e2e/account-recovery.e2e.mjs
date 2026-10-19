@@ -32,7 +32,7 @@ async function unlock(page, password) {
 
 const vault = (page) => page.getByRole("region", { name: "保险箱" });
 
-// Leaving the 账号 section no longer locks it (D-076), so these tests lock it with the auto-lock timer (needs page.clock).
+// Leaving the 账号 section no longer locks it (D-077), so these tests lock it with the auto-lock timer (needs page.clock).
 async function autoLockAfterTenSeconds(settings) {
   await settings.getByRole("radiogroup", { name: "账号页自动上锁" }).getByRole("radio", { name: "10 秒" }).click();
 }
