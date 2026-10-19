@@ -661,3 +661,9 @@ test("snippet numbers are shown as #001 while the stored CB-0001 value stays", a
   assert.equal(displaySnippetNumber(undefined), "");
   assert.equal(formatSnippetNumber(1), "CB-0001");
 });
+
+test("splitParagraphs cuts a long 话术 at blank lines", () => {
+  assert.deepEqual(core.splitParagraphs("Hi [Name]!\n\nPrice is $5.\n  \nThanks\nBye"), ["Hi [Name]!", "Price is $5.", "Thanks\nBye"]);
+  assert.deepEqual(core.splitParagraphs("One line\nand another"), ["One line\nand another"]);
+  assert.deepEqual(core.splitParagraphs("\n\nA\n\n\n\nB\n"), ["A", "B"]);
+});

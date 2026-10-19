@@ -784,3 +784,8 @@ export function countItemsByFolder(list: readonly { folder?: string }[]): Map<st
   }
   return counts;
 }
+
+// A long 话术 is sent as several short messages: its paragraphs are the parts between blank lines.
+export function splitParagraphs(text: string): string[] {
+  return text.split(/\n[ \t]*\n/).map((part) => part.trim()).filter(Boolean);
+}

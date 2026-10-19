@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SecretItem } from "./clipbox-core";
 import { DEFAULT_VALUES } from "./variable-memory";
@@ -76,11 +76,13 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
   })}</>;
 }
 
-export function SnippetFill({ item, state, onState, renderText, onSubmit, onActive, onFocusChange, onPin, isPinned }: {
+export function SnippetFill({ item, state, onState, renderText, renderBody, onSubmit, onActive, onFocusChange, onPin, isPinned }: {
   item: SecretItem;
   state: SnippetFillState;
   onState: (update: (current: SnippetFillState) => SnippetFillState) => void;
   renderText: (text: string) => ReactNode;
+  /** Lays out the text (the page splits long ones into paragraphs); renderPart draws one piece with its blocks. */
+  renderBody: (text: string, renderPart: (part: string) => ReactNode) => ReactNode;
   onSubmit: () => void;
   onActive: (name: string | null) => void;
   onFocusChange: (focused: boolean) => void;
@@ -101,9 +103,9 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
 
   return (
     <div ref={rootRef} className="snippet-fill">
-      <p className="row-content" lang={state.language === "zh" ? "zh" : "en"}>
+      {renderBody(source, (part) => (
         <SnippetVariableText
-          text={source}
+          text={part}
           renderText={renderText}
           values={state.values}
           remembered={state.remembered}
@@ -114,14 +116,18 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
           onPin={onPin}
           isPinned={isPinned}
         />
-      </p>
+      ))}
     </div>
   );
 }
 
 // The choices for a block, shown under it while it is focused. Drawn in the page body so no card can clip it.
-export function VariablePopup({ rowId, name, options, current, onPick }: { rowId: string; name: string; options: readonly string[]; current: string; onPick: (value: string) => void }) {
+export function VariablePopup({ rowId, name, options, current, onPick }: { rowId: string; name: string; options: readonly { label?: string; value: string }[]; current: string; onPick: (value: string) => void }) {
   const [box, setBox] = useState<{ left: number; top: number; below: boolean } | null>(null);
+  // Half the popup's width plus a margin: a wide popup (the four dates) is kept inside the window instead of being cut off.
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [half, setHalf] = useState(0);
+  useLayoutEffect(() => { if (popupRef.current) setHalf(popupRef.current.offsetWidth / 2 + 8); }, [box, options]);
   useEffect(() => {
     const place = () => {
       const input = document.querySelector(`[data-sort-id="${CSS.escape(rowId)}"] input[data-var="${CSS.escape(name)}"]`);
@@ -137,8 +143,8 @@ export function VariablePopup({ rowId, name, options, current, onPick }: { rowId
   }, [rowId, name]);
   if (!box || typeof document === "undefined") return null;
   return createPortal(
-    <div className={`var-popup${box.below ? " below" : ""}`} role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
-      {options.map((option) => <button key={option} type="button" role="option" aria-selected={option === current} className="var-popup-option" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(option)}>{option}</button>)}
+    <div ref={popupRef} className={`var-popup${box.below ? " below" : ""}`} role="listbox" aria-label={`${name} 常用`} style={{ left: Math.max(half, Math.min(box.left, window.innerWidth - half)), top: box.top }}>
+      {options.map(({ label, value }) => <button key={value} type="button" role="option" aria-selected={value === current} className="var-popup-option" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(value)}>{label && <span className="var-popup-label">{label}</span>}{value}</button>)}
     </div>,
     document.body,
   );

@@ -1110,6 +1110,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .var-popup-option { padding: 4px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
 .var-popup-option:hover, .var-popup-option[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
 .var-popup-option:active { scale: .96; }
+.var-popup-label { margin-right: 6px; color: var(--muted); font-weight: 400; }
+.var-popup-option:hover .var-popup-label, .var-popup-option[aria-selected="true"] .var-popup-label { color: inherit; }
 @keyframes var-popup-in { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)); } }
 .var-popup.below { transform: translate(-50%, 6px); animation-name: var-popup-in-below; }
 @keyframes var-popup-in-below { from { opacity: 0; transform: translate(-50%, 2px); } }
@@ -1775,3 +1777,14 @@ button { -webkit-tap-highlight-color: transparent; }
 :root:not(.brand-off) :is(.backup-head > button, .snippet-dialog-head > button) { width: 28px; height: 28px; border-radius: 8px; font-size: 18px; line-height: 1; }
 :root:not(.brand-off) .whats-new-actions { margin-top: 18px; }
 :root:not(.brand-off) .guide-dialog .primary-button { height: 36px; }
+/* Long 话术: one small copy button per paragraph (D of the 2026-10-19 desktop review). */
+.row-paragraphs { display: grid; gap: 8px; }
+.row-paragraph { display: flex; align-items: flex-start; gap: 6px; }
+.row-paragraph-text { flex: 1; min-width: 0; }
+.paragraph-copy { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -1px -4px 0 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; transition: background-color .12s cubic-bezier(.22,1,.36,1), color .12s cubic-bezier(.22,1,.36,1), scale .12s cubic-bezier(.22,1,.36,1); }
+.paragraph-copy .icon { width: 14px; height: 14px; }
+.paragraph-copy:hover { background: var(--fill); color: var(--ink); }
+.paragraph-copy:active { scale: .92; }
+.row-paragraph[data-copied] .paragraph-copy { color: var(--ok); }
+.row-paragraph[data-copied] .row-paragraph-text { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .paragraph-copy { transition: none; } .paragraph-copy:active { scale: 1; } }
