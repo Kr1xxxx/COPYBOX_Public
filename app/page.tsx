@@ -509,9 +509,12 @@ export default function Home() {
   // D-070: once opened, the 账号 page closes again after this many seconds without activity (0 = 不上锁).
   const [autoLockSeconds, setAutoLockSeconds] = useState<AutoLockSeconds>(() => (typeof window === "undefined" ? AUTO_LOCK_DEFAULT : readAutoLockSeconds()));
   const autoLockOn = autoLockRunning({ seconds: autoLockSeconds, lockSet, unlocked: accountUnlocked, slideOn: slideUnlockOn, slidOpen: accountSlidOpen, fullWindow: windowMode === "full" });
-  useAccountAutoLock(autoLockOn, autoLockSeconds, () => {
+  const lockAccountNow = () => {
     if (lockSet) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); } else setAccountSlidOpen(false);
-  });
+  };
+  useAccountAutoLock(autoLockOn, autoLockSeconds, lockAccountNow);
+  // The 上锁 button replaces the 本机加密 note when there is a lock to go back to (password, or the slide in the full window).
+  const canLockAccountNow = lockSet || (slideUnlockOn && windowMode === "full");
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
@@ -2381,7 +2384,9 @@ export default function Home() {
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
                 {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
                 {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
-                <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
+                {canLockAccountNow
+                  ? <button type="button" className="ghost-button select-toggle" title="内容用本机密钥加密保存。点一下马上上锁。" onClick={lockAccountNow}><Icon name="lock" />上锁</button>
+                  : <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span>}</div>
               <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} />

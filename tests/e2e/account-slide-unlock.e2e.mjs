@@ -118,6 +118,9 @@ for (const platform of ["win32", "darwin"]) {
     await expect(page.locator(".native-row").first()).toBeVisible();
     await openAccounts(page);
     await expectOpen(page);
+    // 上锁 frosts it again at once.
+    await page.getByRole("button", { name: "上锁" }).click();
+    await expectVeiled(page);
   });
 
   test(`${platform}: the focused knob opens with its own keys, and hiding the window frosts the page again`, async ({ page }) => {

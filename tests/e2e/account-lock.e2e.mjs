@@ -47,6 +47,9 @@ for (const platform of ["win32", "darwin"]) {
     await kinds.getByRole("button", { name: "账号" }).click();
     await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeEnabled();
+    // 上锁 brings the password screen back at once.
+    await page.getByRole("button", { name: "上锁" }).click();
+    await expect(page.getByRole("form", { name: "账号页已上锁" })).toBeVisible();
   });
 }
 

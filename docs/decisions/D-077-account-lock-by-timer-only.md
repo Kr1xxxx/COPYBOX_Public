@@ -7,5 +7,8 @@
   - **Locked sidebar.** While the 账号页密码 screen or the slide frost shows, the 账号 sidebar buttons (全部 / 收藏 / 最近 /
     回收站 and 分类) are disabled; the mini window's tabs do nothing on the password screen. They work again once unlocked.
     The 话术 / 图片 / 账号 switch stays usable.
+  - **上锁 button.** Beside the 账号 title, the 「本机加密」 note becomes a 「上锁」 button that locks the page at once
+    (owner, 2026-10-19: 「本机加密 改成上锁按钮」). It shows only when there is a lock to go back to (账号页密码, or the
+    slide in the full window); otherwise the 「本机加密」 note stays.
 - Nothing in storage, encryption or the vault changes. Tests: `tests/account-auto-lock.test.mjs`,
   `tests/e2e/account-auto-lock.e2e.mjs`, `tests/e2e/account-lock.e2e.mjs`, `tests/e2e/account-slide-unlock.e2e.mjs`.
