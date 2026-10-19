@@ -30,7 +30,8 @@
     backupImagePrune: function (keep) { return invoke("backup_image_prune", { keep: keep }).then(noop); },
     didCopy: function () { fireAndForget("did_copy"); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
-    setMiniHidePolicy: function (policy) { fireAndForget("set_mini_hide_policy", { policy: policy }); },
+    // Windows 贴边 (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
+    setMiniEdgeSnap: function (on) { fireAndForget("set_mini_edge_snap", { on: Boolean(on) }); },
     setPasteBack: function (enabled, repeatAfter) { fireAndForget("set_paste_back", { enabled: Boolean(enabled), repeatAfter: Number(repeatAfter) || 6 }); },
     getLaunchAtLogin: function () { return invoke("get_launch_at_login"); },
     setLaunchAtLogin: function (enabled) { return invoke("set_launch_at_login", { enabled: Boolean(enabled) }); },
@@ -162,8 +163,18 @@
     }, true);
   }
 
+  // Windows 贴边 (D-079): while the mini window is folded against a screen edge, the page draws a notch-like tab
+  // on the strip that stays visible (globals.css, html[data-mini-fold]).
+  function watchMiniFold() {
+    tauri.event.listen("clipbox:mini-fold", function (event) {
+      if (event.payload === "left" || event.payload === "right") document.documentElement.setAttribute("data-mini-fold", event.payload);
+      else document.documentElement.removeAttribute("data-mini-fold");
+    }).catch(noop);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.documentElement.classList.add("desktop-app", "platform-" + platform);
+    watchMiniFold();
     watchIdle();
     watchTitleDrag();
     quietBrowserChrome();

@@ -1,4 +1,4 @@
-import type { CloseBehavior, MiniHidePolicy, ThemeChoice } from "./preferences";
+import type { CloseBehavior, ThemeChoice } from "./preferences";
 
 // `installable` is false when 立即更新 cannot work here (no checksum in the manifest, or neither Windows nor the Mac); older shells omit it.
 export type UpdateInfo = { status: "disabled" | "current" | "error" } | { status: "available"; version: string; notes: string[]; installable?: boolean };
@@ -29,8 +29,9 @@ export type ClipboxDesktop = {
   backupImageRead?: (name: string) => Promise<Uint8Array>;
   // Removes every picture file not named in `keep`.
   backupImagePrune?: (keep: string[]) => Promise<void>;
+  // Windows only (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
+  setMiniEdgeSnap?: (on: boolean) => void;
   didCopy: () => void;
-  setMiniHidePolicy?: (policy: MiniHidePolicy) => void;
   // 复制后贴到刚才的窗口 (D-081): the shell pastes a mini-window copy into the window the person came from.
   setPasteBack?: (enabled: boolean, repeatAfter: number) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;

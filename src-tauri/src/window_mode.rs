@@ -1,5 +1,5 @@
 // Full and mini window, remembered position, theme: the window parts of desktop/main.cjs.
-use crate::window_state::{self as ws, Bounds, Point};
+use crate::window_state::{self as ws, Bounds, Edge, Point};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -12,11 +12,13 @@ const FILE_MINI: &str = "mini-window-state.json";
 #[derive(Default)]
 struct Inner {
     quick_mode: bool,
-    /// Opened by the tray or 快速搜索: the window may hide itself after a copy.
-    mini_auto_hide: bool,
     /// 固定在最上层 in the full window (the page remembers it and sends it on start).
     pinned: bool,
     normal: Option<Bounds>,
+    /// Windows 贴边 (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
+    edge_snap: bool,
+    dock: Option<(Edge, Point)>,
+    folded: bool,
 }
 
 /// Whether the window stays above others: the mini window always does, the full window only when pinned.
@@ -57,7 +59,14 @@ fn work_areas(app: &AppHandle) -> Vec<Bounds> {
 /// Where the full window starts: the saved place, or None for the default size in the middle.
 pub fn saved_full_bounds(app: &AppHandle) -> Option<Bounds> {
     let saved = ws::read_json::<Bounds>(&data_file(app, FILE_FULL)?);
-    ws::normalize_bounds(saved, &work_areas(app))
+    let b = ws::normalize_bounds(saved, &work_areas(app))?;
+    // A window saved before the Mac size limit (D-079) opens at the limit.
+    let (w, h) = ws::full_max_size().unwrap_or((b.width, b.height));
+    Some(Bounds { width: b.width.min(w), height: b.height.min(h), ..b })
+}
+
+fn full_max_size() -> Option<LogicalSize<f64>> {
+    ws::full_max_size().map(|(w, h)| LogicalSize::new(w, h))
 }
 
 fn current_bounds(window: &WebviewWindow) -> Option<Bounds> {
@@ -77,15 +86,12 @@ impl WindowMode {
         self.inner.lock().unwrap().quick_mode
     }
 
-    pub fn mini_auto_hide(&self) -> bool {
-        self.inner.lock().unwrap().mini_auto_hide
-    }
-
     /// Writes the full-window size or the mini position, whichever is showing.
     pub fn save_now(&self, window: &WebviewWindow) {
         let app = window.app_handle();
         let quick = self.is_mini();
         if quick {
+            self.settle_mini(window);
             if let (Some(b), Some(path)) = (current_bounds(window), data_file(app, FILE_MINI)) {
                 if ws::normalize_mini_position(Some(Point { x: b.x, y: b.y }), &work_areas(app)).is_some() {
                     ws::write_json(&path, &Point { x: b.x, y: b.y });
@@ -113,9 +119,55 @@ impl WindowMode {
         });
     }
 
-    pub fn enter_mini(&self, window: &WebviewWindow, auto_hide: bool) {
+    /// Once the mini window has come to rest (Windows, 贴边 on): stick it to a nearby screen edge, or forget the edge.
+    fn settle_mini(&self, window: &WebviewWindow) {
+        let (snap, folded) = {
+            let inner = self.inner.lock().unwrap();
+            (inner.edge_snap, inner.folded)
+        };
+        if !snap || folded {
+            return;
+        }
+        let app = window.app_handle();
+        let here = current_bounds(window);
+        let dock = here.and_then(|b| ws::mini_dock(Point { x: b.x, y: b.y }, &work_areas(app)));
+        if let (Some((_, p)), Some(b)) = (dock, here) {
+            // Only move when it is really somewhere else: moving fires another Moved event, which lands here again.
+            if (b.x - p.x).abs() > 1.0 || (b.y - p.y).abs() > 1.0 {
+                let _ = window.set_position(LogicalPosition::new(p.x, p.y));
+            }
+        }
+        self.inner.lock().unwrap().dock = dock;
+    }
+
+    /// Brings a folded mini window back out and forgets its edge.
+    fn undock(&self, window: &WebviewWindow) {
+        let folded = {
+            let mut inner = self.inner.lock().unwrap();
+            let folded = inner.folded.then_some(inner.dock).flatten();
+            inner.dock = None;
+            inner.folded = false;
+            folded
+        };
+        if let Some((_, p)) = folded {
+            let _ = window.set_position(LogicalPosition::new(p.x, p.y));
+            emit_fold(window, None);
+        }
+    }
+
+    pub fn set_edge_snap(&self, window: &WebviewWindow, on: bool) {
+        self.inner.lock().unwrap().edge_snap = on;
+        if on {
+            if self.is_mini() {
+                self.settle_mini(window);
+            }
+        } else {
+            self.undock(window);
+        }
+    }
+
+    pub fn enter_mini(&self, window: &WebviewWindow) {
         if self.is_mini() {
-            self.inner.lock().unwrap().mini_auto_hide = auto_hide;
             self.emit_mode(window);
             return;
         }
@@ -130,7 +182,6 @@ impl WindowMode {
         {
             let mut inner = self.inner.lock().unwrap();
             inner.quick_mode = true;
-            inner.mini_auto_hide = auto_hide;
         }
         let app = window.app_handle();
         let saved = data_file(app, FILE_MINI)
@@ -150,6 +201,7 @@ impl WindowMode {
         let _ = window.set_always_on_top(true);
         // Some platforms apply the new minimum size only after the first resize, so ask again.
         let _ = window.set_size(LogicalSize::new(ws::MINI_WIDTH, ws::MINI_HEIGHT));
+        self.settle_mini(window);
         self.emit_mode(window);
     }
 
@@ -171,16 +223,17 @@ impl WindowMode {
             return;
         }
         self.save_now(window);
+        self.undock(window);
         let normal = self.inner.lock().unwrap().normal;
         {
             let mut inner = self.inner.lock().unwrap();
             inner.quick_mode = false;
-            inner.mini_auto_hide = false;
         }
         let pinned = self.inner.lock().unwrap().pinned;
         let _ = window.set_always_on_top(stays_on_top(false, pinned));
-        let _ = window.set_max_size(None::<LogicalSize<f64>>);
-        let _ = window.set_maximizable(true);
+        // macOS (D-079): the full window keeps its size limit and its zoom button stays off, so no full screen.
+        let _ = window.set_max_size(full_max_size());
+        let _ = window.set_maximizable(ws::full_max_size().is_none());
         let _ = window.set_min_size(Some(LogicalSize::new(ws::MIN_WIDTH, ws::MIN_HEIGHT)));
         if let Some(b) = normal {
             let _ = window.set_size(LogicalSize::new(b.width, b.height));
@@ -190,6 +243,65 @@ impl WindowMode {
     }
 }
 
+/// Tells the page which edge the mini window is folded against ("" when it is out), so it can draw the notch-like tab.
+fn emit_fold(window: &WebviewWindow, edge: Option<Edge>) {
+    let _ = window.emit("clipbox:mini-fold", match edge { Some(Edge::Left) => "left", Some(Edge::Right) => "right", None => "" });
+}
+
+/// Glides the mini window between its stuck and its folded place in about 150 ms (owner: 「弹出做动效」).
+fn slide(window: &WebviewWindow, from: f64, to: f64, y: f64) {
+    const STEPS: u32 = 10;
+    for step in 1..=STEPS {
+        let _ = window.set_position(LogicalPosition::new(ws::slide_x(from, to, step, STEPS), y));
+        std::thread::sleep(Duration::from_millis(15));
+    }
+}
+
+fn mouse_over(app: &AppHandle, window: &WebviewWindow) -> bool {
+    let (Ok(c), Ok(p), Ok(s)) = (app.cursor_position(), window.outer_position(), window.outer_size()) else { return false };
+    c.x >= p.x as f64 && c.x < (p.x + s.width as i32) as f64 && c.y >= p.y as f64 && c.y < (p.y + s.height as i32) as f64
+}
+
+/// Windows 贴边 (D-079): a docked mini window folds away half a second after the mouse leaves it and slides out
+/// as soon as the mouse touches the strip or the window gets the focus (the tray's 快速搜索).
+pub fn watch_mouse(app: AppHandle, mode: WindowMode) {
+    if !cfg!(target_os = "windows") {
+        return;
+    }
+    std::thread::spawn(move || {
+        let mut away = 0u8;
+        loop {
+            std::thread::sleep(Duration::from_millis(100));
+            let (dock, folded) = {
+                let inner = mode.inner.lock().unwrap();
+                (inner.dock.filter(|_| inner.quick_mode && inner.edge_snap), inner.folded)
+            };
+            let Some((edge, docked)) = dock else { away = 0; continue };
+            let Some(window) = app.get_webview_window("main") else { continue };
+            if !window.is_visible().unwrap_or(false) {
+                continue;
+            }
+            let near = window.is_focused().unwrap_or(false) || mouse_over(&app, &window);
+            if folded && near {
+                emit_fold(&window, None);
+                slide(&window, ws::mini_folded_x(edge, &docked), docked.x, docked.y);
+                mode.inner.lock().unwrap().folded = false;
+                away = 0;
+            } else if !folded && !near {
+                away += 1;
+                if away >= 5 {
+                    emit_fold(&window, Some(edge));
+                    slide(&window, docked.x, ws::mini_folded_x(edge, &docked), docked.y);
+                    mode.inner.lock().unwrap().folded = true;
+                    away = 0;
+                }
+            } else {
+                away = 0;
+            }
+        }
+    });
+}
+
 fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     app.get_webview_window("main").ok_or_else(|| "no window".to_string())
 }
@@ -197,13 +309,19 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 #[tauri::command]
 pub fn set_window_mode(app: AppHandle, state: tauri::State<WindowMode>, mode: String) -> Result<(), String> {
     let window = main_window(&app)?;
-    if mode == "mini" { state.enter_mini(&window, false) } else { state.enter_full(&window) }
+    if mode == "mini" { state.enter_mini(&window) } else { state.enter_full(&window) }
     Ok(())
 }
 
 #[tauri::command]
 pub fn set_pinned(app: AppHandle, state: tauri::State<WindowMode>, pinned: bool) -> Result<(), String> {
     state.set_pinned(&main_window(&app)?, pinned);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_mini_edge_snap(app: AppHandle, state: tauri::State<WindowMode>, on: bool) -> Result<(), String> {
+    state.set_edge_snap(&main_window(&app)?, on);
     Ok(())
 }
 

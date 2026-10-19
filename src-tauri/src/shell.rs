@@ -1,7 +1,6 @@
-// Tray, close behaviour, launch at login, data folder and "hide after copy": the shell parts of desktop/main.cjs.
+// Tray, close behaviour, launch at login (with its guard) and data folder: the shell parts of desktop/main.cjs.
 use crate::window_mode::WindowMode;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
@@ -15,16 +14,8 @@ pub enum CloseBehavior {
     Quit,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum MiniHidePolicy {
-    Hotkey,
-    Always,
-    Never,
-}
-
 struct Settings {
     close: CloseBehavior,
-    mini_hide: MiniHidePolicy,
     quitting: bool,
 }
 
@@ -35,7 +26,7 @@ pub struct Shell {
 
 impl Default for Shell {
     fn default() -> Self {
-        Shell { settings: Arc::new(Mutex::new(Settings { close: CloseBehavior::Tray, mini_hide: MiniHidePolicy::Never, quitting: false })) }
+        Shell { settings: Arc::new(Mutex::new(Settings { close: CloseBehavior::Tray, quitting: false })) }
     }
 }
 
@@ -56,11 +47,6 @@ pub fn close_action(behavior: CloseBehavior, quitting: bool, is_windows: bool) -
     } else {
         CloseAction::Hide
     }
-}
-
-/// Whether a copy should make the mini window hide itself.
-pub fn hides_after_copy(policy: MiniHidePolicy, is_mini: bool, auto_hide: bool) -> bool {
-    is_mini && policy != MiniHidePolicy::Never && (policy == MiniHidePolicy::Always || auto_hide)
 }
 
 impl Shell {
@@ -113,7 +99,7 @@ impl Shell {
     }
 }
 
-/// A tray click or "快速搜索" opens the mini window (it hides again after a copy, by setting).
+/// A tray click or "快速搜索" opens the mini window (it never hides after a copy; owner, 2026-10-19).
 /// Every other way of opening Clipbox returns to the full window.
 pub fn show_window(app: &AppHandle, as_quick_search: bool) {
     let Some(window) = app.get_webview_window("main") else { return };
@@ -122,7 +108,7 @@ pub fn show_window(app: &AppHandle, as_quick_search: bool) {
         crate::paste_back::remember_front();
     }
     if as_quick_search {
-        mode.enter_mini(&window, true);
+        mode.enter_mini(&window);
     } else {
         mode.enter_full(&window);
     }
@@ -180,35 +166,12 @@ pub fn set_close_behavior(state: tauri::State<Shell>, behavior: String) {
     state.settings.lock().unwrap().close = b;
 }
 
+/// The page copied something: the mini window may paste it into the window the person came from (D-081).
 #[tauri::command]
-pub fn set_mini_hide_policy(state: tauri::State<Shell>, policy: String) {
-    let p = match policy.as_str() {
-        "hotkey" => MiniHidePolicy::Hotkey,
-        "always" => MiniHidePolicy::Always,
-        "never" => MiniHidePolicy::Never,
-        _ => return,
-    };
-    state.settings.lock().unwrap().mini_hide = p;
-}
-
-/// The page copied something: the mini window may paste it into the window the person came from (D-081), and may
-/// go away after a moment.
-#[tauri::command]
-pub fn did_copy(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {
+pub fn did_copy(app: AppHandle, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {
     if paste_back.enabled() && mode.is_mini() {
-        let app = app.clone();
         std::thread::spawn(move || crate::paste_back::paste_into_front(app));
     }
-    let policy = shell.settings.lock().unwrap().mini_hide;
-    if !hides_after_copy(policy, mode.is_mini(), mode.mini_auto_hide()) {
-        return;
-    }
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(1200));
-        if let Some(w) = app.get_webview_window("main") {
-            let _ = w.hide();
-        }
-    });
 }
 
 #[tauri::command]
@@ -220,7 +183,54 @@ pub fn get_launch_at_login(app: AppHandle) -> bool {
 pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<bool, String> {
     let launcher = app.autolaunch();
     if enabled { launcher.enable() } else { launcher.disable() }.map_err(|e| e.to_string())?;
+    if let Some(file) = launch_wish_file(&app) {
+        let _ = std::fs::write(file, if enabled { "on" } else { "off" });
+    }
     Ok(launcher.is_enabled().unwrap_or(false))
+}
+
+/// The person's own choice for 开机自动启动 ("on"/"off"), kept apart from the system's entry so a cleaner or security
+/// tool that removes that entry cannot silently switch it off (D-079).
+fn launch_wish_file(app: &AppHandle) -> Option<std::path::PathBuf> {
+    let dir = app.path().app_data_dir().ok()?;
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir.join("launch-at-login"))
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LaunchGuard {
+    /// The person wants it on and the system entry is gone: put it back.
+    SwitchOn,
+    /// No choice recorded yet (switched on before this version): record the current "on".
+    Remember,
+    Nothing,
+}
+
+pub fn launch_guard(wish: Option<&str>, enabled: bool) -> LaunchGuard {
+    match (wish.map(str::trim), enabled) {
+        (Some("on"), false) => LaunchGuard::SwitchOn,
+        (None, true) => LaunchGuard::Remember,
+        _ => LaunchGuard::Nothing,
+    }
+}
+
+/// Puts launch at login back when something else switched it off; runs at start and then once an hour.
+pub fn guard_launch_at_login(app: &AppHandle) {
+    let Some(file) = launch_wish_file(app) else { return };
+    let launcher = app.autolaunch();
+    let wish = std::fs::read_to_string(&file).ok();
+    match launch_guard(wish.as_deref(), launcher.is_enabled().unwrap_or(false)) {
+        LaunchGuard::SwitchOn => { let _ = launcher.enable(); }
+        LaunchGuard::Remember => { let _ = std::fs::write(&file, "on"); }
+        LaunchGuard::Nothing => {}
+    }
+}
+
+pub fn watch_launch_at_login(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
+        guard_launch_at_login(&app);
+    });
 }
 
 #[tauri::command]
@@ -246,6 +256,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn launch_guard_only_restores_a_recorded_on() {
+        assert_eq!(launch_guard(Some("on\n"), false), LaunchGuard::SwitchOn);
+        assert_eq!(launch_guard(Some("on"), true), LaunchGuard::Nothing);
+        assert_eq!(launch_guard(Some("off"), false), LaunchGuard::Nothing);
+        assert_eq!(launch_guard(Some("off"), true), LaunchGuard::Nothing);
+        assert_eq!(launch_guard(None, true), LaunchGuard::Remember);
+        assert_eq!(launch_guard(None, false), LaunchGuard::Nothing);
+    }
+
+    #[test]
     fn close_button_follows_the_setting() {
         assert_eq!(close_action(CloseBehavior::Tray, false, true), CloseAction::Hide);
         assert_eq!(close_action(CloseBehavior::Taskbar, false, true), CloseAction::Minimize);
@@ -253,17 +273,5 @@ mod tests {
         assert_eq!(close_action(CloseBehavior::Taskbar, false, false), CloseAction::Hide);
         assert_eq!(close_action(CloseBehavior::Quit, false, true), CloseAction::Quit);
         assert_eq!(close_action(CloseBehavior::Tray, true, true), CloseAction::Quit);
-    }
-
-    #[test]
-    fn mini_hides_after_copy_by_policy() {
-        // 快速搜索 opened it: hide unless the person said never.
-        assert!(hides_after_copy(MiniHidePolicy::Hotkey, true, true));
-        // Opened by hand from the full window: stay.
-        assert!(!hides_after_copy(MiniHidePolicy::Hotkey, true, false));
-        assert!(hides_after_copy(MiniHidePolicy::Always, true, false));
-        assert!(!hides_after_copy(MiniHidePolicy::Never, true, true));
-        // The full window never hides after a copy.
-        assert!(!hides_after_copy(MiniHidePolicy::Always, false, true));
     }
 }

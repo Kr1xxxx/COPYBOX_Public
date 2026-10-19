@@ -75,10 +75,10 @@ fn main() {
             window_mode::set_window_mode,
             window_mode::get_window_mode,
             window_mode::set_pinned,
+            window_mode::set_mini_edge_snap,
             window_mode::set_theme,
             window_mode::page_ready,
             shell::set_close_behavior,
-            shell::set_mini_hide_policy,
             shell::did_copy,
             paste_back::set_paste_back,
             shell::get_launch_at_login,
@@ -118,6 +118,9 @@ fn main() {
             // An older product name's launch-at-login entry would start the old copy at login (D-046).
             #[cfg(windows)]
             old_autostart::migrate(app.handle());
+            // Something else (a cleaner, a security tool) may have switched launch at login off: put it back (D-079).
+            shell::guard_launch_at_login(app.handle());
+            shell::watch_launch_at_login(app.handle().clone());
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Copyboxx")
@@ -128,11 +131,14 @@ fn main() {
                 Some(b) => builder.inner_size(b.width, b.height).position(b.x, b.y),
                 None => builder.inner_size(window_state::DEFAULT_WIDTH, window_state::DEFAULT_HEIGHT).center(),
             };
+            // macOS (D-079): never bigger than MAC_MAX, no zoom and no full screen; staff park it at the screen edge.
             #[cfg(target_os = "macos")]
             let builder = builder
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
                 .hidden_title(true)
-                .traffic_light_position(tauri::LogicalPosition::new(14.0, 19.0));
+                .traffic_light_position(tauri::LogicalPosition::new(14.0, 19.0))
+                .max_inner_size(window_state::MAC_MAX_WIDTH, window_state::MAC_MAX_HEIGHT)
+                .maximizable(false);
             #[cfg(all(feature = "test-hooks", target_os = "windows"))]
             let builder = match std::env::var("CLIPBOX_TEST_DEBUG_PORT") {
                 Ok(port) if port.chars().all(|c| c.is_ascii_digit()) && !port.is_empty() => builder.additional_browser_args(&format!(
@@ -141,8 +147,22 @@ fn main() {
                 _ => builder,
             };
             let window = builder.build()?;
+            // Without a View menu there is no 进入全屏 (⌃⌘F) either (D-079).
+            #[cfg(target_os = "macos")]
+            {
+                let menu = tauri::menu::Menu::default(app.handle())?;
+                for item in menu.items()? {
+                    if let Some(sub) = item.as_submenu() {
+                        if sub.text()? == "View" {
+                            menu.remove(sub)?;
+                        }
+                    }
+                }
+                app.set_menu(menu)?;
+            }
             shell::build_tray(app.handle())?;
             power::watch_window(app.handle(), &window);
+            window_mode::watch_mouse(app.handle().clone(), app.state::<WindowMode>().inner().clone());
             automation::start(app.handle());
             paste_back::start(app.handle());
 
