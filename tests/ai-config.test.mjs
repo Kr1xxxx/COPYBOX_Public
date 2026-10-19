@@ -54,6 +54,20 @@ test("stored settings are only used while they are complete", () => {
   assert.ok(DEFAULT_AI_PROMPTS.polish.trim() && DEFAULT_AI_PROMPTS.organize.trim());
 });
 
+test("settings saved with the old built-in prompts pick up the new defaults; own prompts stay", () => {
+  const storage = (value) => ({ getItem: () => JSON.stringify(value) });
+  const old = {
+    ...good,
+    polishPrompt: "润色下面这段客服话术：保持原意和原语言，让语气更自然、礼貌、简洁。必须原样保留所有 [方括号] 和 {花括号} 里的变量，不要增加原文没有的信息。只返回润色后的正文，不要解释，不要加引号。",
+    organizePrompt: "整理下面这段话术：修正错别字和标点，分段清晰，去掉重复和多余空格。不改变意思，不增删信息，原样保留所有 [方括号] 和 {花括号} 里的变量。只返回整理后的正文，不要解释，不要加引号。",
+  };
+  const read = readAiSettings(storage(old));
+  assert.equal(read.polishPrompt, DEFAULT_AI_PROMPTS.polish);
+  assert.equal(read.organizePrompt, DEFAULT_AI_PROMPTS.organize);
+  assert.equal(readAiSettings(storage({ ...old, polishPrompt: "我自己的提示词" })).polishPrompt, "我自己的提示词");
+  for (const prompt of Object.values(DEFAULT_AI_PROMPTS)) assert.match(prompt, /\[方括号\].*\{花括号\}/);
+});
+
 test("every preset has a valid address and the model list address is derived from it", async () => {
   const { AI_PRESETS, modelsUrl, parseModelsResponse } = await import("../app/ai-config.ts");
   assert.ok(AI_PRESETS.length >= 6);
