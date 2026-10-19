@@ -108,6 +108,7 @@ import { applyImportSampleSnippets, planClearSampleSnippets, planImportSampleSni
 import { decryptVaultBox, encryptVaultBox, isSaneIterationCount, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
+import { accountCsv } from "./account-health";
 import { ArcMenu } from "./arc/menu";
 import { ReorderHandle } from "./reorder-handle";
 import { AnimatePresence } from "motion/react";
@@ -479,6 +480,8 @@ export default function Home() {
   // 账号 header: 选择 (tick entries, 删除) and 收起 (fold every website card to its title).
   const [acctSelecting, setAcctSelecting] = useState(false);
   const [acctFolded, setAcctFolded] = useState(false);
+  // 密码体检: each press opens the check inside the 账号 page.
+  const [acctCheckup, setAcctCheckup] = useState(0);
   const accountLocked = lockSet && !accountUnlocked;
   const lockedHere = accountMode && lockSet && !accountUnlocked;
   // Read by the command line door when it asks for a 秘密 (a locked 账号 page refuses it at once).
@@ -1911,6 +1914,22 @@ export default function Home() {
     document.querySelector(`[data-row-index="${safeSelected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [safeSelected, windowMode, activeFolder, activeKind]);
 
+  // 导出账号表格: a plain CSV on this device only (the settings row warns first that anyone with the file can read it).
+  async function exportAccountSheet() {
+    try {
+      const [vaultItems, totps] = await Promise.all([openSecretItemsStore(accountKey).list(), openTotpStore(accountKey).list()]);
+      const url = URL.createObjectURL(new Blob([accountCsv(vaultItems, totps, legacySecrets)], { type: "text/csv;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `copyboxx-账号-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast("账号表格已导出，用完请删掉这个文件");
+    } catch {
+      showToast("账号里的内容读不出来，表格没有生成", { tone: "error", ms: 5000 });
+    }
+  }
+
   async function exportVault(password: string, scope: BackupScope) {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, folderShortNames: folderShortNamesRef.current, sharedSeen: sharedSeenRef.current };
     const scopedData = vaultDataForBackupScope(currentData, scope);
@@ -2430,11 +2449,12 @@ export default function Home() {
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
                 {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
+                {activeFolder !== "trash" && !acctSelecting && !accountVeiled && account.entries?.some((entry) => entry.tab === "login") && <button type="button" className="ghost-button select-toggle" title="只在本机检查：重复使用、太短、一年以上没改的密码" onClick={() => setAcctCheckup((n) => n + 1)}>密码体检</button>}
                 {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
                 {canLockAccountNow
                   ? <button type="button" className="ghost-button select-toggle" title="内容用本机密钥加密保存。点一下马上上锁。" onClick={lockAccountNow}><Icon name="lock" />上锁</button>
                   : <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span>}</div>
-              <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
+              <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} checkupRequest={acctCheckup} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} onAdd={accountVeiled ? undefined : () => setAddMenuOpen(true)} />
             </>}
@@ -2561,6 +2581,7 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
+        onExportAccountSheet={() => void exportAccountSheet()}
         slideUnlock={{ on: slideUnlockOn, onChange: (on) => { writeSlideUnlockOn(on); setSlideUnlockOn(on); } }}
         autoLock={{ seconds: autoLockSeconds, onChange: (seconds) => { writeAutoLockSeconds(seconds); setAutoLockSeconds(seconds); } }}
         accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { if (mode === "none" && accountMode) setAccountSlidOpen(true); setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}
