@@ -1921,7 +1921,7 @@ export default function Home() {
       const url = URL.createObjectURL(new Blob([accountCsv(vaultItems, totps, legacySecrets)], { type: "text/csv;charset=utf-8" }));
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `copyboxx-账号-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.download = `copyboxx-accounts-${new Date().toISOString().slice(0, 10)}.csv`;
       anchor.click();
       URL.revokeObjectURL(url);
       showToast("账号表格已导出，用完请删掉这个文件");
