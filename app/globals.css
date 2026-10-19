@@ -1689,7 +1689,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-dialog > header .icon-button { border-radius: 8px; color: var(--muted); }
 .settings-dialog > header .icon-button:hover { background: var(--hover); color: var(--ink); }
 .settings-dialog .settings-page-title { padding-top: 6px; font-family: var(--brand-font-heading); font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
-.settings-body > .settings-card > h3, .settings-body[data-searching] > .settings-card[data-solo] > h3 { padding: 20px 0 6px; font-family: var(--brand-font-heading); font-size: 15px; font-weight: 600; letter-spacing: -.005em; }
+/* Group labels (外观, 账号与同步, …) sit quieter than the rows under them: smaller and gray, so they read as a label for
+   the group instead of a stray row title (owner 2026-10-19 「这种小标题看起来很突兀」). */
+.settings-body > .settings-card > h3, .settings-body[data-searching] > .settings-card[data-solo] > h3 { padding: 12px 0 2px; color: var(--muted); font-family: var(--brand-font-heading); font-size: 12.5px; font-weight: 500; letter-spacing: 0; }
+.settings-brand + .settings-card > h3 { padding-top: 4px; }
 
 /* Left column: search and tabs. The selected tab sits on a light gray pill with a short orange bar. */
 .settings-dialog .settings-search input { height: 34px; border-color: var(--border); border-radius: 9px; background: var(--content); }
