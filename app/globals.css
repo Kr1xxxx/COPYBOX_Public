@@ -938,10 +938,11 @@ button { -webkit-tap-highlight-color: transparent; }
 .desktop-app:not(.platform-darwin) .mini-top { height: 36px; }
 /* Windows 贴边 (D-079): folded against a screen edge, only a 16 px strip of the mini window stays on screen; the page
    then hides itself and draws a notch-like tab on that strip (the window's left edge when docked right, and vice versa). */
-html[data-mini-fold] .app-shell { visibility: hidden; }
+html[data-mini-fold] body > * { visibility: hidden; }
 html[data-mini-fold] body::after { content: ""; position: fixed; top: 50%; width: 16px; height: 96px; transform: translateY(-50%); background: var(--accent); box-shadow: 0 2px 8px rgba(31,30,28,.28); }
-html[data-mini-fold="right"] body::after { left: 0; border-radius: 0 10px 10px 0; }
-html[data-mini-fold="left"] body::after { right: 0; border-radius: 10px 0 0 10px; }
+/* Docked right, the window's left edge is what shows, so the tab rounds toward the screen on its left; and vice versa. */
+html[data-mini-fold="right"] body::after { left: 0; border-radius: 10px 0 0 10px; }
+html[data-mini-fold="left"] body::after { right: 0; border-radius: 0 10px 10px 0; }
 .desktop-app:not(.platform-darwin) .drag-region { -webkit-app-region: no-drag; }
 
 /* 图片 section */
