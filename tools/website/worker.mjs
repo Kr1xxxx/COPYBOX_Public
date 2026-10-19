@@ -4,10 +4,11 @@
 // Plain http:// requests are sent to https:// (301), and every https answer carries HSTS, so a first download of the
 // installer cannot be swapped on the way (audit S2, 2026-10-14). The site no longer hosts the web preview (owner,
 // 2026-10-14): /preview/ is an ordinary 404. /api/* is the account and sync API (api.mjs, D-063);
-// /admin is the owner's read-only user list (admin.mjs, D-065).
+// /admin is the owner's read-only user list (admin.mjs, D-065). POST /staff/download sends a staff installer after the
+// company password (secret STAFF_PASSWORD) is checked here, never in the page (D-078).
 
 import { handleAdmin, isAdminPath } from "./admin.mjs";
-import { handleApi, isApiPath } from "./api.mjs";
+import { allowRequest, handleApi, isApiPath, sameText, sha256Hex } from "./api.mjs";
 
 const types = {
   html: "text/html; charset=utf-8",
@@ -90,7 +91,7 @@ function fileResponse(request, key, file, status = 200) {
     "Cache-Control": status === 200 ? cacheControlFor(key) : "no-cache",
     "X-Content-Type-Options": "nosniff",
   });
-  if (extensionOf(key) === "exe") headers.set("Content-Disposition", 'attachment; filename="Copyboxx-Setup.exe"');
+  if (["exe", "zip"].includes(extensionOf(key))) headers.set("Content-Disposition", `attachment; filename="${key.slice(key.lastIndexOf("/") + 1)}"`);
   if (status === 200 && meta.sha256) {
     const etag = `"${meta.sha256}"`;
     headers.set("ETag", etag);
@@ -141,11 +142,6 @@ function syncNotFound(request) {
   });
 }
 
-async function sha256Hex(text) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 async function syncResponse(request, env, pathname) {
   const key = syncKeyFor(pathname);
   if (!key) return syncNotFound(request);
@@ -157,6 +153,35 @@ async function syncResponse(request, env, pathname) {
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Content-Length", String(new TextEncoder().encode(file.value).length));
   return new Response(request.method === "HEAD" ? null : file.value, { status: 200, headers });
+}
+
+// Staff installers (D-078): the private builds live under download/private-<token>/ (uploaded by the packaging
+// thread; the token is only in the staff app's update check). The /staff/ page posts the company password and which
+// file; the password is compared here with the secret STAFF_PASSWORD (both hashed, so the compare is constant-time
+// and leaks no length), at most 20 tries per IP and hour through the API's rate_limits table, and only then the file
+// is streamed. A wrong password goes back to the page's #wrong line, too many tries to #limit.
+const staffFiles = { win: "Copyboxx-Setup.exe", mac: "Copyboxx-macOS-arm64.zip" };
+
+export async function staffDownload(request, env, now = Date.now()) {
+  const form = await request.formData().catch(() => null);
+  const name = staffFiles[form?.get("file")];
+  const password = form?.get("password");
+  if (!name || typeof password !== "string") return new Response("Bad Request", { status: 400 });
+  if (!env.STAFF_PASSWORD) return new Response("还没有设置下载密码。", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  if (env.DB && !(await allowRequest(env.DB, `staff:${ip}`, 20, now))) return staffBack("limit");
+  if (!sameText(await sha256Hex(password), await sha256Hex(env.STAFF_PASSWORD))) return staffBack("wrong");
+  const { keys } = await env.FILES.list({ prefix: "download/private-" });
+  const key = keys.find((entry) => entry.name.endsWith(`/${name}`))?.name;
+  const file = key ? await env.FILES.getWithMetadata(key, { type: "stream" }) : null;
+  if (file?.value == null) return new Response("文件还没有上传。", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  const response = fileResponse(request, key, file);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function staffBack(anchor) {
+  return new Response(null, { status: 303, headers: { Location: `/staff/#${anchor}`, "Cache-Control": "no-store" } });
 }
 
 // Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
@@ -175,6 +200,10 @@ async function serve(request, env) {
   const url = new URL(request.url);
   if (isApiPath(url.pathname)) return handleApi(request, env);
   if (isAdminPath(url.pathname)) return handleAdmin(request, env);
+  if (url.pathname === "/staff/download") {
+    if (request.method === "POST") return staffDownload(request, env);
+    return new Response("Method Not Allowed", { status: 405, headers: { Allow: "POST" } });
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }

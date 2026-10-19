@@ -12,6 +12,7 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | `/download/` | The download card (version, size, date, SHA-256), install steps, the SmartScreen warning, moving data from the old version, updating, Mac |
 | `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
+| `/staff/` | 员工下载 (D-078): a password field and Windows / Mac buttons; `noindex`, not in the nav or sitemap. `POST /staff/download` (`password`, `file` = `win` \| `mac`) checks the password against the Worker secret `STAFF_PASSWORD` (set it in the dashboard; never in the repo) and streams the newest staff build from `download/private-<token>/` (uploaded by the packaging thread); a wrong password answers 303 to `/staff/#wrong`, the 21st try from one IP in an hour 303 to `/staff/#limit`, no secret 503, `GET` 405 |
 | `/download/Copyboxx-Setup.exe` | The Windows installer: the newest `tauri-test-N` pre-release asset (`*-Windows-setup.exe`), built from `main` (D-048) |
 | `/download/latest.json` | `{ version, notes, url, size, sha256, updatedAt }`, same shape as the desktop update check (D-023); the Windows app reads it (D-047). `version` is the installer's own, from the release's `release-version.json` (D-048) |
 | `/assets/site.<hash>.css` | The stylesheet; its name carries the first 8 hex of its sha256, so a changed file gets a new name |
@@ -24,7 +25,7 @@ Source files in this folder:
 
 | File | What it is |
 | --- | --- |
-| `pages/{index,download,help,privacy}.html` | Page bodies (what goes inside `<main>`) with `__PLACEHOLDER__` slots |
+| `pages/{index,download,help,privacy,staff}.html` | Page bodies (what goes inside `<main>`) with `__PLACEHOLDER__` slots |
 | `partials/head.html` | Everything up to `<body>`: title, description, canonical, share-card tags, icons, manifest, the stylesheet link and the theme script (跟随系统 → 浅色 → 深色, `localStorage` key `clipboxx-site-theme`, set as `data-theme` before the page paints) |
 | `partials/header.html`, `partials/footer.html` | Header (brand, nav with `__NAV_HOME__` … slots, theme toggle, 下载) and footer |
 | `site.css` | All styles, light and dark; no fonts or frameworks from the network |

@@ -141,6 +141,7 @@ test("website build writes every page, the stylesheet, icons, images, installer 
     "robots.txt",
     "site.webmanifest",
     "sitemap.xml",
+    "staff/index.html",
     "wordmark-cn.svg",
     "wordmark.svg",
   ]);

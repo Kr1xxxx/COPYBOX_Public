@@ -41,6 +41,9 @@ function fakeEnv(entries = files) {
         const value = opts?.type === "stream" ? new Blob([file.bytes]).stream() : file.bytes.toString();
         return { value, metadata: file.metadata };
       },
+      async list({ prefix }) {
+        return { keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })) };
+      },
     },
   };
 }
@@ -281,4 +284,64 @@ test("worker: domain bindings (domains/<domain> → 同步码) are never served 
     assert.ok(!(await response.text()).includes("XS-7KQ2M9AB"), path);
   }
   assert.ok(!env.reads.some((key) => key.startsWith("domains")), env.reads.join(", "));
+});
+
+// Staff installers behind the company password (D-078): the password is checked in the Worker, the file is only
+// streamed after a match, and the page's own source never names the file's address.
+const staffFiles = {
+  ...files,
+  "staff/index.html": '<form method="post" action="/staff/download">',
+  "download/private-t0k3n/Copyboxx-Setup.exe": "MZ staff installer",
+  "download/private-t0k3n/Copyboxx-macOS-arm64.zip": "PK staff mac",
+};
+
+function staffPost(body, env) {
+  return get("/staff/download", { method: "POST", body: new URLSearchParams(body), headers: { "CF-Connecting-IP": "1.2.3.4" } }, env);
+}
+
+test("worker: /staff/download sends the file only after the right password", async () => {
+  const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "open sesame" };
+  const win = await staffPost({ password: "open sesame", file: "win" }, env);
+  assert.equal(win.status, 200);
+  assert.equal(win.headers.get("Content-Disposition"), 'attachment; filename="Copyboxx-Setup.exe"');
+  assert.equal(win.headers.get("Cache-Control"), "no-store");
+  assert.equal(await win.text(), "MZ staff installer");
+  const mac = await staffPost({ password: "open sesame", file: "mac" }, env);
+  assert.equal(mac.headers.get("Content-Disposition"), 'attachment; filename="Copyboxx-macOS-arm64.zip"');
+  assert.equal(await mac.text(), "PK staff mac");
+
+  for (const password of ["open sesam", "open sesame ", "", "OPEN SESAME"]) {
+    const wrong = await staffPost({ password, file: "win" }, env);
+    assert.equal(wrong.status, 303, password);
+    assert.equal(wrong.headers.get("Location"), "/staff/#wrong");
+    assert.equal(await wrong.text(), "");
+  }
+  assert.equal((await staffPost({ password: "open sesame", file: "linux" }, env)).status, 400);
+  assert.equal((await get("/staff/download", {}, env)).status, 405);
+  // The private files stay reachable only by their unlisted address or through the gate: never listed on the site.
+  assert.equal((await get("/staff/", {}, env)).status, 200);
+});
+
+test("worker: /staff/download without the secret, without the file, and over the hourly limit", async () => {
+  assert.equal((await staffPost({ password: "x", file: "win" }, fakeEnv(staffFiles))).status, 503);
+  const missing = { ...fakeEnv(files), STAFF_PASSWORD: "pw" };
+  assert.equal((await staffPost({ password: "pw", file: "win" }, missing)).status, 404);
+
+  // A D1 stand-in that counts: the 21st try in the hour is refused before the password is looked at.
+  const rows = new Map();
+  const db = {
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        first: async () => rows.get(args[0]) ?? null,
+        run: async () => {
+          if (sql.startsWith("INSERT")) rows.set(args[0], { window_start: args[1], count: 1 });
+          else rows.get(args[0]).count += 1;
+        },
+      }),
+    }),
+  };
+  const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "pw", DB: db };
+  for (let i = 0; i < 20; i += 1) assert.equal((await staffPost({ password: "bad", file: "win" }, env)).status, 303);
+  const limited = await staffPost({ password: "pw", file: "win" }, env);
+  assert.equal(limited.headers.get("Location"), "/staff/#limit");
 });
