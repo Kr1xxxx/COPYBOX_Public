@@ -104,6 +104,9 @@ impl Shell {
 pub fn show_window(app: &AppHandle, as_quick_search: bool) {
     let Some(window) = app.get_webview_window("main") else { return };
     let mode = app.state::<WindowMode>();
+    if as_quick_search && app.state::<crate::paste_back::PasteBack>().enabled() {
+        crate::paste_back::remember_front();
+    }
     if as_quick_search {
         mode.enter_mini(&window);
     } else {
@@ -161,6 +164,15 @@ pub fn set_close_behavior(state: tauri::State<Shell>, behavior: String) {
         _ => return,
     };
     state.settings.lock().unwrap().close = b;
+}
+
+#[tauri::command]
+/// The page copied something: the mini window may paste it into the window the person came from (D-081).
+#[tauri::command]
+pub fn did_copy(app: AppHandle, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {
+    if paste_back.enabled() && mode.is_mini() {
+        std::thread::spawn(move || crate::paste_back::paste_into_front(app));
+    }
 }
 
 #[tauri::command]

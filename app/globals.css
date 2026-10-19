@@ -1161,6 +1161,9 @@ html[data-mini-fold="left"] body::after { right: 0; border-radius: 0 10px 10px 0
 .totp-delete{flex:none}
 .totp-confirm{display:flex;gap:6px;flex:none}
 .totp-empty{margin:4px 0;color:var(--muted);font-size:12.5px}
+.checkup-group{display:grid;gap:6px}
+.checkup-group h3{margin:4px 0 0;color:var(--muted);font-size:12px;font-weight:600}
+.checkup-dot{display:inline-block;width:7px;height:7px;margin-left:4px;border-radius:50%;background:#d93a2b;vertical-align:top}
 .totp-form{display:grid;gap:10px}
 .totp-form label{display:grid;gap:4px;color:var(--muted);font-size:11.5px}
 .totp-form textarea,.totp-form input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;resize:none}

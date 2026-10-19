@@ -18,7 +18,7 @@ for (const platform of ["win32", "darwin"]) {
   test(`${platform}: 收起 (left of 选择) folds every website card to its title and 展开 brings them back`, async ({ page }) => {
     const region = await open(page, platform);
     const head = page.locator(".section-head");
-    await expect(head.getByRole("button")).toHaveText(["收起", "选择"]);
+    await expect(head.getByRole("button")).toHaveText(["收起", "密码体检", "选择"]);
     await head.getByRole("button", { name: "收起账号" }).click();
     await expect(region.locator(".vault-group h3")).toHaveCount(2);
     await expect(region.locator(".vault-entry")).toHaveCount(0);

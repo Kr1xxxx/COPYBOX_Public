@@ -67,6 +67,7 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
       }).then(function (blob) { return blob.arrayBuffer(); }).then(function (buffer) { return { ok: true, bytes: new Uint8Array(buffer) }; })
         .catch(function () { return { ok: false, reason: "service" }; });
     },
+    didCopy: function () {},
     getVersion: function () { return Promise.resolve(${JSON.stringify(info.version)}); },
     getBuildTime: function () { return Promise.resolve(${JSON.stringify(info.updatedAt)}); },
     onFocusSearch: function () { return function () {}; },

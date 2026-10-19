@@ -51,7 +51,7 @@ export async function pageHarness() {
     timestampNow: () => 2, URLSearchParams,
     window: { location: { protocol: 'http:', search: '' }, setTimeout: () => 1, clipboxDesktop: {
       capabilities: caps, automationReady: () => {}, onAutomationCommand: fn => { c.command = fn; return () => {}; },
-      respondAutomationCommand: (id, response) => responses.push({ id, response }),
+      respondAutomationCommand: (id, response) => responses.push({ id, response }), didCopy: () => {},
       copyText: async text => { copyCalls.push(text); },
     } },
     setTimeout: () => 1, clearTimeout: () => {}, navigator: { clipboard: { writeText: async () => {} } },

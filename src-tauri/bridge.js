@@ -28,9 +28,11 @@
     backupImageList: function () { return invoke("backup_image_list"); },
     backupImageRead: function (name) { return invoke("backup_image_read", { name: name }).then(function (buffer) { return new Uint8Array(buffer); }); },
     backupImagePrune: function (keep) { return invoke("backup_image_prune", { keep: keep }).then(noop); },
+    didCopy: function () { fireAndForget("did_copy"); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
     // Windows 贴边 (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
     setMiniEdgeSnap: function (on) { fireAndForget("set_mini_edge_snap", { on: Boolean(on) }); },
+    setPasteBack: function (enabled, repeatAfter) { fireAndForget("set_paste_back", { enabled: Boolean(enabled), repeatAfter: Number(repeatAfter) || 6 }); },
     getLaunchAtLogin: function () { return invoke("get_launch_at_login"); },
     setLaunchAtLogin: function (enabled) { return invoke("set_launch_at_login", { enabled: Boolean(enabled) }); },
     openDataFolder: function () { return invoke("open_data_folder"); },

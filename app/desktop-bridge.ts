@@ -31,6 +31,9 @@ export type ClipboxDesktop = {
   backupImagePrune?: (keep: string[]) => Promise<void>;
   // Windows only (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
   setMiniEdgeSnap?: (on: boolean) => void;
+  didCopy: () => void;
+  // 复制后贴到刚才的窗口 (D-081): the shell pastes a mini-window copy into the window the person came from.
+  setPasteBack?: (enabled: boolean, repeatAfter: number) => void;
   setCloseBehavior?: (behavior: CloseBehavior) => void;
   getLaunchAtLogin?: () => Promise<boolean>;
   setLaunchAtLogin?: (enabled: boolean) => Promise<boolean>;

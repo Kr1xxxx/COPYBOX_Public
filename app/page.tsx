@@ -80,7 +80,7 @@ import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Highlight, Icon, ParagraphCopy, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type ThemeChoice } from "./preferences";
+import { DEFAULT_TRASH_DAYS, PASTE_BACK_REPEAT_OPTIONS, TRASH_DAY_OPTIONS, type CloseBehavior, type PasteBackRepeat, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
@@ -108,6 +108,9 @@ import { applyImportSampleSnippets, planClearSampleSnippets, planImportSampleSni
 import { decryptVaultBox, encryptVaultBox, isSaneIterationCount, isVaultBoxEmpty, looksLikeVaultBox, mergeVaultBox, type VaultBoxEnvelope, type VaultBoxPayload } from "./vault-backup";
 import { openSecretItemsStore } from "./secret-items-store";
 import { openTotpStore } from "./totp-store";
+import { accountCsv, accountRows, accountsFromSheet } from "./account-health";
+import { readSpreadsheet } from "./spreadsheet-read";
+import { useCheckupDot } from "./password-checkup";
 import { ArcMenu } from "./arc/menu";
 import { ReorderHandle } from "./reorder-handle";
 import { AnimatePresence } from "motion/react";
@@ -175,6 +178,8 @@ const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
 const MINI_EDGE_KEY = "clipbox.mini-edge-snap";
+const PASTE_BACK_KEY = "clipbox.paste-back";
+const PASTE_BACK_REPEAT_KEY = "clipbox.paste-back-repeat";
 // 固定在最上层 for the full window: "1" when on, absent when off.
 const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
 const TRASH_DAYS_KEY = "clipbox.trash-retention-days";
@@ -356,6 +361,7 @@ export default function Home() {
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const spreadsheetFileRef = useRef<HTMLInputElement>(null);
+  const accountSheetRef = useRef<HTMLInputElement>(null);
   const folderCreateButtonRef = useRef<HTMLButtonElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
   const editorTriggerRef = useRef<HTMLElement | null>(null);
@@ -477,6 +483,8 @@ export default function Home() {
   // 账号 header: 选择 (tick entries, 删除) and 收起 (fold every website card to its title).
   const [acctSelecting, setAcctSelecting] = useState(false);
   const [acctFolded, setAcctFolded] = useState(false);
+  // 密码体检: each press opens the check inside the 账号 page.
+  const [acctCheckup, setAcctCheckup] = useState(0);
   const accountLocked = lockSet && !accountUnlocked;
   const lockedHere = accountMode && lockSet && !accountUnlocked;
   // Read by the command line door when it asks for a 秘密 (a locked 账号 page refuses it at once).
@@ -520,6 +528,7 @@ export default function Home() {
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => CATEGORY_ORDER.filter((id) => !HIDDEN_ACCOUNT_KINDS.includes(id)), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
+  const checkupDot = useCheckupDot(accountMode ? accountKey : "", account.entries);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
   const directoryShortcuts = useMemo(() => buildDirectoryShortcuts(items, activeKind), [items, activeKind]);
@@ -1145,10 +1154,11 @@ export default function Home() {
   async function finishCopy(item: SecretItem, copied: string, part = false) {
     await copyTextWithExpiry(copied);
     void persistLazy((current) => ({ ...current, items: current.items.map((value) => value.id === item.id ? recordCopy(value, timestampNow()) : value) })).catch(() => showToast("已复制，但使用记录保存失败", { tone: "error" }));
-    if (part) return;
+    if (part) { window.clipboxDesktop?.didCopy(); return; }
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
+    window.clipboxDesktop?.didCopy();
   }
 
   async function copySecretReference(item: SecretItem) {
@@ -1157,6 +1167,7 @@ export default function Home() {
     if (referenceFeedbackTimer.current) clearTimeout(referenceFeedbackTimer.current);
     referenceFeedbackTimer.current = window.setTimeout(() => setCopiedReferenceId(""), 1600);
     showToast("引用已复制，可直接发给其他任务");
+    window.clipboxDesktop?.didCopy();
   }
 
   function fillFor(item: SecretItem) { return fill?.itemId === item.id ? fill : emptyFillState(item, lastValues); }
@@ -1673,6 +1684,26 @@ export default function Home() {
     window.clipboxDesktop?.setCloseBehavior?.(behavior);
   }
 
+  // 复制后贴到刚才的窗口 (D-081): off until the person turns it on; the shell does the pasting.
+  const [pasteBack, setPasteBack] = useState(() => readStoredChoice(PASTE_BACK_KEY, ["0", "1"], "0") === "1");
+  // Same text to the same window again only after this many seconds (owner, 2026-10-19: 6).
+  const [pasteBackRepeat, setPasteBackRepeat] = useState<PasteBackRepeat>(() => readStoredChoice<PasteBackRepeat>(PASTE_BACK_REPEAT_KEY, PASTE_BACK_REPEAT_OPTIONS, 6));
+  useEffect(() => {
+    if (pasteBack) window.clipboxDesktop?.setPasteBack?.(true, pasteBackRepeat);
+    // Sent once on start; later changes go through choosePasteBack / choosePasteBackRepeat.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function choosePasteBack(on: boolean) {
+    setPasteBack(on);
+    writeStoredChoice(PASTE_BACK_KEY, on ? "1" : "0");
+    window.clipboxDesktop?.setPasteBack?.(on, pasteBackRepeat);
+  }
+  function choosePasteBackRepeat(seconds: PasteBackRepeat) {
+    setPasteBackRepeat(seconds);
+    writeStoredChoice(PASTE_BACK_REPEAT_KEY, seconds);
+    window.clipboxDesktop?.setPasteBack?.(pasteBack, seconds);
+  }
+
   function chooseTrashDays(days: number) {
     setTrashDays(days);
     writeStoredChoice(TRASH_DAYS_KEY, days);
@@ -1885,6 +1916,40 @@ export default function Home() {
   useEffect(() => {
     document.querySelector(`[data-row-index="${safeSelected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [safeSelected, windowMode, activeFolder, activeKind]);
+
+  // 导出账号表格: a plain CSV on this device only (the settings row warns first that anyone with the file can read it).
+  async function exportAccountSheet() {
+    try {
+      const [vaultItems, totps] = await Promise.all([openSecretItemsStore(accountKey).list(), openTotpStore(accountKey).list()]);
+      const url = URL.createObjectURL(new Blob([accountCsv(vaultItems, totps, legacySecrets)], { type: "text/csv;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `copyboxx-accounts-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast("账号表格已导出，用完请删掉这个文件");
+    } catch {
+      showToast("账号里的内容读不出来，表格没有生成", { tone: "error", ms: 5000 });
+    }
+  }
+
+  // 导入账号表格: a table made by 导出账号表格 comes back as new entries; rows already here are skipped, nothing is replaced.
+  async function importAccountSheet(file: File) {
+    try {
+      const [table] = await readSpreadsheet(await file.arrayBuffer(), file.name);
+      const itemsStore = openSecretItemsStore(accountKey);
+      const totpStore = openTotpStore(accountKey);
+      const [vaultItems, totps] = await Promise.all([itemsStore.list(), totpStore.list()]);
+      const found = accountsFromSheet(table?.rows ?? [], accountRows(vaultItems, totps, legacySecrets), HIDDEN_ACCOUNT_KINDS, Date.now(), () => crypto.randomUUID());
+      if (vaultItems.length + found.items.length > 200) throw new Error("账号最多保存 200 条，表格里的太多了，请先删掉一些再导入");
+      if (found.items.length) await itemsStore.update((current) => [...current, ...found.items]);
+      if (found.totps.length) await totpStore.update((current) => [...current, ...found.totps]);
+      const added = found.items.length + found.totps.length;
+      showToast([`已导入 ${added} 条`, found.skipped && `跳过 ${found.skipped} 条已有的`, found.unreadable && `${found.unreadable} 行读不出来`].filter(Boolean).join("，"), { ms: 4000 });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "导入没有成功，账号没有改动", { tone: "error", ms: 5000 });
+    }
+  }
 
   async function exportVault(password: string, scope: BackupScope) {
     const currentData = { items: itemsRef.current, folders: foldersRef.current, nextSnippetNumber: nextSnippetNumberRef.current, folderColors: folderColorsRef.current, folderShortNames: folderShortNamesRef.current, sharedSeen: sharedSeenRef.current };
@@ -2356,6 +2421,7 @@ export default function Home() {
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
+              <input ref={accountSheetRef} className="hidden-input" type="file" accept=".csv,.xlsx,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importAccountSheet(file); event.target.value = ""; }} />
               <input ref={spreadsheetFileRef} className="hidden-input" type="file" accept=".xlsx,.csv,.md,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareSnippetImport(file); event.target.value = ""; }} />
             </div>
           </aside>
@@ -2405,11 +2471,12 @@ export default function Home() {
             {vaultPage && <>
               <div className="section-head"><h1>{sectionTitle}</h1><span className="spacer" />
                 {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
+                {activeFolder !== "trash" && !acctSelecting && !accountVeiled && account.entries?.some((entry) => entry.tab === "login") && <button type="button" className="ghost-button select-toggle" title="只在本机检查：重复使用、太短、一年以上没改的密码" onClick={() => { checkupDot.markSeen(); setAcctCheckup((n) => n + 1); }}>密码体检{checkupDot.dot && <span className="checkup-dot" role="img" aria-label="有需要处理的密码" />}</button>}
                 {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
                 {canLockAccountNow
                   ? <button type="button" className="ghost-button select-toggle" title="内容用本机密钥加密保存。点一下马上上锁。" onClick={lockAccountNow}><Icon name="lock" />上锁</button>
                   : <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span>}</div>
-              <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
+              <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} checkupRequest={acctCheckup} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} onAdd={accountVeiled ? undefined : () => setAddMenuOpen(true)} />
             </>}
@@ -2512,6 +2579,10 @@ export default function Home() {
         itemCount={items.filter((item) => !isTrashedItem(item)).length}
         miniEdgeSnap={miniEdgeSnap}
         onMiniEdgeSnap={chooseMiniEdgeSnap}
+        pasteBack={pasteBack}
+        onPasteBack={choosePasteBack}
+        pasteBackRepeat={pasteBackRepeat}
+        onPasteBackRepeat={choosePasteBackRepeat}
         folderGroups={buildSettingsFolderGroups()}
         onFolderAdd={settingsFolderAdd}
         onFolderRename={settingsFolderRename}
@@ -2532,6 +2603,8 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         onExport={() => { setSettingsOpen(false); setBackupMode("export"); }}
         onExportSecret={() => { setSettingsOpen(false); setBackupMode("export-secret"); }}
+        onExportAccountSheet={() => void exportAccountSheet()}
+        onImportAccountSheet={() => { setSettingsOpen(false); accountSheetRef.current?.click(); }}
         slideUnlock={{ on: slideUnlockOn, onChange: (on) => { writeSlideUnlockOn(on); setSlideUnlockOn(on); } }}
         autoLock={{ seconds: autoLockSeconds, onChange: (seconds) => { writeAutoLockSeconds(seconds); setAutoLockSeconds(seconds); } }}
         accountLock={{ mode: lockModeNow, deviceKey, onChanged: (mode, key) => { if (mode === "none" && accountMode) setAccountSlidOpen(true); setLockSet(mode !== "none"); setLockModeNow(mode); setAccountSecret(key ?? ""); setAccountUnlocked(mode !== "none" && accountMode && key !== null); } }}

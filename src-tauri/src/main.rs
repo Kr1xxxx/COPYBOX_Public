@@ -14,6 +14,7 @@ mod mcp_images;
 // Windows only; elsewhere just the pure decision logic and its tests (D-046).
 #[cfg_attr(not(windows), allow(dead_code))]
 mod old_autostart;
+mod paste_back;
 mod power;
 mod secret_store;
 mod shared_library;
@@ -66,6 +67,7 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(WindowMode::default())
         .manage(Shell::default())
+        .manage(paste_back::PasteBack::default())
         .manage(flush::Flush::default())
         .manage(Updates::default())
         .manage(automation::Bridge::default())
@@ -77,6 +79,8 @@ fn main() {
             window_mode::set_theme,
             window_mode::page_ready,
             shell::set_close_behavior,
+            shell::did_copy,
+            paste_back::set_paste_back,
             shell::get_launch_at_login,
             shell::set_launch_at_login,
             shell::open_data_folder,
@@ -160,6 +164,7 @@ fn main() {
             power::watch_window(app.handle(), &window);
             window_mode::watch_mouse(app.handle().clone(), app.state::<WindowMode>().inner().clone());
             automation::start(app.handle());
+            paste_back::start(app.handle());
 
             // If the page never reports in, show the window anyway (unless Clipbox was started quietly).
             if !start_hidden() {
@@ -173,6 +178,7 @@ fn main() {
             let mode = app.state::<WindowMode>().inner().clone();
             let shell = app.state::<Shell>().inner().clone();
             let watched = window.clone();
+            let app_handle = app.handle().clone();
             window.on_window_event(move |event| match event {
                 WindowEvent::Moved(_) | WindowEvent::Resized(_) => mode.schedule_save(&watched),
                 WindowEvent::CloseRequested { api, .. } => {
@@ -181,6 +187,13 @@ fn main() {
                     }
                 }
                 WindowEvent::Destroyed => mode.save_now(&watched),
+                // The person went to another window: that is where a paste-back goes next (D-081).
+                WindowEvent::Focused(false) if app_handle.state::<paste_back::PasteBack>().enabled() => {
+                    std::thread::spawn(|| {
+                        std::thread::sleep(Duration::from_millis(120));
+                        paste_back::remember_front();
+                    });
+                }
                 _ => {}
             });
             Ok(())

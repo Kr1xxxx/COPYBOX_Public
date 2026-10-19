@@ -62,6 +62,8 @@ export type LoginItem = EntryMeta & {
   // Id of a 验证码 account (clipbox.totp.v1) whose current code is shown with this login.
   totpId?: string;
   note: string;
+  // When the password itself last changed (「一年以上没改」); entries saved before 2.26 have none and fall back to updatedAt.
+  passwordChangedAt?: number;
   // Set when this login was made from a 笔记 (「转为登录」): the note exactly as it was, so 还原 can bring it back.
   fromNote?: NoteItem;
   createdAt: number;

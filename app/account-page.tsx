@@ -9,19 +9,20 @@ import { ListScrollFrame } from "./list-scroll-rail";
 import { LoginPanel } from "./login-panel";
 import { NotePanel } from "./note-panel";
 import type { MarkItem } from "./payment-core";
+import { PasswordCheckup } from "./password-checkup";
 import { PaymentPanel } from "./payment-panel";
 import { RecoveryPanel } from "./recovery-panel";
 import { SiteIconsProvider } from "./site-icons-context";
 import { TotpPanel } from "./totp-dialog";
 
 export type AddRequest = { tab: EntryKind; n: number };
-type Panel = { tab: EntryKind; focusId: string; adding: boolean; n: number };
+type Panel = { tab: EntryKind | "checkup"; focusId: string; adding: boolean; n: number };
 
 // The 账号 page (Mac): the list of everything, or one entry's panel (to open, change or add). The category and the search
 // text come from the page (sidebar and toolbar); `legacyView` is the old 秘密 list that the 「其他」 category shows.
-export function AccountPage({ deviceKey, entries, trashed, marks, error, category, view, query, addRequest, onOpenLegacy, onPinLegacy, onTrashLegacy, onToast, legacyView, selecting, folded, onSelectingChange, onAdd }: {
+export function AccountPage({ deviceKey, entries, trashed, marks, error, category, view, query, addRequest, checkupRequest = 0, onOpenLegacy, onPinLegacy, onTrashLegacy, onToast, legacyView, selecting, folded, onSelectingChange, onAdd }: {
   deviceKey: string; entries: AccountEntry[] | null; trashed: AccountEntry[]; marks: Record<string, MarkItem>; error: string; category: EntryKind | "all"; view: AccountView; query: string;
-  addRequest: AddRequest | null; onOpenLegacy: (id: string) => void; onPinLegacy: (id: string) => void; onTrashLegacy: (ids: string[]) => Promise<void>; onToast: (message: string) => void; legacyView: ReactNode;
+  addRequest: AddRequest | null; checkupRequest?: number; onOpenLegacy: (id: string) => void; onPinLegacy: (id: string) => void; onTrashLegacy: (ids: string[]) => Promise<void>; onToast: (message: string) => void; legacyView: ReactNode;
   selecting: boolean; folded: boolean; onSelectingChange: (selecting: boolean) => void; onAdd?: () => void;
 }) {
   const [panel, setPanel] = useState<Panel | null>(null);
@@ -33,6 +34,8 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
     setSeenAdd(addRequest?.n ?? 0);
     if (addRequest) setPanel({ tab: addRequest.tab, focusId: "", adding: true, n: addRequest.n });
   }
+  const [seenCheckup, setSeenCheckup] = useState(checkupRequest);
+  if (checkupRequest !== seenCheckup) { setSeenCheckup(checkupRequest); setPanel({ tab: "checkup", focusId: "", adding: false, n: checkupRequest }); }
 
   const back = () => setPanel(null);
   // 「转为登录 / API」 and 「还原为笔记」 move the entry to another type: show it there.
@@ -55,6 +58,7 @@ export function AccountPage({ deviceKey, entries, trashed, marks, error, categor
         {panel.tab === "apikey" && <ApiKeyPanel {...common} onShowEntry={showEntry} />}
         {panel.tab === "recovery" && <RecoveryPanel {...common} />}
         {panel.tab === "note" && <NotePanel {...common} onShowEntry={showEntry} />}
+        {panel.tab === "checkup" && <PasswordCheckup deviceKey={deviceKey} onOpen={(id) => showEntry("login", id)} />}
         {panel.tab === "totp" && <TotpPanel deviceKey={deviceKey} onToast={onToast} startAdding={panel.adding} />}
       </div>
     );

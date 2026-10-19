@@ -479,6 +479,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
       onToast("图片复制失败，请重试");
       return;
     }
+    window.clipboxDesktop?.didCopy();
     if (!mounted.current) return;
     setCopiedId(meta.id);
     if (copyTimer.current) clearTimeout(copyTimer.current);
