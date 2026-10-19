@@ -47,6 +47,8 @@ export async function pageHarness() {
     useCallback: fn => fn, setItems: () => {}, setFolders: () => {}, setFolderColors: () => {}, folderColorsRef: { current: undefined }, setFolderShortNames: () => {}, folderShortNamesRef: { current: undefined }, setToast: () => {}, showToast: () => {}, setSelected: () => {}, closeEditor: () => {},
     itemsRef: { current: [] }, foldersRef: { current: core.EMPTY_FOLDER_REGISTRY }, nextSnippetNumberRef: { current: 1 }, sharedSeenRef: { current: undefined },
     persistQueueRef: { current: Promise.resolve() }, lazyWriterRef: { current: null }, automationQueueRef: { current: Promise.resolve() },
+    // The login page (D-085) is passed: commands work as on a signed-in computer.
+    signedInRef: { current: true },
     deviceKey: 'synthetic-device-key', capabilitiesRef: { current: caps }, capabilities: caps,
     timestampNow: () => 2, URLSearchParams,
     window: { location: { protocol: 'http:', search: '' }, setTimeout: () => 1, clipboxDesktop: {

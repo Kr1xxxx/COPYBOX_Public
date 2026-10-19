@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
-import { asDesktop, seedSnippets } from "./helpers.mjs";
+import { asDesktop, seedSnippets, signInAtGate } from "./helpers.mjs";
 
 // Company 话术 by the signed-in email's domain, against the pretend server (app/cloud-demo.ts): it binds example.com to
 // three 话术 (DEMO-DOMAIN-1…3); every other domain gets none. A typed 同步码 always wins.
@@ -13,27 +13,21 @@ async function openHome(page) {
   return page.locator(".settings-dialog section[aria-labelledby=set-home-account]");
 }
 
-async function signIn(card, email) {
-  await card.getByRole("button", { name: "登录…" }).click();
-  await card.getByLabel("邮箱").fill(email);
-  await card.getByRole("button", { name: "发送验证码" }).click();
-  await card.getByLabel("验证码").fill("123456");
-  await card.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(card.locator(".cloud-email")).toHaveText(email);
-}
-
+// The app opens only after the sign-in (D-085), so the 话术 are seeded after it: the first sync of an empty computer
+// then brings nothing but the company library.
 test.beforeEach(async ({ page }) => {
   await asDesktop(page, "win32");
   await page.addInitScript(() => { window.clipboxDesktop.cloudDemo = true; });
-  await seedSnippets(page);
 });
 
 test("signing in at a bound domain brings in the company's 话术 and Settings says where they come from", async ({ page }) => {
-  const before = await page.locator(".native-row").count();
-  const card = await openHome(page);
-  await signIn(card, "someone@example.com");
-  await expect(card.locator(".cloud-domain-library")).toHaveText(LINE);
+  await signInAtGate(page, "someone@example.com");
   await expect(page.getByText(/公司话术已同步：新增 3 条/)).toBeVisible();
+  await seedSnippets(page);
+  const before = await page.locator(".native-row").count() - 3;
+  const card = await openHome(page);
+  await expect(card.locator(".cloud-email")).toHaveText("someone@example.com");
+  await expect(card.locator(".cloud-domain-library")).toHaveText(LINE);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.domain-library.v1")).domain)).toBe("example.com");
   await page.getByRole("button", { name: "关闭设置" }).click();
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
@@ -46,21 +40,21 @@ test("signing in at a bound domain brings in the company's 话术 and Settings s
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
   await expect(page.getByText("公司话术已同步")).toHaveCount(0);
 
-  // Signing out forgets that this computer gets a domain library; the 话术 already here stay.
+  // Signing out forgets that this computer gets a domain library and shows the login page; the 话术 already here stay.
   const again = await openHome(page);
   await expect(again.locator(".cloud-domain-library")).toHaveText(LINE);
   await again.getByRole("button", { name: "退出登录" }).click();
-  await expect(again.getByRole("button", { name: "登录…" })).toBeVisible();
-  await expect(again.locator(".cloud-domain-library")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "登录后开始使用" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => localStorage.getItem("clipbox.domain-library.v1"))).toBeNull();
-  await page.getByRole("button", { name: "关闭设置" }).click();
+  await signInAtGate(page, "someone@example.com");
   await expect(page.locator(".native-row")).toHaveCount(before + 3);
 });
 
 test("a free-mail address gets no company 话术 and no line in Settings", async ({ page }) => {
+  await signInAtGate(page, "someone@gmail.com");
+  await seedSnippets(page);
   const before = await page.locator(".native-row").count();
   const card = await openHome(page);
-  await signIn(card, "someone@gmail.com");
   await expect(card.locator(".cloud-last-sync")).toContainText("最后同步");
   await page.waitForTimeout(800);
   await expect(card.locator(".cloud-domain-library")).toHaveCount(0);
@@ -74,12 +68,13 @@ test("with a 同步码 typed, the domain library is not asked for or applied", a
   const fs = await import("node:fs");
   const body = fs.readFileSync(V1, "utf8");
   await page.route("https://copyboxx.com/sync/**", (route) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body }));
-  const before = await page.locator(".native-row").count();
+  // The 同步码 was typed before this sign-in (it lives in the page's storage).
+  await page.addInitScript(() => { localStorage.setItem("clipbox.shared-library-url", "https://copyboxx.com/sync/XS-7KQ2M9AB/snippets.json"); });
+  await signInAtGate(page, "someone@example.com");
+  await seedSnippets(page);
+  const before = await page.locator(".native-row").count() - 3;
   const card = await openHome(page);
-  await card.getByLabel("企业同步码").fill("xs-7kq2m9ab");
-  await card.getByRole("button", { name: "立即同步" }).click();
-  await expect(card.locator(".sync-code-result")).toContainText("新增 3 条");
-  await signIn(card, "someone@example.com");
+  await expect(card.getByLabel("企业同步码")).toHaveValue("https://copyboxx.com/sync/XS-7KQ2M9AB/snippets.json");
   await expect(card.locator(".cloud-last-sync")).toContainText("最后同步");
   await page.waitForTimeout(800);
   await expect(card.locator(".cloud-domain-library")).toHaveCount(0);

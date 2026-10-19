@@ -225,7 +225,7 @@ test("at most 3 computers: a new sign-in hears which ones signed out, an ended o
     "GET /api/vault": { status: 401, text: JSON.stringify({ error: "device_limit", message: "…" }) },
   };
   const api = createCloudApi(async ({ method, path }) => answers[`${method} ${path}`]);
-  assert.deepEqual(await api.verify("a@example.com", "123456", "Mac 电脑"), { token: "new", email: "a@example.com", signedOut: ["Windows 电脑"] });
+  assert.deepEqual(await api.verify("a@example.com", "123456", "Mac 电脑"), { token: "new", email: "a@example.com", signedOut: ["Windows 电脑"], activated: true });
   await assert.rejects(api.getVault("old"), { code: "replaced", message: /最多同时登录 3 台电脑，这台电脑已退出登录/ });
   answers["POST /api/auth/verify"].text = JSON.stringify({ token: "t", email: "a@example.com" });
   assert.deepEqual((await api.verify("a@example.com", "123456", "Mac 电脑")).signedOut, [], "an older server sends no list");
@@ -238,4 +238,35 @@ test("a cloud copy over 1.9 MB is not sent at all, and nothing here changes", as
   await assert.rejects(pc.sync(api), { code: "too_large" });
   assert.equal(state.puts, 0);
   assert.equal(pc.here.items[0].secret, big);
+});
+
+test("login page (D-085): the 人机验证 token goes with the code request, verify says whether the email is activated, activate posts the code", async () => {
+  const calls = [];
+  const answers = {
+    "POST /api/auth/code": { status: 200, text: "{}" },
+    "POST /api/auth/verify": { status: 200, text: JSON.stringify({ token: "t", email: "me@gmail.com", activated: false }) },
+    "POST /api/activate": { status: 200, text: JSON.stringify({ activated: true }) },
+  };
+  const api = createCloudApi(async (request) => { calls.push(request); return answers[`${request.method} ${request.path}`]; });
+  await api.sendCode("Me@Gmail.com", "tok");
+  await api.sendCode("me@gmail.com");
+  assert.deepEqual(calls.map((call) => call.body), [{ email: "me@gmail.com", turnstile: "tok" }, { email: "me@gmail.com" }]);
+  assert.equal((await api.verify("me@gmail.com", "123456", "电脑")).activated, false);
+  await api.activate("t", " aaaa-bbbb ");
+  assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/activate", token: "t", body: { code: "aaaa-bbbb" } });
+  // An older server never mentions activation: the sign-in counts as activated.
+  answers["POST /api/auth/verify"] = { status: 200, text: JSON.stringify({ token: "t", email: "me@gmail.com" }) };
+  assert.equal((await api.verify("me@gmail.com", "123456", "电脑")).activated, true);
+});
+
+test("login page (D-085): the server's refusals turn into plain messages: 人机验证 missing, bad activation code, not activated yet", async () => {
+  const answers = {
+    "POST /api/auth/code": { status: 400, text: JSON.stringify({ error: "captcha", message: "请先完成人机验证" }) },
+    "POST /api/activate": { status: 400, text: JSON.stringify({ error: "bad_activation_code", message: "激活码不对或已经用过" }) },
+    "GET /api/vault": { status: 403, text: JSON.stringify({ error: "not_activated", message: "这个邮箱还没激活" }) },
+  };
+  const api = createCloudApi(async ({ method, path }) => answers[`${method} ${path}`]);
+  await assert.rejects(api.sendCode("a@example.com", "x"), { code: "captcha", message: "请先完成人机验证" });
+  await assert.rejects(api.activate("t", "0000"), { code: "bad_activation", message: "激活码不对或已经用过" });
+  await assert.rejects(api.getVault("t"), { code: "not_activated", message: /还没激活/ });
 });

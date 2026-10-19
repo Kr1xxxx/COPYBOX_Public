@@ -121,6 +121,7 @@ import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode
 import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview, snippetShareDocument, snippetShareText } from "./snippet-doc";
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
+import { LoginGate } from "./login-gate";
 import { isSyncedSnippet, mergeAccounts, mergeSnippets, syncPolicy, tooManyRemovals } from "./cloud-sync-core";
 import { SHARED_SYNC_INTERVAL_MS, acceptSharedUpdate, presetLibraryText, exportSharedLibrary, keepMySharedVersion, parseSharedLibrary, sharedMark, syncSharedLibrary, describeSync, type SyncSummary } from "./shared-library";
 import { fetchSharedLibraryText, readSharedUrl, writeSharedSummary } from "./shared-library-client";
@@ -1030,11 +1031,15 @@ export default function Home() {
     };
   }, [loading, deviceKey, enqueueVaultTask, storeVault, readVault, showToast]);
 
+  // The command line and MCP tools wait for the sign-in too (D-085).
+  const signedInRef = useRef(true);
+  signedInRef.current = !cloudSync.available || Boolean(cloudSync.account);
   useEffect(() => {
     if (loading || !deviceKey || !window.clipboxDesktop?.onAutomationCommand) return;
     const remove = window.clipboxDesktop.onAutomationCommand(({ requestId, command, caller }) => {
       const execute = async () => {
         try {
+          if (!signedInRef.current) throw new AutomationCommandError("NOT_SIGNED_IN", "请先在 Copyboxx 里登录");
           if (isMcpSnippetCommand(command)) {
             const result = await runMcpSnippetCommand(readVault(), command, { createId: () => crypto.randomUUID(), now: timestampNow }, writeVault);
             window.clipboxDesktop?.respondAutomationCommand(requestId, { ok: true, ...result });
@@ -2089,6 +2094,8 @@ export default function Home() {
 
   if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Copyboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Copyboxx…</span></main>;
+  // Nobody signed in on this computer: only the login page, until the sign-in succeeds (D-085).
+  if (cloudSync.available && !cloudSync.account) return <LoginGate cloud={cloudSync} theme={theme} />;
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
