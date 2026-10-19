@@ -147,8 +147,9 @@ export function ApiKeyPanel({ deviceKey, onToast, focusId, startAdding, onShowEn
       <form className="totp-form pay-form" onSubmit={(event) => { event.preventDefault(); void save(); }} noValidate>
         <label>名称<input ref={nameRef} value={draft.name} maxLength={40} autoComplete="off" placeholder="例如：客服 AI 接口" onChange={(event) => setField("name", event.target.value)} />
           {errors.name && <span className="totp-error" role="alert">{errors.name}</span>}</label>
-        <fieldset className="apikey-fields">
-          <legend>保密内容 <small>每一项都会隐藏，可以加多项</small></legend>
+        <fieldset className="apikey-fields" aria-labelledby={`${listId}-title`}>
+          {/* Not a <legend>: WebKit squeezes a legend inside a grid fieldset to one character per line. */}
+          <div className="apikey-fields-title" id={`${listId}-title`}>保密内容 <small>每一项都会隐藏，可以加多项</small></div>
           <datalist id={listId}>{API_FIELD_SUGGESTIONS.map((label) => <option key={label} value={label} />)}</datalist>
           {draft.fields.map((field, index) => {
             const error = fieldErrors[field.id];

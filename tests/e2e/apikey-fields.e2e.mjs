@@ -69,3 +69,15 @@ test("an API entry saved before keeps its key as the first field and can get mor
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("demo_key_0000000000EXAMPLE");
   await expect(dialog.getByRole("button", { name: /【范例】接口密钥/ }).first()).toContainText("· 2 项");
 });
+
+test("darwin: the 保密内容 title and its hint sit on one line above the fields", async ({ page }) => {
+  const dialog = await openApiKeys(page, "darwin");
+  await accountAddButton(page).click();
+  const group = dialog.getByRole("group", { name: /^保密内容/ });
+  await expect(group).toBeVisible();
+  const title = group.locator(".apikey-fields-title");
+  const box = await title.boundingBox();
+  const row = await group.locator(".apikey-field-row").first().boundingBox();
+  expect(box.height).toBeLessThan(24);
+  expect(box.width).toBeGreaterThan(row.width * 0.9);
+});
