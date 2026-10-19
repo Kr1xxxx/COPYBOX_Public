@@ -166,7 +166,6 @@ pub fn set_close_behavior(state: tauri::State<Shell>, behavior: String) {
     state.settings.lock().unwrap().close = b;
 }
 
-#[tauri::command]
 /// The page copied something: the mini window may paste it into the window the person came from (D-081).
 #[tauri::command]
 pub fn did_copy(app: AppHandle, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {
