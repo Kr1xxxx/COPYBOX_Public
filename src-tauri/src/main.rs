@@ -77,8 +77,6 @@ fn main() {
             window_mode::set_theme,
             window_mode::page_ready,
             shell::set_close_behavior,
-            shell::set_mini_hide_policy,
-            shell::did_copy,
             shell::get_launch_at_login,
             shell::set_launch_at_login,
             shell::open_data_folder,
@@ -116,6 +114,9 @@ fn main() {
             // An older product name's launch-at-login entry would start the old copy at login (D-046).
             #[cfg(windows)]
             old_autostart::migrate(app.handle());
+            // Something else (a cleaner, a security tool) may have switched launch at login off: put it back (D-079).
+            shell::guard_launch_at_login(app.handle());
+            shell::watch_launch_at_login(app.handle().clone());
             let bridge = include_str!("../bridge.js").replace("__PLATFORM__", page_platform());
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Copyboxx")

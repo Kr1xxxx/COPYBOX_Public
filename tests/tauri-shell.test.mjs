@@ -104,7 +104,7 @@ test("the browser's page menu and its keys are blocked, but text fields keep the
   const vm = await import("node:vm");
   const listeners = {};
   const window = { addEventListener(name, fn) { if (name === "DOMContentLoaded") fn(); } };
-  window.__TAURI__ = { core: { invoke: async () => {} }, clipboardManager: {}, app: {}, event: {} };
+  window.__TAURI__ = { core: { invoke: async () => {} }, clipboardManager: {}, app: {}, event: { listen: async () => {} } };
   const document = {
     documentElement: { classList: { add() {}, remove() {} } },
     hidden: false,

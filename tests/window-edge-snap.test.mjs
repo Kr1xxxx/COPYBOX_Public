@@ -18,6 +18,15 @@ test("the mini edge-snap switch is remembered and sent to the shell (Windows onl
   assert.match(main, /window_mode::watch_mouse\(/);
 });
 
+test("the folded tab is a long notch with the product name, and launch at login is guarded", () => {
+  const css = read("../app/globals.css");
+  const main = read("../src-tauri/src/main.rs");
+  const settings = read("../app/settings.tsx");
+  assert.match(css, /html\[data-mini-fold\] body::after \{ content: "copyboxx"; [^}]*height: 288px;/);
+  assert.match(main, /shell::guard_launch_at_login\(app\.handle\(\)\);\s*shell::watch_launch_at_login\(/);
+  assert.match(settings, /被别的软件关掉会自动恢复/);
+});
+
 test("the Mac window is capped and cannot zoom or go full screen", () => {
   const main = read("../src-tauri/src/main.rs");
   const state = read("../src-tauri/src/window_state.rs");

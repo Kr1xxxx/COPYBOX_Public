@@ -12,8 +12,6 @@ const FILE_MINI: &str = "mini-window-state.json";
 #[derive(Default)]
 struct Inner {
     quick_mode: bool,
-    /// Opened by the tray or 快速搜索: the window may hide itself after a copy.
-    mini_auto_hide: bool,
     /// 固定在最上层 in the full window (the page remembers it and sends it on start).
     pinned: bool,
     normal: Option<Bounds>,
@@ -86,10 +84,6 @@ impl WindowMode {
 
     pub fn is_mini(&self) -> bool {
         self.inner.lock().unwrap().quick_mode
-    }
-
-    pub fn mini_auto_hide(&self) -> bool {
-        self.inner.lock().unwrap().mini_auto_hide
     }
 
     /// Writes the full-window size or the mini position, whichever is showing.
@@ -172,9 +166,8 @@ impl WindowMode {
         }
     }
 
-    pub fn enter_mini(&self, window: &WebviewWindow, auto_hide: bool) {
+    pub fn enter_mini(&self, window: &WebviewWindow) {
         if self.is_mini() {
-            self.inner.lock().unwrap().mini_auto_hide = auto_hide;
             self.emit_mode(window);
             return;
         }
@@ -189,7 +182,6 @@ impl WindowMode {
         {
             let mut inner = self.inner.lock().unwrap();
             inner.quick_mode = true;
-            inner.mini_auto_hide = auto_hide;
         }
         let app = window.app_handle();
         let saved = data_file(app, FILE_MINI)
@@ -236,7 +228,6 @@ impl WindowMode {
         {
             let mut inner = self.inner.lock().unwrap();
             inner.quick_mode = false;
-            inner.mini_auto_hide = false;
         }
         let pinned = self.inner.lock().unwrap().pinned;
         let _ = window.set_always_on_top(stays_on_top(false, pinned));
@@ -255,6 +246,15 @@ impl WindowMode {
 /// Tells the page which edge the mini window is folded against ("" when it is out), so it can draw the notch-like tab.
 fn emit_fold(window: &WebviewWindow, edge: Option<Edge>) {
     let _ = window.emit("clipbox:mini-fold", match edge { Some(Edge::Left) => "left", Some(Edge::Right) => "right", None => "" });
+}
+
+/// Glides the mini window between its stuck and its folded place in about 150 ms (owner: 「弹出做动效」).
+fn slide(window: &WebviewWindow, from: f64, to: f64, y: f64) {
+    const STEPS: u32 = 10;
+    for step in 1..=STEPS {
+        let _ = window.set_position(LogicalPosition::new(ws::slide_x(from, to, step, STEPS), y));
+        std::thread::sleep(Duration::from_millis(15));
+    }
 }
 
 fn mouse_over(app: &AppHandle, window: &WebviewWindow) -> bool {
@@ -283,15 +283,15 @@ pub fn watch_mouse(app: AppHandle, mode: WindowMode) {
             }
             let near = window.is_focused().unwrap_or(false) || mouse_over(&app, &window);
             if folded && near {
-                let _ = window.set_position(LogicalPosition::new(docked.x, docked.y));
-                mode.inner.lock().unwrap().folded = false;
                 emit_fold(&window, None);
+                slide(&window, ws::mini_folded_x(edge, &docked), docked.x, docked.y);
+                mode.inner.lock().unwrap().folded = false;
                 away = 0;
             } else if !folded && !near {
                 away += 1;
                 if away >= 5 {
                     emit_fold(&window, Some(edge));
-                    let _ = window.set_position(LogicalPosition::new(ws::mini_folded_x(edge, &docked), docked.y));
+                    slide(&window, docked.x, ws::mini_folded_x(edge, &docked), docked.y);
                     mode.inner.lock().unwrap().folded = true;
                     away = 0;
                 }
@@ -309,7 +309,7 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 #[tauri::command]
 pub fn set_window_mode(app: AppHandle, state: tauri::State<WindowMode>, mode: String) -> Result<(), String> {
     let window = main_window(&app)?;
-    if mode == "mini" { state.enter_mini(&window, false) } else { state.enter_full(&window) }
+    if mode == "mini" { state.enter_mini(&window) } else { state.enter_full(&window) }
     Ok(())
 }
 

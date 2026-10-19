@@ -139,7 +139,6 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
     }
     if (shouldCopy && !structured) {
       await onCopy(secret);
-      window.clipboxDesktop?.didCopy();
     }
   }
 
@@ -167,7 +166,6 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
     try {
       await copyTextWithExpiry(formatSecretReference(item.id));
       setReferenceStatus("copied");
-      window.clipboxDesktop?.didCopy();
       window.setTimeout(() => setReferenceStatus("idle"), 1600);
     } catch {
       setReferenceStatus("error");

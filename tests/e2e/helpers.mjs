@@ -72,7 +72,6 @@ export async function asDesktop(page, platform, { imageView, testTools = false }
       ...(tools ? { testTools: true } : {}),
       copyText: async (text) => { window.__copied = text; },
       copyImage: async (png) => { window.__copiedImage = Array.from(png.slice(0, 8)); window.__copiedImageLength = png.length; },
-      didCopy() {},
       getVersion: async () => "0.0.0-test",
       getBuildTime: async () => "2026-10-10T21:37:00",
       onFocusSearch: () => () => {},

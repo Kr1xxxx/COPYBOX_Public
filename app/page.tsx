@@ -80,7 +80,7 @@ import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
 import type { WindowMode } from "./desktop-bridge";
-import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type MiniHidePolicy, type ThemeChoice } from "./preferences";
+import { DEFAULT_TRASH_DAYS, TRASH_DAY_OPTIONS, type CloseBehavior, type ThemeChoice } from "./preferences";
 import { ItemEditor } from "./item-editor";
 import { ImageFolderNav } from "./image-folders";
 import { MiniTabs, type MiniTab } from "./mini-tabs";
@@ -174,7 +174,6 @@ const CLOSE_BEHAVIOR_KEY = "clipbox.close-behavior";
 const THEME_KEY = "clipbox.theme";
 const LAST_BACKUP_KEY = "clipbox.last-backup-at";
 const THEME_OPTIONS = ["system", "light", "dark"] as const;
-const MINI_HIDE_KEY = "clipbox.mini-hide-policy";
 const MINI_EDGE_KEY = "clipbox.mini-edge-snap";
 // 固定在最上层 for the full window: "1" when on, absent when off.
 const PIN_ON_TOP_KEY = "clipbox.pin-on-top";
@@ -1148,8 +1147,6 @@ export default function Home() {
     setCopiedId(item.id);
     if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
     copyFeedbackTimer.current = window.setTimeout(() => setCopiedId(""), 1250);
-    window.clipboxDesktop?.didCopy();
-
   }
 
   async function copySecretReference(item: SecretItem) {
@@ -1158,7 +1155,6 @@ export default function Home() {
     if (referenceFeedbackTimer.current) clearTimeout(referenceFeedbackTimer.current);
     referenceFeedbackTimer.current = window.setTimeout(() => setCopiedReferenceId(""), 1600);
     showToast("引用已复制，可直接发给其他任务");
-    window.clipboxDesktop?.didCopy();
   }
 
   function fillFor(item: SecretItem) { return fill?.itemId === item.id ? fill : emptyFillState(item, lastValues); }
@@ -1629,16 +1625,8 @@ export default function Home() {
     showToast(deleteRequest.permanent ? "已永久删除" : "已移入回收站");
   }
 
-  // The mini window stays after a copy unless the person picks otherwise (owner, 2026-10-13: it vanished after a copy on Windows).
-  const [miniHidePolicy, setMiniHidePolicy] = useState<MiniHidePolicy>(() => readStoredChoice<MiniHidePolicy>(MINI_HIDE_KEY, ["hotkey", "always", "never"], "never"));
   const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
   useAutoBackup(!loading && !startupError);
-  useEffect(() => {
-    window.clipboxDesktop?.setMiniHidePolicy?.(miniHidePolicy);
-    // Only tell the desktop shell about the stored choice once on start; later changes go through chooseMiniHidePolicy.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Windows 贴边 (D-079): on until the person turns it off (owner, 2026-10-19: 「Windows 开关默认开」).
   const [miniEdgeSnap, setMiniEdgeSnap] = useState(() => readStoredChoice(MINI_EDGE_KEY, ["0", "1"], "1") === "1");
   useEffect(() => {
@@ -1678,12 +1666,6 @@ export default function Home() {
     setCloseBehavior(behavior);
     writeStoredChoice(CLOSE_BEHAVIOR_KEY, behavior);
     window.clipboxDesktop?.setCloseBehavior?.(behavior);
-  }
-
-  function chooseMiniHidePolicy(policy: MiniHidePolicy) {
-    setMiniHidePolicy(policy);
-    writeStoredChoice(MINI_HIDE_KEY, policy);
-    window.clipboxDesktop?.setMiniHidePolicy?.(policy);
   }
 
   function chooseTrashDays(days: number) {
@@ -2523,8 +2505,6 @@ export default function Home() {
         refreshing={refreshing}
         trashCount={items.filter((item) => isTrashedItem(item)).length}
         itemCount={items.filter((item) => !isTrashedItem(item)).length}
-        miniHidePolicy={miniHidePolicy}
-        onMiniHidePolicy={chooseMiniHidePolicy}
         miniEdgeSnap={miniEdgeSnap}
         onMiniEdgeSnap={chooseMiniEdgeSnap}
         folderGroups={buildSettingsFolderGroups()}

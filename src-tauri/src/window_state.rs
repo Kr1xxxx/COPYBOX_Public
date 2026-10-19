@@ -101,6 +101,12 @@ pub fn mini_dock(p: Point, areas: &[Bounds]) -> Option<(Edge, Point)> {
 }
 
 /// The x of a docked mini window folded away so that only a thin strip stays on screen.
+/// Where a sliding window is after `step` of `steps` (ease-out), so folding and unfolding glide instead of jumping.
+pub fn slide_x(from: f64, to: f64, step: u32, steps: u32) -> f64 {
+    let t = step as f64 / steps as f64;
+    from + (to - from) * (1.0 - (1.0 - t) * (1.0 - t))
+}
+
 pub fn mini_folded_x(edge: Edge, docked: &Point) -> f64 {
     match edge {
         Edge::Left => docked.x - MINI_WIDTH + STRIP_WIDTH,
@@ -175,6 +181,13 @@ mod tests {
     fn folded_mini_leaves_a_strip_on_screen() {
         assert_eq!(mini_folded_x(Edge::Left, &Point { x: 0.0, y: 10.0 }), -344.0);
         assert_eq!(mini_folded_x(Edge::Right, &Point { x: 1560.0, y: 10.0 }), 1904.0);
+    }
+
+    #[test]
+    fn slide_eases_out_and_lands_exactly() {
+        assert_eq!(slide_x(0.0, 100.0, 5, 10), 75.0);
+        assert_eq!(slide_x(0.0, 100.0, 10, 10), 100.0);
+        assert_eq!(slide_x(1904.0, 1560.0, 10, 10), 1560.0);
     }
 
     #[test]
