@@ -51,10 +51,10 @@ test("Windows: the 账号 page has no 其他, API 密钥 or 恢复码 category a
   await asDesktop(page, "win32");
   await seedSnippets(page);
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText([/^登录/, /^收款信息/, /^验证码/, /^笔记/]);
+  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText([/^登录/, /^收款信息/, /^地址/, /^验证码/, /^笔记/]);
   await expect(page.locator("body")).not.toContainText("未分类");
   await page.getByRole("button", { name: /新增/ }).first().click();
-  await expect(page.getByRole("menuitem")).toHaveText(["登录", "收款信息", "验证码", "笔记"]);
+  await expect(page.getByRole("menuitem")).toHaveText(["登录", "收款信息", "地址", "验证码", "笔记"]);
   await page.keyboard.press("Escape");
 });
 
