@@ -311,7 +311,8 @@ function cell(text, className) {
 function render() {
   const query = $("filter").value.trim().toLowerCase();
   const shown = users.filter((user) => user.email.includes(query));
-  $("count").textContent = "共 " + users.length + " 人" + (query ? "，显示 " + shown.length + " 人" : "");
+  const online = users.reduce((sum, user) => sum + user.devices, 0);
+  $("count").textContent = "注册 " + users.length + " 人 · 登录中 " + online + " 台" + (query ? "，显示 " + shown.length + " 人" : "");
   const rows = $("rows");
   rows.replaceChildren();
   for (const user of shown) {

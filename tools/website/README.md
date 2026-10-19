@@ -174,7 +174,7 @@ npm run website:deploy                                     # node tools/website/
 ## 后台 (owner page, D-065)
 
 `/admin/` lists who registered, when they last signed in and synced, which computers are signed in and how big their
-cloud copy is (`admin.mjs`, routed after `/api/`). Read-only: it never decrypts a vault and has no buttons that change
+cloud copy is, with 「注册 N 人 · 登录中 M 台」 (M = signed-in computers across all accounts) at the top (`admin.mjs`, routed after `/api/`). Read-only: it never decrypts a vault and has no buttons that change
 user data. "Last sign-in" is the newest app session's expiry minus 90 days (sessions keep no start time). People who
 only asked for a code show 「还没登录过」.
 
