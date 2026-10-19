@@ -168,7 +168,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
             </div>
           </section>
           <section className="settings-card" aria-labelledby="set-home-account" hidden={hideSection("look", "set-home-account")}><h3 id="set-home-account">账号与同步</h3>
-            <div className="settings-row"><div><strong>账号</strong><small>{PLAIN_NOTES ? "登录、收款信息、验证码和笔记" : "登录、收款信息、API 密钥、验证码、恢复码和笔记"} · {accountLock.mode !== "none" ? "已设账号页密码" : slideUnlock.on ? "打开时先滑动解锁" : "打开就能看到"}</small></div>
+            <div className="settings-row"><div><strong>账号</strong></div>
               <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => goToCard("security", "set-security")}>安全设置</button><button type="button" className="secondary-button" onClick={onOpenAccount}>打开账号页</button></div></div>
             {syncCode}
           </section>

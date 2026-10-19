@@ -1,6 +1,6 @@
 import type { CloseBehavior, ThemeChoice } from "./preferences";
 
-// `installable` is false when 立即更新 cannot work here (no checksum in the manifest, or not Windows); older shells omit it.
+// `installable` is false when 立即更新 cannot work here (no checksum in the manifest, or neither Windows nor the Mac); older shells omit it.
 export type UpdateInfo = { status: "disabled" | "current" | "error" } | { status: "available"; version: string; notes: string[]; installable?: boolean };
 
 export type UpdateInstallResult =

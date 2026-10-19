@@ -10,7 +10,8 @@ type Phase =
   | { kind: "downloading"; received: number; total: number }
   | { kind: "installing" }
   | { kind: "error"; reason: string }
-  // 下载 opened the new version in the browser; the person installs it by hand (the Mac, D-073; older Windows shells).
+  // 下载 opened the new version in the browser; the person installs it by hand (older shells, or a manifest without a
+  // checksum; D-073).
   | { kind: "opened" };
 
 function readDismissed() {
@@ -23,7 +24,7 @@ export function updateErrorText(reason: string) {
     case "network": return "网络连不上或断了";
     case "incomplete": return "下载的文件不完整";
     case "disk": return "电脑上存不下安装文件";
-    case "start": return "安装程序没能打开";
+    case "start": return "新版本没能装上";
     case "unavailable": return "这个版本请去网站下载";
     default: return "出了点问题";
   }
@@ -33,7 +34,7 @@ function megabytes(bytes: number) {
   return (Math.max(0, bytes) / (1024 * 1024)).toFixed(1);
 }
 
-// How to finish a download by hand. The Mac app is unsigned, so the first open of a new copy may be stopped (D-073).
+// How to finish a browser download by hand. The Mac app is unsigned, so the first open of a new copy may be stopped (D-073).
 export function manualInstallHint(platform: string | undefined) {
   return platform === "darwin"
     ? "下载好后打开它，把 Copyboxx 拖进「应用程序」替换旧版，内容都会保留。被拦住时，到「系统设置 › 隐私与安全性」点「仍要打开」。"
@@ -41,8 +42,9 @@ export function manualInstallHint(platform: string | undefined) {
 }
 
 // Asks the desktop shell for a newer version on launch and then once a day. 「立即更新」 downloads it with a progress bar
-// and installs it over this app (Windows, D-047); the Mac and older shells offer 「下载」 in the browser and then say how
-// to install it (D-073). 「稍后」 hides that version only; 「知道了」 hides it until the app opens again.
+// and installs it over this app (Windows D-047, Mac D-078); older shells and a manifest without a checksum offer 「下载」
+// in the browser and then say how to install it (D-073). 「稍后」 hides that version only; 「知道了」 hides it until the
+// app opens again.
 export function UpdateNotice() {
   const [update, setUpdate] = useState<{ version: string; notes: string[]; installable: boolean } | null>(null);
   const [dismissed, setDismissed] = useState(readDismissed);

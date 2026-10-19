@@ -116,8 +116,8 @@ export function AiSettingsSection({ localAiAvailable }: { localAiAvailable: bool
           <div className="settings-ai-field"><span><label htmlFor="ai-model">模型</label><button type="button" className="settings-link-button" disabled={Boolean(busy)} onClick={() => void fetchModels()}>{busy === "models" ? "获取中…" : "获取模型"}</button></span><input id="ai-model" value={form.model} list="ai-model-choices" onChange={(event) => edit({ model: event.target.value })} placeholder="例如 gpt-4o-mini" spellCheck={false} /><datalist id="ai-model-choices">{modelChoices.map((name) => <option key={name} value={name} />)}</datalist></div>
           <label className="settings-ai-field"><span>API Key</span><input type="password" value={keyInput} onChange={(event) => { setKeyInput(event.target.value); setTouched(true); setMessage(null); }} placeholder={status.hasKey ? "已保存，留空则保持不变" : "sk-…"} spellCheck={false} autoComplete="new-password" /></label>
         </div>
-        <label className="settings-ai-field"><span>润色提示词</span><textarea rows={4} value={form.polishPrompt} onChange={(event) => edit({ polishPrompt: event.target.value })} aria-invalid={!form.polishPrompt.trim()} /></label>
-        <label className="settings-ai-field"><span>整理提示词</span><textarea rows={4} value={form.organizePrompt} onChange={(event) => edit({ organizePrompt: event.target.value })} aria-invalid={!form.organizePrompt.trim()} /></label>
+        <label className="settings-ai-field"><span>润色提示词</span><textarea rows={8} value={form.polishPrompt} onChange={(event) => edit({ polishPrompt: event.target.value })} aria-invalid={!form.polishPrompt.trim()} /></label>
+        <label className="settings-ai-field"><span>整理提示词</span><textarea rows={6} value={form.organizePrompt} onChange={(event) => edit({ organizePrompt: event.target.value })} aria-invalid={!form.organizePrompt.trim()} /></label>
         {(touched && problem && !message) && <p className="settings-error" role="alert">{problem}</p>}
         {message && <p className={message.tone === "error" ? "settings-error" : "settings-ok"} role="status">{message.text}</p>}
         <div className="settings-ai-actions">
