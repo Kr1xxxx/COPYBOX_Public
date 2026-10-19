@@ -163,8 +163,18 @@
     }, true);
   }
 
+  // Windows 贴边 (D-079): while the mini window is folded against a screen edge, the page draws a notch-like tab
+  // on the strip that stays visible (globals.css, html[data-mini-fold]).
+  function watchMiniFold() {
+    tauri.event.listen("clipbox:mini-fold", function (event) {
+      if (event.payload === "left" || event.payload === "right") document.documentElement.setAttribute("data-mini-fold", event.payload);
+      else document.documentElement.removeAttribute("data-mini-fold");
+    }).catch(noop);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.documentElement.classList.add("desktop-app", "platform-" + platform);
+    watchMiniFold();
     watchIdle();
     watchTitleDrag();
     quietBrowserChrome();

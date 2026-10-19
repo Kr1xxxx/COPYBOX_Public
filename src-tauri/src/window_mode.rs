@@ -157,6 +157,7 @@ impl WindowMode {
         };
         if let Some((_, p)) = folded {
             let _ = window.set_position(LogicalPosition::new(p.x, p.y));
+            emit_fold(window, None);
         }
     }
 
@@ -251,6 +252,11 @@ impl WindowMode {
     }
 }
 
+/// Tells the page which edge the mini window is folded against ("" when it is out), so it can draw the notch-like tab.
+fn emit_fold(window: &WebviewWindow, edge: Option<Edge>) {
+    let _ = window.emit("clipbox:mini-fold", match edge { Some(Edge::Left) => "left", Some(Edge::Right) => "right", None => "" });
+}
+
 fn mouse_over(app: &AppHandle, window: &WebviewWindow) -> bool {
     let (Ok(c), Ok(p), Ok(s)) = (app.cursor_position(), window.outer_position(), window.outer_size()) else { return false };
     c.x >= p.x as f64 && c.x < (p.x + s.width as i32) as f64 && c.y >= p.y as f64 && c.y < (p.y + s.height as i32) as f64
@@ -279,10 +285,12 @@ pub fn watch_mouse(app: AppHandle, mode: WindowMode) {
             if folded && near {
                 let _ = window.set_position(LogicalPosition::new(docked.x, docked.y));
                 mode.inner.lock().unwrap().folded = false;
+                emit_fold(&window, None);
                 away = 0;
             } else if !folded && !near {
                 away += 1;
                 if away >= 5 {
+                    emit_fold(&window, Some(edge));
                     let _ = window.set_position(LogicalPosition::new(ws::mini_folded_x(edge, &docked), docked.y));
                     mode.inner.lock().unwrap().folded = true;
                     away = 0;

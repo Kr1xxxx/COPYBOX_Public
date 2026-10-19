@@ -1639,17 +1639,17 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Windows 贴边 (D-079): off until the person turns it on, so the mini window never folds away unexpectedly.
-  const [miniEdgeSnap, setMiniEdgeSnap] = useState(() => readStoredChoice(MINI_EDGE_KEY, ["1"], "") === "1");
+  // Windows 贴边 (D-079): on until the person turns it off (owner, 2026-10-19: 「Windows 开关默认开」).
+  const [miniEdgeSnap, setMiniEdgeSnap] = useState(() => readStoredChoice(MINI_EDGE_KEY, ["0", "1"], "1") === "1");
   useEffect(() => {
-    if (miniEdgeSnap) window.clipboxDesktop?.setMiniEdgeSnap?.(true);
+    window.clipboxDesktop?.setMiniEdgeSnap?.(miniEdgeSnap);
     // Sent once on start; later changes go through chooseMiniEdgeSnap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function chooseMiniEdgeSnap(on: boolean) {
     setMiniEdgeSnap(on);
-    try { if (on) localStorage.setItem(MINI_EDGE_KEY, "1"); else localStorage.removeItem(MINI_EDGE_KEY); } catch { /* keep the in-memory choice for this session */ }
+    writeStoredChoice(MINI_EDGE_KEY, on ? "1" : "0");
     window.clipboxDesktop?.setMiniEdgeSnap?.(on);
   }
 

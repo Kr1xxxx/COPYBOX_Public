@@ -238,7 +238,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
                 options={[["hotkey", "从托盘呼出时收起"], ["always", "总是收起"], ["never", "不收起"]].map(([value, label]) => ({ value, label }))} />
             </div>
             {/* D-079, Windows only: the mini window sticks to the screen's left or right edge and folds away while the mouse is elsewhere. */}
-            {window.clipboxDesktop?.platform === "win32" && <div className="settings-row"><div><strong>迷你窗口贴边收起</strong><small>{miniEdgeSnap ? "拖到屏幕左右边缘会吸住；鼠标离开后缩成一条，碰一下就滑出来" : "拖到屏幕左右边缘会吸住，鼠标离开后缩成一条"}</small></div>
+            {window.clipboxDesktop?.platform === "win32" && <div className="settings-row"><div><strong>迷你窗口贴边收起</strong><small>{miniEdgeSnap ? "拖到屏幕左右边缘会吸住；鼠标离开后只留一个小标签，碰一下就滑出来" : "迷你窗口放在哪就停在哪"}</small></div>
               <ArcSegmented className="settings-segment" mode="radio" label="迷你窗口贴边收起" value={miniEdgeSnap ? "on" : "off"} onSelect={(value) => onMiniEdgeSnap(value === "on")}
                 options={[{ value: "off", label: "关" }, { value: "on", label: "开" }]} />
             </div>}

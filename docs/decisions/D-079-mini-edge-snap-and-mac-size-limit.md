@@ -2,10 +2,12 @@
 - Context (owner, 2026-10-19, answering item B of the desktop audit): 「只做 Windows, 再把 mac 改成无法全屏, 最大限定一个尺寸,
   不会拖到窗口边上后自适应变大(我们的软件不需要那么大) 反而经常会在窗口最边上等待复制」.
 - Decision, Windows (`src-tauri/src/window_mode.rs`, `window_state.rs`):
-  - 设置 → 窗口 → 「迷你窗口贴边收起」, off by default, Windows only (`clipbox.mini-edge-snap`, sent to the shell on start).
+  - 设置 → 窗口 → 「迷你窗口贴边收起」, on by default (owner: 「Windows 开关默认开」), Windows only
+    (`clipbox.mini-edge-snap`, sent to the shell on start).
   - With it on, a mini window let go within 24 px of a screen's left or right edge sticks to that edge. Half a second after
-    the mouse leaves the window it folds away off the edge, leaving a 16 px strip; the mouse touching the strip, or the
-    window getting the focus (tray 快速搜索), slides it back out. An edge shared with a second screen never counts.
+    the mouse leaves the window it folds away off the edge, leaving a 16 px strip drawn as a notch-like rounded tab
+    (owner: 「收起来后做一个刘海类似的效果」; the shell tells the page the edge, `clipbox:mini-fold`); the mouse touching
+    the tab, or the window getting the focus (tray 快速搜索), slides it back out. An edge shared with a second screen never counts.
   - Switching to the full window, or turning the setting off, brings a folded window back out. The remembered mini
     position is the stuck one, never the folded one.
 - Decision, macOS (`src-tauri/src/main.rs`, `window_mode.rs`):
