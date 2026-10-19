@@ -2382,7 +2382,7 @@ export default function Home() {
                 <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span></div>
               <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
-                legacyView={legacyList} />
+                legacyView={legacyList} onAdd={() => setAddMenuOpen(true)} />
             </>}
             {!vaultPage && <div className="section-head">
               <h1>{sectionTitle}</h1>
@@ -2404,7 +2404,7 @@ export default function Home() {
               />}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
-              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
                 <AnimatePresence>{productMenuOpen && <ArcMenu className="product-filter-menu">
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}

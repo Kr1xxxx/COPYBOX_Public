@@ -119,14 +119,16 @@ export function SnippetFill({ item, state, onState, renderText, onSubmit, onActi
   );
 }
 
-// The choices for a block, shown above it while it is focused. Drawn in the page body so no card can clip it.
+// The choices for a block, shown under it while it is focused. Drawn in the page body so no card can clip it.
 export function VariablePopup({ rowId, name, options, current, onPick }: { rowId: string; name: string; options: readonly string[]; current: string; onPick: (value: string) => void }) {
-  const [box, setBox] = useState<{ left: number; top: number } | null>(null);
+  const [box, setBox] = useState<{ left: number; top: number; below: boolean } | null>(null);
   useEffect(() => {
     const place = () => {
       const input = document.querySelector(`[data-sort-id="${CSS.escape(rowId)}"] input[data-var="${CSS.escape(name)}"]`);
       const rect = input?.closest(".var-chip")?.getBoundingClientRect();
-      setBox(rect ? { left: rect.left + rect.width / 2, top: rect.top } : null);
+      // Below the block so it never covers the card title; above only when the window ends right under it.
+      const below = Boolean(rect) && rect!.bottom + 48 <= window.innerHeight;
+      setBox(rect ? { left: rect.left + rect.width / 2, top: below ? rect.bottom : rect.top, below } : null);
     };
     place();
     window.addEventListener("resize", place);
@@ -135,7 +137,7 @@ export function VariablePopup({ rowId, name, options, current, onPick }: { rowId
   }, [rowId, name]);
   if (!box || typeof document === "undefined") return null;
   return createPortal(
-    <div className="var-popup" role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
+    <div className={`var-popup${box.below ? " below" : ""}`} role="listbox" aria-label={`${name} 常用`} style={{ left: box.left, top: box.top }}>
       {options.map((option) => <button key={option} type="button" role="option" aria-selected={option === current} className="var-popup-option" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(option)}>{option}</button>)}
     </div>,
     document.body,

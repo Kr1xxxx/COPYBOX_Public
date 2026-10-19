@@ -19,7 +19,7 @@ function useNow(interval = 250) {
   return now;
 }
 
-function Ring({ left, period }: { left: number; period: number }) {
+export function Ring({ left, period }: { left: number; period: number }) {
   const radius = 9;
   const length = 2 * Math.PI * radius;
   return (
