@@ -1,4 +1,5 @@
-// D-070: 设置 → 安全. Once opened, the 账号 page locks again after 10 / 20 / 30 秒 without activity (20 by default);
+// D-070: 设置 → 安全. Once opened, the 账号 page locks again after 10 / 20 / 30 秒 without activity (20 by default),
+// on whichever section is showing (D-077);
 // 不上锁 asks first. Works with the slide (frost comes back) and with the 账号页密码 (the password screen comes back).
 import { expect, test } from "@playwright/test";
 import { AUTO_LOCK_KEY, asDesktop, guideSeenState, seedSnippets } from "./helpers.mjs";
@@ -45,6 +46,21 @@ for (const platform of ["win32", "darwin"]) {
     await expect(page.locator(".account-veil-content")).toHaveAttribute("inert", "");
   });
 }
+
+test("switching to 话术 keeps the 账号 page open; the countdown still runs there (D-077)", async ({ page }) => {
+  await page.clock.install();
+  await asDesktop(page, "win32");
+  await seedSnippets(page);
+  await openAccounts(page);
+  await slideOpen(page);
+  await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
+  await openAccounts(page);
+  await expect(vault(page)).toBeVisible();
+  await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
+  await page.clock.fastForward(21_000);
+  await openAccounts(page);
+  await expect(knob(page)).toBeVisible();
+});
 
 test("Settings has a 安全 page holding the 账号 locks and the auto-lock choice", async ({ page }) => {
   await asDesktop(page, "win32");

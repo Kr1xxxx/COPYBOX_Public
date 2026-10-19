@@ -32,11 +32,10 @@ test("the choice is remembered, 不上锁 included", () => {
   });
 });
 
-test("the countdown runs only while the 账号 page is open and has a lock to go back to", () => {
-  const base = { seconds: 20, accountMode: true, lockSet: false, unlocked: false, slideOn: true, slidOpen: true, fullWindow: true };
+test("the countdown runs while the 账号 page is open and has a lock to go back to, on any section (D-077)", () => {
+  const base = { seconds: 20, lockSet: false, unlocked: false, slideOn: true, slidOpen: true, fullWindow: true };
   assert.equal(autoLockRunning(base), true);
   assert.equal(autoLockRunning({ ...base, seconds: 0 }), false, "不上锁");
-  assert.equal(autoLockRunning({ ...base, accountMode: false }), false, "another section");
   assert.equal(autoLockRunning({ ...base, slidOpen: false }), false, "still frosted");
   assert.equal(autoLockRunning({ ...base, slideOn: false }), false, "no slide and no password: nothing to lock");
   assert.equal(autoLockRunning({ ...base, fullWindow: false }), false, "the mini window has no veil");

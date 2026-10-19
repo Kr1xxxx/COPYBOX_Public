@@ -32,7 +32,18 @@ async function unlock(page, password) {
 
 const vault = (page) => page.getByRole("region", { name: "保险箱" });
 
+// Leaving the 账号 section no longer locks it (D-077), so these tests lock it with the auto-lock timer (needs page.clock).
+async function autoLockAfterTenSeconds(settings) {
+  await settings.getByRole("radiogroup", { name: "账号页自动上锁" }).getByRole("radio", { name: "10 秒" }).click();
+}
+
+async function waitForLock(page) {
+  await page.clock.fastForward(11_000);
+  await expect(page.getByRole("form", { name: "账号页已上锁" })).toBeVisible();
+}
+
 test("closing 设置 while the recovery code is on screen asks first; closing anyway gives a new code at the next unlock", async ({ page }) => {
+  await page.clock.install();
   await asDesktop(page, "win32");
   await seedSnippets(page);
   const { settings, code } = await startPassword(page, "abcd1234");
@@ -67,12 +78,14 @@ test("closing 设置 while the recovery code is on screen asks first; closing an
   await expect(vault(page)).toBeVisible();
 
   // confirmed: the next unlock opens straight away, and the old code no longer works
-  await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
+  const security = await openSettings(page);
+  await autoLockAfterTenSeconds(security);
+  await security.getByRole("button", { name: "关闭设置" }).click();
+  await waitForLock(page);
   await unlock(page, "abcd1234");
   await expect(vault(page)).toBeVisible();
   await expect(page.getByRole("group", { name: "新的恢复码" })).toHaveCount(0);
-  await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
-  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
+  await waitForLock(page);
   await page.getByRole("button", { name: "忘记密码" }).click();
   const recover = page.getByRole("group", { name: "用恢复码找回" });
   await recover.getByLabel("恢复码").fill(code);
@@ -110,6 +123,7 @@ test("if the app stops before the recovery code is confirmed, the next unlock sh
 });
 
 test("the copy kept before encrypting is deleted after the data opened fine in three later app sessions", async ({ page }) => {
+  await page.clock.install();
   await asDesktop(page, "win32");
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
   await page.goto("/");
@@ -122,6 +136,7 @@ test("the copy kept before encrypting is deleted after the data opened fine in t
   await settings.getByRole("button", { name: "完成" }).click();
   await expect(settings).toContainText("设密码前的备份");
   await expect(settings).toContainText("自动删除");
+  await autoLockAfterTenSeconds(settings);
   await settings.getByRole("button", { name: "关闭设置" }).click();
   const copy = () => page.evaluate(() => localStorage.getItem("clipbox.account-premigration.v1"));
   const counted = () => page.evaluate(() => JSON.parse(localStorage.getItem("clipbox.account-premigration.v1") ?? "{}").unlocks?.length ?? -1);
@@ -138,7 +153,7 @@ test("the copy kept before encrypting is deleted after the data opened fine in t
     await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
     await expect.poll(counted).toBe(expected);
     // a second unlock in the same session does not count again
-    await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
+    await waitForLock(page);
     await unlock(page, "abcd1234");
     await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
     await page.waitForTimeout(300);

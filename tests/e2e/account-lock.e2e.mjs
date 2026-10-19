@@ -25,7 +25,7 @@ async function setPassword(page, password) {
 }
 
 for (const platform of ["win32", "darwin"]) {
-  test(`${platform}: a password locks the 账号 page until it is entered, and locks again after leaving`, async ({ page }) => {
+  test(`${platform}: a password locks the 账号 page until it is entered; leaving the page does not lock it again`, async ({ page }) => {
     await asDesktop(page, platform);
     await seedSnippets(page);
     await setPassword(page, "abcd1234");
@@ -34,6 +34,8 @@ for (const platform of ["win32", "darwin"]) {
     const lock = page.getByRole("form", { name: "账号页已上锁" });
     await expect(lock).toBeVisible();
     await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
+    // Locked, the 账号 sidebar cannot switch views (D-077).
+    await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeDisabled();
     await lock.getByLabel("账号页密码").fill("wrong-one");
     await lock.getByRole("button", { name: "打开" }).click();
     await expect(lock.getByRole("alert")).toContainText("密码不对");
@@ -43,6 +45,10 @@ for (const platform of ["win32", "darwin"]) {
     await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
     await kinds.getByRole("button", { name: "话术" }).click();
     await kinds.getByRole("button", { name: "账号" }).click();
+    await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeEnabled();
+    // 上锁 brings the password screen back at once.
+    await page.getByRole("button", { name: "上锁" }).click();
     await expect(page.getByRole("form", { name: "账号页已上锁" })).toBeVisible();
   });
 }
@@ -142,7 +148,9 @@ test("the recovery code reopens the data and sets a new password; the old passwo
   await recover.getByLabel("恢复码").fill(code.toLowerCase());
   await recover.getByRole("button", { name: "用恢复码重设密码" }).click();
   await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(5);
-  await kinds.getByRole("button", { name: "话术" }).click();
+  // Leaving the section no longer locks it (D-077); opening the app again does.
+  await page.reload();
+  await page.waitForSelector(".app-shell");
   await kinds.getByRole("button", { name: "账号" }).click();
   await page.getByLabel("账号页密码").fill("abcd1234");
   await page.getByRole("button", { name: "打开" }).click();

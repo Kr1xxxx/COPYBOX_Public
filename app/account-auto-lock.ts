@@ -21,11 +21,12 @@ export function autoLockLabel(seconds: AutoLockSeconds): string {
   return seconds === 0 ? "不上锁" : `${seconds} 秒`;
 }
 
-// Whether the countdown runs right now: the 账号 page is showing and open, and there is a lock to go back to.
+// Whether the countdown runs right now: the 账号 page is open and there is a lock to go back to. It keeps running on the
+// other sections too, since switching sections no longer locks the page (D-077).
 // With 账号页密码 set, the password screen is that lock (in either window); without it, the slide veil is, which only the
 // full window has (D-051).
-export function autoLockRunning(state: { seconds: number; accountMode: boolean; lockSet: boolean; unlocked: boolean; slideOn: boolean; slidOpen: boolean; fullWindow: boolean }): boolean {
-  if (!(state.seconds > 0) || !state.accountMode) return false;
+export function autoLockRunning(state: { seconds: number; lockSet: boolean; unlocked: boolean; slideOn: boolean; slidOpen: boolean; fullWindow: boolean }): boolean {
+  if (!(state.seconds > 0)) return false;
   if (state.lockSet) return state.unlocked;
   return state.slideOn && state.slidOpen && state.fullWindow;
 }
@@ -33,6 +34,6 @@ export function autoLockRunning(state: { seconds: number; accountMode: boolean; 
 // What the 「自动上锁」 row says under its title.
 export function autoLockHint(seconds: AutoLockSeconds, hasLock: boolean): string {
   if (!hasLock) return "要先设账号页密码或打开滑动解锁，才会自动上锁";
-  if (seconds === 0) return "解锁后一直保持打开，直到离开账号页";
+  if (seconds === 0) return "解锁后一直保持打开";
   return `解锁后 ${seconds} 秒内没有操作，账号页就会重新上锁`;
 }
