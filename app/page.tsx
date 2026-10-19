@@ -75,7 +75,7 @@ import { waitForImageWrites } from "./image-store";
 import { isQuotaError, isStorageNearlyFull, STORAGE_FULL_MESSAGE, STORAGE_NEARLY_FULL_MESSAGE } from "./clipbox-core";
 import { FolderRow } from "./folder-row";
 import { ListEmptyState } from "./list-empty-state";
-import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import { HIDDEN_ACCOUNT_KINDS, PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
@@ -511,7 +511,7 @@ export default function Home() {
     if (lockSet) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); } else setAccountSlidOpen(false);
   });
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
-  const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
+  const categoryList = useMemo(() => CATEGORY_ORDER.filter((id) => !HIDDEN_ACCOUNT_KINDS.includes(id)), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
