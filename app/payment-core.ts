@@ -91,13 +91,24 @@ export type RecoveryItem = EntryMeta & {
   updatedAt: number;
 };
 
+// 地址 (D-076): a company's postal address. Nothing in it is hidden. `fields` holds the parts (address-core.ts); being a
+// record with no "account" / "email" key, older app versions that read it as 收款信息 still show it without failing.
+export type AddressItem = EntryMeta & {
+  id: string;
+  type: "address";
+  name: string;
+  fields: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+};
+
 // Lock's own sorting of an entry in 全部: another type (only for old 秘密) and/or another website. Not shown in any list.
 export type MarkItem = {
   id: string;
   type: "mark";
   // "legacy:<id>" for an old 秘密 entry, "<type>:<id>" for a 保险箱 entry.
   target: string;
-  as?: "login" | "payment" | "apikey" | "totp" | "recovery" | "note" | "other";
+  as?: "login" | "payment" | "address" | "apikey" | "totp" | "recovery" | "note" | "other";
   site?: string;
   updatedAt: number;
 };

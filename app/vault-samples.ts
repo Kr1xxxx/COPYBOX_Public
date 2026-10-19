@@ -9,7 +9,8 @@ export const SAMPLES_DONE_KEY = "clipbox.vault.samples.v2";
 const PREFIX = "sample-";
 export const isSampleId = (id: string) => id.startsWith(PREFIX);
 
-export function sampleVaultData(now: number): { totp: TotpAccount[]; items: VaultItem[] } {
+// `hiddenKinds`: item types the platform has no category for; their 范例 are left out (the 验证码 stays, every platform has it).
+export function sampleVaultData(now: number, hiddenKinds: string[] = []): { totp: TotpAccount[]; items: VaultItem[] } {
   const totp: TotpAccount[] = [{ id: `${PREFIX}totp`, issuer: "Example", name: "【范例】验证码", secret: "JBSWY3DPEHPK3PXP", digits: 6, period: 30, algorithm: "SHA1", createdAt: now }];
   const base = { createdAt: now, updatedAt: now };
   const items: VaultItem[] = [
@@ -18,7 +19,7 @@ export function sampleVaultData(now: number): { totp: TotpAccount[]; items: Vaul
     { id: `${PREFIX}apikey`, type: "apikey", name: "【范例】接口密钥", service: "Example", key: "demo_key_0000000000EXAMPLE", secret: "", endpoint: "", expires: "", ...base },
     { id: `${PREFIX}recovery`, type: "recovery", name: "【范例】恢复码", site: "example.com", codes: ["0000-1111", "2222-3333", "4444-5555"], note: "", ...base },
   ];
-  return { totp, items };
+  return { totp, items: items.filter((item) => !hiddenKinds.includes(item.type)) };
 }
 
 type SampleItem = { id: string; createdAt?: number; updatedAt?: number; type?: string; target?: string };
@@ -29,10 +30,12 @@ function untouched(entry: SampleItem) {
 }
 
 // Which ids a clear may remove, found by the sample id mark only, never by guessing from the content.
-export function planClearSamples(totp: SampleItem[], items: SampleItem[]) {
-  const removeTotp = totp.filter((entry) => isSampleId(entry.id) && untouched(entry)).map((entry) => entry.id);
-  const removeItems = items.filter((entry) => entry.type !== "mark" && isSampleId(entry.id) && untouched(entry)).map((entry) => entry.id);
-  const keptEdited = items.filter((entry) => entry.type !== "mark" && isSampleId(entry.id) && !untouched(entry)).length;
+// `onlyKinds` limits it to items of those types (the 范例 of kinds this platform has no category for).
+export function planClearSamples(totp: SampleItem[], items: SampleItem[], onlyKinds?: string[]) {
+  const ofKind = (entry: SampleItem) => entry.type !== "mark" && isSampleId(entry.id) && (!onlyKinds || onlyKinds.includes(entry.type ?? ""));
+  const removeTotp = onlyKinds ? [] : totp.filter((entry) => isSampleId(entry.id) && untouched(entry)).map((entry) => entry.id);
+  const removeItems = items.filter((entry) => ofKind(entry) && untouched(entry)).map((entry) => entry.id);
+  const keptEdited = items.filter((entry) => ofKind(entry) && !untouched(entry)).length;
   return { removeTotp, removeItems, keptEdited };
 }
 
@@ -41,8 +44,8 @@ export function isMarkOfSample(target: string) {
 }
 
 // A restore only adds the samples whose ids are missing; whatever is there stays exactly as it is.
-export function planRestoreSamples(totp: SampleItem[], items: SampleItem[], now: number) {
-  const samples = sampleVaultData(now);
+export function planRestoreSamples(totp: SampleItem[], items: SampleItem[], now: number, hiddenKinds: string[] = []) {
+  const samples = sampleVaultData(now, hiddenKinds);
   const haveTotp = new Set(totp.map((entry) => entry.id));
   const haveItems = new Set(items.map((entry) => entry.id));
   return { addTotp: samples.totp.filter((entry) => !haveTotp.has(entry.id)), addItems: samples.items.filter((entry) => !haveItems.has(entry.id)) };
@@ -61,11 +64,11 @@ export async function previewClearSamples(deviceKey: string, storage: Storage2 =
 // Removes the examples, and nothing else. There is no "remove all" path: each list is rewritten with only the planned ids
 // taken out, and the write is refused unless exactly those entries are gone and every other one is left as it was.
 // Each list is read and rewritten in one step (store.update), so an entry saved at the same moment is never lost.
-export async function clearSampleEntries(deviceKey: string, storage: Storage2 = localStorage) {
+export async function clearSampleEntries(deviceKey: string, storage: Storage2 = localStorage, onlyKinds?: string[]) {
   const totpStore = openTotpStore(deviceKey, storage);
   const itemStore = openSecretItemsStore(deviceKey, storage);
   let removedTotp: string[] = [];
-  await totpStore.update((totp) => {
+  if (!onlyKinds) await totpStore.update((totp) => {
     removedTotp = planClearSamples(totp, []).removeTotp;
     const gone = new Set(removedTotp);
     const kept = totp.filter((entry) => !gone.has(entry.id));
@@ -75,12 +78,13 @@ export async function clearSampleEntries(deviceKey: string, storage: Storage2 = 
   let removedItems = 0;
   let keptEdited = 0;
   await itemStore.update((items) => {
-    const plan = planClearSamples([], items);
+    const plan = planClearSamples([], items, onlyKinds);
     const goneItems = new Set(plan.removeItems);
+    if (goneItems.size === 0 && removedTotp.length === 0) { keptEdited = plan.keptEdited; return items; }
     const goneTotp = new Set(removedTotp);
     // Marks (改归类) that only point at a removed example go with it.
     const finalItems = items.filter((item) => !goneItems.has(item.id) && !(item.type === "mark" && (goneItems.has(item.target.slice(item.target.indexOf(":") + 1)) || goneTotp.has(item.target.slice(item.target.indexOf(":") + 1)))));
-    const safe = items.length - finalItems.length >= goneItems.size && finalItems.every((item) => items.includes(item) && !(isSampleId(item.id) && untouched(item) && item.type !== "mark")) && goneItems.size <= 20;
+    const safe = items.length - finalItems.length >= goneItems.size && finalItems.every((item) => items.includes(item) && !(isSampleId(item.id) && untouched(item) && item.type !== "mark" && (!onlyKinds || onlyKinds.includes(item.type)))) && goneItems.size <= 20;
     if (!safe) throw new Error("清除范例的检查没通过，数据没有改动");
     removedItems = goneItems.size;
     keptEdited = plan.keptEdited;
@@ -90,13 +94,13 @@ export async function clearSampleEntries(deviceKey: string, storage: Storage2 = 
   return { removed: removedItems + removedTotp.length, keptEdited };
 }
 
-export async function restoreSampleEntries(deviceKey: string, storage: Storage2 = localStorage) {
+export async function restoreSampleEntries(deviceKey: string, storage: Storage2 = localStorage, hiddenKinds: string[] = []) {
   const totpStore = openTotpStore(deviceKey, storage);
   const itemStore = openSecretItemsStore(deviceKey, storage);
   const now = Date.now();
   let added = 0;
   await itemStore.update((items) => {
-    const { addItems } = planRestoreSamples([], items, now);
+    const { addItems } = planRestoreSamples([], items, now, hiddenKinds);
     added += addItems.length;
     return addItems.length > 0 ? [...items, ...addItems] : items;
   });

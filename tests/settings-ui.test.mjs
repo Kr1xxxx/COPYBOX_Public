@@ -20,7 +20,8 @@ test("settings is a full panel covering data, security, trash, window, AI and ab
 });
 
 test("settings shows the version and the editor calls the snippet note 小提示 with AI 润色 / AI 整理 on the content", () => {
-  assert.match(page, /\{structured \? "核心动作" : "小提示"\}/);
+  assert.match(page, /<label htmlFor="summary-input">小提示 /);
+  assert.match(page, /<span>核心动作<\/span>/);
   assert.doesNotMatch(page, /: "备注"\} \{!structured/);
   assert.match(page, /Copyboxx \{version \? `v\$\{version\}`/);
   assert.match(page, /AI 润色/);

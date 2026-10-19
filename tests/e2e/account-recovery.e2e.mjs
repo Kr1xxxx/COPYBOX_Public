@@ -129,7 +129,7 @@ test("the copy kept before encrypting is deleted after the data opened fine in t
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await expect(vault(page).locator(".vault-entry")).toHaveCount(5);
+  await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
   await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
   const { settings } = await startPassword(page, "abcd1234");
   await settings.getByLabel("我已经把恢复码保存好了").check();
@@ -143,19 +143,19 @@ test("the copy kept before encrypting is deleted after the data opened fine in t
 
   // the session that made the copy does not count
   await unlock(page, "abcd1234");
-  await expect(vault(page).locator(".vault-entry")).toHaveCount(5);
+  await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
   expect(await counted()).toBe(0);
 
   for (const expected of [1, 2]) {
     await page.reload();
     await page.waitForSelector(".app-shell");
     await unlock(page, "abcd1234");
-    await expect(vault(page).locator(".vault-entry")).toHaveCount(5);
+    await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
     await expect.poll(counted).toBe(expected);
     // a second unlock in the same session does not count again
     await waitForLock(page);
     await unlock(page, "abcd1234");
-    await expect(vault(page).locator(".vault-entry")).toHaveCount(5);
+    await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
     await page.waitForTimeout(300);
     expect(await counted()).toBe(expected);
   }
@@ -163,7 +163,7 @@ test("the copy kept before encrypting is deleted after the data opened fine in t
   await page.reload();
   await page.waitForSelector(".app-shell");
   await unlock(page, "abcd1234");
-  await expect(vault(page).locator(".vault-entry")).toHaveCount(5);
+  await expect(vault(page).locator(".vault-entry")).toHaveCount(3);
   await expect.poll(copy).toBeNull();
   await page.locator(".kind-switch").getByRole("button", { name: "话术" }).click();
   const after = await openSettings(page);

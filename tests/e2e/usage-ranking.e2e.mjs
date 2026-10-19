@@ -23,8 +23,8 @@ for (const platform of ["win32", "darwin"]) {
     await expect(dialog.locator('[data-usage="stale"]')).toContainText("暂时没有");
     const never = dialog.locator('[data-usage="never"]');
     await expect(never.locator("h4")).toContainText("33 条");
-    await expect(never.locator(".usage-row")).toHaveCount(30);
-    await expect(never).toContainText("还有 3 条没有列出");
+    await expect(never.locator(".usage-row")).toHaveCount(5);
+    await expect(never).toContainText("还有 28 条没有列出");
 
     // Clicking an entry closes Settings and finds that snippet.
     await top.locator(".usage-row").click();

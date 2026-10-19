@@ -11,7 +11,8 @@ import { openSecretItemsStore, type SecretItemsStore } from "./secret-items-stor
 import { SiteBadge } from "./site-badge";
 import { useSiteIconScan } from "./site-icons-context";
 import { detectSite, isPlausibleUrl, normalizeUrl } from "./site-core";
-import { accountTitle, generateTotp, formatCode, type TotpAccount } from "./totp-core";
+import { accountTitle, generateTotp, formatCode, secondsLeft, type TotpAccount } from "./totp-core";
+import { Ring } from "./totp-dialog";
 import { openTotpStore } from "./totp-store";
 import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Icon } from "./ui-atoms";
@@ -37,7 +38,7 @@ function LinkedCode({ account, onCopy }: { account: TotpAccount; onCopy: (code: 
   return (
     <div className="pay-field">
       <dt>验证码</dt>
-      <dd className="login-code">{code ? formatCode(code) : "······"}<small>{accountTitle(account)}</small></dd>
+      <dd className="login-code">{code ? formatCode(code) : "······"}<small>{accountTitle(account)}</small><Ring left={secondsLeft(account.period, now)} period={account.period} /></dd>
       <button type="button" className="icon-button pay-copy" onClick={() => code && onCopy(code)} aria-label="复制验证码" title="复制"><Icon name="copy" /></button>
     </div>
   );

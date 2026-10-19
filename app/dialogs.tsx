@@ -119,8 +119,7 @@ export function BackupDialog({ mode, needsPassword, secretWord, onClose, onExpor
     <div className="backup-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section ref={dialogRef} className="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title">
         <header className="backup-head">
-          <div><p>{mode === "export" ? "话术备份" : mode === "export-secret" ? "备注备份" : "安全导入"}</p><h2 id="backup-title">{exporting ? `导出${exportWord}备份` : "导入备份"}</h2></div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="关闭">×</button>
+          <h2 id="backup-title">{exporting ? `导出${exportWord}备份` : "导入备份"}</h2>
         </header>
         <form className="backup-form" onSubmit={submit}>
           <p className="backup-intro">{exporting ? `只备份${exportWord}，并使用独立密码加密${otherWord ? `；${otherWord}不会包含在文件中` : ""}。` : needsPassword ? "先验证备份密码，验证成功后才会写入本机数据。" : "已识别旧版备份。导入前仍可选择合并或覆盖。"}</p>

@@ -20,7 +20,7 @@ test("账号 全部: one card per website with every type of that site, 收款�
   await expect(groups.first()).toHaveAttribute("aria-label", "example.com");
   await expect(groups.first().locator(".vault-type-chip")).toHaveText(["登录", "API", "恢复", "验证码"]);
   await expect(groups.last()).toHaveAttribute("aria-label", "收款信息");
-  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText(["登录1", "收款信息1", "API 密钥1", "验证码1", "恢复码1", "笔记0", "其他0"]);
+  await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText(["登录1", "收款信息1", "地址0", "API 密钥1", "验证码1", "恢复码1", "笔记0", "其他0"]);
   await expect(page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ })).toContainText("5");
   // The encryption note is only beside the title; the footer note is gone.
   await expect(dialog).not.toContainText("导出「账号备份」");

@@ -121,7 +121,7 @@ test("a block offers its last three values; clicking one fills it and copies whe
   await expect.poll(() => page.evaluate(() => window.__copied)).toContain("Bella");
 });
 
-test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out when nothing is chosen", async ({ page }) => {
+test("Name offers Beautiful, Friend and Lovely under the block; Friend goes out when nothing is chosen", async ({ page }) => {
   await page.evaluate(() => { Object.defineProperty(navigator.clipboard, "writeText", { value: async (text) => { window.__copied = text; }, configurable: true }); });
   await openRow(page, page.locator(".native-row", { hasText: "自我介绍" }).locator(".row-main"));
   const row = page.locator(".native-row.selected");
@@ -133,13 +133,13 @@ test("Name offers Beautiful, Friend and Lovely above the block; Friend goes out 
   await row.locator("input[data-var=Name]").click();
   const popup = page.locator(".var-popup");
   await expect(popup.locator(".var-popup-option")).toHaveText(["Beautiful", "Friend", "Lovely"]);
-  // the 英文/中文 switch sits in the top row now, so the choices open above the block as before
+  // The choices open under the block so they never cover the card title (UI review 2026-10-19, H).
   await expect.poll(async () => {
     const chipBox = await chip.boundingBox();
     const popupBox = await popup.boundingBox();
     if (!chipBox || !popupBox) return "waiting";
-    return popupBox.y + popupBox.height <= chipBox.y + 1 ? "above" : `popup ${popupBox.y}+${popupBox.height} chip ${chipBox.y}`;
-  }, { timeout: 5000 }).toBe("above");
+    return popupBox.y >= chipBox.y + chipBox.height - 1 ? "below" : `popup ${popupBox.y} chip ${chipBox.y}+${chipBox.height}`;
+  }, { timeout: 5000 }).toBe("below");
   await popup.getByRole("option", { name: "Lovely" }).click();
   await expect.poll(() => page.evaluate(() => window.__copied)).toBe("Hi Lovely, thanks for reaching out to Comely! How can I help you today?");
 });

@@ -75,7 +75,7 @@ import { waitForImageWrites } from "./image-store";
 import { isQuotaError, isStorageNearlyFull, STORAGE_FULL_MESSAGE, STORAGE_NEARLY_FULL_MESSAGE } from "./clipbox-core";
 import { FolderRow } from "./folder-row";
 import { ListEmptyState } from "./list-empty-state";
-import { PLAIN_NOTES, SECRET_WORD } from "./platform";
+import { HIDDEN_ACCOUNT_KINDS, PLAIN_NOTES, SECRET_WORD } from "./platform";
 import { RevealButtons, useReveal } from "./reveal-buttons";
 import { Highlight, Icon, SnippetContent, SnippetTitle, VaultMark } from "./ui-atoms";
 import "./desktop-bridge";
@@ -516,7 +516,7 @@ export default function Home() {
   // The 上锁 button replaces the 本机加密 note when there is a lock to go back to (password, or the slide in the full window).
   const canLockAccountNow = lockSet || (slideUnlockOn && windowMode === "full");
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
-  const categoryList = useMemo(() => (PLAIN_NOTES ? CATEGORY_ORDER.filter((id) => id !== "other" && id !== "apikey" && id !== "recovery") : CATEGORY_ORDER), []);
+  const categoryList = useMemo(() => CATEGORY_ORDER.filter((id) => !HIDDEN_ACCOUNT_KINDS.includes(id)), []);
   const account = useAccountEntries(accountKey, legacySecrets, accountMode, vaultRev);
   const accountCounts = useMemo(() => ({ ...countByKind(account.entries), other: legacySecrets.length }), [account.entries, legacySecrets]);
   const trashedKindItems = useMemo(() => selectItemsByTrashState(items, activeKind, "trash"), [items, activeKind]);
@@ -2306,7 +2306,7 @@ export default function Home() {
             {accountMode && <>
               <div className="nav-heading"><span>分类</span></div>
               <nav className="nav-list account-categories" aria-label="分类">
-                {categoryList.map((id) => <button key={id} type="button" disabled={accountNavLocked} className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "note" ? "note" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
+                {categoryList.map((id) => <button key={id} type="button" disabled={accountNavLocked} className={`nav-item ${activeFolder === "all" && vaultCat === id ? "active" : ""}`} onClick={() => { selectFolder("all"); setVaultCat(id); }}><span className="nav-icon"><Icon name={id === "login" ? "lock" : id === "recovery" ? "shield" : id === "address" ? "place" : id === "note" ? "note" : id === "apikey" ? "link" : id === "totp" ? "clock" : "grid"} /></span><span className="nav-label">{CATEGORY_LABEL[id]}</span><b>{accountCounts[id]}</b></button>)}
               </nav>
             </>}
             {!accountMode && <>
@@ -2389,7 +2389,7 @@ export default function Home() {
                   : <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span>}</div>
               <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
-                legacyView={legacyList} />
+                legacyView={legacyList} onAdd={accountVeiled ? undefined : () => setAddMenuOpen(true)} />
             </>}
             {!vaultPage && <div className="section-head">
               <h1>{sectionTitle}</h1>
@@ -2411,7 +2411,7 @@ export default function Home() {
               />}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
-              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && <div className="product-filter-wrap">
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
                 <AnimatePresence>{productMenuOpen && <ArcMenu className="product-filter-menu">
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}

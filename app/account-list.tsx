@@ -2,25 +2,26 @@
 
 import { useMemo, useState } from "react";
 import { patchEntry, purgeEntry } from "./account-entries";
-import { type AccountEntry, type EntryKind, CATEGORY_LABEL, TYPE_LABEL, UNKNOWN_SITE, groupBySite, matchesQuery } from "./account-view";
+import { HIDDEN_ACCOUNT_KINDS } from "./platform";
+import { type AccountEntry, type EntryKind, CATEGORY_LABEL, CATEGORY_ORDER, TYPE_LABEL, UNKNOWN_SITE, groupBySite, matchesQuery } from "./account-view";
 import { copyTextWithExpiry } from "./clipboard";
 import type { MarkItem } from "./payment-core";
 import { openSecretItemsStore } from "./secret-items-store";
 import { SiteBadge } from "./site-badge";
-import { Icon } from "./ui-atoms";
+import { Icon, VaultMark } from "./ui-atoms";
 import { clearSampleEntries, isSampleId, previewClearSamples } from "./vault-samples";
 
-const KIND_CHOICES: EntryKind[] = ["login", "payment", "apikey", "totp", "recovery", "note", "other"];
+const KIND_CHOICES: EntryKind[] = ["login", "payment", "address", "apikey", "totp", "recovery", "note", "other"];
 
 // The 账号 list: one row style for every type, each row led by its website's logo (the card title carries it only when 收起).
 // The row opens its entry; one button copies the most useful thing;
 // everything else (打开, 改归类) is in the 「…」 menu.
 export type AccountView = "all" | "pinned" | "recent" | "trash";
 
-export function AccountList({ deviceKey, entries, trashed, marks, category, view = "all", query, selecting = false, folded = false, onSelectingChange, onOpen, onPinLegacy, onTrashLegacy, onToast }: {
+export function AccountList({ deviceKey, entries, trashed, marks, category, view = "all", query, selecting = false, folded = false, onSelectingChange, onOpen, onPinLegacy, onTrashLegacy, onToast, onAdd }: {
   deviceKey: string; entries: AccountEntry[]; trashed: AccountEntry[]; marks: Record<string, MarkItem>; category: EntryKind | "all"; view?: AccountView; query: string;
   selecting?: boolean; folded?: boolean; onSelectingChange?: (selecting: boolean) => void;
-  onOpen: (entry: AccountEntry) => void; onPinLegacy: (id: string) => void; onTrashLegacy: (ids: string[]) => Promise<void>; onToast: (message: string) => void;
+  onOpen: (entry: AccountEntry) => void; onPinLegacy: (id: string) => void; onTrashLegacy: (ids: string[]) => Promise<void>; onToast: (message: string) => void; onAdd?: () => void;
 }) {
   const [menuId, setMenuId] = useState("");
   const [editing, setEditing] = useState("");
@@ -42,7 +43,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
   }, [entries, trashed, category, view, query]);
   // 最近使用 and 回收站 are plain lists (newest first); everything else is one card per website.
   const groups = useMemo(() => (view === "recent" || view === "trash" ? (shown.length ? [{ key: "flat", title: view === "recent" ? "最近使用" : "回收站", site: UNKNOWN_SITE, entries: shown }] : []) : groupBySite(shown)), [shown, view]);
-  const siteNames = useMemo(() => [...new Set(entries.map((entry) => entry.site).filter((site) => site.key !== "other" && site.key !== "payment" && site.key !== "note").map((site) => site.name))], [entries]);
+  const siteNames = useMemo(() => [...new Set(entries.map((entry) => entry.site).filter((site) => site.key !== "other" && site.key !== "payment" && site.key !== "address" && site.key !== "note").map((site) => site.name))], [entries]);
   const hasSamples = view === "all" && category === "all" && !query.trim() && entries.some((entry) => !entry.legacy && isSampleId(entry.id));
 
   async function copy(entry: AccountEntry) {
@@ -112,7 +113,14 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
   }
 
   if (error) return <p className="settings-note" role="alert">{error}</p>;
-  if (view === "all" && entries.length === 0) return <p className="totp-empty">还没有账号。点右上角「新增」，添加登录、收款信息、验证码或笔记。</p>;
+  if (view === "all" && category === "all" && entries.length === 0) return (
+    <div className="native-empty onboarding">
+      <VaultMark />
+      <strong>还没有账号，先添加第一条</strong>
+      <span>{CATEGORY_ORDER.filter((kind) => kind !== "other" && !HIDDEN_ACCOUNT_KINDS.includes(kind)).map((kind) => CATEGORY_LABEL[kind]).join("、")}都加密保存在这台电脑上，一键复制。</span>
+      {onAdd && <div className="onboarding-actions"><button type="button" className="primary-button" onClick={onAdd}><Icon name="plus" />新增第一条</button></div>}
+    </div>
+  );
   if (shown.length === 0) return <p className="totp-empty">{query.trim() ? "没有找到匹配的内容。" : view === "pinned" ? "还没有收藏内容。点条目右边「…」里的「收藏」添加。" : view === "recent" ? "复制过的内容会出现在这里。" : view === "trash" ? "回收站里没有新添加的类型。" : `「${category === "all" ? "全部" : CATEGORY_LABEL[category]}」里还没有内容。点右上角「新增」添加。`}</p>;
   return (
     <>
@@ -128,7 +136,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
       <div className="vault-groups">
         {groups.map((group) => (
           <section key={group.key} className="vault-group" aria-label={group.title}>
-            <h3>{folded && !selecting && group.key !== "payment" && group.key !== "note" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
+            <h3>{folded && !selecting && group.key !== "payment" && group.key !== "address" && group.key !== "note" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
             {(!folded || selecting || group.key === "flat") && <ul className="totp-list">
               {group.entries.map((entry) => (
                 <li key={entry.target} className={`vault-entry-row acct-row${selecting ? " selecting" : ""}`}>
