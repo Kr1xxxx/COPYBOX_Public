@@ -113,6 +113,8 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEnt
       id: draft.id ?? crypto.randomUUID(), type: "login", name: Array.from(draft.name.trim().replace(/\s+/g, " ")).slice(0, 40).join(""),
       url: draft.url.trim() ? normalizeUrl(draft.url) : "", username: draft.username.trim(), password: draft.password,
       ...(draft.totpId ? { totpId: draft.totpId } : {}), note: draft.note.trim(), createdAt: existing?.createdAt ?? now, updatedAt: now,
+      // A new password starts the clock; otherwise keep the known date (older entries: their last change, the best we know).
+      passwordChangedAt: !existing || existing.password !== draft.password ? now : existing.passwordChangedAt ?? existing.updatedAt,
     };
     try {
       const list = await store.put(item);
