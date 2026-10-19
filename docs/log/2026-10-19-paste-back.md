@@ -1,7 +1,7 @@
 # 复制后贴到刚才的窗口
 
 - Date: 2026-10-19 · Thread/agent: 【功能】複製後直接貼回聊天窗
-- What changed: new setting 「复制后贴到刚才的窗口」 (设置 → 窗口, off by default, D-078). When on, a copy in the mini
+- What changed: new setting 「复制后贴到刚才的窗口」 (设置 → 窗口, off by default, D-081). When on, a copy in the mini
   window brings the window the person came from back to the front and presses paste once: Windows through a
   foreground-window hook plus `SendInput` Ctrl+V, Mac through System Events (`osascript`) with ⌘V. New
   `src-tauri/src/paste_back.rs`, `set_paste_back` command, `setPasteBack` on the bridge; `app/page.tsx` (settings

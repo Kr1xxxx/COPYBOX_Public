@@ -167,7 +167,7 @@ fn main() {
                     }
                 }
                 WindowEvent::Destroyed => mode.save_now(&watched),
-                // The person went to another window: that is where a paste-back goes next (D-078).
+                // The person went to another window: that is where a paste-back goes next (D-081).
                 WindowEvent::Focused(false) if app_handle.state::<paste_back::PasteBack>().enabled() => {
                     std::thread::spawn(|| {
                         std::thread::sleep(Duration::from_millis(120));

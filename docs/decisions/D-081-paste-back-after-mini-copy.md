@@ -1,4 +1,4 @@
-### D-078 A mini-window copy can paste itself into the window the person came from (2026-10-19)
+### D-081 A mini-window copy can paste itself into the window the person came from (2026-10-19)
 - Context (desktop audit item A, owner, 2026-10-19: 「A 可以?电脑版有这个权限?」). Staff copy a reply in the mini window,
   then still have to click back into WeChat / 千牛 and paste. 客服宝 and 聊天宝 sell this as 「一键发送」.
 - Decision (both Windows and Mac):

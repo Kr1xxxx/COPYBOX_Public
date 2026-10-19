@@ -191,7 +191,7 @@ pub fn set_mini_hide_policy(state: tauri::State<Shell>, policy: String) {
     state.settings.lock().unwrap().mini_hide = p;
 }
 
-/// The page copied something: the mini window may paste it into the window the person came from (D-078), and may
+/// The page copied something: the mini window may paste it into the window the person came from (D-081), and may
 /// go away after a moment.
 #[tauri::command]
 pub fn did_copy(app: AppHandle, shell: tauri::State<Shell>, mode: tauri::State<WindowMode>, paste_back: tauri::State<crate::paste_back::PasteBack>) {

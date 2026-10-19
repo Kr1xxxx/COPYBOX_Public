@@ -1,4 +1,4 @@
-// 复制后贴到刚才的窗口 (D-078): a copy in the mini window can go straight into the chat window the person came from.
+// 复制后贴到刚才的窗口 (D-081): a copy in the mini window can go straight into the chat window the person came from.
 // The shell keeps track of the last window that was in front (not ours, not the taskbar or desktop), and after a
 // copy brings it back and presses paste once for them. Off unless the setting is on; never a global shortcut (D-005).
 use std::sync::atomic::{AtomicBool, Ordering};

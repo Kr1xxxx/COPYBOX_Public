@@ -1654,7 +1654,7 @@ export default function Home() {
     window.clipboxDesktop?.setMiniHidePolicy?.(policy);
   }
 
-  // 复制后贴到刚才的窗口 (D-078): off until the person turns it on; the shell does the pasting.
+  // 复制后贴到刚才的窗口 (D-081): off until the person turns it on; the shell does the pasting.
   const [pasteBack, setPasteBack] = useState(() => readStoredChoice(PASTE_BACK_KEY, ["0", "1"], "0") === "1");
   useEffect(() => {
     if (pasteBack) window.clipboxDesktop?.setPasteBack?.(true);
