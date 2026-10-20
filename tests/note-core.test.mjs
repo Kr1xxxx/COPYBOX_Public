@@ -59,9 +59,9 @@ test("转为登录 guesses fields from labelled lines, a bare address and an e-m
   assert.equal(noteLines("a\n\n```\nb").length, 2);
 });
 
-test("the preview refuses a login without name, user or password", () => {
+test("the preview refuses a login without name or password; an empty user is asked about on save instead", () => {
   const problems = loginDraftProblems({ name: "", url: "not a url", username: "", password: "", note: "" });
-  assert.deepEqual(Object.keys(problems).sort(), ["name", "password", "url", "username"]);
+  assert.deepEqual(Object.keys(problems).sort(), ["name", "password", "url"]);
 });
 
 test("convert swaps note for login in one list; 还原 brings the note back exactly", () => {

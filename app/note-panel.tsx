@@ -42,6 +42,7 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
   const [draft, setDraft] = useState<Draft | null>(startAdding ? { ...EMPTY } : null);
   const [previewing, setPreviewing] = useState(false);
   const [convert, setConvert] = useState<Convert | null>(null);
+  const [confirmNoUser, setConfirmNoUser] = useState(false);
   const [apiConvert, setApiConvert] = useState<ApiConvert | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, { label?: string; value?: string }>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -120,11 +121,13 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
     const guess = guessLoginFields(note);
     setConvert({ note, values: guess.values, from: guess.from });
     setErrors({});
+    setConfirmNoUser(false);
   }
 
   function setValue(field: LoginField, value: string, from?: number) {
     setConvert((current) => current && { ...current, values: { ...current.values, [field]: value }, from: { ...current.from, [field]: from } });
     setErrors((current) => (current[field] ? { ...current, [field]: "" } : current));
+    setConfirmNoUser(false);
   }
 
   async function saveConvert() {
@@ -132,6 +135,8 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
     if (!convert || !store) return;
     const found = loginDraftProblems(convert.values);
     if (Object.keys(found).length > 0) { setErrors(found as Record<string, string>); return; }
+    // Same as the login editor: an empty 用户名 saves on the second press.
+    if (!convert.values.username.trim() && !confirmNoUser) { setConfirmNoUser(true); return; }
     const login = loginFromNote(convert.note, convert.values, crypto.randomUUID(), Date.now());
     try {
       setItems(onlyNotes(await store.update((current) => convertNote(current, convert.note.id, login))));
@@ -203,6 +208,7 @@ export function NotePanel({ deviceKey, onToast, focusId, startAdding, onShowEntr
             </div>
           );
         })}
+        {confirmNoUser && <p className="pay-confirm" role="alert">还没填用户名 / 邮箱。不用填的话，再按一次「保存为登录」就保存。</p>}
         <div className="settings-inline-actions">
           <button type="button" className="secondary-button" onClick={() => setConvert(null)}>取消</button>
           <button type="submit" className="primary-button">保存为登录</button>
