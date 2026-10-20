@@ -77,7 +77,8 @@ test("账号密码: add, hold to show, copy, generate a password, and the 全部
   const shopify = dialog.getByRole("region", { name: "Shopify" });
   await expect(shopify).toContainText("Shopify 后台");
   await expect(shopify).toContainText("Shopify 备用号");
-  await expect(shopify.locator(".vault-count")).toHaveText("2");
+  // Expanded there is no title line with a count any more; the website still holds both rows.
+  await expect(shopify.locator(".vault-entry")).toHaveCount(2);
   await expect(dialog.getByRole("region", { name: "某供应商" })).toBeVisible();
   // Clicking an entry opens it, expanded.
   await dialog.locator(".vault-entry", { hasText: "Shopify 后台" }).click();
