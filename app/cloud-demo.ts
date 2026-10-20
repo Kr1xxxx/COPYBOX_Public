@@ -90,6 +90,7 @@ export async function demoCloudRequest(request: CloudRequest): Promise<CloudResp
     save(state);
     return reply(200, { version: current + 1 });
   }
+  if (request.path === "/api/vault/too-large" && request.method === "POST") return reply(200, { ok: true });
   if (request.path === "/api/library" && request.method === "GET") {
     const domain = owner.slice(owner.lastIndexOf("@") + 1).toLowerCase();
     return reply(200, domain === DEMO_DOMAIN ? { domain, library: DEMO_DOMAIN_LIBRARY } : { domain: null, library: null });

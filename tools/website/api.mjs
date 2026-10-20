@@ -9,6 +9,7 @@
 // GET /api/library gives a signed-in user the company 话术 library bound to their email domain (KV key domains/<domain>
 // holds a 同步码, written by sync.mjs --link-domain); free-mail domains never get one.
 
+import { adminEmails } from "./admin.mjs";
 import { isFreeMailDomain, normalizeDomain } from "./free-mail.mjs";
 
 const hour = 60 * 60 * 1000;
@@ -507,7 +508,11 @@ async function putVault(request, env, auth, now) {
   if (!isPlainObject(data)) return fail(400, "bad_data");
   const { store, limit } = vaultStore(env);
   const text = JSON.stringify(data);
-  if (new TextEncoder().encode(text).length > limit) return fail(413, "too_large");
+  const size = new TextEncoder().encode(text).length;
+  if (size > limit) {
+    await noteTooLarge(env, auth, size, now);
+    return fail(413, "too_large");
+  }
   const current = async () => (await db.prepare("SELECT version FROM vault_meta WHERE user_id = ?").bind(auth.userId).first())?.version ?? 0;
   // Claim the next version in D1 first (atomic), so of two uploads from the same base only one goes ahead.
   const claim =
@@ -525,7 +530,38 @@ async function putVault(request, env, auth, now) {
     return fail(500, "storage_error");
   }
   await db.prepare("UPDATE users SET last_sync_at = ? WHERE id = ?").bind(now, auth.userId).run();
+  await db.prepare("DELETE FROM vault_oversize WHERE user_id = ?").bind(auth.userId).run().catch(() => {});
   return json({ version });
+}
+
+// A cloud copy over the cap (D-097): kept in vault_oversize for /admin and mailed to the ADMIN_EMAILS at most once a
+// day per user. Never fails the request: before schema.sql adds the table this only skips.
+async function noteTooLarge(env, auth, bytes, now) {
+  try {
+    const db = env.DB;
+    const last = await db.prepare("SELECT mailed_at FROM vault_oversize WHERE user_id = ?").bind(auth.userId).first();
+    const mail = !(last?.mailed_at > now - 24 * hour) && env.RESEND_API_KEY && adminEmails(env).length > 0;
+    await db
+      .prepare("INSERT OR REPLACE INTO vault_oversize (user_id, bytes, reported_at, mailed_at) VALUES (?, ?, ?, ?)")
+      .bind(auth.userId, bytes, now, mail ? now : (last?.mailed_at ?? null))
+      .run();
+    if (!mail) return;
+    const user = await db.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
+    const mb = (bytes / 1_000_000).toFixed(2);
+    const text = `${user?.email ?? "一位用户"} 的云端副本有 ${mb} MB，超过了 1.9 MB 的上限，这次没有上传。\n\n在后台查看：https://copyboxx.com/admin/`;
+    await sendMail(env, { to: adminEmails(env), subject: "Copyboxx：有人的云端副本超出上限", text });
+  } catch {
+    // no table yet, or D1 / Resend down: the app still shows its message
+  }
+}
+
+// POST /api/vault/too-large {bytes}: the app refuses a copy over the cap before sending it and reports its size here.
+async function reportTooLarge(request, env, auth, now) {
+  const parsed = await readJson(request, maxSmallBody);
+  const bytes = parsed.body?.bytes;
+  if (!Number.isSafeInteger(bytes) || bytes <= 0) return fail(400, "bad_request");
+  await noteTooLarge(env, auth, bytes, now);
+  return json({ ok: true });
 }
 
 async function deleteAccount(env, auth) {
@@ -533,6 +569,7 @@ async function deleteAccount(env, auth) {
   const user = await db.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
   await vaultStore(env).store.delete(vaultObjectKey(auth.userId));
   await db.prepare("DELETE FROM vault_meta WHERE user_id = ?").bind(auth.userId).run();
+  await db.prepare("DELETE FROM vault_oversize WHERE user_id = ?").bind(auth.userId).run().catch(() => {});
   await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(auth.userId).run();
   if (user) await db.prepare("DELETE FROM login_codes WHERE email = ?").bind(user.email).run();
   await db.prepare("DELETE FROM users WHERE id = ?").bind(auth.userId).run();
@@ -579,6 +616,7 @@ const routes = {
   "/api/auth/verify": { POST: "verify" },
   "/api/auth/logout": { POST: "logout" },
   "/api/vault": { GET: "getVault", PUT: "putVault" },
+  "/api/vault/too-large": { POST: "reportTooLarge" },
   "/api/account": { DELETE: "deleteAccount" },
   "/api/library": { GET: "getLibrary" },
   "/api/activate": { POST: "activate" },
@@ -612,6 +650,7 @@ async function routeApi(request, env, now) {
   if (auth.ended) return fail(401, "device_limit");
   if (action === "logout") return logout(env, auth);
   if (action === "activate") return activate(request, env, auth, now);
+  if (action === "reportTooLarge") return reportTooLarge(request, env, auth, now);
   if (needsActivation.has(action)) {
     const user = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(auth.userId).first();
     if (!user || !(await isActivated(env, user.email))) return fail(403, "not_activated");

@@ -285,3 +285,44 @@ test("admin: the owner makes activation codes, sees them once, and the list show
   assert.equal(users.find((user) => user.email === "staff@company.com").activated, "domain");
   assert.equal(users.find((user) => user.email === "owner@example.com")?.activated ?? null, null);
 });
+
+test("admin: a cloud copy over 1.9 MB is noted for /admin and mailed to ADMIN_EMAILS at most once a day (D-097)", async (t) => {
+  const sent = stubMail(t);
+  const env = fakeEnv();
+  await app(env, "POST", "/api/auth/code", { body: { email: "staff@example.com" } });
+  const { token } = await (await app(env, "POST", "/api/auth/verify", { body: { email: "staff@example.com", code: codeOf(sent.at(-1)) } })).json();
+  env.DB.sqlite.prepare("INSERT INTO activation_codes (code_hash, hint, created_at, email, used_at) VALUES ('h', 'TEST', ?, 'staff@example.com', ?)").run(clock, clock);
+  const mails = () => sent.filter((mail) => mail.subject.includes("超出上限"));
+
+  // The server refuses a copy over its D1 cap and notes it.
+  const big = await app(env, "PUT", "/api/vault", { body: { baseVersion: 0, data: { text: "x".repeat(2_000_000) } }, token });
+  assert.equal(big.status, 413);
+  assert.equal(mails().length, 1);
+  assert.deepEqual(mails()[0].to, ["owner@example.com", "second@example.com"]);
+  assert.match(mails()[0].text, /staff@example\.com 的云端副本有 2\.00 MB/);
+
+  // The app refuses before sending and reports the size; the same day gives no second mail.
+  const report = (body, now = clock + 60_000, auth = token) => app(env, "POST", "/api/vault/too-large", { body, token: auth, now });
+  assert.equal((await report({ bytes: 3_100_000 })).status, 200);
+  assert.equal(mails().length, 1);
+  assert.equal((await report({ bytes: "big" })).status, 400);
+  assert.equal((await report({ bytes: 3_100_000 }, clock, null)).status, 401);
+
+  const listed = async (now) => {
+    const cookie = await adminSignIn(env, sent, "owner@example.com", now);
+    return (await (await admin(env, "GET", "/admin/api/users", { cookie, now })).json()).users[0];
+  };
+  assert.deepEqual((await listed(clock + 2 * 60_000)).oversize, { bytes: 3_100_000, at: clock + 60_000 });
+
+  assert.equal((await report({ bytes: 3_200_000 }, clock + 25 * 60 * 60 * 1000)).status, 200);
+  assert.equal(mails().length, 2, "a day later the manager hears again");
+
+  // Once a copy fits again the note is gone.
+  assert.equal((await app(env, "PUT", "/api/vault", { body: { baseVersion: 0, data: { v: 1 } }, token, now: clock + 26 * 60 * 60 * 1000 })).status, 200);
+  assert.equal((await listed(clock + 26 * 60 * 60 * 1000 + 1)).oversize, null);
+
+  // Before schema.sql adds the table, reports still answer ok and /admin still lists users.
+  env.DB.sqlite.exec("DROP TABLE vault_oversize");
+  assert.equal((await report({ bytes: 3_100_000 }, clock + 27 * 60 * 60 * 1000)).status, 200);
+  assert.equal((await listed(clock + 27 * 60 * 60 * 1000)).oversize, null);
+});

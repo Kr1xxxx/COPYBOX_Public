@@ -155,6 +155,14 @@ async function listUsers(env, session, now) {
   )
     .bind(now, now)
     .all();
+  // Copies over the cap (D-097, api.mjs noteTooLarge); before schema.sql adds the table there are none.
+  const oversize = new Map();
+  try {
+    const found = await env.DB.prepare("SELECT u.email, o.bytes, o.reported_at FROM vault_oversize o JOIN users u ON u.id = o.user_id").all();
+    for (const row of found.results) oversize.set(row.email, { bytes: row.bytes, at: row.reported_at });
+  } catch {
+    // no table yet
+  }
   const users = results.map((row) => ({
     email: row.email,
     createdAt: row.created_at ?? null,
@@ -166,6 +174,7 @@ async function listUsers(env, session, now) {
     version: row.version ?? 0,
     vaultUpdatedAt: row.updated_at ?? null,
     vaultBytes: row.size ?? null,
+    oversize: oversize.get(row.email) ?? null,
   }));
   return json({ admin: session.email, now, users });
 }
@@ -273,6 +282,7 @@ function adminPage() {
       <button id="refresh" type="button">刷新</button>
       <button id="logout" type="button" class="quiet">退出</button>
     </header>
+    <p id="oversize" class="alert" hidden></p>
     <div class="table-wrap">
       <table>
         <thead><tr><th>邮箱</th><th>注册时间</th><th>最后登录</th><th>最后同步</th><th>已登录电脑</th><th>激活</th><th>云端数据</th></tr></thead>
@@ -326,6 +336,8 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--li
 th { color: var(--muted); font-weight: 500; }
 tr:last-child td { border-bottom: 0; }
 td.devices { white-space: normal; }
+.alert { margin: 0 0 16px; padding: 10px 12px; border-radius: 8px; background: rgba(215, 58, 58, .12); color: #d73a3a; }
+td.over { color: #d73a3a; }
 .codes-head { margin-top: 32px; }
 label.inline { display: flex; align-items: center; gap: 6px; }
 label.inline input { width: 64px; }
@@ -372,7 +384,10 @@ function render() {
   const query = $("filter").value.trim().toLowerCase();
   const shown = users.filter((user) => user.email.includes(query));
   const online = users.reduce((sum, user) => sum + user.devices, 0);
+  const over = users.filter((user) => user.oversize);
   $("count").textContent = "注册 " + users.length + " 人 · 登录中 " + online + " 台" + (query ? "，显示 " + shown.length + " 人" : "");
+  $("oversize").hidden = !over.length;
+  $("oversize").textContent = "云端副本超出 1.9 MB 上限、同步不上去：" + over.map((user) => user.email + "（" + size(user.oversize.bytes) + "）").join("、");
   const rows = $("rows");
   rows.replaceChildren();
   for (const user of shown) {
@@ -384,7 +399,7 @@ function render() {
       cell(time(user.lastSyncAt)),
       cell(user.devices ? user.devices + " 台（" + user.deviceNames.join("、") + "）" : "0", "devices"),
       cell(user.activated === "domain" ? "公司邮箱" : user.activated === "code" ? "已激活" : "未激活"),
-      cell(size(user.vaultBytes)),
+      user.oversize ? cell("超出上限 " + size(user.oversize.bytes) + "，" + time(user.oversize.at), "over") : cell(size(user.vaultBytes)),
     );
     rows.append(tr);
   }

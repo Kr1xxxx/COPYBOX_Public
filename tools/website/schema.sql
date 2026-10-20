@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS vault_blobs (
   data BLOB NOT NULL
 );
 
+-- Last cloud copy that was over the cap (D-097): its size, when, and when ADMIN_EMAILS were last mailed about it.
+CREATE TABLE IF NOT EXISTS vault_oversize (
+  user_id TEXT PRIMARY KEY,
+  bytes INTEGER,
+  reported_at INTEGER,
+  mailed_at INTEGER
+);
+
 -- Owner page /admin (admin.mjs, D-065): SHA-256 of the admin cookie token, which ADMIN_EMAILS address, 12 hours.
 CREATE TABLE IF NOT EXISTS admin_sessions (
   token_hash TEXT PRIMARY KEY,
