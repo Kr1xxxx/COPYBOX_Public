@@ -2,7 +2,7 @@
 // the data opened fine with K in three later app sessions.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ACCOUNT_LOCK_KEY, changeEncryptedPassword, lockMode, markRecoveryCodeShown, recoveryCodePending, renewRecoveryCode, renewUnseenRecoveryCode, resetPasswordWithRecovery, setAccountLock, setRecoveryEmail, unlockEncrypted, verifyAccountLock } from "../app/account-lock.ts";
+import { ACCOUNT_LOCK_KEY, changeEncryptedPassword, lockMode, markRecoveryCodeShown, recoveryCodePending, renewRecoveryCode, renewUnseenRecoveryCode, resetPasswordWithRecovery, setAccountLock, unlockEncrypted, verifyAccountLock } from "../app/account-lock.ts";
 import { APP_SESSION, PREMIGRATION_KEY, enableAccountEncryption, finishAccountMigration, hasPremigrationBackup, notePremigrationUnlock } from "../app/account-encryption.ts";
 import { SECRET_ITEMS_KEY, openSecretItemsStore } from "../app/secret-items-store.ts";
 import { openTotpStore } from "../app/totp-store.ts";
@@ -28,13 +28,23 @@ test("the recovery code counts as unseen until the user confirms it, then as see
   markRecoveryCodeShown(storage);
   assert.equal(lockRecord(storage).codeShown, true);
   assert.equal(recoveryCodePending(storage), false);
-  // changing the password or the email keeps the flag
+  // changing the password keeps the flag
   await changeEncryptedPassword("correct horse", "second password", storage);
-  setRecoveryEmail("me@x.test", storage);
   assert.equal(lockRecord(storage).codeShown, true);
   // a new code from 设置 is unseen again until confirmed
   await renewRecoveryCode("second password", storage);
   assert.equal(recoveryCodePending(storage), true);
+});
+
+test("D-107: a recovery email saved by an older version still opens with the password and code, and goes at the next write", async () => {
+  const { storage, recoveryCode } = await encrypted();
+  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify({ ...lockRecord(storage), email: "me@x.test" }));
+  assert.equal(lockMode(storage), "encrypted");
+  assert.notEqual(await unlockEncrypted("correct horse", storage), null);
+  assert.equal(lockRecord(storage).email, "me@x.test");
+  assert.notEqual(await resetPasswordWithRecovery(recoveryCode, "brand new pass", storage), null);
+  assert.equal("email" in lockRecord(storage), false);
+  assert.notEqual(await unlockEncrypted("brand new pass", storage), null);
 });
 
 test("records made before the field existed count as confirmed and are never rewritten", async () => {

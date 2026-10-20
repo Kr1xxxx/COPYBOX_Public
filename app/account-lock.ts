@@ -9,14 +9,14 @@ export const ACCOUNT_LOCK_MIN = 4;
 export const ENCRYPTED_LOCK_MIN = 8;
 const ITERATIONS = 210_000;
 
-type LockRecord = { version: 1; salt: string; hash: string; iterations: number; email?: string };
+type LockRecord = { version: 1; salt: string; hash: string; iterations: number };
 // Version 2: the password really protects the data. The account stores are encrypted with a random key K; the record only
 // holds K wrapped by the password and, separately, by a recovery code (so a forgotten password never loses the data).
 export type Wrapped = { salt: string; iv: string; ct: string; iterations: number };
 // codeShown: false from the moment a recovery code is made until the user ticks that they saved it. A record without the field
 // (made before 2026-10-13) counts as saved. While it is false, the next unlock with the password replaces the code with a new one
 // and shows it (the old one is not stored in plain text, so it cannot be shown again). D-042.
-export type EncryptedLockRecord = { version: 2; wrapPw: Wrapped; wrapRecovery: Wrapped; email?: string; phase: "migrating" | "ready"; at: number; codeShown?: boolean };
+export type EncryptedLockRecord = { version: 2; wrapPw: Wrapped; wrapRecovery: Wrapped; phase: "migrating" | "ready"; at: number; codeShown?: boolean };
 export type LockStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 function toBase64(bytes: Uint8Array) {
@@ -46,7 +46,12 @@ function read(storage: LockStorage): LockRecord | null {
 function readEncrypted(storage: LockStorage): EncryptedLockRecord | null {
   try {
     const parsed = JSON.parse(storage.getItem(ACCOUNT_LOCK_KEY) || "null") as Partial<EncryptedLockRecord> | null;
-    if (parsed && parsed.version === 2 && parsed.wrapPw && parsed.wrapRecovery) return parsed as EncryptedLockRecord;
+    if (parsed && parsed.version === 2 && parsed.wrapPw && parsed.wrapRecovery) {
+      // Records made before D-107 may still hold a recovery email; leaving it out here drops it at the next write.
+      const { email: _gone, ...record } = parsed as EncryptedLockRecord & { email?: string };
+      void _gone;
+      return record;
+    }
   } catch { /* not a version 2 record */ }
   return null;
 }
@@ -68,49 +73,18 @@ export function checkNewPassword(password: string): string {
   return "";
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Empty is fine (no recovery email); otherwise it must look like an address.
-export function checkRecoveryEmail(email: string): string {
-  const value = email.trim();
-  return value === "" || (value.length <= 120 && EMAIL_PATTERN.test(value)) ? "" : "邮箱格式不对";
-}
-
-export function getRecoveryEmail(storage: LockStorage = localStorage): string {
-  return readEncrypted(storage)?.email ?? read(storage)?.email ?? "";
-}
-
 // 「a***@x.com」: enough to recognise the address without showing it whole.
 export function maskEmail(email: string): string {
   const [name, domain] = email.split("@");
   return name && domain ? `${name.slice(0, 1)}***@${domain}` : "";
 }
 
-// Where the reset mail is sent from. Empty until the server is deployed; the 忘记密码 button says so in the meantime.
-export const RESET_SERVER_URL = "";
-
-export type ResetResult = { ok: true } | { ok: false; reason: "no-email" | "no-server" | "failed" };
-
-export async function requestPasswordReset(storage: LockStorage = localStorage): Promise<ResetResult> {
-  const email = getRecoveryEmail(storage);
-  if (!email) return { ok: false, reason: "no-email" };
-  if (!RESET_SERVER_URL) return { ok: false, reason: "no-server" };
-  try {
-    const response = await fetch(`${RESET_SERVER_URL}/account-reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-    return response.ok ? { ok: true } : { ok: false, reason: "failed" };
-  } catch {
-    return { ok: false, reason: "failed" };
-  }
-}
-
-export async function setAccountLock(password: string, storage: LockStorage = localStorage, email?: string): Promise<void> {
+// The old door-only password. Nothing makes new ones any more; tests use it to build such records.
+export async function setAccountLock(password: string, storage: LockStorage = localStorage): Promise<void> {
   const problem = checkNewPassword(password);
   if (problem) throw new Error(problem);
-  const emailProblem = email === undefined ? "" : checkRecoveryEmail(email);
-  if (emailProblem) throw new Error(emailProblem);
-  const kept = email === undefined ? getRecoveryEmail(storage) : email.trim();
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const record: LockRecord = { version: 1, salt: toBase64(salt), hash: toBase64(await hashOf(password, salt, ITERATIONS)), iterations: ITERATIONS, ...(kept ? { email: kept } : {}) };
+  const record: LockRecord = { version: 1, salt: toBase64(salt), hash: toBase64(await hashOf(password, salt, ITERATIONS)), iterations: ITERATIONS };
   storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(record));
 }
 
@@ -127,27 +101,6 @@ export async function verifyAccountLock(password: string, storage: LockStorage =
 
 export function removeAccountLock(storage: LockStorage = localStorage): void {
   storage.removeItem(ACCOUNT_LOCK_KEY);
-}
-
-// Changes only the recovery email; the password check is untouched.
-export function setRecoveryEmail(email: string, storage: LockStorage = localStorage): void {
-  const encrypted = readEncrypted(storage);
-  if (encrypted) {
-    const value = email.trim();
-    if (checkRecoveryEmail(email)) throw new Error(checkRecoveryEmail(email));
-    const { email: _gone, ...rest } = encrypted;
-    void _gone;
-    storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value ? { ...rest, email: value } : rest));
-    return;
-  }
-  const record = read(storage);
-  if (!record) return;
-  const problem = checkRecoveryEmail(email);
-  if (problem) throw new Error(problem);
-  const { email: _old, ...rest } = record;
-  void _old;
-  const value = email.trim();
-  storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value ? { ...rest, email: value } : rest));
 }
 
 // ---- version 2: key wrapping --------------------------------------------------------------------------------------------
@@ -192,12 +145,11 @@ export function normalizeRecoveryCode(code: string): string {
   return code.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-export async function writeEncryptedLock(record: { dataKey: string; password: string; recoveryCode: string; email?: string; phase: "migrating" | "ready" }, storage: LockStorage = localStorage): Promise<void> {
+export async function writeEncryptedLock(record: { dataKey: string; password: string; recoveryCode: string; phase: "migrating" | "ready" }, storage: LockStorage = localStorage): Promise<void> {
   const value: EncryptedLockRecord = {
     version: 2, phase: record.phase, at: Date.now(),
     wrapPw: await wrapKey(record.dataKey, record.password),
     wrapRecovery: await wrapKey(record.dataKey, normalizeRecoveryCode(record.recoveryCode)),
-    ...(record.email?.trim() ? { email: record.email.trim() } : {}),
     codeShown: false,
   };
   storage.setItem(ACCOUNT_LOCK_KEY, JSON.stringify(value));

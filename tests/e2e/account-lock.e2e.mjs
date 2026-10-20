@@ -112,28 +112,6 @@ test("a short password is refused, and the account backup cannot be exported whi
   await expect(settings.locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button")).toBeDisabled();
 });
 
-test("忘记密码: with a recovery email it offers a reset mail (needs the server, says so); the recovery code is the way back today", async ({ page }) => {
-  await asDesktop(page, "win32");
-  await seedSnippets(page);
-  const settings = await openSettings(page);
-  await settings.getByRole("button", { name: "设置…" }).click();
-  await settings.getByLabel("新密码", { exact: true }).fill("abcd1234");
-  await settings.getByLabel("再输入一次新密码").fill("abcd1234");
-  await settings.getByLabel("找回邮箱").fill("bad");
-  await settings.getByRole("button", { name: "保存" }).click();
-  await expect(settings.getByRole("alert")).toContainText("邮箱格式不对");
-  await settings.getByLabel("找回邮箱").fill("lock@example.com");
-  await settings.getByRole("button", { name: "保存" }).click();
-  await settings.getByLabel("我已经把恢复码保存好了").check();
-  await settings.getByRole("button", { name: "完成" }).click();
-  await settings.getByRole("button", { name: "关闭设置" }).click();
-  await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
-  await page.getByRole("button", { name: "忘记密码" }).click();
-  await expect(page.locator(".account-lock-forgot")).toContainText("l***@example.com");
-  await page.getByRole("button", { name: "发送重置邮件" }).click();
-  await expect(page.locator(".account-lock-forgot small[role=status]")).toContainText("找回功能需要服务器，部署后开通");
-});
-
 test("the recovery code reopens the data and sets a new password; the old password stops working; nothing is lost", async ({ page }) => {
   await asDesktop(page, "darwin");
   await page.addInitScript(() => { if (!sessionStorage.getItem("__kept")) { localStorage.removeItem("clipbox.vault.samples.v2"); sessionStorage.setItem("__kept", "1"); } });
@@ -194,13 +172,18 @@ test("setting a password keeps every account entry, leaves a deletable backup, a
   await expect(page.getByRole("region", { name: "保险箱" }).locator(".vault-entry")).toHaveCount(3);
 });
 
-test("忘记密码 without a recovery email still offers the recovery code", async ({ page }) => {
+test("忘记密码 offers only the recovery code (D-107: no recovery email, no reset mail)", async ({ page }) => {
   await asDesktop(page, "darwin");
   await seedSnippets(page);
+  const settings = await openSettings(page);
+  await settings.getByRole("button", { name: "设置…" }).click();
+  await expect(settings.getByLabel("找回邮箱")).toHaveCount(0);
+  await settings.getByRole("button", { name: "取消" }).click();
+  await settings.getByRole("button", { name: "关闭设置" }).click();
   await setPassword(page, "abcd1234");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
   await page.getByRole("button", { name: "忘记密码" }).click();
   await expect(page.getByRole("group", { name: "用恢复码找回" })).toBeVisible();
-  await expect(page.locator(".account-lock-forgot")).toContainText("没有设置找回邮箱");
+  await expect(page.locator(".account-lock-forgot")).not.toContainText("邮箱");
   await expect(page.getByRole("button", { name: "发送重置邮件" })).toHaveCount(0);
 });

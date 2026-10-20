@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ENCRYPTED_LOCK_MIN, type LockMode, changeEncryptedPassword, checkRecoveryEmail, getRecoveryEmail, lockMode, markRecoveryCodeShown, maskEmail, removeAccountLock, renewRecoveryCode, renewUnseenRecoveryCode, requestPasswordReset, resetPasswordWithRecovery, setRecoveryEmail, unlockEncrypted, verifyAccountLock } from "./account-lock";
+import { ENCRYPTED_LOCK_MIN, type LockMode, changeEncryptedPassword, lockMode, markRecoveryCodeShown, removeAccountLock, renewRecoveryCode, renewUnseenRecoveryCode, resetPasswordWithRecovery, unlockEncrypted, verifyAccountLock } from "./account-lock";
 import { deletePremigrationBackup, disableAccountEncryption, enableAccountEncryption, finishAccountMigration, hasPremigrationBackup, notePremigrationUnlock } from "./account-encryption";
 import { VaultMark } from "./ui-atoms";
 
@@ -22,7 +22,6 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
   const mode = typeof window === "undefined" ? "none" : lockMode();
-  const email = typeof window === "undefined" ? "" : getRecoveryEmail();
 
   async function open(key: string) {
     await finishAccountMigration(deviceKey, key); // only does anything after an interrupted change
@@ -58,13 +57,6 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
     } finally {
       setBusy(false);
     }
-  }
-
-  async function sendReset() {
-    setBusy(true);
-    const result = await requestPasswordReset();
-    setBusy(false);
-    setForgotNote(result.ok ? "已发送，请查收邮件。" : result.reason === "no-server" ? "找回功能需要服务器，部署后开通。" : result.reason === "no-email" ? "没有设置找回邮箱，暂时无法重置。" : "发送失败，请稍后再试。");
   }
 
   async function recover(event: FormEvent) {
@@ -119,8 +111,7 @@ export function AccountLockScreen({ deviceKey, onUnlock }: { deviceKey: string; 
               <input type="password" value={again} autoComplete="off" aria-label="再输入一次新密码" placeholder="再输入一次" onChange={(event) => { setAgain(event.target.value); setForgotNote(""); }} />
               <button type="button" className="secondary-button" disabled={busy || code.trim() === "" || next === ""} onClick={(event) => void recover(event)}>用恢复码重设密码</button>
             </div>}
-            <small>{email ? `也可以向 ${maskEmail(email)} 发一封重置邮件。` : mode === "encrypted" ? "没有设置找回邮箱。" : "你没有设置找回邮箱，暂时无法重置。"}</small>
-            {email && <button type="button" className="secondary-button" disabled={busy} onClick={() => void sendReset()}>发送重置邮件</button>}
+            {mode !== "encrypted" && <small>旧密码没有恢复码，无法重设。</small>}
             {forgotNote && <small role="status">{forgotNote}</small>}
           </div>}
     </form>
@@ -170,7 +161,6 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCod
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
-  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
@@ -182,9 +172,9 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCod
   useEffect(() => { showingRef.current?.(code !== ""); }, [code]);
   useEffect(() => () => showingRef.current?.(false), []);
 
-  function open(to: Mode) { setEmail(getRecoveryEmail()); setMode(to); }
+  function open(to: Mode) { setMode(to); }
   function done() { markRecoveryCodeShown(); close(); }
-  function close() { setMode("idle"); setCurrent(""); setNext(""); setAgain(""); setEmail(""); setError(""); setCode(""); setSaved(false); }
+  function close() { setMode("idle"); setCurrent(""); setNext(""); setAgain(""); setError(""); setCode(""); setSaved(false); }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -210,18 +200,15 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCod
       if (mode === "change" && (await unlockEncrypted(current)) === null) { setError("现在的密码不对"); return; }
       if (Array.from(next).length < ENCRYPTED_LOCK_MIN) { setError(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`); return; }
       if (next !== again) { setError("两次输入的密码不一样"); return; }
-      const emailProblem = checkRecoveryEmail(email);
-      if (emailProblem) { setError(emailProblem); return; }
       if (mode === "change") {
         const key = await changeEncryptedPassword(current, next);
         if (key === null) { setError("现在的密码不对"); return; }
-        setRecoveryEmail(email);
         onChanged("encrypted", key);
         close();
         return;
       }
       // set / upgrade: encrypt the data with the new password (a recovery code comes back, shown once)
-      const result = await enableAccountEncryption({ deviceKey, password: next, email });
+      const result = await enableAccountEncryption({ deviceKey, password: next });
       setBackup(hasPremigrationBackup());
       setCode(result.recoveryCode);
       onChanged("encrypted", result.dataKey);
@@ -283,7 +270,6 @@ export function AccountLockSettings({ mode: lockNow, deviceKey, onChanged, onCod
         {(mode === "set" || mode === "upgrade" || mode === "change") && <>
           <input type="password" aria-label="新密码" placeholder={`新密码（至少 ${ENCRYPTED_LOCK_MIN} 位）`} autoComplete="off" value={next} onChange={(event) => { setNext(event.target.value); setError(""); }} />
           <input type="password" aria-label="再输入一次新密码" placeholder="再输入一次" autoComplete="off" value={again} onChange={(event) => { setAgain(event.target.value); setError(""); }} />
-          <input type="text" inputMode="email" aria-label="找回邮箱" placeholder="找回邮箱（可不填，服务器开通后用来重置）" autoComplete="off" maxLength={120} value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} />
         </>}
         {(mode === "set" || mode === "upgrade") && <small>设置后，账号里的内容会用这个密码加密，并给你一个恢复码（只显示一次）。设置前的数据会先留一份备份，确认正常后自动删除。Mac 上旧的「其他」列表不在加密范围内。</small>}
         {mode === "remove" && lockNow === "encrypted" && <small>关闭后，账号数据会改回不用密码的加密方式。</small>}
