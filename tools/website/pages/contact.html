@@ -1,0 +1,35 @@
+<div class="solo">
+  <form class="card solo-card staff-form contact-form" id="contact-form" method="post" action="/contact/send">
+    <h1>联系我们</h1>
+    <p>留下邮箱和需求，我们会尽快回复，把安装包和使用方法发给你。</p>
+    <label class="staff-label">姓名<input name="name" type="text" required maxlength="60" autocomplete="name"></label>
+    <label class="staff-label">邮箱<input name="email" type="email" required maxlength="120" autocomplete="email"></label>
+    <label class="staff-label">公司（选填）<input name="company" type="text" maxlength="80" autocomplete="organization"></label>
+    <label class="staff-label">想了解什么<textarea name="message" required maxlength="2000" rows="4" placeholder="比如：几台电脑用、要 Windows 还是 Mac、有没有别的要求"></textarea></label>
+    <div class="cf-turnstile contact-turnstile" data-sitekey="0x4AAAAAAFbunVqZ_GEl5V7v" data-callback="contactVerified" data-expired-callback="contactExpired" data-language="zh-cn"></div>
+    <p class="staff-error" id="captcha">请先完成人机验证。</p>
+    <p class="staff-error" id="bad">请填好姓名、邮箱和需求。</p>
+    <p class="staff-error" id="failed">发送失败，请稍后再试。</p>
+    <p class="staff-error" id="limit">发送太频繁，请一小时后再试。</p>
+    <button class="pill staff-verify" type="submit" disabled><span class="staff-spinner" aria-hidden="true"></span><span class="staff-verify-text">发送</span></button>
+    <p class="small contact-note">只用来回复你，不会用于别的用途。</p>
+  </form>
+  <div class="card solo-card staff-ready" id="sent">
+    <p class="staff-pass"><svg class="staff-check" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M6.5 12.5l3.5 3.5 7.5-8"/></svg>已发送</p>
+    <h1>收到了</h1>
+    <p>我们会尽快回复到你填的邮箱，请留意收件箱和垃圾邮件。</p>
+    <a class="pill" href="/">回到首页</a>
+  </div>
+</div>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script>
+// 「发送」要等人机验证通过才能点；点了以后按钮转圈，直到服务器回来：成功换成「收到了」卡，失败显示红字。
+var contactButton = document.querySelector("#contact-form .staff-verify");
+function contactVerified() { contactButton.disabled = false; }
+function contactExpired() { contactButton.disabled = true; }
+document.getElementById("contact-form").addEventListener("submit", function () {
+  contactButton.classList.add("is-busy");
+  contactButton.querySelector(".staff-verify-text").textContent = "发送中…";
+});
+</script>
