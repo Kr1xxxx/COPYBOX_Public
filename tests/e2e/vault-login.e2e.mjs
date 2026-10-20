@@ -3,8 +3,8 @@ import { accountAddButton, asDesktop, openAccountCategory } from "./helpers.mjs"
 
 const openAll = (page) => page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ }).click();
 
-async function openVault(page) {
-  await asDesktop(page, "darwin");
+async function openVault(page, platform = "darwin") {
+  await asDesktop(page, platform);
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   await page.locator(".kind-switch").getByRole("button", { name: "账号" }).click();
@@ -108,3 +108,19 @@ test("账号密码: the same password is flagged, a linked 验证码 shows its c
   await expect(google.locator(".vault-type-chip")).toHaveText(["登录", "验证码"]);
   await expect(dialog.getByRole("region", { name: "Gmail" }).locator(".vault-entry")).toContainText("Gmail 备用");
 });
+
+for (const platform of ["darwin", "win32"]) {
+  test(`账号密码 (${platform}): an empty 用户名 asks first, and the second 保存 saves`, async ({ page }) => {
+    const dialog = await openVault(page, platform);
+    await openAccountCategory(page, "登录");
+    await accountAddButton(page).click();
+    await dialog.getByPlaceholder("例如：Shopify 后台").fill("只有密码");
+    await dialog.getByLabel("密码", { exact: true }).fill("Only-pass-1");
+    await dialog.getByRole("button", { name: "保存" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText("还没填用户名 / 邮箱。不用填的话，再按一次「保存」就保存。");
+    await dialog.getByRole("button", { name: "保存" }).click();
+    await expect(dialog.getByRole("button", { name: /只有密码/ })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "复制密码" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "复制用户名" })).toHaveCount(0);
+  });
+}

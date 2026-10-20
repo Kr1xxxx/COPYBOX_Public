@@ -96,7 +96,6 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEnt
     const found: Record<string, string> = {};
     if (!value.name.trim()) found.name = "请填写名称";
     if (value.url.trim() && !isPlausibleUrl(value.url)) found.url = "网址格式不对";
-    if (!value.username.trim()) found.username = "请填写用户名或邮箱";
     if (!value.password) found.password = "请填写密码";
     return found;
   }
@@ -106,6 +105,8 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEnt
     if (!draft || !store) return;
     const found = validate(draft);
     if (Object.keys(found).length > 0) { setErrors(found); return; }
+    // An empty 用户名 is allowed, but only on a second press of 保存 (Krix 2026-10-20).
+    if (!draft.username.trim() && !confirmSave) { setConfirmSave(true); return; }
     const now = Date.now();
     const existing = items?.find((entry) => entry.id === draft.id);
     const item: LoginItem = {
@@ -182,7 +183,7 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEnt
             {totps.map((account) => <option key={account.id} value={account.id}>{accountTitle(account)}{account.name && account.issuer ? ` · ${account.name}` : ""}</option>)}
           </select></label>}
         <label>备注（可不填）<textarea rows={2} value={draft.note} onChange={(event) => setField("note", event.target.value)} /></label>
-        {confirmSave && <p className="pay-confirm" role="alert">确认要修改这个账号吗？</p>}
+        {confirmSave && <p className="pay-confirm" role="alert">还没填用户名 / 邮箱。不用填的话，再按一次「保存」就保存。</p>}
         <div className="settings-inline-actions">
           <button type="button" className="secondary-button" onClick={() => { setDraft(null); setConfirmSave(false); }}>取消</button>
           <button type="submit" className="primary-button">保存</button>
@@ -212,8 +213,8 @@ export function LoginPanel({ deviceKey, onToast, focusId, startAdding, onShowEnt
                   <div className="pay-body">
                     <dl className="pay-fields">
                       {/^https?:\/\//i.test(item.url) && <div className="pay-field"><dt>网址</dt><dd><a href={item.url} target="_blank" rel="noreferrer noopener">{item.url.replace(/^https?:\/\//, "")}</a></dd><span /></div>}
-                      <div className="pay-field"><dt>用户名</dt><dd>{item.username}</dd>
-                        <button type="button" className={`icon-button pay-copy${copiedKey === `${item.id}:u` ? " copied" : ""}`} onClick={() => void copy(`${item.id}:u`, item.username)} aria-label="复制用户名" title="复制"><Icon name={copiedKey === `${item.id}:u` ? "check" : "copy"} /></button></div>
+                      {item.username && <div className="pay-field"><dt>用户名</dt><dd>{item.username}</dd>
+                        <button type="button" className={`icon-button pay-copy${copiedKey === `${item.id}:u` ? " copied" : ""}`} onClick={() => void copy(`${item.id}:u`, item.username)} aria-label="复制用户名" title="复制"><Icon name={copiedKey === `${item.id}:u` ? "check" : "copy"} /></button></div>}
                       <div className="pay-field"><dt>密码</dt><dd className="login-pass">{shown ? item.password : "••••••••••"}</dd>
                         <span className="login-pass-actions">
                           <RevealButtons reveal={reveal} id={item.id} label="密码" />

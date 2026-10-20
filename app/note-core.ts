@@ -234,7 +234,6 @@ export function loginDraftProblems(values: Record<LoginField, string>): Partial<
   const found: Partial<Record<LoginField, string>> = {};
   if (!values.name.trim()) found.name = "请填写名称";
   if (values.url.trim() && !isPlausibleUrl(values.url)) found.url = "网址格式不对";
-  if (!values.username.trim()) found.username = "请填写用户名或邮箱";
   if (!values.password) found.password = "请填写密码";
   return found;
 }
