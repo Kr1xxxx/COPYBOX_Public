@@ -20,7 +20,7 @@ import { parseKeyList, staleKeys } from "../tools/website/deploy.mjs";
 
 const pageKeys = ["index.html", "contact/index.html", "help/index.html", "privacy/index.html"];
 const allPageKeys = [...pageKeys, "404.html"];
-// The inquiry form's Turnstile script (D-089): the one resource the site loads from outside.
+// The inquiry form's Turnstile script (D-092): the one resource the site loads from outside.
 const turnstileScript = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 
 // Builds into a temp dir. Placeholder icons and screenshots are written unless `assets` is false, in which case
@@ -82,7 +82,7 @@ test("website pages: head, header, body and footer are joined and the current na
   assert.notEqual(cssAssetKey("body{}"), cssAssetKey("body{ }"));
 });
 
-test("website build writes every page, the stylesheet, icons and images; no installer, no latest.json, no web preview (D-089)", () => {
+test("website build writes every page, the stylesheet, icons and images; no installer, no latest.json, no web preview (D-092)", () => {
   const { out, read, warnings } = site;
   assert.deepEqual(warnings, []);
   const home = read("index.html");
@@ -188,7 +188,7 @@ test("website pages: Chinese, fixed security line, no eyebrow labels, no http://
     assert.deepEqual([...html.matchAll(/>\s*([A-Z][A-Z ]{5,})\s*</g)].map((m) => m[1]), [], key);
     assert.doesNotMatch(html, /http:\/\//, key);
     // Every src/href stays on the site, except the absolute share-card links in <head> and, on the inquiry page
-    // only, Cloudflare's Turnstile script (D-089).
+    // only, Cloudflare's Turnstile script (D-092).
     const outside = [...html.matchAll(/(?:src|href)="([^"]*)"/g)].map((m) => m[1]).filter((link) => !link.startsWith("/") && !link.startsWith("#"));
     const contact = key === "contact/index.html";
     assert.deepEqual(outside.filter((link) => !link.startsWith("https://copyboxx.com/")), contact ? [turnstileScript] : [], key);
@@ -207,7 +207,7 @@ test("website pages: every link inside the site points at a built file", () => {
   }
 });
 
-test("website inquiry page (D-089): form posts to /contact/send, carries the Turnstile widget, 发送 waits for it", () => {
+test("website inquiry page (D-092): form posts to /contact/send, carries the Turnstile widget, 发送 waits for it", () => {
   const html = site.read("contact/index.html");
   assert.match(html, /<form class="card solo-card staff-form contact-form" id="contact-form" method="post" action="\/contact\/send">/);
   for (const name of ["name", "email", "company", "message"]) assert.ok(html.includes(`name="${name}"`), name);

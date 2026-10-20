@@ -6,7 +6,7 @@
 // 2026-10-14): /preview/ is an ordinary 404. /api/* is the account and sync API (api.mjs, D-063);
 // /admin is the owner's read-only user list (admin.mjs, D-065). /staff/ sends a staff installer after the
 // company password (secret STAFF_PASSWORD) is checked here, never in the page (D-080). The public installer is gone
-// (D-089): /download/ goes to the inquiry form /contact/, whose POST /contact/send mails the owner.
+// (D-092): /download/ goes to the inquiry form /contact/, whose POST /contact/send mails the owner.
 
 import { adminEmails, handleAdmin, isAdminPath } from "./admin.mjs";
 import { allowRequest, handleApi, isApiPath, normalizeEmail, sameText, sendMail, sha256Hex, verifyTurnstile } from "./api.mjs";
@@ -224,7 +224,7 @@ function staffBack(anchor) {
   return new Response(null, { status: 303, headers: { Location: anchor ? `/staff/#${anchor}` : "/staff/", "Cache-Control": "no-store" } });
 }
 
-// Inquiry form (D-089): POST /contact/send with name, email, company, message and the Turnstile token the page's
+// Inquiry form (D-092): POST /contact/send with name, email, company, message and the Turnstile token the page's
 // widget added (cf-turnstile-response). The token is checked with Cloudflare before anything is sent, so a bot
 // without a browser cannot mail the owner; 5 inquiries per IP and hour through the API's rate_limits table. The mail
 // goes through Resend to the addresses in ADMIN_EMAILS with the visitor's address as reply-to, then back to
@@ -279,7 +279,7 @@ async function serve(request, env) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
-  // The old public download page (D-089): its links in mails and chats keep working.
+  // The old public download page (D-092): its links in mails and chats keep working.
   if (url.pathname === "/download" || url.pathname === "/download/") {
     return new Response(null, { status: 308, headers: { Location: "/contact/", "Cache-Control": "no-cache" } });
   }

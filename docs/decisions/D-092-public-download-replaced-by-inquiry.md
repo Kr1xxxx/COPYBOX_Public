@@ -1,4 +1,4 @@
-### D-089 No public download on the site; download buttons become an inquiry form (2026-10-20)
+### D-092 No public download on the site; download buttons become an inquiry form (2026-10-20)
 - Context (owner, 2026-10-20: 「官网公开版全部删除,下载按钮改成邮件联系的询单,需要人机验证后才能发」). The public
   installer 1.83.0 had been frozen on copyboxx.com/download/ since the morning (no updates); the owner now wants no
   public version at all and to talk to interested people first.

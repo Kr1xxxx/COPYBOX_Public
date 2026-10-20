@@ -350,7 +350,7 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 @keyframes staff-spin { to { transform: rotate(360deg); } }
 @keyframes staff-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
-/* Inquiry form (/contact/, D-089): the staff card's layout and states. 「发送」 stays grey until the Turnstile widget
+/* Inquiry form (/contact/, D-092): the staff card's layout and states. 「发送」 stays grey until the Turnstile widget
    reports a pass; the Worker's 303 to #sent swaps the form for the thank-you card, the other anchors show a red line. */
 .contact-form .pill:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 .contact-turnstile { display: flex; justify-content: center; margin-top: 24px; min-height: 65px; }

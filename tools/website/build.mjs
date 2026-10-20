@@ -1,7 +1,7 @@
 // Builds the public website for copyboxx.com (see README.md):
 //   node tools/website/build.mjs [--out <dir>] [--icons <dir>] [--images <dir>]
 // Defaults: --out dist-website (relative to the repo root), --icons tools/website/icons,
-// --images tools/website/images. The site hosts no public installer any more (owner, 2026-10-20, D-089): the download
+// --images tools/website/images. The site hosts no public installer any more (owner, 2026-10-20, D-092): the download
 // buttons lead to the inquiry form at /contact/, and the Worker mails each inquiry to the owner.
 // Every page is partials/head.html + partials/header.html (current nav item marked) + its body + partials/footer.html;
 // the stylesheet becomes assets/site.<hash>.css. Besides the site files it writes kv-bulk.json and manifest.json,
@@ -49,7 +49,7 @@ export function escapeHtml(value) {
 export const sitePages = [
   { source: "pages/index.html", key: "index.html", path: "/", nav: "HOME", title: "Copyboxx · 复制盒",
     description: "Copyboxx（复制盒）把常用话术、账号资料和图片存在自己电脑上，点一下就复制。不用注册，断网也能用，内容加密保存。" },
-  // The inquiry form (D-089): the public installer is no longer on the site, interested people write to the owner.
+  // The inquiry form (D-092): the public installer is no longer on the site, interested people write to the owner.
   { source: "pages/contact.html", key: "contact/index.html", path: "/contact/", nav: "CONTACT", title: "联系我们 · Copyboxx",
     description: "想用 Copyboxx（复制盒）？留下邮箱和需求，我们会尽快回复。" },
   { source: "pages/help.html", key: "help/index.html", path: "/help/", nav: "HELP", title: "使用说明 · Copyboxx",

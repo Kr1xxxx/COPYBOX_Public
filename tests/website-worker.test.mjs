@@ -147,7 +147,7 @@ test("worker: pages are served, a folder without slash redirects, html files kee
   assert.equal(bare.headers.get("location"), "/help/?from=mail");
 });
 
-test("worker: the public download is gone (D-089): /download/ goes to the inquiry form, its files are 404", async () => {
+test("worker: the public download is gone (D-092): /download/ goes to the inquiry form, its files are 404", async () => {
   for (const path of ["/download", "/download/"]) {
     const moved = await get(path);
     assert.equal(moved.status, 308, path);
@@ -388,7 +388,7 @@ test("worker: /staff/verify without the secret, without the file, and over the h
   assert.equal(limited.headers.get("Location"), "/staff/#limit");
 });
 
-// Inquiry form (D-089): the Turnstile token is checked with Cloudflare, then the inquiry is mailed through Resend to
+// Inquiry form (D-092): the Turnstile token is checked with Cloudflare, then the inquiry is mailed through Resend to
 // the owner's addresses with the visitor as reply-to. `calls` records what the Worker sent out.
 function contactPost(fields, env) {
   return get("/contact/send", { method: "POST", body: new URLSearchParams(fields), headers: { "CF-Connecting-IP": "9.8.7.6" } }, env);
