@@ -9,6 +9,8 @@ use crate::site_icon::read_capped;
 
 const BASE: &str = "https://copyboxx.com";
 const TIMEOUT: Duration = Duration::from_secs(30);
+/// A route that cannot even connect in this time is given up for the next one.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// The page refuses to upload more than 5 MB; a little room for the JSON around it.
 const MAX_BYTES: usize = 6 * 1024 * 1024;
 const PATHS: [(&str, &str); 8] = [
@@ -54,7 +56,7 @@ fn describe(error: reqwest::Error) -> String {
 
 /// Two ways to the server, tried in this order: through the computer's system proxy (the same route as the browser;
 /// without a proxy this is already a direct connection), then directly, so a proxy that cannot reach copyboxx.com
-/// does not lock anyone out (owner, 2026-10-20).
+/// does not lock anyone out (owner, 2026-10-20). The next route is only for a route that could not connect (D-089).
 pub(crate) fn clients(configure: impl Fn(reqwest::ClientBuilder) -> reqwest::ClientBuilder) -> Vec<reqwest::Client> {
     [false, true]
         .into_iter()
@@ -86,7 +88,7 @@ pub async fn cloud_request(request: CloudRequest) -> Result<CloudResponse, Strin
         return Err("invalid".into());
     }
     let mut failure = "network".to_string();
-    for client in clients(|builder| builder.redirect(reqwest::redirect::Policy::none()).timeout(TIMEOUT)) {
+    for client in clients(|builder| builder.redirect(reqwest::redirect::Policy::none()).connect_timeout(CONNECT_TIMEOUT).timeout(TIMEOUT)) {
         let mut builder = client.request(method.clone(), format!("{BASE}{}", request.path)).header("accept", "application/json");
         if let Some(token) = request.token.as_deref() {
             builder = builder.header("authorization", format!("Bearer {token}"));
@@ -94,8 +96,6 @@ pub async fn cloud_request(request: CloudRequest) -> Result<CloudResponse, Strin
         if let Some(bytes) = &body {
             builder = builder.header("content-type", "application/json").body(bytes.clone());
         }
-        // shortcut: a request that reached the server but timed out on the way back is sent again directly (a second
-        // 验证码 email at worst); upgrade to a per-attempt connect timeout if that ever shows up.
         match builder.send().await {
             Ok(response) => {
                 let status = response.status().as_u16();
@@ -104,7 +104,9 @@ pub async fn cloud_request(request: CloudRequest) -> Result<CloudResponse, Strin
                 };
                 return Ok(CloudResponse { status, text: String::from_utf8_lossy(&bytes).into_owned() });
             }
-            Err(error) => failure = describe(error),
+            Err(error) if error.is_connect() => failure = describe(error),
+            // The request may already have reached the server: sending it again could mean a second 验证码 email.
+            Err(error) => return Err(describe(error)),
         }
     }
     Err(failure)
@@ -129,6 +131,22 @@ mod tests {
     #[test]
     fn the_server_is_tried_through_the_proxy_and_then_directly() {
         assert_eq!(clients(|builder| builder.timeout(TIMEOUT)).len(), 2);
+    }
+
+    #[test]
+    fn only_a_request_that_never_connected_counts_as_a_connect_failure() {
+        let client = reqwest::Client::builder().no_proxy().connect_timeout(CONNECT_TIMEOUT).timeout(Duration::from_millis(300)).build().unwrap();
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap();
+        let silent = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let silent_address = silent.local_addr().unwrap();
+        tauri::async_runtime::block_on(async {
+            let refused = client.get(format!("http://{closed}/api/library")).send().await.unwrap_err();
+            assert!(refused.is_connect(), "{refused:?}");
+            // Connected and sent, but no answer comes back: not tried again on the other route.
+            let unanswered = client.post(format!("http://{silent_address}/api/auth/code")).send().await.unwrap_err();
+            assert!(unanswered.is_timeout() && !unanswered.is_connect(), "{unanswered:?}");
+        });
+        drop(silent);
     }
 
     #[test]
