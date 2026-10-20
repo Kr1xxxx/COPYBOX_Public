@@ -245,8 +245,17 @@ export function hasOptionalSnippetPreparation(item: SecretItem | SnippetImportIt
 }
 
 export function matchesSnippetProduct(item: SecretItem | SnippetImportItem, product: string) {
-  if (product === "全部产品") return true;
-  return item.snippetMeta?.productGroups.includes(product) ?? false;
+  const groups = item.snippetMeta?.productGroups;
+  // A 话术 with no product (typed by hand, D-101) shows under every product, not only under 全部产品.
+  if (product === "全部产品" || !groups?.length) return true;
+  return groups.includes(product);
+}
+
+// 公司 = came from the company library (it carries a `shared` link, retired ones too); 我的 = everything else (D-101).
+export type SnippetSource = "" | "company" | "mine";
+export function matchesSnippetSource(item: SecretItem | SnippetImportItem, source: SnippetSource) {
+  if (!source) return true;
+  return ("shared" in item && Boolean(item.shared)) === (source === "company");
 }
 
 export function snippetCopyReadiness(
