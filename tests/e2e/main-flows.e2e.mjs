@@ -386,6 +386,15 @@ test("a 话术 typed by hand stays in the list when a product is picked (D-101)"
   await page.locator(".product-filter-menu").getByRole("menuitem", { name: "睫毛" }).click();
   await expect(page.locator(".product-filter")).toContainText("睫毛");
   await expect(page.locator(".native-row", { hasText: "自己写的话术" })).toHaveCount(1);
+  // 公司 / 我的 sit left of 选择; the sample sheet has no company 话术, so 公司 empties the list and 我的 keeps the row.
+  const source = page.locator(".source-filter");
+  await source.getByRole("button", { name: "公司" }).click();
+  await expect(page.locator(".native-row")).toHaveCount(0);
+  await source.getByRole("button", { name: "我的" }).click();
+  await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".native-row", { hasText: "自己写的话术" })).toHaveCount(1);
+  await source.getByRole("button", { name: "我的" }).click();
+  await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "false");
 });
 
 test("the 全部产品 filter and the row menu close on an outside click and on Esc", async ({ page }) => {

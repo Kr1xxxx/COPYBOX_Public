@@ -251,6 +251,13 @@ export function matchesSnippetProduct(item: SecretItem | SnippetImportItem, prod
   return groups.includes(product);
 }
 
+// 公司 = came from the company library (it carries a `shared` link, retired ones too); 我的 = everything else (D-101).
+export type SnippetSource = "" | "company" | "mine";
+export function matchesSnippetSource(item: SecretItem | SnippetImportItem, source: SnippetSource) {
+  if (!source) return true;
+  return ("shared" in item && Boolean(item.shared)) === (source === "company");
+}
+
 export function snippetCopyReadiness(
   item: SecretItem | SnippetImportItem,
   values: Record<string, string>,

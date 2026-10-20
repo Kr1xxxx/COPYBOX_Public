@@ -59,11 +59,13 @@ import {
   fillSnippetTemplate,
   hasOptionalSnippetPreparation,
   matchesSnippetProduct,
+  matchesSnippetSource,
   parseSnippetWorkbook,
   PRODUCT_GROUPS,
   resolveSnippetCopySource,
   snippetCopyReadiness,
   type SnippetImportPreview,
+  type SnippetSource,
 } from "./snippet-import";
 import { createLazyWriter, type LazyWriter } from "./lazy-writer";
 import { derivePbkdf2AesKey } from "./key-cache";
@@ -352,6 +354,7 @@ export default function Home() {
   // 编辑 in the toast after a save: the entry to open once it is in the list shown.
   const pendingSavedEdit = useRef("");
   const [productFilter, setProductFilter] = useState("全部产品");
+  const [sourceFilter, setSourceFilter] = useState<SnippetSource>("");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [startupError, setStartupError] = useState("");
@@ -555,7 +558,7 @@ export default function Home() {
     const scopeFolder = !trashView && normalized && searchAllFolders ? "all" : activeFolder;
     const scoped = kindItems.filter((item) => itemMatchesActiveFolder(item, scopeFolder));
     const productMatched = activeKind === "snippet" && !trashView
-      ? scoped.filter((item) => matchesSnippetProduct(item, productFilter))
+      ? scoped.filter((item) => matchesSnippetProduct(item, productFilter) && matchesSnippetSource(item, sourceFilter))
       : scoped;
     const isSnippetSearch = Boolean(normalized) && activeKind === "snippet";
     const matched = isSnippetSearch ? (englishSearch ? searchSnippetsEnglish(productMatched, normalized) : searchSnippets(productMatched, normalized)) : normalized ? productMatched.filter((item) => {
@@ -564,7 +567,7 @@ export default function Home() {
     }) : productMatched;
     if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, RECENT_LIMIT);
     return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
-  }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders, englishSearch]);
+  }, [items, query, activeKind, activeFolder, productFilter, sourceFilter, searchAllFolders, englishSearch]);
   // Worked out once per list, not per row: with 1,000+ snippets the per-row search made every render slow.
   const cardMoves = useMemo(() => buildCardMoveMap(filtered), [filtered]);
   const folderCounts = useMemo(() => countItemsByFolder(activeKindItems), [activeKindItems]);
@@ -1837,6 +1840,7 @@ export default function Home() {
     setActiveKind("snippet");
     setActiveFolder("all");
     setProductFilter("全部产品");
+    setSourceFilter("");
     setSearchAllFolders(true);
     setQuery(item.label);
   }
@@ -1847,6 +1851,7 @@ export default function Home() {
     setActiveKind(kind);
     setActiveFolder("all");
     setProductFilter("全部产品");
+    setSourceFilter("");
     setQuery("");
     setSearchAllFolders(false);
     setSelected(0);
@@ -1877,7 +1882,7 @@ export default function Home() {
 
   function selectFolder(folder: string) {
     setActiveFolder(folder);
-    if (folder === "trash") setProductFilter("全部产品");
+    if (folder === "trash") { setProductFilter("全部产品"); setSourceFilter(""); }
     setSelected(0);
     setRowMenuId("");
     hideSecret();
@@ -2111,6 +2116,7 @@ export default function Home() {
     setActiveKind("snippet");
     setActiveFolder("all");
     setProductFilter("全部产品");
+    setSourceFilter("");
     setQuery("");
     setSelected(0);
     showToast(`已导入 ${importedCount} 条话术`, { ms: 2600 });
@@ -2542,6 +2548,9 @@ export default function Home() {
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
               {!imageView && activeFolder === "trash" && trashHereCount > 0 && emptyTrashButton}
               {imageView && imageLibrary.filter === IMAGE_FILTER_TRASH && imageLibrary.trashed.length > 0 && <button type="button" className="ghost-button select-toggle danger-text" onClick={() => imageSectionRef.current?.askEmptyTrash()}>全部删除</button>}
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="source-filter" role="group" aria-label="话术来源">
+                {([["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" key={value} className={sourceFilter === value ? "active" : ""} aria-pressed={sourceFilter === value} onClick={() => { setSourceFilter((current) => current === value ? "" : value); setSelected(0); }}>{label}</button>)}
+              </div>}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>

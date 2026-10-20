@@ -7,6 +7,7 @@ import {
   extractPlaceholders,
   fillSnippetTemplate,
   matchesSnippetProduct,
+  matchesSnippetSource,
   normalizeSnippetRow,
   parseSnippetWorkbook,
   hasOptionalSnippetPreparation,
@@ -225,6 +226,15 @@ test("matches structured product groups and never hides snippets that have no pr
   assert.equal(matchesSnippetProduct(legacy, "睫毛"), true);
   const handTyped = { ...legacy, snippetMeta: { ...structured.snippetMeta, productGroups: [], rawProduct: "" } };
   assert.equal(matchesSnippetProduct(handTyped, "镊子"), true);
+});
+
+test("the 公司 / 我的 filter splits company-library 话术 from a person's own (D-101)", () => {
+  const own = { id: "own", label: "x", secret: "y", note: "", color: "#fff", kind: "snippet", createdAt: 1, updatedAt: 1 };
+  const company = { ...own, id: "c", shared: { id: "STD-1", baseHash: "h" } };
+  const retired = { ...own, id: "r", shared: { id: "STD-2", baseHash: "h", retired: true } };
+  assert.deepEqual([own, company, retired].map((item) => matchesSnippetSource(item, "")), [true, true, true]);
+  assert.deepEqual([own, company, retired].map((item) => matchesSnippetSource(item, "company")), [false, true, true]);
+  assert.deepEqual([own, company, retired].map((item) => matchesSnippetSource(item, "mine")), [true, false, false]);
 });
 
 test("requires placeholder values before copy; the old 发送前确认 / 发送前核实 ticks no longer matter", () => {
