@@ -356,6 +356,7 @@ export default function Home() {
   const [productFilter, setProductFilter] = useState("全部产品");
   const [sourceFilter, setSourceFilter] = useState<SnippetSource>("");
   const [productMenuOpen, setProductMenuOpen] = useState(false);
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [startupError, setStartupError] = useState("");
   // No data but a copy from an import that was cut off: starting empty waits for the person's answer (LeftoverRestoreDialog).
@@ -895,11 +896,11 @@ export default function Home() {
   }, [modalOpen, backgroundInert]);
 
   // The 全部产品 filter, a row's ⋯ menu, the bulk 移动到 / 导出 menus and the folder menu close on a click or touch anywhere outside them, and on Esc.
-  const dropdownOpen = productMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || bulkExportOpen || Boolean(folderMenu);
+  const dropdownOpen = productMenuOpen || sourceMenuOpen || Boolean(rowMenuId) || bulkMoveOpen || bulkExportOpen || Boolean(folderMenu);
   useDropdownDismiss(dropdownOpen, {
-    all: () => { setProductMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
+    all: () => { setProductMenuOpen(false); setSourceMenuOpen(false); setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); setFolderMenu(""); setFolderDeleteArm(""); },
     rowAndBulk: () => { setRowMenuId(""); setBulkMoveOpen(false); setBulkExportOpen(false); },
-    product: () => setProductMenuOpen(false),
+    product: () => { setProductMenuOpen(false); setSourceMenuOpen(false); },
   });
   useRowMenuPlacement(rowMenuId);
 
@@ -2178,10 +2179,16 @@ export default function Home() {
   // The 账号 section's content goes inside the veil (it stays mounted, so sliding open shows it at once); other sections are left as they are.
   const wrapAccountVeil = (content: ReactNode) => (accountMode && slideUnlockOn ? <AccountVeil veiled={accountVeiled} onUnlock={() => setAccountSlidOpen(true)}>{content}</AccountVeil> : content);
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
-  // 公司 / 我的 (D-101): left of 「选择」 in the full window, right of the search box in the mini window (D-106).
-  const sourceFilterNode = <div className="source-filter" role="group" aria-label="话术来源">
-    {([["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" key={value} className={sourceFilter === value ? "active" : ""} aria-pressed={sourceFilter === value} onClick={() => { setSourceFilter((current) => current === value ? "" : value); setSelected(0); }}>{label}</button>)}
+  // Mini window (D-106): 公司 / 我的 (D-101) sit behind a filter icon inside the search box; filled while one is picked.
+  const sourceLabel = sourceFilter === "company" ? "公司" : sourceFilter === "mine" ? "我的" : "";
+  const miniSourceFilter = <div className="product-filter-wrap mini-source">
+    <button type="button" className={`mini-source-button${sourceFilter ? " active" : ""}`} onClick={() => setSourceMenuOpen((value) => !value)} aria-expanded={sourceMenuOpen} aria-label={sourceLabel ? `话术来源：${sourceLabel}` : "话术来源"} title="话术来源"><Icon name="filter" /></button>
+    <AnimatePresence>{sourceMenuOpen && <ArcMenu className="product-filter-menu">
+      {([["", "全部"], ["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" role="menuitem" className={sourceFilter === value ? "active" : ""} key={label} onClick={() => { setSourceFilter(value); setSourceMenuOpen(false); setSelected(0); }}>{label}<span>{sourceFilter === value ? "✓" : ""}</span></button>)}
+    </ArcMenu>}</AnimatePresence>
   </div>;
+  const showSearchMode = !imageView && searching && activeKind === "snippet" && activeFolder !== "trash";
+  const showSearchScope = !imageView && searching && activeFolder !== "all" && activeFolder !== "trash";
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = (
     <ListEmptyState
@@ -2367,14 +2374,18 @@ export default function Home() {
               {kindSwitch}
               <MiniTabs label="范围" tabs={miniTopTabs} active={miniTabActive} onSelect={selectMiniTab} />
             </div>
-            <button type="button" className="icon-button" onClick={() => requestWindowMode("full")} aria-label="恢复完整窗口" title="恢复完整窗口"><Icon name="restore" /></button>
+            <div className="mini-top-actions">
+              <button type="button" className="icon-button" onClick={() => requestWindowMode("full")} aria-label="恢复完整窗口" title="恢复完整窗口"><Icon name="restore" /></button>
+              {/* Windows: the mini window has no system title bar (D-106), so its ✕ lives here; it closes as Settings says (tray by default). */}
+              {typeof window !== "undefined" && window.clipboxDesktop?.closeWindow && window.clipboxDesktop.platform !== "darwin" && <button type="button" className="icon-button" onClick={() => window.clipboxDesktop?.closeWindow?.()} aria-label="关闭" title="关闭"><Icon name="close" /></button>}
+            </div>
           </header>
           <div className="mini-search">
             <div className="native-search">
               <Icon name="search" className="search-glyph" />
               {searchInput}
+              {!imageView && activeKind === "snippet" && activeKindItems.length > 0 && miniSourceFilter}
             </div>
-            {!imageView && activeKind === "snippet" && activeKindItems.length > 0 && sourceFilterNode}
           </div>
           <div className="mini-folders">{miniFolderTabs.length > 0 && <MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} />}</div>
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} selecting={false} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
@@ -2535,24 +2546,12 @@ export default function Home() {
               <h1>{sectionTitle}</h1>
               <span className="section-count">{imageView ? imageCounts.shown : filtered.length}</span>
               <span className="spacer" />
-              {!imageView && searching && activeKind === "snippet" && activeFolder !== "trash" && <ArcSegmented
-                className="scope-switch"
-                label="搜索方式"
-                value={englishSearch ? "english" : "pinyin"}
-                onSelect={(next) => { setEnglishSearch(next === "english"); setSelected(0); }}
-                options={[{ value: "pinyin", label: "中文拼音" }, { value: "english", label: "英文单词" }]}
-              />}
-              {!imageView && searching && activeFolder !== "all" && activeFolder !== "trash" && <ArcSegmented
-                className="scope-switch"
-                label="搜索范围"
-                value={searchAllFolders ? "all" : "here"}
-                onSelect={(next) => { setSearchAllFolders(next === "all"); setSelected(0); }}
-                options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
-              />}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
               {!imageView && activeFolder === "trash" && trashHereCount > 0 && emptyTrashButton}
               {imageView && imageLibrary.filter === IMAGE_FILTER_TRASH && imageLibrary.trashed.length > 0 && <button type="button" className="ghost-button select-toggle danger-text" onClick={() => imageSectionRef.current?.askEmptyTrash()}>全部删除</button>}
-              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && sourceFilterNode}
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="source-filter" role="group" aria-label="话术来源">
+                {([["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" key={value} className={sourceFilter === value ? "active" : ""} aria-pressed={sourceFilter === value} onClick={() => { setSourceFilter((current) => current === value ? "" : value); setSelected(0); }}>{label}</button>)}
+              </div>}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
@@ -2563,6 +2562,23 @@ export default function Home() {
               {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && !imageSelecting && imageCounts.open && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的图片" onClick={() => imageSectionRef.current?.collapse()}>收起</button>}
               {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && imageCounts.shown > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${imageSelecting ? "active" : ""}`} aria-pressed={imageSelecting} onClick={() => setImageSelecting((value) => !value)}>{imageSelecting ? "取消选择" : "选择"}</button>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
+            </div>}
+            {/* While searching, how and where to search get their own row, so the head never runs out of room (D-106). */}
+            {!vaultPage && (showSearchMode || showSearchScope) && <div className="search-options">
+              {showSearchMode && <ArcSegmented
+                className="scope-switch"
+                label="搜索方式"
+                value={englishSearch ? "english" : "pinyin"}
+                onSelect={(next) => { setEnglishSearch(next === "english"); setSelected(0); }}
+                options={[{ value: "pinyin", label: "中文拼音" }, { value: "english", label: "英文单词" }]}
+              />}
+              {showSearchScope && <ArcSegmented
+                className="scope-switch"
+                label="搜索范围"
+                value={searchAllFolders ? "all" : "here"}
+                onSelect={(next) => { setSearchAllFolders(next === "all"); setSelected(0); }}
+                options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
+              />}
             </div>}
             {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact={false} view={imageViewMode} paused={backgroundInert} selecting={imageSelecting} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
             {!imageView && !vaultPage && <ListScrollFrame>{legacyList}</ListScrollFrame>}

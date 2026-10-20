@@ -81,6 +81,8 @@ export function withDesktopShim(html, platform, info = { version: "网页测试�
     aiStatus: function () { return Promise.resolve({ hasKey: false, origin: "" }); },
     // A browser tab cannot stay above other windows; the button is there so it can be seen and tried.
     setPinned: function () {},
+    // The ✕ on the Windows mini window: a browser tab cannot hide to the tray, so here it goes back to the full window.
+    closeWindow: function () { try { parent.postMessage({ clipbox: "window-mode", mode: "full" }, "*"); } catch (e) {} location.reload(); },
     setWindowMode: function (mode) { try { parent.postMessage({ clipbox: "window-mode", mode: mode }, "*"); } catch (e) {} },
     relaunch: function () { location.reload(); }
   };

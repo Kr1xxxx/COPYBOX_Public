@@ -9,6 +9,8 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   mini: <><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><rect x="4" y="13" width="8" height="7" rx="1.5" /></>,
   pin: <><path d="M9 4h6l-1 5.5 3 2.5v2H7v-2l3-2.5L9 4z" /><path d="M12 14v6" /></>,
+  filter: <path d="M4 5h16l-6 7.5V18l-4 2v-7.5z" />,
+  close: <path d="M6 6l12 12M18 6L6 18" />,
   restore: <><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5" /><path d="M15 4h5v5M20 4l-7 7" /></>,
   grid: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M4 10h16" /></>,
   star: <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" />,

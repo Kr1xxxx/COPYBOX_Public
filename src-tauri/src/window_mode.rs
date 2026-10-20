@@ -199,6 +199,9 @@ impl WindowMode {
         let _ = window.set_max_size(Some(LogicalSize::new(ws::MINI_WIDTH, ws::MINI_HEIGHT)));
         let _ = window.set_maximizable(false);
         let _ = window.set_always_on_top(true);
+        // Windows (D-106): no system title bar on the mini window; the page's top row drags it and holds ✕.
+        #[cfg(target_os = "windows")]
+        let _ = window.set_decorations(false);
         // Some platforms apply the new minimum size only after the first resize, so ask again.
         let _ = window.set_size(LogicalSize::new(ws::MINI_WIDTH, ws::MINI_HEIGHT));
         self.settle_mini(window);
@@ -231,6 +234,8 @@ impl WindowMode {
         }
         let pinned = self.inner.lock().unwrap().pinned;
         let _ = window.set_always_on_top(stays_on_top(false, pinned));
+        #[cfg(target_os = "windows")]
+        let _ = window.set_decorations(true);
         // macOS (D-079): the full window keeps its size limit and its zoom button stays off, so no full screen.
         let _ = window.set_max_size(full_max_size());
         let _ = window.set_maximizable(ws::full_max_size().is_none());
