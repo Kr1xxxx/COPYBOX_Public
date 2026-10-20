@@ -2497,17 +2497,18 @@ export default function Home() {
                 ? <button type="button" className="primary-button add-button" onClick={() => imageSectionRef.current?.openPicker()} aria-label="新增图片"><Icon name="plus" />新增图片</button>
                 : <>
                   {vaultPage
-                    ? activeFolder !== "trash" && !lockedHere && !accountVeiled && <span className="add-menu-wrap">
-                      <button type="button" className="primary-button add-button" aria-label="新增条目" aria-haspopup={addAsksType ? "menu" : undefined} aria-expanded={addAsksType ? addMenuOpen : undefined}
+                    ? activeFolder !== "trash" && <span className="add-menu-wrap">
+                      {/* Locked or veiled: the button stays so the search bar keeps its width, but it cannot be pressed. */}
+                      <button type="button" className="primary-button add-button" aria-label="新增条目" disabled={lockedHere || accountVeiled} aria-haspopup={addAsksType ? "menu" : undefined} aria-expanded={addAsksType ? addMenuOpen : undefined}
                         onClick={() => { if (addAsksType) setAddMenuOpen((open) => !open); else addAccount(vaultCat as EntryKind); }}><Icon name="plus" />新增</button>
-                      {addMenuOpen && addAsksType && <>
+                      {addMenuOpen && addAsksType && !lockedHere && !accountVeiled && <>
                         <div className="menu-scrim" role="presentation" onMouseDown={() => setAddMenuOpen(false)} />
                         <div className="dropdown acct-menu" role="menu" aria-label="新增什么">
                           {categoryList.map((id) => <button key={id} type="button" role="menuitem" onClick={() => addAccount(id)}>{CATEGORY_LABEL[id]}</button>)}
                         </div>
                       </>}
                     </span>
-                    : canAddItemInFolder(activeFolder) && !accountVeiled && <button type="button" className="primary-button add-button" onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
+                    : canAddItemInFolder(activeFolder) && <button type="button" className="primary-button add-button" disabled={lockedHere || accountVeiled} onClick={() => openEditor(null)} aria-label="新增条目"><Icon name="plus" />新增</button>}
                 </>}
               {/* Only a desktop shell (or the web preview's stand-in) can keep the window on top; a plain browser tab gets no button. */}
               {typeof window !== "undefined" && window.clipboxDesktop?.setPinned && <button type="button" className={`icon-button pin-on-top${pinOnTop ? " active" : ""}`} onClick={togglePinOnTop} aria-pressed={pinOnTop} aria-label={pinOnTop ? "取消固定" : "固定在最上层"} title={pinOnTop ? "取消固定" : "固定在最上层"}><Icon name="pin" filled={pinOnTop} /></button>}
