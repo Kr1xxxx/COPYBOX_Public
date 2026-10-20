@@ -344,34 +344,39 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
-/* Staff download (/staff/, D-080): the password is verified first. The Worker redirects a wrong password to #wrong
-   (the error line shows through :target, no script needed) and, once the cookie is valid, serves the page with
-   body.staff-verified, which swaps the form for the download card with an entrance animation. */
-.staff-label { display: block; margin-top: 20px; font-size: 14px; font-weight: 500; }
+/* Staff download (/staff/, D-080): one centred card (the 404 page's .solo layout). The password is verified first:
+   the Worker redirects a wrong password to #wrong (the error line shows through :target, no script needed) and, once
+   the cookie is valid, serves the page with body.staff-verified, which swaps the form for the download card with an
+   entrance animation. */
+.staff-label { display: block; margin-top: 24px; text-align: left; font-size: 14px; font-weight: 500; }
 .staff-label input {
-  display: block; width: 100%; max-width: 320px; margin-top: 6px; padding: 10px 12px; font: inherit; color: var(--ink);
-  background: var(--page); border: 1px solid var(--border); border-radius: 10px;
+  display: block; width: 100%; margin-top: 6px; padding: 11px 14px; font: inherit; color: var(--ink);
+  background: var(--page); border: 1px solid var(--border); border-radius: 12px;
 }
-.staff-form .staff-error { display: none; margin-top: 10px; font-size: 14px; color: #c0392b; scroll-margin-top: 240px; }
+.staff-label input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.staff-form .staff-error { display: none; margin-top: 10px; font-size: 14px; color: #c0392b; }
 .staff-form .staff-error:target { display: block; }
 .staff-form:has(.staff-error:target) input { border-color: #c0392b; animation: staff-shake 0.4s; }
-.staff-buttons { display: grid; gap: 12px; }
-.staff-buttons .pill { border: 0; cursor: pointer; font: inherit; }
-.staff-verify { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.staff-form .pill, .staff-ready .pill { width: 100%; min-height: 44px; font-size: 15px; }
+.staff-form .pill { margin-top: 24px; border: 0; cursor: pointer; font-family: inherit; }
+.staff-verify { gap: 8px; }
 .staff-spinner {
   display: none; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent;
   border-radius: 50%; animation: staff-spin 0.7s linear infinite;
 }
 .staff-verify.is-busy { opacity: 0.85; pointer-events: none; }
 .staff-verify.is-busy .staff-spinner { display: inline-block; }
-.staff-ready { display: none; scroll-margin-top: 240px; }
+.staff-ready { display: none; scroll-margin-top: 120px; }
 .staff-verified .staff-form { display: none; }
-.staff-verified .staff-ready { display: grid; animation: staff-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.staff-verified .staff-ready .pill { animation: staff-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s both; }
-.staff-pass { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; font-weight: 600; color: #1f9d55; }
+.staff-verified .staff-ready { display: block; animation: staff-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.staff-buttons { display: grid; gap: 10px; margin-top: 28px; }
+.staff-buttons .pill { margin-top: 0; }
+.staff-verified .staff-buttons .pill { animation: staff-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s both; }
+.staff-pass { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; font-size: 14px; font-weight: 600; color: #1f9d55; }
 .staff-check { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .staff-check circle { stroke-dasharray: 70; animation: staff-draw-circle 0.5s ease-out 0.1s both; }
 .staff-check path { stroke-dasharray: 20; animation: staff-draw-check 0.35s ease-out 0.55s both; }
+.staff-notes { margin-top: 24px; text-align: left; line-height: 1.6; }
 @keyframes staff-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes staff-draw-circle { from { stroke-dashoffset: 70; } to { stroke-dashoffset: 0; } }
 @keyframes staff-draw-check { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
