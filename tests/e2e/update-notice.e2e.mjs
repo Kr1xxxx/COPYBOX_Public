@@ -25,7 +25,7 @@ async function withUpdate(page, result, platform = "win32", { install = false } 
 const available = { status: "available", version: "0.2.25", notes: ["修复复制图片", "更快的搜索"], installable: true };
 const MB = 1024 * 1024;
 
-for (const platform of ["win32", "darwin"]) test(`a newer version shows a banner; 稍后 hides that version only (${platform})`, async ({ page }) => {
+for (const platform of ["win32", "darwin"]) test(`a newer version shows a banner; 稍后 hides it until the next launch (${platform})`, async ({ page }) => {
   await withUpdate(page, { status: "available", version: "0.2.25", notes: ["修复复制图片", "更快的搜索"] }, platform);
   await seedSnippets(page);
   const banner = page.locator(".update-banner");
@@ -36,9 +36,12 @@ for (const platform of ["win32", "darwin"]) test(`a newer version shows a banner
   await expect(banner.getByRole("button", { name: "下载" })).toBeVisible();
   await banner.getByRole("button", { name: "稍后" }).click();
   await expect(banner).toHaveCount(0);
+  // D-102: 稍后 skips this time only; the next launch reminds again, and an old forever-skip is ignored.
+  await page.evaluate(() => localStorage.setItem("clipbox.update-dismissed", "0.2.25"));
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await expect(page.locator(".update-banner")).toHaveCount(0);
+  await expect(page.locator(".update-banner")).toContainText("有新版本 0.2.25");
+  expect(await page.evaluate(() => localStorage.getItem("clipbox.update-dismissed"))).toBeNull();
   expect(await page.evaluate(() => window.__opened)).toBe(0);
 });
 
@@ -115,7 +118,7 @@ test("a failed update says why and offers 重试 and 去网站下载", async ({ 
   await expect(banner).toContainText("更新没成功：下载的文件不完整");
 });
 
-test("稍后 still hides that version when 立即更新 is offered", async ({ page }) => {
+test("稍后 hides it for now when 立即更新 is offered, and the next launch asks again", async ({ page }) => {
   await withUpdate(page, available, "win32", { install: true });
   await seedSnippets(page);
   const banner = page.locator(".update-banner");
@@ -124,7 +127,7 @@ test("稍后 still hides that version when 立即更新 is offered", async ({ pa
   await expect(banner).toHaveCount(0);
   await page.reload();
   await page.waitForSelector(".app-shell");
-  await expect(page.locator(".update-banner")).toHaveCount(0);
+  await expect(page.locator(".update-banner").getByRole("button", { name: "立即更新" })).toBeVisible();
   expect(await page.evaluate(() => window.__installs)).toBe(0);
 });
 

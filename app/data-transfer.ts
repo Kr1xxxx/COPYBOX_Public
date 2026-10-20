@@ -367,5 +367,5 @@ export async function openTransfer(file: TransferFile, password: string): Promis
 }
 
 export function transferFileName(date = new Date()) {
-  return `clipbox-full-backup-${date.toISOString().slice(0, 10)}.json`;
+  return `copyboxx-full-backup-${date.toISOString().slice(0, 10)}.json`;
 }

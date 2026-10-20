@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { UpdateInstallResult, UpdateProgress } from "./desktop-bridge";
 import "./desktop-bridge";
 
-const DISMISSED_KEY = "clipbox.update-dismissed";
+// Where 稍后 used to hide a version for good; now only cleared (D-102).
+const OLD_DISMISSED_KEY = "clipbox.update-dismissed";
 const RECHECK_MS = 24 * 60 * 60 * 1000;
 
 type Phase =
@@ -13,10 +14,6 @@ type Phase =
   // 下载 opened the new version in the browser; the person installs it by hand (older shells, or a manifest without a
   // checksum; D-073).
   | { kind: "opened" };
-
-function readDismissed() {
-  try { return localStorage.getItem(DISMISSED_KEY) || ""; } catch { return ""; }
-}
 
 // Plain words for why 立即更新 did not work (the reasons come from src-tauri/src/update.rs).
 export function updateErrorText(reason: string) {
@@ -43,22 +40,23 @@ export function manualInstallHint(platform: string | undefined) {
 
 // Asks the desktop shell for a newer version on launch and then once a day. 「立即更新」 downloads it with a progress bar
 // and installs it over this app (Windows D-047, Mac D-078); older shells and a manifest without a checksum offer 「下载」
-// in the browser and then say how to install it (D-073). 「稍后」 hides that version only; 「知道了」 hides it until the
-// app opens again.
+// in the browser and then say how to install it (D-073). 「稍后」 and 「知道了」 hide it until the next check (next launch
+// or a day later), never for good (D-102).
 export function UpdateNotice() {
   const [update, setUpdate] = useState<{ version: string; notes: string[]; installable: boolean } | null>(null);
-  const [dismissed, setDismissed] = useState(readDismissed);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [closedFor, setClosedFor] = useState("");
 
   useEffect(() => {
     const desktop = window.clipboxDesktop;
     if (!desktop?.checkUpdate) return;
+    try { localStorage.removeItem(OLD_DISMISSED_KEY); } catch { /* optional */ }
     let cancelled = false;
     const run = () => desktop.checkUpdate?.()
       .then((result) => {
         if (cancelled) return;
         setUpdate(result.status === "available" ? { version: result.version, notes: result.notes, installable: result.installable !== false } : null);
+        setClosedFor("");
       })
       .catch(() => undefined);
     void run();
@@ -81,16 +79,10 @@ export function UpdateNotice() {
   }, []);
 
   const busy = phase.kind === "downloading" || phase.kind === "installing";
-  if (!update || ((update.version === dismissed || update.version === closedFor) && !busy)) return null;
+  if (!update || (update.version === closedFor && !busy)) return null;
 
   const desktop = window.clipboxDesktop;
   const canInstall = Boolean(desktop?.installUpdate) && update.installable;
-
-  function later() {
-    if (!update) return;
-    try { localStorage.setItem(DISMISSED_KEY, update.version); } catch { /* optional */ }
-    setDismissed(update.version);
-  }
 
   // From the error state the banner stays as it is, so 重试 is still there.
   function openSite(showHint = false) {
@@ -167,7 +159,7 @@ export function UpdateNotice() {
       {canInstall
         ? <button type="button" className="primary-button" onClick={install}>立即更新</button>
         : <button type="button" className="primary-button" onClick={() => openSite(true)}>下载</button>}
-      <button type="button" className="ghost-button" onClick={later}>稍后</button>
+      <button type="button" className="ghost-button" onClick={() => setClosedFor(update.version)}>稍后</button>
     </div>
   );
 }
