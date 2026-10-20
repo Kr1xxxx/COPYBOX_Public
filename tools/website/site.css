@@ -16,7 +16,6 @@
   /* Cards on hover; floating things (hero cards, the screenshot window). */
   --shadow-card: 0 1px 2px rgba(31,39,51,.06), 0 2px 8px -2px rgba(31,39,51,.06);
   --shadow-float: 0 2px 6px rgba(31,39,51,.05), 0 14px 32px -10px rgba(31,39,51,.18);
-  --glow: rgba(255,255,255,.95);
   --r-panel: 24px; --r-card: 16px; --r-small: 12px;
   --gutter: clamp(16px, 4vw, 40px);
   --ease: cubic-bezier(.22, 1, .36, 1);
@@ -32,7 +31,6 @@
     --pill-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 1px 2px rgba(0,0,0,.4);
     --shadow-card: 0 1px 2px rgba(0,0,0,.3), 0 2px 8px -2px rgba(0,0,0,.4);
     --shadow-float: 0 2px 6px rgba(0,0,0,.25), 0 14px 32px -10px rgba(0,0,0,.6);
-    --glow: rgba(163,156,240,.16);
     color-scheme: dark;
   }
 }
@@ -45,7 +43,6 @@
   --pill-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 1px 2px rgba(0,0,0,.4);
   --shadow-card: 0 1px 2px rgba(0,0,0,.3), 0 2px 8px -2px rgba(0,0,0,.4);
   --shadow-float: 0 2px 6px rgba(0,0,0,.25), 0 14px 32px -10px rgba(0,0,0,.6);
-  --glow: rgba(163,156,240,.16);
   color-scheme: dark;
 }
 
@@ -136,44 +133,12 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 
 /* Hero */
 .hero { padding-block: 72px 48px; overflow-x: clip; }
-.hero .wrap { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+.hero .wrap > div { max-width: 720px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 14px; color: var(--muted); }
 .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .hero h1 span { display: inline-block; }
 .hero .lead { margin-top: 20px; }
 .hero-note { margin-top: 18px; font-size: 13px; color: var(--muted); }
-
-.hero-visual { position: relative; }
-.hero-visual::before {
-  content: ""; position: absolute; inset: -14% -10%; z-index: 0;
-  background: radial-gradient(closest-side, var(--glow), transparent);
-}
-.fan {
-  position: relative; z-index: 1; width: min(100%, 480px); margin: 0 auto; aspect-ratio: 1 / 1;
-  container-type: inline-size; animation: rise .4s var(--ease) both;
-}
-@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
-.fcard {
-  position: absolute; width: 56%; padding: 5cqi; border-radius: 4cqi; background: var(--card);
-  border: 1px solid var(--border); box-shadow: var(--shadow-float); font-size: 3.4cqi; line-height: 1.55; color: var(--ink-2);
-}
-.fcard-1 { left: 0; top: 40%; z-index: 3; transform: rotate(-8deg); }
-.fcard-2 { left: 28%; top: 0; z-index: 1; }
-.fcard-3 { right: 0; top: 46%; z-index: 2; transform: rotate(6deg); }
-.fcard-label { display: flex; align-items: center; gap: 1.6cqi; font-size: 2.9cqi; color: var(--muted); margin-bottom: 2.4cqi; }
-.fcard-label i { width: 1.8cqi; height: 1.8cqi; border-radius: 50%; background: var(--accent); }
-.fcard strong { display: block; color: var(--ink); font-size: 4cqi; font-weight: 600; margin-bottom: 1.2cqi; }
-.fcard .chip {
-  display: inline-block; margin-top: 3cqi; padding: .6cqi 2.8cqi; border-radius: 9999px; font-size: 2.9cqi; font-weight: 500;
-  background: var(--primary); color: var(--primary-ink); box-shadow: var(--pill-shadow);
-}
-.fcard .dots { letter-spacing: .25em; color: var(--ink); font-size: 4cqi; }
-.fcard .row { display: flex; justify-content: space-between; align-items: center; gap: 2cqi; }
-.fcard .tile {
-  height: 26cqi; border-radius: 2.6cqi; margin-bottom: 2.4cqi;
-  background: linear-gradient(135deg, #cfc9f6 0%, #a39cf0 55%, #8a82e0 100%);
-}
-.fcard .caption { font-size: 2.9cqi; color: var(--muted); }
 
 /* Cards: a border at rest, a soft shadow on hover. */
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
@@ -299,8 +264,7 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 
 /* Tablets */
 @media (max-width: 899px) {
-  .hero .wrap, .pair { grid-template-columns: minmax(0, 1fr); }
-  .hero-visual { max-width: 520px; width: 100%; margin: 0 auto; }
+  .pair { grid-template-columns: minmax(0, 1fr); }
   .grid-3, .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .footer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .footer-brand { grid-column: 1 / -1; }
@@ -315,7 +279,6 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
   .header-actions { gap: 6px; }
   .section { padding-block: 48px; }
   .hero { padding-block: 40px 32px; }
-  .hero .wrap { gap: 32px; }
   .hero h1 { font-size: 32px; }
   .page-head { padding-block: 44px 28px; }
   .page-head h1 { font-size: 30px; }
