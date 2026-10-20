@@ -6,6 +6,8 @@ async function openSettings(page) {
   await page.getByRole("button", { name: /设置/ }).first().click();
   const dialog = page.getByRole("dialog", { name: "设置" });
   await dialog.getByRole("tab", { name: "数据" }).click();
+  // The single-part exports and imports sit under 更多 (D-103).
+  await dialog.getByText("更多导出和导入").click();
   return dialog;
 }
 

@@ -93,7 +93,7 @@ test("error words are recognised; text the person typed inside 「」 does not c
   for (const message of ["复制失败，请重试", "无法打开数据文件夹", "图片太大，最多 10 MB", "只支持 PNG、JPG、WebP、GIF 图片", "目录名已存在", "目录名不能为空", "这张图片打不开", "存储空间满了，请清空回收站或删掉不用的内容", "存储空间快满了，请清空回收站或删掉不用的内容", "已添加 2 张，有 1 张没有添加：图片太大，最多 10 MB"]) {
     assert.equal(toastToneFor(message), "error", message);
   }
-  for (const message of ["已复制", "图片已加密保存", "目录已创建", "已移到「失败案例」", "已删除目录「无法联系」", "验证码已复制", "已恢复"]) {
+  for (const message of ["已复制", "图片已保存", "目录已创建", "已移到「失败案例」", "已删除目录「无法联系」", "验证码已复制", "已恢复"]) {
     assert.equal(toastToneFor(message), "ok", message);
   }
 });
@@ -117,16 +117,16 @@ test("a toast stays fully visible, then fades during the last part of its time",
 
 test("pause stops the time and brings it back to full; resume runs what was left", () => {
   const { clock, toast, current } = controller();
-  toast.show("条目已加密保存", { ms: 5000 });
+  toast.show("条目已保存", { ms: 5000 });
   clock.advance(1000);
   toast.pause();
   assert.equal(clock.pending, 0, "no timer while held");
   clock.advance(60_000);
-  assert.equal(current().message, "条目已加密保存");
+  assert.equal(current().message, "条目已保存");
   assert.equal(current().fading, false);
   toast.resume();
   clock.advance(3999);
-  assert.equal(current().message, "条目已加密保存", "the 4 s that were left");
+  assert.equal(current().message, "条目已保存", "the 4 s that were left");
   clock.advance(1);
   assert.deepEqual(current(), EMPTY_TOAST);
 });

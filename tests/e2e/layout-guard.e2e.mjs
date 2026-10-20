@@ -139,7 +139,7 @@ for (const { platform, theme, size } of cases) {
       await press2();
       if (tabNames.length === 0) {
         await state("settings-top", openSettings);
-        for (const h of ["外观", "数据", "回收站", "窗口", "AI", "关于"]) {
+        for (const h of ["外观", "备份与恢复", "回收站", "窗口", "AI", "关于"]) {
           await state(`settings-${h}`, async () => { await openSettings(); await dialog().locator("h3", { hasText: h }).first().scrollIntoViewIfNeeded(); }, { optional: true });
         }
       } else {
@@ -148,6 +148,7 @@ for (const { platform, theme, size } of cases) {
       await state("backup-export", async () => {
         await openSettings();
         if (tabNames.length) await tabs().filter({ hasText: "数据" }).first().click();
+        await dialog().getByText("更多导出和导入").click();
         await dialog().locator(".settings-row", { hasText: "导出话术备份" }).getByRole("button").first().click();
         await page.locator("#backup-title").waitFor();
       });

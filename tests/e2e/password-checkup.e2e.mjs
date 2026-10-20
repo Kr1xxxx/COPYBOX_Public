@@ -32,6 +32,7 @@ test("密码体检 shows a red dot for a short password and opens it; 导出账�
   await page.getByRole("button", { name: /设置/ }).first().click();
   const dialog = page.getByRole("dialog", { name: "设置" });
   await dialog.getByRole("tab", { name: "数据" }).click();
+  await dialog.getByText("更多导出和导入").click();
   await dialog.locator(".settings-row", { hasText: "导出账号表格" }).getByRole("button", { name: "导出…" }).click();
   await expect(dialog).toContainText("这个文件没有加密");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "仍然导出" }).click()]);

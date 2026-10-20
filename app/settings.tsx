@@ -178,16 +178,27 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
           <section className="settings-card" data-solo="" aria-labelledby="set-folders" hidden={hideSection("folders", "set-folders")}><h3 id="set-folders">目录</h3>
             <SettingsFolders groups={folderGroups} onAdd={onFolderAdd} onRename={onFolderRename} onDelete={onFolderDelete} onColor={onFolderColor} onShortName={onFolderShortName} onMove={onFolderMove} onReorder={onFolderReorder} />
           </section>
-          <section className="settings-card" data-solo="" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">数据</h3>
-            {row("导出话术备份", `${PLAIN_NOTES ? "用独立密码加密，不含图片" : `用独立密码加密，不含${SECRET_WORD}和图片`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
-            {row(`导出${SECRET_WORD}备份`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : `用独立密码加密，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…", accountLocked)}
-            <div className="settings-row"><div><strong>导出{SECRET_WORD}表格（.csv）</strong><small>{accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : "不加密的表格，Excel 能直接打开，只存到这台电脑"}</small>
-              {confirmSheet && <small className="settings-sample-list" role="alert">这个文件没有加密，谁拿到都能看到全部密码。只在需要时导出，用完请删掉。</small>}</div>
-              {confirmSheet
-                ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmSheet(false)}>取消</button><button type="button" className="secondary-button danger" onClick={() => { setConfirmSheet(false); onExportAccountSheet(); }}>仍然导出</button></div>
-                : <button type="button" className="secondary-button" disabled={accountLocked} onClick={() => setConfirmSheet(true)}>导出…</button>}
-            </div>
-            {row(`导入${SECRET_WORD}表格`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导入` : "读取「导出账号表格」的文件（.csv / .xlsx），已有的不会重复，也不会被覆盖", onImportAccountSheet, "选择文件…", accountLocked)}
+          {/* D-103: one main backup (完整备份); the single-part exports and imports wait under 更多 so the page stays short. */}
+          <section className="settings-card" aria-labelledby="set-data" hidden={hideSection("data", "set-data")}><h3 id="set-data">备份与恢复</h3>
+            <div className="settings-row"><div><strong>完整备份</strong><small>话术、账号、图片和设置，全部打包成一个带密码的文件。平时备份用这一个就够了</small></div><button type="button" className="primary-button" onClick={() => setDataMove("export")}>导出…</button></div>
+            {row("从完整备份恢复", "读取完整备份文件，替换这里现有的全部内容，替换前会再问你一次", () => setDataMove("import"), "选择文件…")}
+            <AutoBackupRows itemCount={itemCount} />
+            <details className="settings-more" open={searching || undefined}><summary>更多导出和导入</summary>
+              {row("导出话术备份", `${PLAIN_NOTES ? "单独设一个密码，不含图片" : `单独设一个密码，不含${SECRET_WORD}和图片`} · ${backupAgeLabel(lastBackupAt)}`, onExport, "导出…")}
+              {row(`导出${SECRET_WORD}备份`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : `单独设一个密码，只包含${SECRET_WORD}，不包含话术`, onExportSecret, "导出…", accountLocked)}
+              <div className="settings-row"><div><strong>导出{SECRET_WORD}表格（.csv）</strong><small>{accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导出` : "不加密的表格，Excel 能直接打开，只存到这台电脑"}</small>
+                {confirmSheet && <small className="settings-sample-list" role="alert">这个文件没有加密，谁拿到都能看到全部密码。只在需要时导出，用完请删掉。</small>}</div>
+                {confirmSheet
+                  ? <div className="settings-inline-actions"><button type="button" className="secondary-button" onClick={() => setConfirmSheet(false)}>取消</button><button type="button" className="secondary-button danger" onClick={() => { setConfirmSheet(false); onExportAccountSheet(); }}>仍然导出</button></div>
+                  : <button type="button" className="secondary-button" disabled={accountLocked} onClick={() => setConfirmSheet(true)}>导出…</button>}
+              </div>
+              {row(`导入${SECRET_WORD}表格`, accountLocked ? `先打开${SECRET_WORD}页、输入密码，才能导入` : "读取「导出账号表格」的文件（.csv / .xlsx），已有的不会重复，也不会被覆盖", onImportAccountSheet, "选择文件…", accountLocked)}
+              {row("导入备份", "读取话术备份或账号备份文件，可选择合并或覆盖", onImport, "选择文件…")}
+            </details>
+          </section>
+          <section className="settings-card" aria-labelledby="set-import" hidden={hideSection("data", "set-import")}><h3 id="set-import">导入话术</h3>
+            {row("导入话术表格", "读取表格（.xlsx / .csv）或话术文档（.md），只在本机解析", onImportSheet, "选择文件…")}
+            <TipsImportRow />
             {testTools && onImportTest && row("导入测试内容", `放入一批带「范例」标记的假内容（话术${PLAIN_NOTES ? "" : `、${SECRET_WORD}`}），重复导入不会重复`, () => void onImportTest(), "导入")}
             {testTools && onClearTest && (
               <div className="settings-row"><div><strong>清除测试内容</strong><small>只清带「范例」标记、你没改过的内容，其他内容不动；话术会先进回收站</small>
@@ -198,12 +209,8 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
                   : <button type="button" className="secondary-button" onClick={() => void (onPreviewTest?.() ?? Promise.resolve({ snippets: 0, accounts: null, keptEdited: 0 })).then(setConfirmClearTest)}>清除…</button>}
               </div>
             )}
-            {row("导入备份", "读取话术备份或账号备份文件，可选择合并或覆盖", onImport, "选择文件…")}
-            {row("导入话术表格", "读取表格（.xlsx / .csv）或话术文档（.md），只在本机解析", onImportSheet, "选择文件…")}
-            <TipsImportRow />
-            {row("完整备份", "话术、账号、图片和设置，全部打包成一个带密码的文件", () => setDataMove("export"), "导出…")}
-            {row("从完整备份恢复", "读取完整备份文件，替换这里现有的全部内容，替换前会再问你一次", () => setDataMove("import"), "选择文件…")}
-            <AutoBackupRows itemCount={itemCount} />
+          </section>
+          <section className="settings-card" aria-labelledby="set-local" hidden={hideSection("data", "set-local")}><h3 id="set-local">本机数据</h3>
             {row("重新加载", "重新读取本地数据，不会改动内容", onReload, refreshing ? "加载中…" : "重新加载", refreshing)}
             {isDesktop
               ? row("数据位置", "在文件夹中打开 Copyboxx 的本机数据", onOpenDataFolder, "打开文件夹")

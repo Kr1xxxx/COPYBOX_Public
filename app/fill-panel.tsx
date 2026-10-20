@@ -52,7 +52,7 @@ export function SnippetVariableText({ text, renderText, values, remembered, onCh
           value={value}
           data-var={name}
           placeholder={name}
-          aria-label={`变量 ${name}`}
+          aria-label={`高亮块 ${name}`}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => onChange(name, event.target.value)}

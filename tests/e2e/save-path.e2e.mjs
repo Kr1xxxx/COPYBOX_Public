@@ -47,7 +47,7 @@ test("a delayed save (copy count) that hits full storage says so too", async ({ 
 test("when storage is nearly full, a save warns once", async ({ page }) => {
   // Other data fills about 87% of the ~5 million characters a page may keep.
   await page.evaluate(() => localStorage.setItem("clipbox.test-filler", "x".repeat(4_350_000)));
-  // A new entry: its own 「条目已加密保存」 must not hide the warning.
+  // A new entry: its own 「条目已保存」 must not hide the warning.
   await page.getByRole("button", { name: "新增条目", exact: true }).click();
   await page.getByLabel("标题", { exact: true }).fill("快满提醒");
   await page.getByLabel("话术内容", { exact: true }).fill("Synthetic nearly-full check.");

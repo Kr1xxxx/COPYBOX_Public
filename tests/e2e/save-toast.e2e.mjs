@@ -125,7 +125,7 @@ test.describe("win32", () => {
 
   test("撤销 after adding a new entry removes it: not in the list, not after a reload, not in the 回收站", async ({ page }) => {
     await addNew(page, "刚加的话术");
-    await expect(toast(page)).toContainText("条目已加密保存");
+    await expect(toast(page)).toContainText("条目已保存");
     await expect(page.locator(".native-row", { hasText: "刚加的话术" })).toHaveCount(1);
     await toast(page).getByRole("button", { name: "撤销" }).click();
     await expect(toast(page)).toContainText("已撤销");

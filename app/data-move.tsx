@@ -87,7 +87,7 @@ export function DataMoveDialog({ mode, itemCount, onClose }: { mode: "export" | 
         anchor.click();
         URL.revokeObjectURL(url);
         const counts = countPayload(payload);
-        setSaved(`已导出：${counts.settings} 项设置，${counts.records} 条加密记录（话术、图片等）。请把文件放在安全的地方，需要时用「从完整备份恢复」读回来。`);
+        setSaved(`已导出：${counts.settings} 项设置，${counts.records} 条记录（话术、图片等）。请把文件放在安全的地方，需要时用「从完整备份恢复」读回来。`);
       } else {
         if (pending) {
           await applyPayload(pending.payload);
