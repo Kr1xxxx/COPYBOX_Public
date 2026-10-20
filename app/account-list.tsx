@@ -133,10 +133,11 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
               {sampleNames.length > 0 && <button type="button" className="secondary-button danger" onClick={() => void removeSamples()}>确认删除</button>}</span>}
         </div>
       )}
-      <div className="vault-groups">
+      <div className={`vault-groups${folded || selecting ? "" : " plain"}`}>
         {groups.map((group) => (
           <section key={group.key} className="vault-group" aria-label={group.title}>
-            <h3>{folded && !selecting && group.key !== "payment" && group.key !== "address" && group.key !== "note" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>
+            {/* Expanded, the rows follow one another; only 收起 and 选择 show the website title (account list advice B). */}
+            {(folded || selecting || group.key === "flat") && <h3>{folded && !selecting && group.key !== "payment" && group.key !== "address" && group.key !== "note" && group.key !== "flat" && <SiteBadge site={group.site} size={20} />}{group.title}<span className="vault-count">{group.entries.length}</span></h3>}
             {(!folded || selecting || group.key === "flat") && <ul className="totp-list">
               {group.entries.map((entry) => (
                 <li key={entry.target} className={`vault-entry-row acct-row${selecting ? " selecting" : ""}`}>

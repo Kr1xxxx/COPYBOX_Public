@@ -1337,7 +1337,11 @@ html[data-mini-fold="left"] body::after { right: 0; border-radius: 0 10px 10px 0
 .add-menu-wrap{position:relative;display:inline-flex}
 .acct-menu{z-index:40}
 .acct-menu-wrap{position:relative;display:inline-flex}
-.acct-row{grid-template-columns:minmax(0,1fr) auto auto}
+.vault-groups.plain{gap:6px}
+/* Fixed button columns: a row without a copy button keeps the same card width. */
+.acct-row{grid-template-columns:minmax(0,1fr) minmax(30px,auto) minmax(30px,auto)}
+.acct-row .acct-menu-wrap{grid-column:3}
+.acct-row .acct-trash-actions{grid-column:2 / -1}
 .acct-copy.copied{color:var(--accent)}
 .vault-inline .vault-panel .totp-actions{display:none}
 /* 账号 forms look like the inline 话术 editor: same card border, buttons at the right-bottom (UI review 2026-10-19, E). */

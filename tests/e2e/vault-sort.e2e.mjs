@@ -34,6 +34,11 @@ test("old 账号 entries are sorted by content in 全部, unknown ones go to 其
   const dialog = await openVault(page);
   await expect(dialog.getByRole("region", { name: "Anthropic" })).toContainText("客服 AI");
   await expect(dialog.getByRole("region", { name: "Anthropic" })).toContainText("来自「其他」");
+  // Old entries copy like the rest, and their card is as wide as the others (account list advice A).
+  await dialog.getByRole("button", { name: "复制 客服 AI" }).click();
+  await expect.poll(() => page.evaluate(() => window.__copied)).toBe("sk-ant-api03-ABCDEFGH1234");
+  const widths = await dialog.locator(".acct-row .vault-entry").evaluateAll((cards) => cards.map((card) => Math.round(card.getBoundingClientRect().width)));
+  expect(new Set(widths).size).toBe(1);
   await expect(dialog.getByRole("region", { name: "其他网站" })).toContainText("仓库地址");
   await expect(dialog.locator(".vault-entry", { hasText: "客服 AI" }).locator(".vault-type-chip")).toHaveText("API");
   await expect(dialog.locator(".vault-entry", { hasText: "邮箱" }).locator(".vault-type-chip")).toHaveText("登录");
