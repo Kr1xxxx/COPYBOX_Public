@@ -539,7 +539,7 @@ export default function Home() {
     if (lockSet) { setAccountUnlocked(false); setAccountSecret(""); setAcctSelecting(false); } else setAccountSlidOpen(false);
   };
   useAccountAutoLock(autoLockOn, autoLockSeconds, lockAccountNow);
-  // The 上锁 button replaces the 本机加密 note when there is a lock to go back to (password, or the slide in the full window).
+  // The 上锁 button shows when there is a lock to go back to (password, or the slide in the full window).
   const canLockAccountNow = lockSet || (slideUnlockOn && windowMode === "full");
   // Windows has no old 秘密 list, so no 其他 category and no old 目录 under 分类.
   const categoryList = useMemo(() => CATEGORY_ORDER.filter((id) => !HIDDEN_ACCOUNT_KINDS.includes(id)), []);
@@ -1097,7 +1097,7 @@ export default function Home() {
               secretCount: secretData.items.length,
               backup,
             });
-            showToast(`${SECRET_WORD}加密备份已生成`);
+            showToast(`${SECRET_WORD}备份已生成`);
             return;
           }
           if (isApiKeySecretCommand(command)) {
@@ -1348,7 +1348,7 @@ export default function Home() {
     closeEditor();
     const after = itemsRef.current.find((item) => item.id === id);
     const record: ItemSaveRecord | null = after && (before || !wasEditing) ? { before, after, nextBefore, nextAfter: nextSnippetNumberRef.current } : null;
-    showToast(wasEditing ? "条目已更新" : "条目已加密保存", record ? {
+    showToast(wasEditing ? "条目已更新" : "条目已保存", record ? {
       ms: 5000,
       actions: [
         { label: "编辑", variant: "primary", onClick: () => editSavedItem(id) },
@@ -2520,9 +2520,7 @@ export default function Home() {
                 {activeFolder !== "trash" && !acctSelecting && !accountVeiled && account.entries?.some((entry) => entry.tab === "login") && <button type="button" className="ghost-button select-toggle" title="只在本机检查：重复使用、太短、一年以上没改的密码" onClick={() => { checkupDot.markSeen(); setAcctCheckup((n) => n + 1); }}>密码体检{checkupDot.dot && <span className="checkup-dot" role="img" aria-label="有需要处理的密码" />}</button>}
                 {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
                 {activeFolder === "trash" && !accountVeiled && trashHereCount > 0 && emptyTrashButton}
-                {canLockAccountNow
-                  ? <button type="button" className="ghost-button select-toggle" title="内容用本机密钥加密保存。点一下马上上锁。" onClick={lockAccountNow}><Icon name="lock" />上锁</button>
-                  : <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span>}</div>
+                {canLockAccountNow && <button type="button" className="ghost-button select-toggle" title="点一下马上上锁" onClick={lockAccountNow}><Icon name="lock" />上锁</button>}</div>
               <AccountPage deviceKey={accountKey} entries={account.entries} trashed={account.trashed} marks={account.marks} error={account.error} category={vaultCat} view={activeFolder as "all" | "pinned" | "recent" | "trash"} query={query} addRequest={vaultAdd} checkupRequest={acctCheckup} onOpenLegacy={openLegacyEntry} onPinLegacy={(id) => { const found = items.find((entry) => entry.id === id); if (found) togglePinned(found); }} onToast={flashToast}
                 selecting={acctSelecting} folded={acctFolded} onSelectingChange={setAcctSelecting} onTrashLegacy={(ids) => trashNow(items.filter((entry) => ids.includes(entry.id)))}
                 legacyView={legacyList} onAdd={accountVeiled ? undefined : () => setAddMenuOpen(true)} />
@@ -2558,7 +2556,6 @@ export default function Home() {
                   {["全部产品", ...PRODUCT_GROUPS].map((product) => <button type="button" role="menuitem" className={productFilter === product ? "active" : ""} key={product} onClick={() => { setProductFilter(product); setProductMenuOpen(false); setSelected(0); }}>{product}<span>{productFilter === product ? "✓" : ""}</span></button>)}
                 </ArcMenu>}</AnimatePresence>
               </div>}
-              {!imageView && activeKind === "secret" && !PLAIN_NOTES && activeFolder !== "trash" && <span className="section-note"><Icon name="lock" />本机加密</span>}
               {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && !imageSelecting && imageCounts.open && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的图片" onClick={() => imageSectionRef.current?.collapse()}>收起</button>}
               {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && imageCounts.shown > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${imageSelecting ? "active" : ""}`} aria-pressed={imageSelecting} onClick={() => setImageSelecting((value) => !value)}>{imageSelecting ? "取消选择" : "选择"}</button>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}

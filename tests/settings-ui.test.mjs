@@ -10,7 +10,7 @@ const platformSource = fs.readFileSync(new URL("../app/platform.ts", import.meta
 const aiClient = fs.readFileSync(new URL("../app/ai-client.ts", import.meta.url), "utf8");
 
 test("settings is a full panel covering data, security, trash, window, AI and about (no shortcut list)", () => {
-  for (const heading of ["数据", "目录", "安全", "回收站", "窗口", "AI", "关于"]) assert.match(page, new RegExp(`>${heading}</h3>`));
+  for (const heading of ["备份与恢复", "目录", "安全", "回收站", "窗口", "AI", "关于"]) assert.match(page, new RegExp(`>${heading}</h3>`));
   assert.doesNotMatch(page, />快捷键<\/h3>/);
   assert.doesNotMatch(page, />命令行<\/h3>/);
   assert.doesNotMatch(page, /自动清除剪贴板|CLIPBOARD_CLEAR/);

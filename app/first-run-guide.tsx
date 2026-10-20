@@ -111,7 +111,7 @@ function guidePages(platform: string | undefined): GuidePage[] {
     },
     {
       title: "账号：密码和验证码放这里",
-      lines: ["登录账号、收款信息、验证码等，加密后只存在这台电脑上。", "想更放心，可以在「设置 → 数据」里给账号页加一个密码。"],
+      lines: ["登录账号、收款信息、验证码等，只存在这台电脑上。", "想更放心，可以在「设置 → 安全」里给账号页加一个密码。"],
       art: <AccountArt />,
     },
     {

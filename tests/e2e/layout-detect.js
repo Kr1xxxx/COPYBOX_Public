@@ -1,6 +1,7 @@
 (() => {
   const out = [];
-  const vis = (e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 2 && r.height > 2 && s.visibility !== "hidden" && s.display !== "none" && +s.opacity > 0.05; };
+  // checkVisibility: the rows inside a closed <details> still report a box in Chromium but are not drawn.
+  const vis = (e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 2 && r.height > 2 && s.visibility !== "hidden" && s.display !== "none" && +s.opacity > 0.05 && e.checkVisibility() !== false; };
   const name = (e) => { const c = (e.className && e.className.baseVal === undefined ? e.className : "").toString().trim().split(/\s+/).slice(0, 2).join("."); const t = (e.getAttribute("aria-label") || e.placeholder || e.textContent || "").trim().replace(/\s+/g, " ").slice(0, 24); return `${e.tagName.toLowerCase()}${c ? "." + c : ""}「${t}」`; };
   const topmost = (e) => { const r = e.getBoundingClientRect(); const x = Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), y = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)); const h = document.elementFromPoint(x, y); return h && (h === e || e.contains(h) || h.contains(e)); };
   const overlayOf = (e) => e.closest("[role=menu],[role=listbox],[role=dialog],[role=alertdialog],.dropdown,.var-popup,.toast,.toast-line,.tooltip,.popover");

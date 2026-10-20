@@ -24,9 +24,9 @@ test("账号 全部: one card per website with every type of that site, 收款�
   await expect(dialog.locator(".vault-group h3")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button")).toHaveText(["登录1", "收款信息1", "地址0", "API 密钥1", "验证码1", "恢复码1", "笔记0", "其他0"]);
   await expect(page.getByRole("navigation", { name: "快捷入口" }).getByRole("button", { name: /^全部/ })).toContainText("5");
-  // The encryption note is only beside the title; the footer note is gone.
+  // No encryption note beside the title or in the footer (D-103: say 加密 only on the 安全 page).
   await expect(dialog).not.toContainText("导出「账号备份」");
-  await expect(page.locator(".section-note")).toHaveText("本机加密");
+  await expect(page.getByText("本机加密")).toHaveCount(0);
 });
 
 test("账号 rows: one copy button per type, the rest in the 「…」 menu", async ({ page }) => {

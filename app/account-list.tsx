@@ -117,7 +117,7 @@ export function AccountList({ deviceKey, entries, trashed, marks, category, view
     <div className="native-empty onboarding">
       <VaultMark />
       <strong>还没有账号，先添加第一条</strong>
-      <span>{CATEGORY_ORDER.filter((kind) => kind !== "other" && !HIDDEN_ACCOUNT_KINDS.includes(kind)).map((kind) => CATEGORY_LABEL[kind]).join("、")}都加密保存在这台电脑上，一键复制。</span>
+      <span>{CATEGORY_ORDER.filter((kind) => kind !== "other" && !HIDDEN_ACCOUNT_KINDS.includes(kind)).map((kind) => CATEGORY_LABEL[kind]).join("、")}都只存在这台电脑上，一键复制。</span>
       {onAdd && <div className="onboarding-actions"><button type="button" className="primary-button" onClick={onAdd}><Icon name="plus" />新增第一条</button></div>}
     </div>
   );

@@ -35,7 +35,7 @@ export function ImageCompressSettings() {
 
   return (
     <>
-      <div className="settings-row static"><div><strong>本月已压缩</strong><small>{used} / {COMPRESS_MONTHLY_LIMIT} 张。新添加的图片会先压缩再加密保存，用完后下个月 1 号恢复</small></div></div>
+      <div className="settings-row static"><div><strong>本月已压缩</strong><small>{used} / {COMPRESS_MONTHLY_LIMIT} 张。新添加的图片会先压缩再保存，用完后下个月 1 号恢复</small></div></div>
       {editing ? (
         <div className="settings-row compress-keys-edit"><div className="compress-keys-fields">
           <label className="settings-ai-field"><span>第一个密钥</span>

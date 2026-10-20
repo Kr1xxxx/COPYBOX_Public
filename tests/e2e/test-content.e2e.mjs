@@ -69,7 +69,7 @@ test("the installed app (no preview flag) has no 导入测试内容 / 清除测�
   await page.goto("/");
   await page.waitForSelector(".app-shell");
   const s = await openData(page);
-  await expect(s.getByText("导出话术备份")).toBeVisible();
+  await expect(s.getByText("完整备份", { exact: true })).toBeVisible();
   await expect(s.getByText("导入测试内容")).toHaveCount(0);
   await expect(s.getByText("清除测试内容")).toHaveCount(0);
 });

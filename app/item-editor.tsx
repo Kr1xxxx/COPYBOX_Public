@@ -232,7 +232,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
           {kind === "snippet" && item?.snippetNumber && <b className="editor-snippet-number">{displaySnippetNumber(item.snippetNumber)}</b>}
           {kind === "secret" && !PLAIN_NOTES && item && <button type="button" className={`editor-reference ${referenceStatus}`} onClick={() => void copyEditorReference()} disabled={busy} aria-live="polite">{referenceStatus === "copied" ? "已复制" : referenceStatus === "error" ? "复制失败" : "复制引用"}</button>}
         </div>
-        <span className="inline-editor-hint">{kind === "secret" ? (PLAIN_NOTES ? "加密保存在这台电脑上" : "加密保存在这台设备上") : "内容可用 AI 润色或整理"}</span>
+        <span className="inline-editor-hint">{kind === "secret" ? (PLAIN_NOTES ? "只保存在这台电脑上" : "只保存在这台设备上") : "内容可用 AI 润色或整理"}</span>
       </header>
       <form ref={formRef} onSubmit={submit}>
           <div className="editor-body">

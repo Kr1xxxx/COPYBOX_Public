@@ -417,7 +417,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
     }
     if (added === 0) onToast(firstProblem);
     else if (rejected > 0) onToast(`已添加 ${added} 张，有 ${rejected} 张没有添加：${firstProblem}`);
-    else if (added === 1) onToast(lastNotice ? `图片已加密保存（${lastNotice}）` : "图片已加密保存");
+    else if (added === 1) onToast(lastNotice ? `图片已保存（${lastNotice}）` : "图片已保存");
     else onToast(`已添加 ${added} 张图片${saved > 0 ? `，压缩省了 ${formatBytes(saved)}` : ""}${failedCompress > 0 ? `，有 ${failedCompress} 张压缩没成功，已保存原图` : ""}`);
   }
 
@@ -634,7 +634,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
         <div className="onboarding-actions">
           <button type="button" className="primary-button" onClick={() => fileInputRef.current?.click()}><PlusGlyph />新增第一张</button>
         </div>
-        <small>图片加密保存，只留在这台设备上</small>
+        <small>图片只留在这台设备上</small>
       </div>
     );
   } else if (shown.length === 0) {

@@ -22,7 +22,7 @@ export function ListEmptyState({ firstRun, activeKind, activeFolder, query, sear
       <div className="native-empty onboarding">
         <VaultMark />
         <strong>{activeKind === "snippet" ? "还没有话术，先添加第一条" : `还没有${SECRET_WORD}，先添加第一条`}</strong>
-        <span>{activeKind === "snippet" ? `把常回复的话存进来，一键复制。正文里用 [名字] 标出要替换的内容。${onSyncCode ? "公司给了企业同步码的话，先填上，公司话术会自动同步进来。" : ""}` : "密码和密钥加密保存在本机，默认只复制引用，不暴露明文。"}</span>
+        <span>{activeKind === "snippet" ? `把常回复的话存进来，一键复制。正文里用 [名字] 这样的高亮块标出每次要填的地方。${onSyncCode ? "公司给了企业同步码的话，先填上，公司话术会自动同步进来。" : ""}` : "密码和密钥只存在本机，默认只复制引用，不显示原文。"}</span>
         <div className="onboarding-actions">
           {activeKind === "snippet" && onSyncCode && <button type="button" className="primary-button" onClick={onSyncCode}>输入企业同步码</button>}
           <button type="button" className={activeKind === "snippet" && onSyncCode ? "secondary-button" : "primary-button"} onClick={onAdd}><Icon name="plus" />新增第一条</button>
@@ -33,6 +33,6 @@ export function ListEmptyState({ firstRun, activeKind, activeFolder, query, sear
     );
   }
   return (
-    <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : activeFolder === "recent" ? "还没有使用记录" : "这个目录还是空的"}</strong><span>{query ? (searchAllFolders || activeFolder === "all" ? "换个词搜索试试" : "换个词，或改为搜索全部目录") : activeFolder === "trash" ? "删除的内容会加密保留在这里" : activeFolder === "pinned" ? "点条目右侧的星标添加收藏" : activeFolder === "recent" ? "复制过的内容会出现在这里" : isMini ? "回到完整窗口添加第一条" : "点右上角的「新增」添加第一条"}</span></div>
+    <div className="native-empty"><strong>{query ? "没有匹配的内容" : activeFolder === "trash" ? "回收站是空的" : activeFolder === "pinned" ? "还没有收藏内容" : activeFolder === "recent" ? "还没有使用记录" : "这个目录还是空的"}</strong><span>{query ? (searchAllFolders || activeFolder === "all" ? "换个词搜索试试" : "换个词，或改为搜索全部目录") : activeFolder === "trash" ? "删除的内容会保留在这里" : activeFolder === "pinned" ? "点条目右侧的星标添加收藏" : activeFolder === "recent" ? "复制过的内容会出现在这里" : isMini ? "回到完整窗口添加第一条" : "点右上角的「新增」添加第一条"}</span></div>
   );
 }

@@ -102,6 +102,7 @@ test("a short password is refused, and the account backup cannot be exported whi
   settings = await openSettings(page);
   await settings.getByRole("tab", { name: "数据" }).click();
   await expect(settings).toContainText("先打开账号页、输入密码，才能导出");
+  await settings.getByText("更多导出和导入").click();
   await expect(settings.locator(".settings-row", { hasText: "导出账号备份" }).getByRole("button")).toBeDisabled();
 });
 

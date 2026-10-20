@@ -69,7 +69,7 @@ test("adding through the file chooser makes a row titled with the file name, and
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText("sample-gradient");
   await expect(page.locator(".sidebar .nav-item", { hasText: "全部图片" })).toContainText("1");
-  await expect(page.locator(".toast")).toContainText("图片已加密保存");
+  await expect(page.locator(".toast")).toContainText("图片已保存");
   await expect.poll(() => page.locator(".image-thumb img").evaluate((img) => img.naturalWidth)).toBe(48);
 
   await page.getByRole("button", { name: "复制 sample-gradient" }).click();

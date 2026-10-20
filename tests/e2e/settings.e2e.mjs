@@ -124,7 +124,7 @@ test("Settings has two columns: groups on the left, the chosen group on the righ
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "导入备份" })).toBeHidden();
   await dialog.getByRole("tab", { name: "数据" }).click();
-  await expect(dialog.getByText("导入备份")).toBeVisible();
+  await expect(dialog.getByText("完整备份", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("radiogroup", { name: "回收站自动清理" })).toBeVisible();
   await expect(dialog.getByRole("radiogroup", { name: "主题" })).toBeHidden();
   // Arrow keys move between groups.
