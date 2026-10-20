@@ -8,7 +8,7 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 
 | Path | What it is |
 | --- | --- |
-| `/` | Home: hero with the three fanned cards, 三个部分, 三步装好 beside the app screenshot, 系统要求, 用起来顺手, 常见问题 |
+| `/` | Home: hero, 三个部分, 三步装好 beside the app screenshot, 系统要求, 用起来顺手, 常见问题 |
 | `/download/` | The download card (version, size, date, SHA-256), install steps, the SmartScreen warning, moving data from the old version, updating, Mac |
 | `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
