@@ -20,7 +20,7 @@ For company developers and AI agents. Read `AGENTS.md` first.
 - Target `main` and fill in the template: what changed, how it was verified, what was not verified, what the
   owner needs to decide.
 - CI no longer runs on pull requests (owner, 2026-10-20). On main, lint + tests, browser end-to-end tests, the
-  Tauri build and the Windows smoke test run every 5th preview version (`scripts/ci-due.mjs`), or by hand. Run lint,
+  Tauri build and the Windows smoke test run when VERSION reaches or jumps past a 0.05 step (`scripts/ci-due.mjs`, D-090), or by hand. Run lint,
   typecheck and unit tests locally before merging. The handoff check and `merge policy` jobs are kept but do not run.
   Label new/removed features and layout changes `major` yourself.
 - Who merges what is in AGENTS.md "Merging" (D-041): green PRs are merged by the agent, high-risk ones only after
