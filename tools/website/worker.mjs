@@ -4,7 +4,7 @@
 // Plain http:// requests are sent to https:// (301), and every https answer carries HSTS, so a first download of the
 // installer cannot be swapped on the way (audit S2, 2026-10-14). The site no longer hosts the web preview (owner,
 // 2026-10-14): /preview/ is an ordinary 404. /api/* is the account and sync API (api.mjs, D-063);
-// /admin is the owner's read-only user list (admin.mjs, D-065). POST /staff/download sends a staff installer after the
+// /admin is the owner's read-only user list (admin.mjs, D-065). /staff/ sends a staff installer after the
 // company password (secret STAFF_PASSWORD) is checked here, never in the page (D-080).
 
 import { handleAdmin, isAdminPath } from "./admin.mjs";
@@ -156,23 +156,62 @@ async function syncResponse(request, env, pathname) {
 }
 
 // Staff installers (D-080): the private builds live under download/private-<token>/ (uploaded by the packaging
-// thread; the token is only in the staff app's update check). The /staff/ page posts the company password and which
-// file; the password is compared here with the secret STAFF_PASSWORD (both hashed, so the compare is constant-time
-// and leaks no length), at most 20 tries per IP and hour through the API's rate_limits table, and only then the file
-// is streamed. A wrong password goes back to the page's #wrong line, too many tries to #limit.
+// thread; the token is only in the staff app's update check). The /staff/ page first posts the company password to
+// /staff/verify; it is compared with the secret STAFF_PASSWORD (both hashed, so the compare is constant-time and leaks
+// no length), at most 20 tries per IP and hour through the API's rate_limits table. A match sets the cookie `staff`
+// (a hash of the password, so changing the password signs everyone out) and goes back to /staff/#ok, which the
+// Worker then serves marked verified with the download buttons; a wrong password goes back to #wrong, too many
+// tries to #limit. /staff/file/win|mac stream a file only with the cookie.
 const staffFiles = { win: "Copyboxx-Setup.exe", mac: "Copyboxx-macOS-arm64.zip" };
+const staffCookieLife = 12 * 60 * 60;
 
-export async function staffDownload(request, env, now = Date.now()) {
+function staffToken(env) {
+  return sha256Hex(`staff-cookie:${env.STAFF_PASSWORD}`);
+}
+
+async function staffVerified(request, env) {
+  if (!env.STAFF_PASSWORD) return false;
+  const match = /(?:^|;\s*)staff=([0-9a-f]{64})(?:;|$)/.exec(request.headers.get("Cookie") ?? "");
+  return match != null && sameText(match[1], await staffToken(env));
+}
+
+async function staffKey(env, name) {
+  const { keys } = await env.FILES.list({ prefix: "download/private-" });
+  return keys.find((entry) => entry.name.endsWith(`/${name}`))?.name;
+}
+
+export async function staffVerify(request, env, now = Date.now()) {
   const form = await request.formData().catch(() => null);
-  const name = staffFiles[form?.get("file")];
   const password = form?.get("password");
-  if (!name || typeof password !== "string") return new Response("Bad Request", { status: 400 });
+  if (typeof password !== "string") return new Response("Bad Request", { status: 400 });
   if (!env.STAFF_PASSWORD) return new Response("还没有设置下载密码。", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
   if (env.DB && !(await allowRequest(env.DB, `staff:${ip}`, 20, now))) return staffBack("limit");
   if (!sameText(await sha256Hex(password), await sha256Hex(env.STAFF_PASSWORD))) return staffBack("wrong");
-  const { keys } = await env.FILES.list({ prefix: "download/private-" });
-  const key = keys.find((entry) => entry.name.endsWith(`/${name}`))?.name;
+  const response = staffBack("ok");
+  response.headers.set("Set-Cookie", `staff=${await staffToken(env)}; Path=/staff; Max-Age=${staffCookieLife}; HttpOnly; Secure; SameSite=Lax`);
+  return response;
+}
+
+// GET /staff/: the page as built, or, with a valid cookie, marked verified and showing the staff build's version.
+async function staffPage(request, env) {
+  const key = "staff/index.html";
+  const file = await env.FILES.getWithMetadata(key, { type: "text" });
+  if (file?.value == null) return notFound(request, env);
+  if (!(await staffVerified(request, env))) return fileResponse(request, key, file);
+  const latestKey = await staffKey(env, "latest.json");
+  const latest = latestKey ? await env.FILES.get(latestKey, { type: "json" }).catch(() => null) : null;
+  const version = typeof latest?.version === "string" ? latest.version : "";
+  const html = file.value.replace("<body", '<body class="staff-verified"').replace('id="staff-version">', `id="staff-version">${version}`);
+  return new Response(request.method === "HEAD" ? null : html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+  });
+}
+
+export async function staffFile(request, env, which) {
+  if (!(await staffVerified(request, env))) return staffBack("");
+  const name = staffFiles[which];
+  const key = name ? await staffKey(env, name) : null;
   const file = key ? await env.FILES.getWithMetadata(key, { type: "stream" }) : null;
   if (file?.value == null) return new Response("文件还没有上传。", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const response = fileResponse(request, key, file);
@@ -181,7 +220,7 @@ export async function staffDownload(request, env, now = Date.now()) {
 }
 
 function staffBack(anchor) {
-  return new Response(null, { status: 303, headers: { Location: `/staff/#${anchor}`, "Cache-Control": "no-store" } });
+  return new Response(null, { status: 303, headers: { Location: anchor ? `/staff/#${anchor}` : "/staff/", "Cache-Control": "no-store" } });
 }
 
 // Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
@@ -200,13 +239,15 @@ async function serve(request, env) {
   const url = new URL(request.url);
   if (isApiPath(url.pathname)) return handleApi(request, env);
   if (isAdminPath(url.pathname)) return handleAdmin(request, env);
-  if (url.pathname === "/staff/download") {
-    if (request.method === "POST") return staffDownload(request, env);
+  if (url.pathname === "/staff/verify") {
+    if (request.method === "POST") return staffVerify(request, env);
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "POST" } });
   }
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
+  if (url.pathname === "/staff/") return staffPage(request, env);
+  if (url.pathname.startsWith("/staff/file/")) return staffFile(request, env, url.pathname.slice("/staff/file/".length));
   if (isSyncPath(url.pathname)) return syncResponse(request, env, url.pathname);
   const candidates = candidateKeys(url.pathname);
   if (!candidates) return notFound(request, env);

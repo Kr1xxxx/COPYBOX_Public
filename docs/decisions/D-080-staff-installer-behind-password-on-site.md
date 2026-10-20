@@ -13,4 +13,8 @@
   - Known limits, told to the owner: whoever has the password can pass it or the file on; the staff app's own update
     address stays unlisted and open (the app needs it), so someone who digs it out of the app can download without the
     password; a weak password can be guessed within the 20-per-hour limit from many addresses, so it should be long.
+- Amended 2026-10-20 (owner: 「改成先点验证,验证通过才能下载这个版本」, 「验证做好动效」, 「员工版改成内部版」): the page is
+  titled 内部版下载; the password is verified first (`POST /staff/verify`, a 「验证」 button with a spinner), a match sets a
+  12-hour cookie and the Worker then serves `/staff/` with the download card (animated check mark, the build's version,
+  Windows / Mac buttons to `/staff/file/win|mac`, which stream only with the cookie). `/staff/download` is gone.
 - Tests: `tests/website-worker.test.mjs` (gate, wrong password, limit, no secret, missing file), `tests/website-build.test.mjs`.
