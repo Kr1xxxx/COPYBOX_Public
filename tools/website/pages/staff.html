@@ -1,42 +1,23 @@
-<div class="wrap page-head">
-  <h1>内部版下载</h1>
-  <p class="lead">公司内部版本，先验证密码，通过后才能下载。</p>
-</div>
-
-<div class="wrap">
-  <form class="card download-card staff-form" id="staff-form" method="post" action="/staff/verify">
-    <div>
-      <h2>Copyboxx 内部版</h2>
-      <p class="meta">Windows 10 / 11（64 位）和 Mac（Apple 芯片）</p>
-      <label class="staff-label">密码<input name="password" type="password" required autocomplete="current-password"></label>
-      <p class="staff-error" id="wrong">密码不对，请再试一次。</p>
-      <p class="staff-error" id="limit">试的次数太多了，请一小时后再试。</p>
-    </div>
-    <div class="staff-buttons">
-      <button class="pill staff-verify" type="submit"><span class="staff-spinner" aria-hidden="true"></span><span class="staff-verify-text">验证</span></button>
-    </div>
+<div class="solo">
+  <form class="card solo-card staff-form" id="staff-form" method="post" action="/staff/verify">
+    <h1>Copyboxx 内部版</h1>
+    <p>输入公司发的密码，验证通过后才能下载。</p>
+    <label class="staff-label">密码<input name="password" type="password" required autocomplete="current-password"></label>
+    <p class="staff-error" id="wrong">密码不对，请再试一次。</p>
+    <p class="staff-error" id="limit">试的次数太多了，请一小时后再试。</p>
+    <button class="pill staff-verify" type="submit"><span class="staff-spinner" aria-hidden="true"></span><span class="staff-verify-text">验证</span></button>
   </form>
-  <div class="card download-card staff-ready" id="ok">
-    <div>
-      <p class="staff-pass"><svg class="staff-check" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M6.5 12.5l3.5 3.5 7.5-8"/></svg>验证通过</p>
-      <h2>Copyboxx 内部版 <span id="staff-version"></span></h2>
-      <p class="meta">Windows 10 / 11（64 位）和 Mac（Apple 芯片）。12 小时内不用再验证。</p>
-    </div>
+  <div class="card solo-card staff-ready" id="ok">
+    <p class="staff-pass"><svg class="staff-check" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M6.5 12.5l3.5 3.5 7.5-8"/></svg>验证通过</p>
+    <h1>Copyboxx 内部版</h1>
+    <p>Windows 10 / 11（64 位）和 Mac（Apple 芯片）</p>
+    <p class="small">版本 <span id="staff-version"></span> · 12 小时内不用再验证</p>
     <div class="staff-buttons">
       <a class="pill" href="/staff/file/win">下载 Windows 版 →</a>
       <a class="pill" href="/staff/file/mac">下载 Mac 版 →</a>
+      <a class="pill staff-ios" aria-disabled="true">App Store 下载（即将上线）</a>
     </div>
-  </div>
-</div>
-
-<div class="wrap section">
-  <div class="doc">
-    <section aria-labelledby="staff-install">
-      <h2 id="staff-install">安装</h2>
-      <p>Windows：下载后双击运行；如果提示「未知发布者」，点「更多信息」再点「仍要运行」。</p>
-      <p>Mac：解压后把 Copyboxx 拖进「应用程序」；第一次打开如果被拦下，到「系统设置 → 隐私与安全性」里点「仍要打开」。</p>
-      <p>装好以后软件会自己更新，不用再回来下载。</p>
-    </section>
+    <p class="small staff-notes">Windows：下载后双击运行，提示「未知发布者」时点「更多信息」再点「仍要运行」。Mac：解压后把 Copyboxx 拖进「应用程序」，第一次被拦下时到「系统设置 → 隐私与安全性」点「仍要打开」。装好以后软件会自己更新。</p>
   </div>
 </div>
 
