@@ -22,11 +22,18 @@ const add = (first: MergeCounts, second: MergeCounts): MergeCounts => ({ added: 
 
 export async function syncOnce(steps: SyncSteps): Promise<SyncResult> {
   let counts: MergeCounts = { added: 0, updated: 0, removed: 0 };
-  const base = steps.base;
   // Another computer can upload between our download and upload; then download again and merge again.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { version, data } = await steps.api.getVault(steps.token);
     const remote = readCloudDoc(data);
+    // A missing cloud copy (the server's row lost or restored), or a section of it with nothing in it, says nothing about
+    // what another computer deleted: that section is a first sync again and both sides are kept. Otherwise the base
+    // would mark everything untouched here as "deleted elsewhere" and wipe it from every computer (D-093). Per section,
+    // because a computer whose 账号 page is locked uploads 话术 with no 账号.
+    const base: SyncBase = {
+      snippets: remote?.snippets.length ? steps.base.snippets : EMPTY_BASE.snippets,
+      accounts: remote?.accounts.length ? steps.base.accounts : EMPTY_BASE.accounts,
+    };
     const snippets = await steps.snippets({ items: remote?.snippets ?? [], folders: remote?.snippetFolders ?? [], sharedSeen: remote?.sharedSeen ?? [] }, base.snippets);
     const accounts = steps.accounts ? await steps.accounts(remote?.accounts ?? [], base.accounts) : null;
     counts = add(counts, add(snippets.counts, accounts?.counts ?? { added: 0, updated: 0, removed: 0 }));
@@ -37,7 +44,7 @@ export async function syncOnce(steps: SyncSteps): Promise<SyncResult> {
       sharedSeen: snippets.cloud.sharedSeen,
       accounts: accounts ? accounts.cloud : remote?.accounts ?? [],
     };
-    const next: SyncBase = { snippets: snippets.base, accounts: accounts ? accounts.base : base.accounts };
+    const next: SyncBase = { snippets: snippets.base, accounts: accounts ? accounts.base : steps.base.accounts };
     if (sameCloudDoc(remote, doc)) return { base: next, counts, accountsSkipped: !steps.accounts };
     if (new TextEncoder().encode(JSON.stringify(doc)).length > CLOUD_MAX_BYTES) throw new CloudError("too_large", "要同步的内容太多，超过了云端的上限，这次没有上传，这台电脑上的内容没有变化");
     try {
