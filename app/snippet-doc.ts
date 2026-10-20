@@ -5,6 +5,7 @@ import { extractPlaceholders, productGroupsForRawProduct, type SnippetImportPrev
 //   ## 01 开场接待      a folder (a leading number is dropped)
 //   ### 1.1 新询盘      a section inside it
 //   **通用开场**        one 话术; the plain lines under it are the message, up to the next ** / ### / ## / ---
+//                       (blank lines inside it are kept; a "\" in front of a line starting with # > * - or \ keeps it as text, D-091)
 // A section with no **…** lines is one 话术 per block of lines; a folder with no ### holds its **…** 话术 directly.
 // "> " lines right under a folder become the 使用备注 of its 话术; other "> " lines, "# " and "---" are skipped.
 // [名字], $[金额] and other [ ] parts are fill-in blocks, as in every 话术.
@@ -20,6 +21,7 @@ export function parseSnippetDocument(markdown: string): { folders: string[]; ite
   let section: { number: string; title: string; count: number } | null = null;
   let entry: { title: string; lines: string[] } | null = null;
   const finishEntry = () => {
+    while (entry?.lines.at(-1) === "") entry.lines.pop();
     if (entry && entry.lines.length && section) {
       section.count += 1;
       items.push({
@@ -59,9 +61,9 @@ export function parseSnippetDocument(markdown: string): { folders: string[]; ite
     if (folder && !section && line) section = { number: folderNumber, title: "", count: 0 };
     if (!folder || !section) continue;
     if (title) { finishEntry(); entry = { title: title[1].trim(), lines: [] }; continue; }
-    if (!line) { if (entry?.lines.length && !entry.title) finishEntry(); continue; }
+    if (!line) { if (entry?.title) { if (entry.lines.length) entry.lines.push(""); } else if (entry?.lines.length) finishEntry(); continue; }
     if (!entry) entry = { title: "", lines: [] };
-    entry.lines.push(line);
+    entry.lines.push(line.replace(/^\\(?=[#>*\-\\])/, ""));
   }
   finishEntry();
   return { folders, items };
@@ -107,7 +109,7 @@ export function buildSnippetDocImportPreview(markdown: string, current: SecretIt
 
 // Selected 话术 as a document the 导入话术表格 import reads back: one numbered ## folder each, **label** + text per 话术.
 // A folder note is kept when every exported 话术 in that folder shares it.
-// shortcut: blank lines inside a 话术 are dropped on import and body lines that look like ##, **…**, > or --- are not escaped; fine for chat replies.
+// Body lines that would read as structure get a "\" in front, which the import drops again (D-091).
 export function snippetShareDocument(items: SecretItem[]) {
   const folders = [...new Set(items.map((item) => item.folder || "未分类"))];
   const lines = ["# 分享话术", ""];
@@ -116,9 +118,13 @@ export function snippetShareDocument(items: SecretItem[]) {
     const note = inFolder[0].snippetMeta?.usageNote || "";
     lines.push(`## ${String(index + 1).padStart(2, "0")} ${folder}`, "");
     if (note && inFolder.every((item) => item.snippetMeta?.usageNote === note)) lines.push(...note.split("\n").map((line) => `> ${line}`), "");
-    for (const item of inFolder) lines.push(`**${item.label || "未命名"}**`, item.secret.trim(), "");
+    for (const item of inFolder) lines.push(`**${item.label || "未命名"}**`, ...item.secret.trim().split(/\r?\n/).map(escapeBodyLine), "");
   });
   return lines.join("\n");
+}
+
+function escapeBodyLine(line: string) {
+  return /^\s*(?:[#>\\]|-{3,}\s*$|\*\*.+\*\*\s*$)/.test(line) ? `\\${line.trim()}` : line;
 }
 
 // The same 话术 as plain text to paste anywhere: title, then the text with the [ ] of fill-in blocks removed.
