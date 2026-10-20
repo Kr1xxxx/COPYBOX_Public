@@ -134,8 +134,9 @@ test("an unreadable or emptied cloud copy never deletes everything here", () => 
 
 // A pretend server with the real rules (version numbers), and two computers sharing it.
 function fakeServer() {
-  const state = { version: 0, data: null, puts: 0, cutIn: null };
+  const state = { version: 0, data: null, puts: 0, cutIn: null, reports: [] };
   const transport = async ({ method, path, body }) => {
+    if (path === "/api/vault/too-large" && method === "POST") { state.reports.push(body.bytes); return { status: 200, text: "{}" }; }
     if (path === "/api/vault" && method === "GET") return { status: 200, text: JSON.stringify({ version: state.version, data: state.data }) };
     if (path === "/api/vault" && method === "PUT") {
       if (state.cutIn) { const cut = state.cutIn; state.cutIn = null; cut(); }
@@ -267,7 +268,7 @@ test("the server's answers turn into plain messages: too big, not available yet,
     "GET /api/vault": { status: 401, text: JSON.stringify({ error: "unauthorized", message: "请重新登录" }) },
   };
   const api = createCloudApi(async ({ method, path }) => answers[`${method} ${path}`]);
-  await assert.rejects(api.putVault("t", 0, {}), { code: "too_large", message: /超过了云端的上限/ });
+  await assert.rejects(api.putVault("t", 0, {}), { code: "too_large", message: /超过了云端 1.9 MB 的上限.*请联系管理者/ });
   await assert.rejects(api.sendCode("a@example.com"), { code: "unavailable", message: "登录同步暂时不能用，请稍后再试" });
   await assert.rejects(api.verify("a@example.com", "000000", "电脑"), { code: "bad_code" });
   await assert.rejects(api.getVault("t"), { code: "signed_out" });
@@ -296,8 +297,10 @@ test("a cloud copy over 1.9 MB is not sent at all, and nothing here changes", as
   const { state, api } = fakeServer();
   const big = "字".repeat(700_000);
   const pc = computer([snippet("a", big)]);
-  await assert.rejects(pc.sync(api), { code: "too_large" });
+  await assert.rejects(pc.sync(api), { code: "too_large", message: /请联系管理者/ });
   assert.equal(state.puts, 0);
+  assert.equal(state.reports.length, 1, "the size is reported so the manager hears about it (D-097)");
+  assert.ok(state.reports[0] > 1_900_000);
   assert.equal(pc.here.items[0].secret, big);
 });
 

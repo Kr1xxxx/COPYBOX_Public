@@ -44,7 +44,7 @@ const MESSAGES: Record<CloudErrorCode, string> = {
   rate_limited: "发送太频繁了，请过一会儿再试",
   mail_failed: "验证码邮件没有发出去，请稍后再试",
   conflict: "另一台电脑刚同步过，请再同步一次",
-  too_large: "要同步的内容太多，超过了云端的上限，这次没有上传，这台电脑上的内容没有变化",
+  too_large: "要同步的内容超过了云端 1.9 MB 的上限，这次没有上传。请联系管理者处理",
   unavailable: "登录同步暂时不能用，请稍后再试",
   network: "连不上服务器，请检查网络后再试",
   server: "服务器出了点问题，请稍后再试",
@@ -121,6 +121,10 @@ export function createCloudApi(transport: CloudTransport) {
       const body = await call(transport, { method: "PUT", path: "/api/vault", token, body: { baseVersion, data } });
       if (typeof body.version !== "number") throw new CloudError("server", MESSAGES.server);
       return body.version;
+    },
+    // A copy over the cap was not sent; the server notes its size for /admin and mails the manager (D-097).
+    async reportTooLarge(token: string, bytes: number) {
+      await call(transport, { method: "POST", path: "/api/vault/too-large", token, body: { bytes } });
     },
     // Company 话术 for this email's domain (bound on the server), in a 同步码 library's format; nulls when none.
     async getLibrary(token: string) {
