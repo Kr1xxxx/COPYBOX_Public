@@ -3,12 +3,6 @@ name: Tauri build
 # D-029: the desktop app is Tauri (Electron was removed in step 8). This only builds the Tauri shell on both platforms;
 # it does not ship anything.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    paths:
-      - "src-tauri/**"
-      - "scripts/tauri-frontend.mjs"
-      - ".github/workflows/tauri.yml"
   workflow_dispatch:
     inputs:
       publish_test_build:
@@ -17,9 +11,6 @@ on:
         default: false
   push:
     branches: [main]
-    paths:
-      - "src-tauri/**"
-      - "scripts/tauri-frontend.mjs"
 
 concurrency:
   group: tauri-${{ github.ref }}
@@ -27,7 +18,22 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Owner 2026-10-20: on main this runs only every 5th preview version (scripts/ci-due.mjs); by hand it always runs.
+  due:
+    name: every 5th version
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.due.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: due
+        run: node scripts/ci-due.mjs
+        env:
+          EVENT: ${{ github.event_name }}
+
   build:
+    needs: due
+    if: needs.due.outputs.run == 'true'
     name: build (${{ matrix.name }})
     strategy:
       fail-fast: false
