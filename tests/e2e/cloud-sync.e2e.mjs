@@ -105,41 +105,53 @@ test("a Mac says its passwords stay on the Mac, and 注销账号 asks first, cle
   expect(vaults).toEqual({});
 });
 
-test("real installs talk to the server through the app with the 人机验证 token; a server that is not ready says so plainly", async ({ page }) => {
+const STUB_TURNSTILE = `window.turnstile = { render(element, options) { element.textContent = "人机验证通过"; setTimeout(() => options.callback("stub-token"), 0); return "w1"; }, reset() {}, remove() {} };`;
+
+test("real installs ask the server without 人机验证; only a server answer `captcha` brings the widget up, then the token is sent (D-087)", async ({ page }) => {
   await asDesktop(page, "win32");
   // Stands in for Cloudflare Turnstile: the widget passes at once with a known token.
-  await page.route("https://challenges.cloudflare.com/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: `
-    window.turnstile = { render(element, options) { element.textContent = "人机验证通过"; setTimeout(() => options.callback("stub-token"), 0); return "w1"; }, reset() {}, remove() {} };` }));
+  await page.route("https://challenges.cloudflare.com/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: STUB_TURNSTILE }));
   await page.addInitScript(() => {
     window.__cloudCalls = [];
     window.clipboxDesktop.cloudRequest = async (request) => {
       window.__cloudCalls.push(`${request.method} ${request.path} ${JSON.stringify(request.body)}`);
+      if (!request.body.turnstile) return { status: 400, text: JSON.stringify({ error: "captcha", message: "请先完成人机验证" }) };
       return { status: 503, text: JSON.stringify({ error: "unavailable", message: "同步服务暂时不能用，请稍后再试" }) };
     };
   });
   await page.goto("/");
   const gate = page.locator(".login-card");
   await expect(gate.getByText("测试版不会真的发邮件", { exact: false })).toHaveCount(0);
-  await expect(gate.getByText("人机验证通过")).toBeVisible();
+  await expect(gate.locator(".login-captcha")).toHaveCount(0);
   await gate.getByLabel("邮箱").fill(EMAIL);
   await gate.getByRole("button", { name: "发送验证码" }).click();
+  await expect(gate.getByRole("alert")).toHaveText("请先完成人机验证");
+  await expect(gate.getByText("人机验证通过")).toBeVisible();
+  await gate.getByRole("button", { name: "发送验证码" }).click();
   await expect(gate.getByRole("alert")).toHaveText("登录同步暂时不能用，请稍后再试");
-  expect(await page.evaluate(() => window.__cloudCalls)).toEqual([`POST /api/auth/code {"email":"${EMAIL}","turnstile":"stub-token"}`]);
+  expect(await page.evaluate(() => window.__cloudCalls)).toEqual([
+    `POST /api/auth/code {"email":"${EMAIL}"}`,
+    `POST /api/auth/code {"email":"${EMAIL}","turnstile":"stub-token"}`,
+  ]);
 });
 
-test("without the 人机验证 widget (offline) the code is not sent, and 重新加载 tries again", async ({ page }) => {
+test("when the server asks for 人机验证 but the widget cannot load (offline) the code is not sent, and 重新加载 tries again", async ({ page }) => {
   await asDesktop(page, "win32");
   await page.route("https://challenges.cloudflare.com/**", (route) => route.abort());
-  await page.addInitScript(() => { window.clipboxDesktop.cloudRequest = async () => ({ status: 200, text: "{}" }); });
+  await page.addInitScript(() => {
+    window.clipboxDesktop.cloudRequest = async (request) => request.body.turnstile
+      ? { status: 200, text: "{}" }
+      : { status: 400, text: JSON.stringify({ error: "captcha", message: "请先完成人机验证" }) };
+  });
   await page.goto("/");
   const gate = page.locator(".login-card");
-  await expect(gate.getByText("人机验证没有加载出来。")).toBeVisible();
   await gate.getByLabel("邮箱").fill(EMAIL);
+  await gate.getByRole("button", { name: "发送验证码" }).click();
+  await expect(gate.getByText("人机验证没有加载出来。")).toBeVisible();
   await gate.getByRole("button", { name: "发送验证码" }).click();
   await expect(gate.getByRole("alert")).toHaveText("人机验证没有加载出来，请检查网络后重试");
   await page.unroute("https://challenges.cloudflare.com/**");
-  await page.route("https://challenges.cloudflare.com/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: `
-    window.turnstile = { render(element, options) { element.textContent = "人机验证通过"; setTimeout(() => options.callback("stub-token"), 0); return "w1"; }, reset() {}, remove() {} };` }));
+  await page.route("https://challenges.cloudflare.com/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: STUB_TURNSTILE }));
   await gate.getByRole("button", { name: "重新加载" }).click();
   await expect(gate.getByText("人机验证通过")).toBeVisible();
   await gate.getByRole("button", { name: "发送验证码" }).click();
