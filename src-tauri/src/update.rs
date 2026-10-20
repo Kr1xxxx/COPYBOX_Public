@@ -228,6 +228,17 @@ pub fn evaluate_manifest(manifest: &serde_json::Value, current: &str) -> (Update
     }
 }
 
+/// GET through the system proxy first, then directly (cloud.rs, D-095): the next route only when one got no answer at
+/// all. Reading a file twice does no harm, so any failure moves on.
+async fn get_first(clients: Vec<reqwest::Client>, url: &str) -> Option<reqwest::Response> {
+    for client in clients {
+        if let Ok(response) = client.get(url).header("cache-control", "no-store").send().await {
+            return Some(response);
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn check_update(app: AppHandle, state: tauri::State<'_, Updates>) -> Result<UpdateInfo, String> {
     let url = std::env::var("CLIPBOX_UPDATE_URL").unwrap_or_else(|_| default_update_url(UPDATE_FOLDER, MANIFEST_NAME));
@@ -236,15 +247,11 @@ pub async fn check_update(app: AppHandle, state: tauri::State<'_, Updates>) -> R
     }
     let current = app.package_info().version.to_string();
     let fetched = async {
-        // System proxy first, then direct (cloud.rs).
-        for client in crate::cloud::clients(|builder| builder.timeout(CHECK_TIMEOUT)) {
-            let Ok(response) = client.get(&url).header("cache-control", "no-store").send().await else { continue };
-            if !response.status().is_success() {
-                return None;
-            }
-            return serde_json::from_str::<serde_json::Value>(&response.text().await.ok()?).ok();
+        let response = get_first(crate::cloud::clients(|builder| builder.timeout(CHECK_TIMEOUT)), &url).await?;
+        if !response.status().is_success() {
+            return None;
         }
-        None
+        serde_json::from_str::<serde_json::Value>(&response.text().await.ok()?).ok()
     }
     .await;
     let Some(manifest) = fetched else { return Ok(UpdateInfo::status("error")) };
@@ -334,8 +341,8 @@ async fn download(app: &AppHandle, release: &Release) -> Result<PathBuf, &'stati
 }
 
 async fn fetch_to_file(app: &AppHandle, url: &str, size: u64, sha256: &str, path: &Path) -> Result<(), &'static str> {
-    let client = reqwest::Client::builder().connect_timeout(CONNECT_TIMEOUT).build().map_err(|_| "network")?;
-    let mut response = client.get(url).header("cache-control", "no-store").send().await.map_err(|_| "network")?;
+    let clients = crate::cloud::clients(|builder| builder.connect_timeout(CONNECT_TIMEOUT));
+    let mut response = get_first(clients, url).await.ok_or("network")?;
     if !response.status().is_success() {
         return Err("network");
     }
@@ -529,6 +536,27 @@ mod sha {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_route_that_cannot_connect_falls_back_to_the_next() {
+        let server = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = server.local_addr().unwrap();
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap();
+        std::thread::spawn(move || {
+            use std::io::Read;
+            let (mut stream, _) = server.accept().unwrap();
+            let _ = stream.read(&mut [0; 1024]);
+            let _ = stream.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok");
+        });
+        let broken_proxy = reqwest::Client::builder().proxy(reqwest::Proxy::all(format!("http://{closed}")).unwrap()).build().unwrap();
+        let direct = reqwest::Client::builder().no_proxy().build().unwrap();
+        tauri::async_runtime::block_on(async {
+            let response = get_first(vec![broken_proxy.clone()], &format!("http://{address}/latest.json")).await;
+            assert!(response.is_none());
+            let response = get_first(vec![broken_proxy, direct], &format!("http://{address}/latest.json")).await.unwrap();
+            assert_eq!(response.text().await.unwrap(), "ok");
+        });
+    }
 
     const ABC_SHA256: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
     const SITE: &str = "https://copyboxx.com/download/Copyboxx-Setup.exe";
