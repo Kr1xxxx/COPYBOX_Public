@@ -56,3 +56,4 @@ yarn-error.log*
 
 # python caches (tools/brand scripts)
 __pycache__/
+.dev.vars

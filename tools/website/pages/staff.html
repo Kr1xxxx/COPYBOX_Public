@@ -1,0 +1,31 @@
+<div class="wrap page-head">
+  <h1>员工下载</h1>
+  <p class="lead">公司内部版本，输入公司发的密码后才能下载。</p>
+</div>
+
+<div class="wrap">
+  <form class="card download-card staff-form" method="post" action="/staff/download">
+    <div>
+      <h2>Copyboxx 员工版</h2>
+      <p class="meta">Windows 10 / 11（64 位）和 Mac（Apple 芯片）</p>
+      <label class="staff-label">密码<input name="password" type="password" required autocomplete="current-password"></label>
+      <p class="staff-error" id="wrong">密码不对，请再试一次。</p>
+      <p class="staff-error" id="limit">试的次数太多了，请一小时后再试。</p>
+    </div>
+    <div class="staff-buttons">
+      <button class="pill" name="file" value="win">下载 Windows 版 →</button>
+      <button class="pill" name="file" value="mac">下载 Mac 版 →</button>
+    </div>
+  </form>
+</div>
+
+<div class="wrap section">
+  <div class="doc">
+    <section aria-labelledby="staff-install">
+      <h2 id="staff-install">安装</h2>
+      <p>Windows：下载后双击运行；如果提示「未知发布者」，点「更多信息」再点「仍要运行」。</p>
+      <p>Mac：解压后把 Copyboxx 拖进「应用程序」；第一次打开如果被拦下，到「系统设置 → 隐私与安全性」里点「仍要打开」。</p>
+      <p>装好以后软件会自己更新，不用再回来下载。</p>
+    </section>
+  </div>
+</div>

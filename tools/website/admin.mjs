@@ -1,11 +1,11 @@
-// Read-only owner page of copyboxx.com at /admin (D-065): who registered, when they last signed in and synced, how
-// many computers are signed in and how big their cloud copy is. It never decrypts or shows anyone's content and has no
-// buttons that change user data. Only the addresses in the Worker secret ADMIN_EMAILS (comma-separated) can sign in,
+// Owner page of copyboxx.com at /admin (D-065): who registered, when they last signed in and synced, how many
+// computers are signed in, whether the email is activated (D-086) and how big their cloud copy is. It never decrypts
+// or shows anyone's content; its only writing button makes activation codes (D-086), shown once, stored as SHA-256. Only the addresses in the Worker secret ADMIN_EMAILS (comma-separated) can sign in,
 // with a 6-digit code sent to that address (same Resend path as the app). Other addresses get the same "sent" answer
 // and no mail. The admin session is an HttpOnly, SameSite=Strict cookie for 12 hours; its SHA-256 lives in D1
 // admin_sessions. Without DB, RESEND_API_KEY or ADMIN_EMAILS every /admin/api/* answers 503.
 
-import { allowRequest, codeHash, bytesToBase64Url, changes, json, normalizeEmail, randomCode, readJson, sameText, sendCodeMail, sha256Hex } from "./api.mjs";
+import { allowRequest, codeHash, bytesToBase64Url, changes, emailDomain, json, normalizeEmail, randomActivationCode, randomCode, readJson, sameText, sendCodeMail, sha256Hex } from "./api.mjs";
 
 const hour = 60 * 60 * 1000;
 const codeLifetime = 10 * 60 * 1000;
@@ -136,13 +136,25 @@ async function verifyCode(request, env, now) {
   return json({ ok: true, email }, 200, { "Set-Cookie": sessionCookie(token, adminSessionLifetime / 1000) });
 }
 
+// Company domains bound to a library (KV domains/<domain>): an email there is activated without a code (D-086).
+async function boundDomains(env) {
+  try {
+    const { keys } = await env.FILES.list({ prefix: "domains/" });
+    return new Set(keys.map((key) => key.name.slice("domains/".length)));
+  } catch {
+    return new Set();
+  }
+}
+
 async function listUsers(env, session, now) {
+  const domains = env.FILES ? await boundDomains(env) : new Set();
   const { results } = await env.DB.prepare(
     `SELECT u.email, u.created_at, u.last_sync_at,
        (SELECT max(s.expires_at) FROM sessions s WHERE s.user_id = u.id) AS last_expiry,
        (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS devices,
        (SELECT group_concat(coalesce(s.device, '未命名'), '、') FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS device_names,
        m.version, m.updated_at,
+       (SELECT count(*) FROM activation_codes a WHERE a.email = u.email) AS codes,
        (SELECT length(b.data) FROM vault_blobs b WHERE b.key = 'vaults/' || u.id || '.json') AS size
      FROM users u LEFT JOIN vault_meta m ON m.user_id = u.id
      ORDER BY u.created_at DESC LIMIT 2000`,
@@ -156,11 +168,34 @@ async function listUsers(env, session, now) {
     lastSyncAt: row.last_sync_at ?? null,
     devices: row.devices ?? 0,
     deviceNames: row.device_names ? String(row.device_names).split("、") : [],
+    activated: row.codes > 0 ? "code" : domains.has(emailDomain(row.email)) ? "domain" : null,
     version: row.version ?? 0,
     vaultUpdatedAt: row.updated_at ?? null,
     vaultBytes: row.size ?? null,
   }));
   return json({ admin: session.email, now, users });
+}
+
+// POST /admin/api/codes {count}: makes 1–50 activation codes (D-086) and answers them in plain text, this once;
+// only their SHA-256 and first four characters are kept. GET lists every code: hint, made, redeemed by, when.
+async function makeCodes(request, env, now) {
+  const parsed = await readJson(request, 4096);
+  const count = Number.isInteger(parsed.body?.count) ? parsed.body.count : 1;
+  if (count < 1 || count > 50) return fail(400, "bad_request");
+  const codes = [];
+  for (let i = 0; i < count; i += 1) {
+    const code = randomActivationCode();
+    await env.DB.prepare("INSERT INTO activation_codes (code_hash, hint, created_at) VALUES (?, ?, ?)")
+      .bind(await sha256Hex(code.replaceAll("-", "")), code.slice(0, 4), now)
+      .run();
+    codes.push(code);
+  }
+  return json({ codes });
+}
+
+async function listCodes(env) {
+  const { results } = await env.DB.prepare("SELECT hint, created_at, email, used_at FROM activation_codes ORDER BY created_at DESC LIMIT 2000").all();
+  return json({ codes: results.map((row) => ({ hint: row.hint, createdAt: row.created_at, email: row.email ?? null, usedAt: row.used_at ?? null })) });
 }
 
 async function logout(env, session) {
@@ -172,6 +207,7 @@ const routes = {
   "/admin/api/code": { POST: "code" },
   "/admin/api/verify": { POST: "verify" },
   "/admin/api/users": { GET: "users" },
+  "/admin/api/codes": { GET: "codes", POST: "makeCodes" },
   "/admin/api/logout": { POST: "logout" },
 };
 
@@ -197,6 +233,8 @@ export async function handleAdmin(request, env, now = Date.now()) {
   const session = await adminSession(request, env, now);
   if (!session) return fail(401, "unauthorized");
   if (action === "users") return listUsers(env, session, now);
+  if (action === "codes") return listCodes(env);
+  if (action === "makeCodes") return makeCodes(request, env, now);
   return logout(env, session);
 }
 
@@ -234,11 +272,26 @@ function adminPage() {
     </header>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>邮箱</th><th>注册时间</th><th>最后登录</th><th>最后同步</th><th>已登录电脑</th><th>云端数据</th></tr></thead>
+        <thead><tr><th>邮箱</th><th>注册时间</th><th>最后登录</th><th>最后同步</th><th>已登录电脑</th><th>激活</th><th>云端数据</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
     <p id="panel-note" class="note"></p>
+    <header class="codes-head">
+      <h1>激活码</h1>
+      <span id="codes-count" class="muted"></span>
+      <span class="spacer"></span>
+      <label class="inline">数量<input id="code-count" type="number" min="1" max="50" value="1"></label>
+      <button id="make-codes" type="button">生成激活码</button>
+    </header>
+    <pre id="new-codes" class="new-codes" hidden></pre>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>激活码</th><th>生成时间</th><th>使用邮箱</th><th>使用时间</th></tr></thead>
+        <tbody id="code-rows"></tbody>
+      </table>
+    </div>
+    <p class="note">非公司邮箱登录后要输入激活码才能用；公司域名的邮箱不用。激活码只在生成时显示一次，请马上复制。</p>
   </section>
 </main>
 </body>
@@ -270,6 +323,10 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--li
 th { color: var(--muted); font-weight: 500; }
 tr:last-child td { border-bottom: 0; }
 td.devices { white-space: normal; }
+.codes-head { margin-top: 32px; }
+label.inline { display: flex; align-items: center; gap: 6px; }
+label.inline input { width: 64px; }
+.new-codes { margin: 0 0 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; font-size: 16px; letter-spacing: 1px; user-select: all; }
 `;
 }
 
@@ -311,7 +368,8 @@ function cell(text, className) {
 function render() {
   const query = $("filter").value.trim().toLowerCase();
   const shown = users.filter((user) => user.email.includes(query));
-  $("count").textContent = "共 " + users.length + " 人" + (query ? "，显示 " + shown.length + " 人" : "");
+  const online = users.reduce((sum, user) => sum + user.devices, 0);
+  $("count").textContent = "注册 " + users.length + " 人 · 登录中 " + online + " 台" + (query ? "，显示 " + shown.length + " 人" : "");
   const rows = $("rows");
   rows.replaceChildren();
   for (const user of shown) {
@@ -322,11 +380,24 @@ function render() {
       cell(user.lastSignInAt ? time(user.lastSignInAt) : "还没登录过"),
       cell(time(user.lastSyncAt)),
       cell(user.devices ? user.devices + " 台（" + user.deviceNames.join("、") + "）" : "0", "devices"),
+      cell(user.activated === "domain" ? "公司邮箱" : user.activated === "code" ? "已激活" : "未激活"),
       cell(size(user.vaultBytes)),
     );
     rows.append(tr);
   }
   $("panel-note").textContent = shown.length ? "时间按北京时间显示。员工的话术和账号内容是加密的，这里看不到。" : "还没有用户";
+}
+
+function renderCodes(codes) {
+  const used = codes.filter((code) => code.email).length;
+  $("codes-count").textContent = "共 " + codes.length + " 个，已使用 " + used + " 个";
+  const rows = $("code-rows");
+  rows.replaceChildren();
+  for (const code of codes) {
+    const tr = document.createElement("tr");
+    tr.append(cell(code.hint + "-····-····-····"), cell(time(code.createdAt)), cell(code.email || "未使用"), cell(time(code.usedAt)));
+    rows.append(tr);
+  }
 }
 
 async function load() {
@@ -340,7 +411,20 @@ async function load() {
   $("login").hidden = true;
   $("panel").hidden = false;
   render();
+  const codes = await call("GET", "/admin/api/codes");
+  if (codes.status === 200) renderCodes(codes.data.codes);
 }
+
+$("make-codes").addEventListener("click", async () => {
+  $("make-codes").disabled = true;
+  const { status, data } = await call("POST", "/admin/api/codes", { count: Number($("code-count").value) || 1 });
+  $("make-codes").disabled = false;
+  if (status !== 200) return void ($("panel-note").textContent = data.message || "生成失败");
+  $("new-codes").textContent = data.codes.join("\n");
+  $("new-codes").hidden = false;
+  const codes = await call("GET", "/admin/api/codes");
+  if (codes.status === 200) renderCodes(codes.data.codes);
+});
 
 function showLogin(note) {
   $("panel").hidden = true;

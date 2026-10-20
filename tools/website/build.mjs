@@ -71,6 +71,9 @@ export const sitePages = [
     description: "Copyboxx（复制盒）怎么用：话术、账号、图片、托盘小窗、备份与恢复、公司共享话术、AI 润色和整理。" },
   { source: "pages/privacy.html", key: "privacy/index.html", path: "/privacy/", nav: "", title: "隐私说明 · Copyboxx",
     description: "Copyboxx（复制盒）不收集你的内容：没有账号，没有服务器，数据加密后只保存在你的电脑上。" },
+  // Staff installers behind the company password (D-080): not in the nav, not in the sitemap.
+  { source: "pages/staff.html", key: "staff/index.html", path: "/staff/", nav: "", title: "员工下载 · Copyboxx",
+    description: "公司内部版本，输入密码后下载。", noindex: true },
   { source: "404.html", key: "404.html", path: "/", nav: "", title: "找不到这个页面 · Copyboxx",
     description: "找不到这个页面。", noindex: true },
 ];
