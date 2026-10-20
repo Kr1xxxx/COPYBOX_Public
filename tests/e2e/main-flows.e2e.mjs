@@ -389,12 +389,16 @@ test("a 话术 typed by hand stays in the list when a product is picked (D-101)"
   // 公司 / 我的 sit left of 选择; the sample sheet has no company 话术, so 公司 empties the list and 我的 keeps the row.
   const source = page.locator(".source-filter");
   const selectButton = page.locator(".section-head .select-toggle", { hasText: /^选择$/ });
-  const before = [await selectButton.boundingBox(), await page.locator(".product-filter").boundingBox()];
+  const positions = async () => [await source.boundingBox(), await selectButton.boundingBox(), await page.locator(".product-filter").boundingBox()];
+  const before = await positions();
   await source.getByRole("button", { name: "公司" }).click();
   await expect(page.locator(".native-row")).toHaveCount(0);
-  // An empty filter result must not move the buttons: 选择 stays, greyed out, and so does 全部产品.
+  // An empty filter result must not move the buttons: 选择 stays, greyed out, and 公司 / 我的 (left of it) stay put.
   await expect(selectButton).toBeDisabled();
-  expect([await selectButton.boundingBox(), await page.locator(".product-filter").boundingBox()]).toEqual(before);
+  expect(await positions()).toEqual(before);
+  // A greyed-out 选择 shows no hover tint, so it does not look clickable.
+  await selectButton.hover({ force: true });
+  expect(await selectButton.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   await source.getByRole("button", { name: "我的" }).click();
   await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".native-row", { hasText: "自己写的话术" })).toHaveCount(1);
