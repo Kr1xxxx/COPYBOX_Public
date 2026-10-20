@@ -6,7 +6,8 @@
     (`siteverify`) and refused as `400 captcha` 「请先完成人机验证」. Enforced only while the Worker secret
     `TURNSTILE_SECRET` is set, so apps without the widget keep working until the new build ships. Widget "Copyboxx app
     login" (managed mode; hostnames copyboxx.com, tauri.localhost, localhost); its public site key goes in the app, its
-    secret only into the Worker secret.
+    secret only into the Worker secret. Amended by D-087 (2026-10-20): only a frequent asker, the 4th request from one
+    email or one IP within an hour, has to pass it.
   - **Activation**: an email is activated when its domain is bound to a company library (KV `domains/<domain>`) or when it
     redeemed an activation code. `POST /api/auth/verify` answers `activated`; `POST /api/activate {code}` (Bearer) binds a
     code to the signed-in email (`400 bad_activation_code` for unknown, malformed or used codes; 10 tries per IP and
