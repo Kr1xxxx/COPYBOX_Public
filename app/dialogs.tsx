@@ -193,6 +193,47 @@ export function DeleteConfirmDialog({ request, onClose, onConfirm }: {
   );
 }
 
+// 回收站「全部删除」: the same card as 删除确认, naming how many go. 取消 has focus, so Enter or Escape keeps everything.
+export function EmptyTrashDialog({ count, unit = "条内容", onClose, onConfirm }: {
+  count: number;
+  unit?: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useDialogKeyboard(dialogRef, onClose, busy);
+  useEffect(() => { cancelRef.current?.focus(); }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onConfirm();
+    } catch {
+      setError("删除失败，回收站里还有没删掉的内容");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="delete-confirm-backdrop">
+      <section ref={dialogRef} className="delete-confirm-dialog permanent" role="alertdialog" aria-modal="true" aria-labelledby="empty-trash-title" aria-describedby="empty-trash-description">
+        <header><h2 id="empty-trash-title">全部永久删除？</h2><p id="empty-trash-description">回收站里的内容删除后无法恢复，请确认你不再需要它们。</p></header>
+        <form onSubmit={(event) => void submit(event)}>
+          <div className="delete-confirm-item"><strong>{count} {unit}</strong><small>回收站</small></div>
+          {error && <p className="delete-confirm-error" role="alert">{error}</p>}
+          <div className="delete-confirm-actions"><button ref={cancelRef} type="button" onClick={onClose} disabled={busy}>取消</button><button className="danger" disabled={busy}>{busy ? "正在删除…" : "全部删除"}</button></div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 // Asked when the command line wants a 秘密 (clipbox-automation.ts). 拒绝 has focus, so Enter or Escape refuses.
 // 「始终允许」 (D-059) is offered only when the shell could tell which program asked, and never for an export of all 秘密.
 export function AutomationConsentDialog({ question, callerName, canAlways = false, onAnswer }: {
