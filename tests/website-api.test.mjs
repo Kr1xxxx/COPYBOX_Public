@@ -638,38 +638,57 @@ function stubMailAndTurnstile(t, captcha = true) {
   return calls;
 }
 
-test("api: with TURNSTILE_SECRET set, a code request needs a Turnstile token that Cloudflare accepts", async (t) => {
+test("api: with TURNSTILE_SECRET set, the first 3 code requests an hour need no token; from the 4th on, an email or an IP must pass Turnstile (D-087)", async (t) => {
   const env = fakeEnv({ TURNSTILE_SECRET: "0x-secret" });
   const calls = stubMailAndTurnstile(t);
+  // One email, three computers: no 人机验证.
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: `198.51.100.${i}` })).status, 200);
+  }
+  assert.deepEqual(calls.verifies, []);
+  assert.equal(calls.mails.length, 3);
+  // The 4th request for this email needs a token Cloudflare accepts; refusals do not use up the email's codes.
   for (const body of [{ email: "a@example.com" }, { email: "a@example.com", turnstile: "" }, { email: "a@example.com", turnstile: 7 }]) {
-    const refused = await call(env, "POST", "/api/auth/code", { body });
+    const refused = await call(env, "POST", "/api/auth/code", { body, ip: "198.51.100.9" });
     assert.equal(refused.status, 400);
     assert.deepEqual(await refused.json(), { error: "captcha", message: "请先完成人机验证" });
   }
   assert.deepEqual(calls.verifies, []);
-  assert.equal(calls.mails.length, 0);
-
+  assert.equal(calls.mails.length, 3);
   const ok = await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com", turnstile: "tok-123" }, ip: "198.51.100.9" });
   assert.equal(ok.status, 200);
   assert.deepEqual(calls.verifies, [{ secret: "0x-secret", response: "tok-123", remoteip: "198.51.100.9" }]);
-  assert.equal(calls.mails.length, 1);
+  assert.equal(calls.mails.length, 4);
+  // One computer asking a 4th time in the hour needs it too, whatever the email.
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: `p${i}@example.com` }, ip: "192.0.2.7" })).status, 200);
+  }
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "p3@example.com" }, ip: "192.0.2.7" })).status, 400);
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "p3@example.com", turnstile: "tok-456" }, ip: "192.0.2.7" })).status, 200);
   // A malformed email is refused before Turnstile is asked.
-  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "nope", turnstile: "tok-456" } })).status, 400);
-  assert.equal(calls.verifies.length, 1);
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "nope", turnstile: "tok-789" }, ip: "192.0.2.7" })).status, 400);
+  assert.equal(calls.verifies.length, 2);
+  assert.equal(calls.mails.length, 8);
 });
 
 test("api: a Turnstile token Cloudflare rejects is a 400 and sends no mail; without the secret no token is needed", async (t) => {
   const rejected = fakeEnv({ TURNSTILE_SECRET: "0x-secret" });
   const calls = stubMailAndTurnstile(t, false);
-  const refused = await call(rejected, "POST", "/api/auth/code", { body: { email: "a@example.com", turnstile: "tok-bad" } });
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal((await call(rejected, "POST", "/api/auth/code", { body: { email: `w${i}@example.com` }, ip: "192.0.2.8" })).status, 200);
+  }
+  const refused = await call(rejected, "POST", "/api/auth/code", { body: { email: "a@example.com", turnstile: "tok-bad" }, ip: "192.0.2.8" });
   assert.equal((await refused.json()).error, "captcha");
-  assert.equal(calls.mails.length, 0);
-  assert.equal(count(rejected, "login_codes"), 0);
+  assert.equal(calls.verifies.length, 1);
+  assert.equal(calls.mails.length, 3);
+  assert.equal(count(rejected, "login_codes"), 3);
 
   const open = fakeEnv();
-  assert.equal((await call(open, "POST", "/api/auth/code", { body: { email: "a@example.com" } })).status, 200);
+  for (let i = 0; i < 4; i += 1) {
+    assert.equal((await call(open, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "192.0.2.9" })).status, 200);
+  }
   assert.equal(calls.verifies.length, 1);
-  assert.equal(calls.mails.length, 1);
+  assert.equal(calls.mails.length, 7);
 });
 
 test("api: activation codes are 16 Crockford letters in groups of four; typed codes are cleaned up", () => {

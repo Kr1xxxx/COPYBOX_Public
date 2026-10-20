@@ -17,6 +17,8 @@ const sessionLifetime = 90 * 24 * hour;
 const maxCodeAttempts = 5;
 const codesPerEmailPerHour = 5;
 const requestsPerIpPerHour = 20;
+// Code requests per email or per IP an hour before 人机验证 is demanded (D-087): the 4th one needs a token.
+const freeRequestsPerHour = 3;
 const maxVaultBody = 5 * 1024 * 1024;
 const maxSmallBody = 4 * 1024;
 const maxDeviceName = 40;
@@ -162,16 +164,22 @@ export function changes(result) {
   return result?.meta?.changes ?? result?.changes ?? 0;
 }
 
-// Counts one request against `key`; false when the hour's limit is already reached.
-export async function allowRequest(db, key, limit, now) {
+// How many requests `key` has made this hour (0 once the hour is over).
+async function requestCount(db, key, now) {
   const row = await db.prepare("SELECT window_start, count FROM rate_limits WHERE key = ?").bind(key).first();
-  if (!row || row.window_start <= now - hour) {
+  return row && row.window_start > now - hour ? row.count : 0;
+}
+
+// Counts one request against `key`; answers the hour's count so far (truthy), or 0 when its limit is already reached.
+export async function allowRequest(db, key, limit, now) {
+  const count = await requestCount(db, key, now);
+  if (count === 0) {
     await db.prepare("INSERT OR REPLACE INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)").bind(key, now).run();
-    return true;
+    return 1;
   }
-  if (row.count >= limit) return false;
+  if (count >= limit) return 0;
   await db.prepare("UPDATE rate_limits SET count = count + 1 WHERE key = ?").bind(key).run();
-  return true;
+  return count + 1;
 }
 
 async function sweep(db, now) {
@@ -394,13 +402,16 @@ async function requestCode(request, env, now) {
   const db = env.DB;
   if (!env.RESEND_API_KEY) return fail(503, "unavailable");
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  if (!(await allowRequest(db, `ip:${ip}`, requestsPerIpPerHour, now))) return fail(429, "rate_limited");
+  const ipRequests = await allowRequest(db, `ip:${ip}`, requestsPerIpPerHour, now);
+  if (!ipRequests) return fail(429, "rate_limited");
   const parsed = await readJson(request, maxSmallBody);
   if (parsed.status === 413) return fail(413, "too_large");
   const email = normalizeEmail(parsed.body?.email);
   if (!email) return fail(400, "bad_email");
-  // 人机验证 (D-086): enforced once the secret is set, so apps without the widget keep working until then.
-  if (env.TURNSTILE_SECRET) {
+  // 人机验证 (D-086, D-087): only a frequent asker, the 4th request from one email or one IP within an hour, has to
+  // pass it; a refused request does not use up the email's codes. Enforced once the secret is set, so apps without
+  // the widget keep working until then.
+  if (env.TURNSTILE_SECRET && (ipRequests > freeRequestsPerHour || (await requestCount(db, `email:${email}`, now)) >= freeRequestsPerHour)) {
     const token = parsed.body?.turnstile;
     if (typeof token !== "string" || !token || !(await verifyTurnstile(env, token, ip))) return fail(400, "captcha");
   }
