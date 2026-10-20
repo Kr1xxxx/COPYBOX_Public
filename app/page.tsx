@@ -2,7 +2,7 @@
 
 import { ArcToast } from "./arc/arc-toast";
 import { useToast } from "./use-toast";
-import { buildCardMoveMap, countItemsByFolder, undoItemSave, type ItemSaveRecord } from "./clipbox-core";
+import { buildCardMoveMap, countItemsByFolder, RECENT_LIMIT, undoItemSave, type ItemSaveRecord } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
@@ -69,6 +69,7 @@ import { createLazyWriter, type LazyWriter } from "./lazy-writer";
 import { derivePbkdf2AesKey } from "./key-cache";
 import { DEVICE_KEY, deviceKeyCandidates, secureKeyStore, settleDeviceKey } from "./device-key-store";
 import { loadSecretSettings } from "./secret-settings";
+import { hasStashedBackup, restoreStashedBackup } from "./data-transfer";
 import { assertWritesOpen, onQuiesce, writesClosed } from "./write-gate";
 import { drainAll } from "./store-queue";
 import { waitForImageWrites } from "./image-store";
@@ -117,7 +118,7 @@ import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
-import { BackupDialog, DeleteConfirmDialog, EmptyTrashDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
+import { BackupDialog, DeleteConfirmDialog, EmptyTrashDialog, LeftoverRestoreDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview, snippetShareDocument, snippetShareText } from "./snippet-doc";
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
@@ -354,6 +355,8 @@ export default function Home() {
   const [productMenuOpen, setProductMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [startupError, setStartupError] = useState("");
+  // No data but a copy from an import that was cut off: starting empty waits for the person's answer (LeftoverRestoreDialog).
+  const [leftoverStart, setLeftoverStart] = useState<(() => Promise<void>) | null>(null);
   const [appVersion, setAppVersion] = useState("");
   const [buildTime, setBuildTime] = useState("");
   const [windowMode, setWindowMode] = useState<WindowMode>("full");
@@ -419,14 +422,22 @@ export default function Home() {
       const secure = secureKeyStore();
       const knownKeys = await deviceKeyCandidates(localStorage, secure, DEVICE_KEY);
       if (!raw) {
-        const nextDeviceKey = knownKeys[0] || createDeviceKey();
-        const data: VaultData = synchronizeVaultData([], EMPTY_FOLDER_REGISTRY, 1);
-        const envelope = await encryptVault(data, nextDeviceKey);
-        // Written next to the data first, then moved (D-053), so a crash in between never loses it.
-        localStorage.setItem(DEVICE_KEY, nextDeviceKey);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
-        finishOpening(data, nextDeviceKey);
-        void settleDeviceKey(nextDeviceKey, localStorage, secure, DEVICE_KEY);
+        const startEmpty = async () => {
+          const nextDeviceKey = knownKeys[0] || createDeviceKey();
+          const data: VaultData = synchronizeVaultData([], EMPTY_FOLDER_REGISTRY, 1);
+          const envelope = await encryptVault(data, nextDeviceKey);
+          // Written next to the data first, then moved (D-053), so a crash in between never loses it.
+          localStorage.setItem(DEVICE_KEY, nextDeviceKey);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+          finishOpening(data, nextDeviceKey);
+          void settleDeviceKey(nextDeviceKey, localStorage, secure, DEVICE_KEY);
+        };
+        // An import cut off half-way (power loss) leaves no vault but the copy taken before it: ask first (audit #15, D-096).
+        if (await hasStashedBackup()) {
+          if (!cancelled) setLeftoverStart(() => startEmpty);
+          return;
+        }
+        await startEmpty();
         return;
       }
       if (knownKeys.length === 0) throw new Error("Local vault key is missing");
@@ -551,7 +562,7 @@ export default function Home() {
       const haystack = `${item.label} ${item.note} ${item.summary || ""}`.toLowerCase();
       return normalized.split(/\s+/).every((term) => haystack.includes(term));
     }) : productMatched;
-    if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, 50);
+    if (scopeFolder === "recent") return matched.toSorted((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0)).slice(0, RECENT_LIMIT);
     return isSnippetSearch ? matched : matched.toSorted((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
   }, [items, query, activeKind, activeFolder, productFilter, searchAllFolders, englishSearch]);
   // Worked out once per list, not per row: with 1,000+ snippets the per-row search made every render slow.
@@ -2105,7 +2116,13 @@ export default function Home() {
     showToast(`已导入 ${importedCount} 条话术`, { ms: 2600 });
   }
 
+  function onLeftoverSkip() {
+    const start = leftoverStart;
+    setLeftoverStart(null);
+    void start?.().catch(() => setStartupError("本地数据无法打开，原数据和密钥已保留。请重试。"));
+  }
   if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Copyboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
+  if (leftoverStart) return <main className="loading-page"><VaultMark /><LeftoverRestoreDialog onRestore={async () => { if (await restoreStashedBackup()) window.location.reload(); else onLeftoverSkip(); }} onSkip={onLeftoverSkip} /></main>;
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Copyboxx…</span></main>;
   // Nobody signed in on this computer: only the login page, until the sign-in succeeds (D-085).
   // The web preview opens straight into the app (D-098); its shim sets skipLogin, the real bridge never does.

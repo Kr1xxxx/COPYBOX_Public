@@ -337,6 +337,11 @@ test("builds all and favorite shortcuts for the active content kind", () => {
   ]);
 });
 
+test("the 最近 count stops at the 50 entries the list shows", () => {
+  const used = Array.from({ length: 300 }, (_, index) => ({ ...legacyItems[1], id: `u${index}`, lastUsedAt: index + 1 }));
+  assert.equal(buildDirectoryShortcuts(used, "snippet").find((entry) => entry.id === "recent").count, 50);
+});
+
 test("keeps favorites after refresh and hides add controls in virtual directories", () => {
   assert.equal(typeof resolveRefreshedActiveFolder, "function");
   assert.equal(resolveRefreshedActiveFolder("snippet", standardSnippetFolders, "pinned"), "pinned");

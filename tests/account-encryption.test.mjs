@@ -144,3 +144,28 @@ test("failure removing the password record rolls disabling encryption back", asy
   assert.deepEqual(storage.raw, before);
   assert.deepEqual(await openSecretItemsStore(dataKey, storage).list(), [login]);
 });
+
+test("a cloud merge that arrives while the encryption is switched waits and never gets overwritten (audit #7, D-096)", async () => {
+  const storage = await seeded();
+  const merged = { ...login, id: "from-cloud", name: "另一台电脑" };
+  const merge = (key) => openSecretItemsStore(key, storage).update((items) => [...items, merged]);
+  // Switching on: the merge still holds the device key, so after waiting it cannot read the moved data and writes nothing.
+  // Before the fix it landed between the read and the write-back, reported success, and was then overwritten.
+  const enabling = enableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, storage);
+  const lateOn = merge(DEVICE);
+  const { dataKey } = await enabling;
+  await assert.rejects(lateOn, /无法读取/);
+  assert.deepEqual(await openSecretItemsStore(dataKey, storage).list(), [login]);
+  // A merge with the right key after the switch is kept.
+  await merge(dataKey);
+  // Switching off: the merge is started the moment the switch marks itself as under way, i.e. after its read.
+  let lateOff;
+  const observed = { ...storage, setItem: (key, value) => {
+    storage.setItem(key, value);
+    if (key === ACCOUNT_LOCK_KEY && value.includes('"migrating"') && !lateOff) lateOff = openSecretItemsStore(dataKey, observed).update((items) => [...items, { ...merged, id: "late" }]);
+  } };
+  await disableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, observed);
+  assert.ok(lateOff);
+  await assert.rejects(lateOff, /无法读取/);
+  assert.deepEqual(await openSecretItemsStore(DEVICE, storage).list(), [login, merged]);
+});
