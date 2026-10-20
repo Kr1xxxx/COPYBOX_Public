@@ -311,6 +311,13 @@ const staffFiles = {
   "download/private-t0k3n/latest.json": '{"version":"2.0.34"}',
 };
 
+// A D1 stand-in on SQLite with the real schema, enough for the rate_limits counter (allowRequest).
+function rateLimitDb() {
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(readFileSync("tools/website/schema.sql", "utf8"));
+  return { prepare: (sql) => ({ bind: (...args) => ({ first: async () => sqlite.prepare(sql).get(...args) ?? null }) }) };
+}
+
 function staffVerifyPost(password, env) {
   return get("/staff/verify", { method: "POST", body: new URLSearchParams({ password }), headers: { "CF-Connecting-IP": "1.2.3.4" } }, env);
 }
@@ -381,10 +388,8 @@ test("worker: /staff/verify without the secret, without the file, and over the h
   const cookie = (await staffVerifyPost("pw", missing)).headers.get("Set-Cookie").split(";")[0];
   assert.equal((await get("/staff/file/win", { headers: { Cookie: cookie } }, missing)).status, 404);
 
-  // A D1 stand-in on SQLite with the real schema: the 21st try in the hour is refused before the password is looked at.
-  const sqlite = new DatabaseSync(":memory:");
-  sqlite.exec(readFileSync("tools/website/schema.sql", "utf8"));
-  const db = { prepare: (sql) => ({ bind: (...args) => ({ first: async () => sqlite.prepare(sql).get(...args) ?? null }) }) };
+  // The 21st try in the hour is refused before the password is looked at.
+  const db = rateLimitDb();
   const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "pw", DB: db };
   for (let i = 0; i < 20; i += 1) assert.equal((await staffVerifyPost("bad", env)).status, 303);
   const limited = await staffVerifyPost("pw", env);
@@ -463,18 +468,7 @@ test("worker: /contact/send checks the Turnstile token, mails the owner with rep
 });
 
 test("worker: /contact/send allows 5 inquiries per IP and hour", async () => {
-  const rows = new Map();
-  const db = {
-    prepare: (sql) => ({
-      bind: (...args) => ({
-        first: async () => rows.get(args[0]) ?? null,
-        run: async () => {
-          if (sql.startsWith("INSERT")) rows.set(args[0], { window_start: args[1], count: 1 });
-          else rows.get(args[0]).count += 1;
-        },
-      }),
-    }),
-  };
+  const db = rateLimitDb();
   const env = { ...fakeEnv(), TURNSTILE_SECRET: "s", RESEND_API_KEY: "k", ADMIN_EMAILS: "owner@example.com", DB: db };
   await withOutside(() => Response.json({ success: true }), async (calls) => {
     for (let i = 0; i < 5; i += 1) assert.equal((await contactPost(inquiry, env)).headers.get("Location"), "/contact/#sent");
