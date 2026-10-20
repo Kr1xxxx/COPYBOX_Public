@@ -7,16 +7,19 @@ const payload = { localStorage: { "clipbox.x": "1" }, indexedDB: {} };
 const day = (d) => new Date(2026, 9, d, 12, 0, 0);
 
 test("the file name is today's date on this computer, and only that shape counts", () => {
-  assert.equal(autoBackupName(day(5)), "clipbox-auto-2026-10-05.json");
+  assert.equal(autoBackupName(day(5)), "copyboxx-auto-2026-10-05.json");
+  assert.ok(isAutoBackupName("copyboxx-auto-2026-10-05.json"));
+  // Days saved before the rename still count (D-102).
   assert.ok(isAutoBackupName("clipbox-auto-2026-10-05.json"));
-  for (const bad of ["", "clipbox-auto-2026-10-05.json.tmp", "../clipbox-auto-2026-10-05.json", "notes.txt", "clipbox-auto-2026-1-5.json"]) assert.ok(!isAutoBackupName(bad), bad);
+  for (const bad of ["", "copybox-auto-2026-10-05.json", "copyboxx-auto-2026-10-05.json.tmp", "clipbox-auto-2026-10-05.json.tmp", "../clipbox-auto-2026-10-05.json", "notes.txt", "clipbox-auto-2026-1-5.json"]) assert.ok(!isAutoBackupName(bad), bad);
   assert.equal(backupDateLabel("clipbox-auto-2026-10-05.json"), "10月5日");
+  assert.equal(backupDateLabel("copyboxx-auto-2026-10-06.json"), "10月6日");
 });
 
 test("a backup is due only when today's file is missing", () => {
   assert.ok(backupDue([], day(5)));
   assert.ok(backupDue(["clipbox-auto-2026-10-04.json"], day(5)));
-  assert.ok(!backupDue(["clipbox-auto-2026-10-05.json"], day(5)));
+  assert.ok(!backupDue(["copyboxx-auto-2026-10-05.json"], day(5)));
 });
 
 test("only the newest seven are kept and other files are never listed for deletion", () => {
@@ -26,6 +29,9 @@ test("only the newest seven are kept and other files are never listed for deleti
   assert.equal(gone.length, 10 - AUTO_BACKUP_KEEP);
   assert.ok(!gone.includes("notes.txt"));
   assert.deepEqual(backupsToDelete(names.slice(0, 5)), []);
+  // Old clipbox- days are older than every copyboxx- day and go first.
+  const mixed = [...names.slice(0, 5).map((name) => name.replace("copyboxx-", "clipbox-")), ...names.slice(5)];
+  assert.deepEqual(backupsToDelete(mixed), ["clipbox-auto-2026-10-03.json", "clipbox-auto-2026-10-02.json", "clipbox-auto-2026-10-01.json"]);
 });
 
 test("the switch is on until someone turns it off", () => {

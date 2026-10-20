@@ -28,7 +28,7 @@ test("macOS: 账号 can be exported to its own encrypted file and imported back"
   await dialog.getByPlaceholder("至少 8 个字符").fill("secrets-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("secrets-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
-  expect(download.suggestedFilename()).toMatch(/^clipbox-secrets-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^copyboxx-secrets-\d{4}-\d{2}-\d{2}\.json$/);
   const file = await download.path();
   const backup = JSON.parse(readFileSync(file, "utf8"));
   expect(backup).toMatchObject({ format: "clipbox-secure-backup", version: 3, scope: "secret" });
@@ -106,7 +106,7 @@ test("macOS: the snippet backup still leaves 账号 out", async ({ page }) => {
   await dialog.getByPlaceholder("至少 8 个字符").fill("snippet-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("snippet-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
-  expect(download.suggestedFilename()).toMatch(/^clipbox-snippets-/);
+  expect(download.suggestedFilename()).toMatch(/^copyboxx-snippets-/);
   expect(JSON.parse(readFileSync(await download.path(), "utf8")).scope).toBe("snippet");
 });
 

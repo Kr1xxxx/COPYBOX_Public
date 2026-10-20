@@ -14,6 +14,8 @@ mod mcp_images;
 // Windows only; elsewhere just the pure decision logic and its tests (D-046).
 #[cfg_attr(not(windows), allow(dead_code))]
 mod old_autostart;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod old_copy;
 mod paste_back;
 mod power;
 mod secret_store;
@@ -57,6 +59,11 @@ fn main() {
     // `Copyboxx --mcp`: a tool such as Codex started us as its MCP server. No window; talk to the running app (D-060).
     if mcp::is_mcp_launch(&std::env::args().collect::<Vec<_>>()) {
         mcp::run();
+        return;
+    }
+    // An older copy still running would take this launch over through the shared lock; say to quit it first (D-102).
+    #[cfg(windows)]
+    if old_copy::warn_if_running() {
         return;
     }
     let app = tauri::Builder::default()

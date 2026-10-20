@@ -1,6 +1,7 @@
 // Daily automatic backup: the page hands over one finished backup file (raw bytes) and this keeps the newest few in
 // `backups/` inside the app data folder. The page decides what is in the file; this only stores, lists and reads files
-// whose names have exactly the shape `clipbox-auto-YYYY-MM-DD.json`, so nothing outside that folder is ever touched.
+// whose names have exactly the shape `copyboxx-auto-YYYY-MM-DD.json` (or `clipbox-auto-…` from before the rename, D-102),
+// so nothing outside that folder is ever touched.
 // Pictures (D-043) are kept once each in `backups/images/`, named `<64 lowercase hex>.bin` (the page names them after a
 // SHA-256 of their bytes and checks that when reading back); the day files point at them, and the page says which to keep.
 use std::collections::HashSet;
@@ -18,11 +19,14 @@ const MAX_IMAGE_BYTES: usize = 64 * 1024 * 1024;
 const DIR: &str = "backups";
 const IMAGE_DIR: &str = "images";
 
-/// Only `clipbox-auto-YYYY-MM-DD.json` (digits in the date), never a path.
+/// Only `copyboxx-auto-YYYY-MM-DD.json` or the older `clipbox-auto-YYYY-MM-DD.json` (digits in the date), never a path.
 pub fn is_backup_name(name: &str) -> bool {
     let bytes = name.as_bytes();
-    let (prefix, suffix) = ("clipbox-auto-", ".json");
-    if !name.starts_with(prefix) || !name.ends_with(suffix) || name.len() != prefix.len() + 10 + suffix.len() {
+    let suffix = ".json";
+    let Some(prefix) = ["copyboxx-auto-", "clipbox-auto-"].into_iter().find(|prefix| name.starts_with(prefix)) else {
+        return false;
+    };
+    if !name.ends_with(suffix) || name.len() != prefix.len() + 10 + suffix.len() {
         return false;
     }
     let date = &bytes[prefix.len()..prefix.len() + 10];
@@ -166,8 +170,9 @@ mod tests {
 
     #[test]
     fn only_exact_names_are_accepted() {
+        assert!(is_backup_name("copyboxx-auto-2026-10-12.json"));
         assert!(is_backup_name("clipbox-auto-2026-10-12.json"));
-        for bad in ["", "../clipbox-auto-2026-10-12.json", "clipbox-auto-2026-10-12.json.tmp", "clipbox-auto-2026-1-12.json", "clipbox-auto-2026/10/12.json", "clipbox-auto-abcd-10-12.json", "other-2026-10-12.json"] {
+        for bad in ["", "copyboxx-auto-2026-10-12.json.tmp", "copyboxx-auto-2026-1-12.json", "copybox-auto-2026-10-12.json", "../clipbox-auto-2026-10-12.json", "clipbox-auto-2026-10-12.json.tmp", "clipbox-auto-2026-1-12.json", "clipbox-auto-2026/10/12.json", "clipbox-auto-abcd-10-12.json", "other-2026-10-12.json"] {
             assert!(!is_backup_name(bad), "{bad}");
         }
     }
@@ -179,6 +184,10 @@ mod tests {
         names.push("clipbox-auto-2026-10-05.json.tmp".into());
         assert_eq!(names_to_delete(&names, 7), vec!["clipbox-auto-2026-10-02.json", "clipbox-auto-2026-10-01.json"]);
         assert!(names_to_delete(&names[..5], 7).is_empty());
+        // After the rename new days are copyboxx-…; the old clipbox-… days are the oldest and go first (D-102).
+        let mut mixed: Vec<String> = (1..=5).map(|d| format!("clipbox-auto-2026-10-{d:02}.json")).collect();
+        mixed.extend((6..=9).map(|d| format!("copyboxx-auto-2026-10-{d:02}.json")));
+        assert_eq!(names_to_delete(&mixed, 7), vec!["clipbox-auto-2026-10-02.json", "clipbox-auto-2026-10-01.json"]);
     }
 
     #[test]

@@ -819,7 +819,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `clipbox-company-library-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `copyboxx-company-library-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     showToast("已导出公司话术库文件");
@@ -2005,7 +2005,7 @@ export default function Home() {
     const anchor = document.createElement("a");
     anchor.href = url;
     const fileWord = scope === "snippet" ? "snippets" : "secrets";
-    anchor.download = `clipbox-${fileWord}-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `copyboxx-${fileWord}-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     setBackupMode(null);

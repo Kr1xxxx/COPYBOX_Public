@@ -129,7 +129,7 @@ test("snippets and 账号 are exported to separate files, never one combined bac
   await dialog.getByPlaceholder("至少 8 个字符").fill("snippets-backup-1");
   await dialog.getByPlaceholder("确认备份密码").fill("snippets-backup-1");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
-  expect(download.suggestedFilename()).toMatch(/^clipbox-snippets-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^copyboxx-snippets-\d{4}-\d{2}-\d{2}\.json$/);
   const { readFileSync } = await import("node:fs");
   expect(JSON.parse(readFileSync(await download.path(), "utf8"))).toMatchObject({ format: "clipbox-secure-backup", version: 3, scope: "snippet" });
 });

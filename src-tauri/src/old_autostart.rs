@@ -13,7 +13,7 @@
 pub const OLD_NAMES: &[&str] = &["Clipbox", "Clipboxx", "CLIP BOX"];
 
 /// The Cargo binary name; the Tauri installer keeps it as `clipbox.exe` under every product name.
-const PROGRAM: &str = "clipbox.exe";
+pub const PROGRAM: &str = "clipbox.exe";
 
 /// One `Run` value found under an old name.
 #[derive(Clone, Debug, PartialEq)]

@@ -30,7 +30,7 @@ test("全部数据可以导出成加密文件，清空后再导入回来", async
   await expect(dialog).toContainText("两次输入的密码不一致");
   await dialog.getByPlaceholder("确认密码").fill("move-1234");
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "加密并导出" }).click()]);
-  expect(download.suggestedFilename()).toMatch(/^clipbox-full-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^copyboxx-full-backup-\d{4}-\d{2}-\d{2}\.json$/);
   const file = await download.path();
   const text = readFileSync(file, "utf8");
   expect(JSON.parse(text)).toMatchObject({ format: "clipbox-data-move", version: 1 });

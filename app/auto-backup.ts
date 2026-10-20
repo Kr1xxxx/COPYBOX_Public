@@ -45,7 +45,9 @@ type Prefs = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type ImageRef = { $ref: string; size: number };
 export type BackupError = { at: number; reason: "space" | "other" };
 
-const NAME = /^clipbox-auto-(\d{4})-(\d{2})-(\d{2})\.json$/;
+// Days saved before the rename to Copyboxx keep their clipbox- name and still list, restore and age out (D-102); every
+// copyboxx- day is newer and "copyboxx" sorts after "clipbox", so sorting by name still puts the newest first.
+const NAME = /^(?:copyboxx|clipbox)-auto-(\d{4})-(\d{2})-(\d{2})\.json$/;
 export const isAutoBackupName = (name: string) => NAME.test(name);
 const IMAGE_NAME = /^[0-9a-f]{64}\.bin$/;
 export const isImageFileName = (name: string) => IMAGE_NAME.test(name);
@@ -53,7 +55,7 @@ export const isImageFileName = (name: string) => IMAGE_NAME.test(name);
 const two = (value: number) => String(value).padStart(2, "0");
 // The date on this computer's clock, so "today" matches what the person sees.
 export function autoBackupName(now: Date = new Date()) {
-  return `clipbox-auto-${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}.json`;
+  return `copyboxx-auto-${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}.json`;
 }
 
 export function backupDue(names: string[], now: Date = new Date()) {
