@@ -5,13 +5,11 @@
 // and no mail. The admin session is an HttpOnly, SameSite=Strict cookie for 12 hours; its SHA-256 lives in D1
 // admin_sessions. Without DB, RESEND_API_KEY or ADMIN_EMAILS every /admin/api/* answers 503.
 
-import { allowRequest, codeHash, bytesToBase64Url, emailDomain, json, normalizeEmail, randomActivationCode, randomCode, readJson, sendCodeMail, sha256Hex, consumeCode } from "./api.mjs";
+import { allowRequest, codeHash, bytesToBase64Url, emailDomain, json, normalizeEmail, randomActivationCode, randomCode, readJson, sendCodeMail, sessionLifetime, sha256Hex, consumeCode } from "./api.mjs";
 
 const hour = 60 * 60 * 1000;
 const codeLifetime = 10 * 60 * 1000;
 const adminSessionLifetime = 12 * hour;
-// Must match sessionLifetime in api.mjs: the app's sessions keep only their expiry, so sign-in time = expiry - 90 days.
-const appSessionLifetime = 90 * 24 * hour;
 const cookieName = "__Host-cbx_admin";
 
 const messages = {
@@ -166,7 +164,7 @@ async function listUsers(env, session, now) {
   const users = results.map((row) => ({
     email: row.email,
     createdAt: row.created_at ?? null,
-    lastSignInAt: row.last_expiry ? row.last_expiry - appSessionLifetime : null,
+    lastSignInAt: row.last_expiry ? row.last_expiry - sessionLifetime : null,
     lastSyncAt: row.last_sync_at ?? null,
     devices: row.devices ?? 0,
     deviceNames: row.device_names ? String(row.device_names).split("、") : [],

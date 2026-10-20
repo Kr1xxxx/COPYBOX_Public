@@ -153,6 +153,8 @@ export type CloudApi = ReturnType<typeof createCloudApi>;
 export const CLOUD_ACCOUNT_KEY = "clipbox.cloud-account.v1";
 export const CLOUD_SESSION_KEY = "clipbox.cloud-session.v1";
 export const CLOUD_BASE_KEY = "clipbox.cloud-sync-base.v1";
+// The email last signed in here, kept after signing out so the login page can fill it in (D-099).
+export const CLOUD_LAST_EMAIL_KEY = "clipbox.cloud-last-email.v1";
 const SESSION_NAME = "cloud-session";
 
 export type CloudAccount = { email: string; lastSyncAt?: number; lastResult?: string };
@@ -172,6 +174,17 @@ export function writeCloudAccount(account: CloudAccount | null, storage: Storage
     if (account) storage.setItem(CLOUD_ACCOUNT_KEY, JSON.stringify(account));
     else storage.removeItem(CLOUD_ACCOUNT_KEY);
   } catch { /* shown again as signed out next start */ }
+}
+
+export function readLastEmail(storage: Storage = defaultStorage()): string {
+  try { return storage.getItem(CLOUD_LAST_EMAIL_KEY) ?? ""; } catch { return ""; }
+}
+
+export function writeLastEmail(email: string, storage: Storage = defaultStorage()) {
+  try {
+    if (email) storage.setItem(CLOUD_LAST_EMAIL_KEY, email);
+    else storage.removeItem(CLOUD_LAST_EMAIL_KEY);
+  } catch { /* the login page just starts empty */ }
 }
 
 export async function readSessionToken(storage: Storage = defaultStorage()): Promise<string> {

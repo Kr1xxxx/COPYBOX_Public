@@ -137,6 +137,10 @@ Setting up again from scratch (already done once; only after the owner says 部�
    `Copyboxx <noreply@copyboxx.com>`) and `VAULT_KEY` (32 random bytes, base64).
 3. `npm run website:deploy`.
 
+Once, with the deploy of D-099 (sessions 90 → 365 days): `npx --yes wrangler@4.150.0 d1 execute copyboxx-users --remote
+--command "UPDATE sessions SET expires_at = expires_at + 275 * 86400000"`, so computers signed in earlier also last a
+year and `/admin` keeps showing the right sign-in time (it is expiry − 365 days).
+
 ## Build and deploy
 
 ```bash
