@@ -9,4 +9,4 @@
     公司 = has a company-library link (`shared`, retired ones included); 我的 = everything else. Clicking the active
     one again shows all; the picked one is filled with the accent colour (Krix). They reset with the product filter (section switch, trash, jump to an entry). Names chosen
     by Krix.
-- Not done: no product picker in the editor; the mini window has no 公司 / 我的 filter; nothing in stored data changes.
+- Not done: no product picker in the editor; nothing in stored data changes. The mini window got 公司 / 我的 in D-106.

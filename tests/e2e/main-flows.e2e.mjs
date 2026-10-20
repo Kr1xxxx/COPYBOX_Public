@@ -397,6 +397,22 @@ test("a 话术 typed by hand stays in the list when a product is picked (D-101)"
   await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "false");
 });
 
+test("the mini window has 公司 / 我的 right of the search box (D-106)", async ({ page }) => {
+  await page.getByRole("button", { name: "迷你模式" }).click();
+  await page.setViewportSize({ width: 360, height: 440 });
+  const source = page.locator(".mini-search .source-filter");
+  await expect(source.getByRole("button")).toHaveText(["公司", "我的"]);
+  // The sample sheet has no company 话术: 公司 empties the list, a second click shows everything again.
+  await source.getByRole("button", { name: "公司" }).click();
+  await expect(page.locator(".mini-row")).toHaveCount(0);
+  await source.getByRole("button", { name: "公司" }).click();
+  await expect(source.getByRole("button", { name: "公司" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".mini-row").first()).toBeVisible();
+  await source.getByRole("button", { name: "我的" }).click();
+  await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".mini-row").first()).toBeVisible();
+});
+
 test("the 全部产品 filter and the row menu close on an outside click and on Esc", async ({ page }) => {
   const filter = page.locator(".product-filter");
   const menu = page.locator(".product-filter-menu");

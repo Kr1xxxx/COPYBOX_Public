@@ -2178,6 +2178,10 @@ export default function Home() {
   // The 账号 section's content goes inside the veil (it stays mounted, so sliding open shows it at once); other sections are left as they are.
   const wrapAccountVeil = (content: ReactNode) => (accountMode && slideUnlockOn ? <AccountVeil veiled={accountVeiled} onUnlock={() => setAccountSlidOpen(true)}>{content}</AccountVeil> : content);
   const searchInput = <input ref={searchRef} disabled={lockedHere} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); setRowMenuId(""); if (!e.target.value.trim()) { setSearchAllFolders(false); setEnglishSearch(false); } }} onKeyDown={handleSearchKey} aria-label={searchPlaceholder} placeholder={isMini ? (imageView ? "搜索图片" : activeKind === "secret" ? `搜索${SECRET_WORD}` : "搜索话术") : searchPlaceholder} />;
+  // 公司 / 我的 (D-101): left of 「选择」 in the full window, right of the search box in the mini window (D-106).
+  const sourceFilterNode = <div className="source-filter" role="group" aria-label="话术来源">
+    {([["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" key={value} className={sourceFilter === value ? "active" : ""} aria-pressed={sourceFilter === value} onClick={() => { setSourceFilter((current) => current === value ? "" : value); setSelected(0); }}>{label}</button>)}
+  </div>;
   const firstRun = activeKindItems.length === 0 && !query && activeFolder === "all" && !isMini;
   const emptyState = (
     <ListEmptyState
@@ -2370,6 +2374,7 @@ export default function Home() {
               <Icon name="search" className="search-glyph" />
               {searchInput}
             </div>
+            {!imageView && activeKind === "snippet" && activeKindItems.length > 0 && sourceFilterNode}
           </div>
           <div className="mini-folders">{miniFolderTabs.length > 0 && <MiniTabs className="chips" label="目录" tabs={miniFolderTabs} active={miniTabActive} onSelect={selectMiniTab} />}</div>
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} selecting={false} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
@@ -2547,9 +2552,7 @@ export default function Home() {
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
               {!imageView && activeFolder === "trash" && trashHereCount > 0 && emptyTrashButton}
               {imageView && imageLibrary.filter === IMAGE_FILTER_TRASH && imageLibrary.trashed.length > 0 && <button type="button" className="ghost-button select-toggle danger-text" onClick={() => imageSectionRef.current?.askEmptyTrash()}>全部删除</button>}
-              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="source-filter" role="group" aria-label="话术来源">
-                {([["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" key={value} className={sourceFilter === value ? "active" : ""} aria-pressed={sourceFilter === value} onClick={() => { setSourceFilter((current) => current === value ? "" : value); setSelected(0); }}>{label}</button>)}
-              </div>}
+              {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && sourceFilterNode}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
