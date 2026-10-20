@@ -5,10 +5,11 @@
 // installer cannot be swapped on the way (audit S2, 2026-10-14). The site no longer hosts the web preview (owner,
 // 2026-10-14): /preview/ is an ordinary 404. /api/* is the account and sync API (api.mjs, D-063);
 // /admin is the owner's read-only user list (admin.mjs, D-065). /staff/ sends a staff installer after the
-// company password (secret STAFF_PASSWORD) is checked here, never in the page (D-080).
+// company password (secret STAFF_PASSWORD) is checked here, never in the page (D-080). The public installer is gone
+// (D-092): /download/ goes to the inquiry form /contact/, whose POST /contact/send mails the owner.
 
-import { handleAdmin, isAdminPath } from "./admin.mjs";
-import { allowRequest, handleApi, isApiPath, sameText, sha256Hex } from "./api.mjs";
+import { adminEmails, handleAdmin, isAdminPath } from "./admin.mjs";
+import { allowRequest, handleApi, isApiPath, normalizeEmail, sameText, sendMail, sha256Hex, verifyTurnstile } from "./api.mjs";
 
 const types = {
   html: "text/html; charset=utf-8",
@@ -223,6 +224,38 @@ function staffBack(anchor) {
   return new Response(null, { status: 303, headers: { Location: anchor ? `/staff/#${anchor}` : "/staff/", "Cache-Control": "no-store" } });
 }
 
+// Inquiry form (D-092): POST /contact/send with name, email, company, message and the Turnstile token the page's
+// widget added (cf-turnstile-response). The token is checked with Cloudflare before anything is sent, so a bot
+// without a browser cannot mail the owner; 5 inquiries per IP and hour through the API's rate_limits table. The mail
+// goes through Resend to the addresses in ADMIN_EMAILS with the visitor's address as reply-to, then back to
+// /contact/#sent; problems go back to #bad, #captcha, #limit or #failed, shown by the page without a script.
+const contactField = (form, name, max) => String(form.get(name) ?? "").trim().slice(0, max);
+
+export async function contactSend(request, env, now = Date.now()) {
+  const form = await request.formData().catch(() => null);
+  if (!form) return new Response("Bad Request", { status: 400 });
+  const to = adminEmails(env);
+  if (!env.TURNSTILE_SECRET || !env.RESEND_API_KEY || to.length === 0) {
+    return new Response("询单还没有开通。", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  if (env.DB && !(await allowRequest(env.DB, `contact:${ip}`, 5, now))) return contactBack("limit");
+  const name = contactField(form, "name", 60);
+  const email = normalizeEmail(contactField(form, "email", 120));
+  const company = contactField(form, "company", 80);
+  const message = contactField(form, "message", 2000);
+  if (!name || !email || !message) return contactBack("bad");
+  const token = contactField(form, "cf-turnstile-response", 4096);
+  if (!token || !(await verifyTurnstile(env, token, ip))) return contactBack("captcha");
+  const text = `姓名：${name}\n邮箱：${email}\n公司：${company || "（没填）"}\n\n${message}\n\n—— 来自 copyboxx.com 的询单，直接回复这封邮件就能联系对方。`;
+  const sent = await sendMail(env, { to, reply_to: email, subject: `Copyboxx 询单：${name}${company ? `（${company}）` : ""}`, text });
+  return contactBack(sent ? "sent" : "failed");
+}
+
+function contactBack(anchor) {
+  return new Response(null, { status: 303, headers: { Location: `/contact/#${anchor}`, "Cache-Control": "no-store" } });
+}
+
 // Only functions may be named exports of a Worker module (workerd refuses anything else), so constants stay private.
 // Six months, no preload (the audit thread's advice), so a mistake can still be undone.
 const hsts = "max-age=15552000";
@@ -239,12 +272,16 @@ async function serve(request, env) {
   const url = new URL(request.url);
   if (isApiPath(url.pathname)) return handleApi(request, env);
   if (isAdminPath(url.pathname)) return handleAdmin(request, env);
-  if (url.pathname === "/staff/verify") {
-    if (request.method === "POST") return staffVerify(request, env);
+  if (url.pathname === "/staff/verify" || url.pathname === "/contact/send") {
+    if (request.method === "POST") return url.pathname === "/staff/verify" ? staffVerify(request, env) : contactSend(request, env);
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "POST" } });
   }
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+  }
+  // The old public download page (D-092): its links in mails and chats keep working.
+  if (url.pathname === "/download" || url.pathname === "/download/") {
+    return new Response(null, { status: 308, headers: { Location: "/contact/", "Cache-Control": "no-cache" } });
   }
   if (url.pathname === "/staff/") return staffPage(request, env);
   if (url.pathname.startsWith("/staff/file/")) return staffFile(request, env, url.pathname.slice("/staff/file/".length));

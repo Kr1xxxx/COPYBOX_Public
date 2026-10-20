@@ -382,20 +382,26 @@ async function activate(request, env, auth, now) {
 
 // ---- endpoints ----
 
-export async function sendCodeMail(env, email, code) {
-  const text = `你的 Copyboxx 验证码是：${code}\n\n10 分钟内有效。如果不是你本人操作，请忽略这封邮件。`;
-  const html = `<p>你的 Copyboxx 验证码是：</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p><p>10 分钟内有效。如果不是你本人操作，请忽略这封邮件。</p>`;
+// One mail through Resend from noreply@copyboxx.com; `message` is Resend's own shape without `from` ({ to, subject,
+// text, html?, reply_to? }). True when Resend accepted it.
+export async function sendMail(env, message) {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "Copyboxx <noreply@copyboxx.com>", to: [email], subject: `Copyboxx 验证码：${code}`, text, html }),
+      body: JSON.stringify({ from: "Copyboxx <noreply@copyboxx.com>", ...message }),
     });
     if (response.body) response.body.cancel().catch(() => {});
     return response.ok;
   } catch {
     return false;
   }
+}
+
+export function sendCodeMail(env, email, code) {
+  const text = `你的 Copyboxx 验证码是：${code}\n\n10 分钟内有效。如果不是你本人操作，请忽略这封邮件。`;
+  const html = `<p>你的 Copyboxx 验证码是：</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p><p>10 分钟内有效。如果不是你本人操作，请忽略这封邮件。</p>`;
+  return sendMail(env, { to: [email], subject: `Copyboxx 验证码：${code}`, text, html });
 }
 
 async function requestCode(request, env, now) {

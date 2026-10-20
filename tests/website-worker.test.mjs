@@ -12,9 +12,8 @@ import worker, {
 const files = {
   "index.html": "<title>home</title>",
   "404.html": "<title>找不到这个页面</title>",
-  "download/index.html": "<title>download</title>",
-  "download/Copyboxx-Setup.exe": "MZ fake installer",
-  "download/latest.json": '{"version":"1.65.0"}',
+  "contact/index.html": "<title>contact</title>",
+  "help/index.html": "<title>help</title>",
   "favicon.ico": "fake icon",
   "images/app-win-light.png": "fake screenshot",
   "assets/site.0123abcd.css": "body{}",
@@ -139,26 +138,32 @@ test("worker: pages are served, a folder without slash redirects, html files kee
   assert.equal(home.headers.get("x-content-type-options"), "nosniff");
   assert.equal(await home.text(), files["index.html"]);
 
-  const download = await get("/download/");
-  assert.equal(download.status, 200);
-  assert.equal(await download.text(), files["download/index.html"]);
+  const contact = await get("/contact/");
+  assert.equal(contact.status, 200);
+  assert.equal(await contact.text(), files["contact/index.html"]);
 
-  const bare = await get("/download?from=mail");
+  const bare = await get("/help?from=mail");
   assert.equal(bare.status, 308);
-  assert.equal(bare.headers.get("location"), "/download/?from=mail");
+  assert.equal(bare.headers.get("location"), "/help/?from=mail");
 });
 
-test("worker: hashed assets are cached for good, the installer downloads, latest.json revalidates", async () => {
-  const exe = await get("/download/Copyboxx-Setup.exe");
+test("worker: the public download is gone (D-092): /download/ goes to the inquiry form, its files are 404", async () => {
+  for (const path of ["/download", "/download/"]) {
+    const moved = await get(path);
+    assert.equal(moved.status, 308, path);
+    assert.equal(moved.headers.get("location"), "/contact/");
+  }
+  for (const path of ["/download/Copyboxx-Setup.exe", "/download/latest.json"]) assert.equal((await get(path)).status, 404, path);
+});
+
+test("worker: an installer key downloads as an attachment with its size (the staff files use this)", async () => {
+  const env = fakeEnv({ "download/private-t0k3n/Copyboxx-Setup.exe": "MZ fake installer" });
+  const exe = await get("/download/private-t0k3n/Copyboxx-Setup.exe", {}, env);
   assert.equal(exe.status, 200);
   assert.equal(exe.headers.get("content-type"), "application/x-msdownload");
   assert.equal(exe.headers.get("content-disposition"), 'attachment; filename="Copyboxx-Setup.exe"');
-  assert.equal(exe.headers.get("content-length"), String(Buffer.byteLength(files["download/Copyboxx-Setup.exe"])));
-  assert.equal(await exe.text(), files["download/Copyboxx-Setup.exe"]);
-
-  const latest = await get("/download/latest.json");
-  assert.equal(latest.headers.get("cache-control"), "no-cache");
-  assert.match(latest.headers.get("content-type"), /^application\/json/);
+  assert.equal(exe.headers.get("content-length"), String(Buffer.byteLength("MZ fake installer")));
+  assert.equal(await exe.text(), "MZ fake installer");
 });
 
 test("worker: unknown paths get the 404 page, or plain text when it is missing", async () => {
@@ -190,7 +195,7 @@ test("worker: matching ETag gives 304, HEAD has no body, other methods are refus
   assert.equal(await again.text(), "");
   assert.equal((await get("/", { headers: { "If-None-Match": '"other"' } })).status, 200);
 
-  const head = await get("/download/Copyboxx-Setup.exe", { method: "HEAD" });
+  const head = await get("/download/private-t0k3n/Copyboxx-Setup.exe", { method: "HEAD" }, fakeEnv({ "download/private-t0k3n/Copyboxx-Setup.exe": "MZ fake installer" }));
   assert.equal(head.status, 200);
   assert.equal(head.headers.get("content-type"), "application/x-msdownload");
   assert.equal(await head.text(), "");
@@ -381,4 +386,96 @@ test("worker: /staff/verify without the secret, without the file, and over the h
   for (let i = 0; i < 20; i += 1) assert.equal((await staffVerifyPost("bad", env)).status, 303);
   const limited = await staffVerifyPost("pw", env);
   assert.equal(limited.headers.get("Location"), "/staff/#limit");
+});
+
+// Inquiry form (D-092): the Turnstile token is checked with Cloudflare, then the inquiry is mailed through Resend to
+// the owner's addresses with the visitor as reply-to. `calls` records what the Worker sent out.
+function contactPost(fields, env) {
+  return get("/contact/send", { method: "POST", body: new URLSearchParams(fields), headers: { "CF-Connecting-IP": "9.8.7.6" } }, env);
+}
+
+async function withOutside(handler, run) {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, body: init?.body });
+    return handler(url, init);
+  };
+  try {
+    return await run(calls);
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
+const inquiry = { name: "王小明", email: " Ming@Example.com ", company: "示例公司", message: "想给 5 台电脑装，Windows 的。", "cf-turnstile-response": "tok-1" };
+
+test("worker: /contact/send checks the Turnstile token, mails the owner with reply-to, and goes back to #sent", async () => {
+  const env = { ...fakeEnv(), TURNSTILE_SECRET: "ts-secret", RESEND_API_KEY: "re-key", ADMIN_EMAILS: "owner@example.com, Boss@example.com" };
+  const answer = (url) => (url.includes("turnstile") ? Response.json({ success: true }) : Response.json({ id: "m1" }));
+  await withOutside(answer, async (calls) => {
+    const sent = await contactPost(inquiry, env);
+    assert.equal(sent.status, 303);
+    assert.equal(sent.headers.get("Location"), "/contact/#sent");
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].url, "https://challenges.cloudflare.com/turnstile/v0/siteverify");
+    assert.equal(new URLSearchParams(calls[0].body).get("response"), "tok-1");
+    assert.equal(new URLSearchParams(calls[0].body).get("remoteip"), "9.8.7.6");
+    assert.equal(calls[1].url, "https://api.resend.com/emails");
+    const mail = JSON.parse(calls[1].body);
+    assert.equal(mail.from, "Copyboxx <noreply@copyboxx.com>");
+    assert.deepEqual(mail.to, ["owner@example.com", "boss@example.com"]);
+    assert.equal(mail.reply_to, "ming@example.com");
+    assert.equal(mail.subject, "Copyboxx 询单：王小明（示例公司）");
+    assert.match(mail.text, /姓名：王小明\n邮箱：ming@example.com\n公司：示例公司\n\n想给 5 台电脑装，Windows 的。/);
+  });
+
+  // A refused token sends nothing; a missing one is not even checked.
+  await withOutside(() => Response.json({ success: false }), async (calls) => {
+    assert.equal((await contactPost(inquiry, env)).headers.get("Location"), "/contact/#captcha");
+    assert.equal(calls.length, 1);
+    assert.equal((await contactPost({ ...inquiry, "cf-turnstile-response": "" }, env)).headers.get("Location"), "/contact/#captcha");
+    assert.equal(calls.length, 1);
+  });
+  // Missing or bad fields are refused before the token costs a call.
+  await withOutside(() => Response.json({ success: true }), async (calls) => {
+    for (const bad of [{ ...inquiry, email: "not-an-address" }, { ...inquiry, name: "  " }, { ...inquiry, message: "" }]) {
+      assert.equal((await contactPost(bad, env)).headers.get("Location"), "/contact/#bad");
+    }
+    assert.equal(calls.length, 0);
+  });
+  // Resend down: back to #failed.
+  await withOutside((url) => (url.includes("turnstile") ? Response.json({ success: true }) : new Response("no", { status: 500 })), async () => {
+    assert.equal((await contactPost(inquiry, env)).headers.get("Location"), "/contact/#failed");
+  });
+  // Not set up (no Turnstile secret, no mail key or no owner address): 503, nothing sent.
+  await withOutside(() => Response.json({ success: true }), async (calls) => {
+    for (const missing of ["TURNSTILE_SECRET", "RESEND_API_KEY", "ADMIN_EMAILS"]) {
+      assert.equal((await contactPost(inquiry, { ...env, [missing]: "" })).status, 503, missing);
+    }
+    assert.equal(calls.length, 0);
+  });
+  assert.equal((await get("/contact/send", {}, env)).status, 405);
+  assert.equal((await get("/contact/send", { method: "POST", body: "{}", headers: { "Content-Type": "application/json" } }, env)).status, 400);
+});
+
+test("worker: /contact/send allows 5 inquiries per IP and hour", async () => {
+  const rows = new Map();
+  const db = {
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        first: async () => rows.get(args[0]) ?? null,
+        run: async () => {
+          if (sql.startsWith("INSERT")) rows.set(args[0], { window_start: args[1], count: 1 });
+          else rows.get(args[0]).count += 1;
+        },
+      }),
+    }),
+  };
+  const env = { ...fakeEnv(), TURNSTILE_SECRET: "s", RESEND_API_KEY: "k", ADMIN_EMAILS: "owner@example.com", DB: db };
+  await withOutside(() => Response.json({ success: true }), async (calls) => {
+    for (let i = 0; i < 5; i += 1) assert.equal((await contactPost(inquiry, env)).headers.get("Location"), "/contact/#sent");
+    assert.equal((await contactPost(inquiry, env)).headers.get("Location"), "/contact/#limit");
+    assert.equal(calls.length, 10);
+  });
 });

@@ -312,11 +312,12 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
    the cookie is valid, serves the page with body.staff-verified, which swaps the form for the download card with an
    entrance animation. */
 .staff-label { display: block; margin-top: 24px; text-align: left; font-size: 14px; font-weight: 500; }
-.staff-label input {
+.staff-label input, .staff-label textarea {
   display: block; width: 100%; margin-top: 6px; padding: 11px 14px; font: inherit; color: var(--ink);
   background: var(--page); border: 1px solid var(--border); border-radius: 12px;
 }
-.staff-label input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.staff-label textarea { resize: vertical; min-height: 96px; }
+.staff-label input:focus, .staff-label textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
 .staff-form .staff-error { display: none; margin-top: 10px; font-size: 14px; color: #c0392b; }
 .staff-form .staff-error:target { display: block; }
 .staff-form:has(.staff-error:target) input { border-color: #c0392b; animation: staff-shake 0.4s; }
@@ -348,3 +349,11 @@ code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
 @keyframes staff-draw-check { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
 @keyframes staff-spin { to { transform: rotate(360deg); } }
 @keyframes staff-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+/* Inquiry form (/contact/, D-092): the staff card's layout and states. 「发送」 stays grey until the Turnstile widget
+   reports a pass; the Worker's 303 to #sent swaps the form for the thank-you card, the other anchors show a red line. */
+.contact-form .pill:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.contact-turnstile { display: flex; justify-content: center; margin-top: 24px; min-height: 65px; }
+.contact-form .contact-note { margin-top: 14px; font-size: 13px; }
+.solo:has(.staff-ready:target) .contact-form { display: none; }
+.staff-ready:target { display: block; animation: staff-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
