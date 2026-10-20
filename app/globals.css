@@ -260,6 +260,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .product-filter, .source-filter button { height: 26px; max-width: 150px; padding: 0 6px 0 8px; display: flex; align-items: center; gap: 3px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .product-filter:hover, .source-filter button:hover { background: var(--hover); color: var(--ink); }
 .product-filter.active, .source-filter button.active { background: var(--accent-tint); color: var(--accent-ink); }
+/* 公司 / 我的: the picked one is filled so it reads as switched on (Krix 2026-10-20). */
+.source-filter button.active, .source-filter button.active:hover { background: var(--accent); color: #fff; }
 .product-filter .icon { width: 12px; height: 12px; }
 .product-filter-menu { position: absolute; right: 0; top: 30px; z-index: 30; width: 160px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 16px 36px rgba(31,30,28,.15); }
 .product-filter-menu button { width: 100%; height: 30px; padding: 0 9px; display: flex; align-items: center; justify-content: space-between; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); font-size: 12.5px; text-align: left; cursor: pointer; }

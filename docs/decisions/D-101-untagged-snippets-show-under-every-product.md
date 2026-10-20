@@ -7,6 +7,6 @@
     before; imported rows without a product still get 通用.
   - Two toggle buttons 「公司」 and 「我的」 sit left of 「选择」 in the 话术 list header (`matchesSnippetSource`).
     公司 = has a company-library link (`shared`, retired ones included); 我的 = everything else. Clicking the active
-    one again shows all. They reset with the product filter (section switch, trash, jump to an entry). Names picked
-    by default; Krix may rename them.
+    one again shows all; the picked one is filled with the accent colour (Krix). They reset with the product filter (section switch, trash, jump to an entry). Names chosen
+    by Krix.
 - Not done: no product picker in the editor; the mini window has no 公司 / 我的 filter; nothing in stored data changes.
