@@ -2108,7 +2108,8 @@ export default function Home() {
   if (startupError) return <main className="loading-page startup-error"><VaultMark /><strong>Copyboxx 无法打开数据</strong><span>{startupError}</span><button onClick={() => window.location.reload()}>重试</button></main>;
   if (loading) return <main className="loading-page"><VaultMark /><span>正在打开 Copyboxx…</span></main>;
   // Nobody signed in on this computer: only the login page, until the sign-in succeeds (D-085).
-  if (cloudSync.available && !cloudSync.account) return <LoginGate cloud={cloudSync} theme={theme} />;
+  // The web preview opens straight into the app (D-098); its shim sets skipLogin, the real bridge never does.
+  if (cloudSync.available && !cloudSync.account && !window.clipboxDesktop?.skipLogin) return <LoginGate cloud={cloudSync} theme={theme} />;
 
   const isMini = windowMode === "mini";
   const sectionTitle = imageView ? imageFilterTitle(imageLibrary.filter) : activeFolder === "all"
