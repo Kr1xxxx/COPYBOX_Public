@@ -24,7 +24,8 @@ async function expectVeiled(page) {
   expect(await content.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
   await expect(content.locator(".account-page, [aria-label='保险箱']").first()).toBeAttached();
   await expect(vault(page)).toHaveCount(0);
-  await expect(addButton(page)).toHaveCount(0);
+  // Kept in place so the search bar keeps its width (D-105), but it cannot be pressed.
+  await expect(addButton(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: /^(选择|收起账号)$/ })).toHaveCount(0);
   // The rest of the window stays usable.
   await expect(page.getByRole("button", { name: "迷你模式" })).toBeEnabled();
@@ -36,7 +37,7 @@ async function expectOpen(page) {
   await expect(page.locator(".account-veil")).toHaveCount(0);
   await expect(knob(page)).toHaveCount(0);
   await expect(vault(page)).toBeVisible();
-  await expect(addButton(page)).toBeVisible();
+  await expect(addButton(page)).toBeEnabled();
   await expect(page.locator(".account-veil-content")).not.toHaveAttribute("inert", "");
 }
 

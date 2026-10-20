@@ -36,6 +36,10 @@ for (const platform of ["win32", "darwin"]) {
     await expect(page.getByRole("region", { name: "保险箱" })).toHaveCount(0);
     // Locked, the 账号 sidebar cannot switch views (D-077).
     await expect(page.getByRole("navigation", { name: "分类" }).getByRole("button").first()).toBeDisabled();
+    // 新增 stays in place but cannot be pressed, so the search bar is as wide as when open (D-105).
+    await expect(page.getByRole("button", { name: "新增条目" })).toBeDisabled();
+    const searchWidth = async () => (await page.locator(".toolbar .native-search").boundingBox()).width;
+    const lockedWidth = await searchWidth();
     await lock.getByLabel("账号页密码").fill("wrong-one");
     await lock.getByRole("button", { name: "打开" }).click();
     await expect(lock.getByRole("alert")).toContainText("密码不对");
@@ -43,6 +47,8 @@ for (const platform of ["win32", "darwin"]) {
     await lock.getByLabel("账号页密码").fill("abcd1234");
     await lock.getByRole("button", { name: "打开" }).click();
     await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "新增条目" })).toBeEnabled();
+    expect(await searchWidth()).toBe(lockedWidth);
     await kinds.getByRole("button", { name: "话术" }).click();
     await kinds.getByRole("button", { name: "账号" }).click();
     await expect(page.getByRole("region", { name: "保险箱" })).toBeVisible();

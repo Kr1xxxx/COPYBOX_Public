@@ -768,7 +768,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .bulk-bar .spacer { flex: 1 1 auto; }
 .bulk-menu { top: auto; bottom: 36px; min-width: 170px; white-space: nowrap; max-height: 260px; overflow: auto; scrollbar-width: none; }
 .secondary-button.danger-text, .ghost-button.danger-text { color: var(--danger); }
-.secondary-button:disabled, .ghost-button:disabled { opacity: .45; cursor: default; }
+.primary-button:disabled, .secondary-button:disabled, .ghost-button:disabled { opacity: .45; cursor: default; }
+.primary-button:disabled { background: var(--accent); box-shadow: none; transform: none; }
 
 .native-empty.onboarding { height: auto; min-height: 280px; padding: 24px 28px; text-align: center; gap: 9px; }
 .native-empty.onboarding .vault-mark { margin-bottom: 6px; }
