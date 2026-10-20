@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence } from "motion/react";
 import { Icon } from "./ui-atoms";
 import { ArcDropHint } from "./arc/drop-hint";
+import { EmptyTrashDialog } from "./dialogs";
 import { resolveFocusWrapIndex } from "./clipbox-core";
 import "./desktop-bridge";
 import { UNCATEGORIZED_COLOR } from "./category-colors";
@@ -36,7 +37,7 @@ import {
   type ImageMeta,
 } from "./image-store";
 
-export type ImageSectionHandle = { openPicker: () => void; collapse: () => void };
+export type ImageSectionHandle = { openPicker: () => void; collapse: () => void; askEmptyTrash: () => void };
 // `open`: a picture is expanded, so the header offers 收起.
 export type ImageCounts = { total: number; shown: number; open: boolean };
 
@@ -231,6 +232,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [copiedId, setCopiedId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ImageMeta | null>(null);
+  const [emptyAsked, setEmptyAsked] = useState(false);
   const [dragging, setDragging] = useState(false);
   // The "移动到" menu belongs to one row; it opens from the ⋯ button or from the 目录 line.
   const [moveMenu, setMoveMenu] = useState<MoveMenuState>(null);
@@ -464,6 +466,9 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
       setMoveMenu(null);
       setSelectedId("");
     },
+    askEmptyTrash() {
+      setEmptyAsked(true);
+    },
   }), []);
 
   async function copyImage(meta: ImageMeta) {
@@ -519,6 +524,18 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
     setDeleteTarget(null);
     setSelectedId("");
     onToast("已永久删除");
+  }
+
+  // 全部删除 in the 回收站: one by one, so a failure keeps the rest there and the dialog says so.
+  async function confirmEmptyTrash() {
+    const list = library.trashed;
+    for (const meta of list) {
+      await library.remove(meta.id);
+      forgetThumb(meta.id);
+    }
+    setEmptyAsked(false);
+    setSelectedId("");
+    onToast(`已永久删除 ${list.length} 张图片`);
   }
 
   function toggleChecked(id: string) {
@@ -777,6 +794,7 @@ export function ImageSection({ library, query, compact, view, paused, selecting,
       </div>}
       <AnimatePresence>{dragging && <ArcDropHint className="image-drop-hint">松开即可添加图片</ArcDropHint>}</AnimatePresence>
       {deleteTarget && createPortal(<ImageDeleteDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />, document.body)}
+      {emptyAsked && createPortal(<EmptyTrashDialog count={library.trashed.length} unit="张图片" onClose={() => setEmptyAsked(false)} onConfirm={confirmEmptyTrash} />, document.body)}
     </div>
   );
 }

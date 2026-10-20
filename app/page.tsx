@@ -100,7 +100,7 @@ import { readSlideUnlockOn, writeSlideUnlockOn } from "./slide-unlock";
 import { autoLockRunning, readAutoLockSeconds, writeAutoLockSeconds, AUTO_LOCK_DEFAULT, type AutoLockSeconds } from "./account-auto-lock";
 import { useAccountAutoLock } from "./account-auto-lock-ui";
 import { AccountPage, type AddRequest } from "./account-page";
-import { countByKind, useAccountEntries, type LegacySecret } from "./account-entries";
+import { countByKind, purgeEntry, useAccountEntries, type LegacySecret } from "./account-entries";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type EntryKind } from "./account-view";
 import { clearSampleEntries, previewClearSamples, restoreSampleEntries } from "./vault-samples";
 import { useAutoBackup } from "./auto-backup-ui";
@@ -117,7 +117,7 @@ import { AnimatePresence } from "motion/react";
 import { ImageViewSwitch, useImageView } from "./image-view";
 import { SettingsDialog } from "./settings";
 import type { SettingsFolderGroup, SettingsFolderKind } from "./settings-folders";
-import { BackupDialog, DeleteConfirmDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
+import { BackupDialog, DeleteConfirmDialog, EmptyTrashDialog, SnippetImportDialog, type BackupMode, type DeleteRequest } from "./dialogs";
 import { SNIPPET_DOC_EXTENSIONS, buildSnippetDocImportPreview, snippetShareDocument, snippetShareText } from "./snippet-doc";
 import { SharedLibrarySection, SharedNotice, SyncCodeRow } from "./shared-library-ui";
 import { CloudAccountRows, useCloudSync } from "./cloud-sync-ui";
@@ -347,6 +347,7 @@ export default function Home() {
   const [activeVar, setActiveVar] = useState<{ id: string; name: string } | null>(null);
   const [valueMenu, setValueMenu] = useState<{ name: string; value: string; x: number; y: number } | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
+  const [emptyTrashAsked, setEmptyTrashAsked] = useState(false);
   // 编辑 in the toast after a save: the entry to open once it is in the list shown.
   const pendingSavedEdit = useRef("");
   const [productFilter, setProductFilter] = useState("全部产品");
@@ -614,7 +615,7 @@ export default function Home() {
     firstRun: guide.firstRun,
     previewTools: typeof window !== "undefined" && (!window.clipboxDesktop || Boolean(window.clipboxDesktop.testTools)),
   });
-  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || settingsOpen || guideShown || whatsNew.notice);
+  const auxiliaryDialogOpen = Boolean(snippetImport || deleteRequest || emptyTrashAsked || settingsOpen || guideShown || whatsNew.notice);
   const inlineEditing = modalOpen || typingVariable || Boolean(newFolder) || Boolean(renamingFolder);
   const { homeShortcutsEnabled } = modalInteractionState(inlineEditing || auxiliaryDialogOpen, false, Boolean(backupMode));
   const backgroundInert = auxiliaryDialogOpen || Boolean(backupMode);
@@ -1646,6 +1647,18 @@ export default function Home() {
     showToast(deleteRequest.permanent ? "已永久删除" : "已移入回收站");
   }
 
+  // 回收站「全部删除」 of this section: 话术, or in 账号 the old 秘密 plus the new types (images: ImageSection).
+  const trashHereCount = trashedKindItems.length + (accountMode ? account.trashed.length : 0);
+  async function confirmEmptyTrashHere() {
+    const count = trashHereCount;
+    const ids = new Set(trashedKindItems.map((item) => item.id));
+    if (ids.size > 0) await persist((current) => ({ ...current, items: current.items.filter((item) => !ids.has(item.id) || !isTrashedItem(item)) }));
+    if (accountMode) for (const entry of account.trashed) await purgeEntry(accountKey, entry);
+    setEmptyTrashAsked(false);
+    setSelected(0);
+    showToast(`已永久删除 ${count} 条`);
+  }
+
   const [trashDays, setTrashDays] = useState<number>(() => readStoredChoice<number>(TRASH_DAYS_KEY, TRASH_DAY_OPTIONS, DEFAULT_TRASH_DAYS));
   useAutoBackup(!loading && !startupError);
   // Windows 贴边 (D-079): on until the person turns it off (owner, 2026-10-19: 「Windows 开关默认开」).
@@ -2216,6 +2229,8 @@ export default function Home() {
   const menuFolder = folderMenu && activeFolders.includes(folderMenu) ? folderMenu : "";
   const menuFolderCount = menuFolder ? folderCounts.get(menuFolder) ?? 0 : 0;
 
+  const emptyTrashButton = <button type="button" className="ghost-button select-toggle danger-text" onClick={() => setEmptyTrashAsked(true)}>全部删除</button>;
+
   const legacyList = (
             <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`} onAnimationEnd={onRowAnimationEnd}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
@@ -2424,7 +2439,7 @@ export default function Home() {
             </>}
             <DailyTipsCard />
             <div className="nav-footer">
-              {!imageView && <button type="button" disabled={accountMode && accountNavLocked} className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashedKindItems.length + (accountMode ? account.trashed.length : 0) > 0 && <b>{trashedKindItems.length + (accountMode ? account.trashed.length : 0)}</b>}</button>}
+              {!imageView && <button type="button" disabled={accountMode && accountNavLocked} className={`nav-item ${activeFolder === "trash" ? "active" : ""}`} onClick={() => selectFolder("trash")}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{trashHereCount > 0 && <b>{trashHereCount}</b>}</button>}
               {imageView && <button type="button" className={`nav-item ${imageLibrary.filter === IMAGE_FILTER_TRASH ? "active" : ""}`} onClick={() => imageLibrary.setFilter(IMAGE_FILTER_TRASH)}><span className="nav-icon"><Icon name="trash" /></span><span className="nav-label">回收站</span>{imageLibrary.trashed.length > 0 && <b>{imageLibrary.trashed.length}</b>}</button>}
               <button type="button" className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog" aria-label="设置"><span className="nav-icon"><Icon name="settings" /></span><span className="nav-label">设置</span></button>
               <input ref={fileRef} className="hidden-input" type="file" accept="application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importVault(file); event.target.value = ""; }} />
@@ -2480,6 +2495,7 @@ export default function Home() {
                 {(activeFolder === "all" || activeFolder === "pinned") && !acctSelecting && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className="ghost-button select-toggle collapse-cards" aria-pressed={acctFolded} aria-label={acctFolded ? "展开账号" : "收起账号"} onClick={() => setAcctFolded((value) => !value)}>{acctFolded ? "展开" : "收起"}</button>}
                 {activeFolder !== "trash" && !acctSelecting && !accountVeiled && account.entries?.some((entry) => entry.tab === "login") && <button type="button" className="ghost-button select-toggle" title="只在本机检查：重复使用、太短、一年以上没改的密码" onClick={() => { checkupDot.markSeen(); setAcctCheckup((n) => n + 1); }}>密码体检{checkupDot.dot && <span className="checkup-dot" role="img" aria-label="有需要处理的密码" />}</button>}
                 {activeFolder !== "trash" && !accountVeiled && (account.entries?.length ?? 0) > 0 && !(vaultCat === "other" && activeFolder === "all") && <button type="button" className={`ghost-button select-toggle ${acctSelecting ? "active" : ""}`} aria-pressed={acctSelecting} onClick={() => setAcctSelecting((value) => !value)}>{acctSelecting ? "取消选择" : "选择"}</button>}
+                {activeFolder === "trash" && !accountVeiled && trashHereCount > 0 && emptyTrashButton}
                 {canLockAccountNow
                   ? <button type="button" className="ghost-button select-toggle" title="内容用本机密钥加密保存。点一下马上上锁。" onClick={lockAccountNow}><Icon name="lock" />上锁</button>
                   : <span className="section-note" title="内容用本机密钥加密保存；导出「账号备份」时会一起加密带上。"><Icon name="lock" />本机加密</span>}</div>
@@ -2506,6 +2522,8 @@ export default function Home() {
                 options={[{ value: "here", label: "此目录" }, { value: "all", label: "全部目录" }]}
               />}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && selectedCardId !== "" && !bulkMode && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的话术" onClick={collapseCards}>收起</button>}
+              {!imageView && activeFolder === "trash" && trashHereCount > 0 && emptyTrashButton}
+              {imageView && imageLibrary.filter === IMAGE_FILTER_TRASH && imageLibrary.trashed.length > 0 && <button type="button" className="ghost-button select-toggle danger-text" onClick={() => imageSectionRef.current?.askEmptyTrash()}>全部删除</button>}
               {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
@@ -2630,6 +2648,7 @@ export default function Home() {
       {guideShown && <FirstRunGuide onClose={guide.close} fallbackFocus=".nav-item[aria-label='设置']" />}
       {whatsNew.notice && <WhatsNewDialog notice={whatsNew.notice} onClose={whatsNew.dismiss} />}
       {automationConsent.dialog}
+      {emptyTrashAsked && <EmptyTrashDialog count={trashHereCount} onClose={() => setEmptyTrashAsked(false)} onConfirm={confirmEmptyTrashHere} />}
       {deleteRequest && <DeleteConfirmDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} onConfirm={confirmDelete} />}
       {backupMode && <BackupDialog
         mode={backupMode}
