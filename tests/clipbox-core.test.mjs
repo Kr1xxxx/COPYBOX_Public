@@ -53,6 +53,9 @@ test("opens snippets first and toggles between the two content kinds", () => {
 test("limits summaries by Unicode code point", () => {
   assert.equal(limitChars("一二三四五六七八九十十一"), "一二三四五六七八九十");
   assert.equal(limitChars("😀😀😀", 2), "😀😀");
+  assert.equal(core.titleFromContent("\n  Hi [名字],   thanks  \nsecond"), "Hi [名字], thanks");
+  assert.equal(core.titleFromContent("一二三四五六七八九十一二三四五六七八九十多出来"), "一二三四五六七八九十一二三四五六七八九十");
+  assert.equal(core.titleFromContent("  \n "), "");
 });
 
 test("normalizes an encrypted secret reference note without splitting Unicode", () => {

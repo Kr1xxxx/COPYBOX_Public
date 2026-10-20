@@ -15,6 +15,7 @@ import {
   resolveSelectedFolder,
   SNIPPET_NOTE_MAX,
   splitSecretSegments,
+  titleFromContent,
   type AiRewriteMode,
   type ItemKind,
   type SecretItem,
@@ -89,9 +90,11 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
     return () => window.removeEventListener("keydown", handleKey);
   }, [busy, onClose]);
 
+  const title = label.trim() || (kind === "snippet" ? titleFromContent(secret) : "");
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || !label.trim() || !secret) return;
+    if (busy || !title || !secret) return;
     setBusy(true);
     setSaveError("");
     const shouldCopy = copyOnSubmitRef.current;
@@ -101,7 +104,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
     const snippetMeta = structured && item?.snippetMeta ? {
       ...item.snippetMeta,
       stage: selectedFolder,
-      scene: label.trim(),
+      scene: title,
       action: nextSummary,
       productGroups: productGroupsForRawProduct(rawProduct),
       rawProduct: rawProduct.trim(),
@@ -111,7 +114,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
     } : kind === "snippet" && (extractPlaceholders(`${secret}\n${chineseText}`).length > 0 || chineseText.trim()) ? {
       // A 话术 typed by hand gets its variable blocks here; nothing else about it changes.
       stage: selectedFolder,
-      scene: label.trim(),
+      scene: title,
       action: nextSummary,
       productGroups: [],
       rawProduct: "",
@@ -122,7 +125,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
       requiresVerification: false,
     } : undefined;
     const result = await attemptEditorSave(() => onSave({
-      label: label.trim(),
+      label: title,
       secret,
       secretSegments: kind === "secret" && segmentedSecret ? secretParts : undefined,
       note: kind === "secret" ? normalizeReferenceNote(referenceNote) : item?.note || "",
@@ -234,7 +237,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
       <form ref={formRef} onSubmit={submit}>
           <div className="editor-body">
             <div className={`editor-meta-grid ${kind === "snippet" ? "" : "single"}`}>
-              <label className="native-field"><span>标题</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? (PLAIN_NOTES ? "例如 常用地址" : "例如 prod-ssh") : "例如 售后夸赞"} maxLength={60} /></div></label>
+              <label className="native-field"><span>标题</span><div className="soft-input"><input ref={titleInputRef} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "secret" ? (PLAIN_NOTES ? "例如 常用地址" : "例如 prod-ssh") : "可不填，默认用第一行"} maxLength={60} /></div></label>
               {/* 账号 has no 目录 (sorted by 分类 only); an old entry keeps the folder it was saved with. */}
               {kind === "snippet" && <label className="native-field folder-field">
                 <span>目录 <small>必选</small></span>
@@ -276,7 +279,7 @@ export function ItemEditor({ kind, item, folders, defaultFolder, onClose, onDele
           {saveError && <p className="editor-save-error" role="alert">{saveError}</p>}
           <footer className={`editor-footer ${onDelete ? "has-delete" : ""}`}>
             <div>{onDelete && <button type="button" className="delete-entry" onClick={() => void onDelete()}>移到回收站</button>}</div>
-            <div className="editor-actions"><button type="button" className="editor-cancel" onClick={onClose} disabled={busy}>取消</button><button className={`editor-save ${structured ? "" : "secondary"}`} disabled={busy || !label.trim() || !secret}>{busy ? "正在保存…" : "保存"}</button>{!structured && <button className="editor-save" onClick={() => { copyOnSubmitRef.current = true; }} disabled={busy || !label.trim() || !secret}>{busy ? "正在保存…" : "保存并复制"}</button>}</div>
+            <div className="editor-actions"><button type="button" className="editor-cancel" onClick={onClose} disabled={busy}>取消</button><button className={`editor-save ${structured ? "" : "secondary"}`} disabled={busy || !title || !secret}>{busy ? "正在保存…" : "保存"}</button>{!structured && <button className="editor-save" onClick={() => { copyOnSubmitRef.current = true; }} disabled={busy || !title || !secret}>{busy ? "正在保存…" : "保存并复制"}</button>}</div>
           </footer>
       </form>
     </section>

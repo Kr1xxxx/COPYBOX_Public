@@ -162,6 +162,13 @@ export function limitChars(value: string, length = 10) {
   return Array.from(value.trim()).slice(0, length).join("");
 }
 
+// A 话术 saved without a title is named after its first non-empty line (D-104).
+export const AUTO_TITLE_MAX = 20;
+export function titleFromContent(value: string) {
+  const firstLine = value.split(/\r?\n/).find((line) => line.trim()) || "";
+  return limitChars(firstLine.replace(/\s+/g, " "), AUTO_TITLE_MAX).trim();
+}
+
 export function normalizeReferenceNote(value: string) {
   return limitChars(value, 120);
 }

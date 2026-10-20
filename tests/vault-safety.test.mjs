@@ -43,7 +43,7 @@ test('background addition survives an overlapping editor save', async () => {
 
 test('save-and-copy uses the same expiring desktop clipboard path', async () => {
   const h = await pageHarness();
-  Object.assign(h.c, { busy: false, label: 'Title', secret: 'synthetic', kind: 'secret', structured: false, segmentedSecret: false, referenceNote: '', color: '#fff', item: null, folder: '', folders: [], copyOnSubmitRef: { current: true }, setBusy: () => {}, setSaveError: () => {}, onSave: async () => {}, onCopy: text => h.c.copyTextWithExpiry(text) });
+  Object.assign(h.c, { busy: false, label: 'Title', title: 'Title', secret: 'synthetic', kind: 'secret', structured: false, segmentedSecret: false, referenceNote: '', color: '#fff', item: null, folder: '', folders: [], copyOnSubmitRef: { current: true }, setBusy: () => {}, setSaveError: () => {}, onSave: async () => {}, onCopy: text => h.c.copyTextWithExpiry(text) });
   await h.c.submit({ preventDefault() {} });
   assert.deepEqual(h.copyCalls, ['synthetic']);
 });
