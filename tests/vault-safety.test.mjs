@@ -83,3 +83,23 @@ test('queued commands read the editor result and allocate distinct snippet numbe
   assert.ok(final.items.some(item => item.label === 'Edited first'));
   assert.equal(h.responses.length, 2);
 });
+
+test('no vault but a copy from a cut-off import: asks first instead of quietly starting empty (D-096)', async () => {
+  const h = await pageHarness();
+  h.c.hasStashedBackup = async () => true;
+  await h.c.openVault();
+  assert.equal(h.storage.has('vault'), false);
+  assert.equal(h.c.opened, undefined);
+  assert.equal(typeof h.c.leftoverStart, 'function');
+  // 「先不恢复」 starts empty as before.
+  await h.c.leftoverStart()();
+  assert.ok(h.storage.has('vault'));
+  assert.equal(h.c.opened.items.length, 0);
+});
+
+test('no vault and nothing stashed: starts empty straight away', async () => {
+  const h = await pageHarness();
+  await h.c.openVault();
+  assert.ok(h.storage.has('vault'));
+  assert.equal(h.c.leftoverStart, undefined);
+});

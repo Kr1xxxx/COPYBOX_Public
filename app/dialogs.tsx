@@ -234,6 +234,40 @@ export function EmptyTrashDialog({ count, unit = "条内容", onClose, onConfirm
   );
 }
 
+// Shown on start when there is no data but an import was cut off half-way (audit #15, D-096): the copy taken before it is
+// still there. Same card as 删除确认. 「先不恢复」 starts empty; the copy stays and 设置 › 数据 can still bring it back.
+export function LeftoverRestoreDialog({ onRestore, onSkip }: { onRestore: () => Promise<void>; onSkip: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const restoreRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { restoreRef.current?.focus(); }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onRestore();
+    } catch {
+      setError("没能恢复，请再试一次");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="delete-confirm-backdrop">
+      <section className="delete-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="leftover-restore-title" aria-describedby="leftover-restore-description">
+        <header><h2 id="leftover-restore-title">恢复原来的内容？</h2><p id="leftover-restore-description">上次导入备份没有完成，这台设备上暂时是空的。导入前的内容还保留着，可以放回来。</p></header>
+        <form onSubmit={(event) => void submit(event)}>
+          {error && <p className="delete-confirm-error" role="alert">{error}</p>}
+          <div className="delete-confirm-actions"><button type="button" onClick={onSkip} disabled={busy}>先不恢复</button><button ref={restoreRef} className="primary" disabled={busy}>{busy ? "正在恢复…" : "恢复原来的内容"}</button></div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 // Asked when the command line wants a 秘密 (clipbox-automation.ts). 拒绝 has focus, so Enter or Escape refuses.
 // 「始终允许」 (D-059) is offered only when the shell could tell which program asked, and never for an export of all 秘密.
 export function AutomationConsentDialog({ question, callerName, canAlways = false, onAnswer }: {

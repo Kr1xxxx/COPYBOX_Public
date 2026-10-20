@@ -108,12 +108,15 @@ export function itemMatchesActiveFolder(item: SecretItem, activeFolder: string) 
   return item.folder === activeFolder.slice(7);
 }
 
+// 「最近」 lists this many entries at most; its count stops there too.
+export const RECENT_LIMIT = 50;
+
 export function buildDirectoryShortcuts(items: SecretItem[], kind: ItemKind) {
   const activeItems = selectItemsByTrashState(items, kind, "active");
   return [
     { id: "all", label: kind === "snippet" ? "全部话术" : "全部", count: activeItems.length },
     { id: "pinned", label: "收藏", count: activeItems.filter((item) => item.pinned).length },
-    { id: "recent", label: "最近", count: activeItems.filter((item) => itemMatchesActiveFolder(item, "recent")).length },
+    { id: "recent", label: "最近", count: Math.min(RECENT_LIMIT, activeItems.filter((item) => itemMatchesActiveFolder(item, "recent")).length) },
   ];
 }
 

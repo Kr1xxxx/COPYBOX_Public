@@ -43,6 +43,7 @@ export async function pageHarness() {
       writes.push(key); storage.set(key, value);
     } },
     cancelled: false, loading: false, setLoading: () => {}, setStartupError: message => { c.startupError = message; },
+    hasStashedBackup: async () => false, setLeftoverStart: update => { c.leftoverStart = update; },
     setCapabilities: () => {}, setActiveKind: () => {}, finishOpening: data => { c.opened = data; },
     useCallback: fn => fn, setItems: () => {}, setFolders: () => {}, setFolderColors: () => {}, folderColorsRef: { current: undefined }, setFolderShortNames: () => {}, folderShortNamesRef: { current: undefined }, setToast: () => {}, showToast: () => {}, setSelected: () => {}, closeEditor: () => {},
     itemsRef: { current: [] }, foldersRef: { current: core.EMPTY_FOLDER_REGISTRY }, nextSnippetNumberRef: { current: 1 }, sharedSeenRef: { current: undefined },

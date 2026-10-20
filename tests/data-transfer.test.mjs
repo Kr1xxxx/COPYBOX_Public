@@ -240,3 +240,14 @@ test("after a power cut mid-import the leftover copy brings the old data back", 
   assert.equal(await hasStashedBackup(idb), false);
   assert.equal(await restoreStashedBackup(storage, idb), false);
 });
+
+test("restoring a backup keeps this computer signed in but forgets the last sync (D-096)", async () => {
+  const idb = fakeIndexedDB();
+  const storage = fakeStorage({ "clipbox.vault.v1": "OLD", "clipbox.cloud-account.v1": '{"email":"me@example.com"}', "clipbox.cloud-session.v1": "TOKEN", "clipbox.cloud-sync-base.v1": "BASE" });
+  // A backup made on another computer may carry its own sign-in; it never replaces this one.
+  await applyPayload({ localStorage: { "clipbox.vault.v1": "NEW", "clipbox.cloud-session.v1": "OTHER" }, indexedDB: {} }, storage, idb);
+  assert.equal(storage.getItem("clipbox.vault.v1"), "NEW");
+  assert.equal(storage.getItem("clipbox.cloud-account.v1"), '{"email":"me@example.com"}');
+  assert.equal(storage.getItem("clipbox.cloud-session.v1"), "TOKEN");
+  assert.equal(storage.getItem("clipbox.cloud-sync-base.v1"), null);
+});

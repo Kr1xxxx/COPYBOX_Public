@@ -6,6 +6,7 @@
 import { ACCOUNT_LOCK_KEY, ENCRYPTED_LOCK_MIN, type LockStorage, encryptedPhase, lockMode, markEncryptedMigrating, markEncryptedReady, newDataKey, newRecoveryCode, unlockEncrypted, writeEncryptedLock } from "./account-lock.ts";
 import { SECRET_ITEMS_KEY, openSecretItemsStore } from "./secret-items-store.ts";
 import { SITE_ICONS_KEY, readSiteIcons, writeSiteIcons } from "./site-icon-store.ts";
+import { serialFor } from "./store-queue.ts";
 import { TOTP_STORAGE_KEY, openTotpStore } from "./totp-store.ts";
 
 export const PREMIGRATION_KEY = "clipbox.account-premigration.v1";
@@ -38,6 +39,14 @@ async function writeAll(key: string, data: Snapshot, storage: EncryptionStorage)
   const icons = data.icons as Record<string, { data: string; at: number }>;
   if (Object.keys(icons).length > 0) await writeSiteIcons(key, icons, storage);
   else storage.removeItem(SITE_ICONS_KEY);
+}
+
+// A move holds the 账号 and 验证码 save queues from its first read to its last write, so a cloud merge waits instead of landing
+// in between and being overwritten by the old list (audit #7). Inside, the stores run on a stand-in for the same storage: queues
+// belong to the storage object, so the move's own reads and writes don't wait behind the move itself.
+function exclusive<T>(storage: EncryptionStorage, task: (inner: EncryptionStorage) => Promise<T>): Promise<T> {
+  const inner: EncryptionStorage = { getItem: (key) => storage.getItem(key), setItem: (key, value) => storage.setItem(key, value), removeItem: (key) => storage.removeItem(key) };
+  return serialFor(storage, SECRET_ITEMS_KEY)(() => serialFor(storage, TOTP_STORAGE_KEY)(() => task(inner)));
 }
 
 function rawCopy(storage: EncryptionStorage): Record<string, string | null> {
@@ -101,8 +110,12 @@ function readPremigration(storage: EncryptionStorage): PremigrationRecord | null
 // Turn the password into real encryption (or upgrade the old door-only password). Returns the recovery code, shown once.
 // Anything that goes wrong puts the stores and the old lock record back exactly as they were.
 export async function enableAccountEncryption(args: { deviceKey: string; password: string; email?: string }, storage: EncryptionStorage = localStorage): Promise<{ recoveryCode: string; dataKey: string }> {
+  if (Array.from(args.password).length < ENCRYPTED_LOCK_MIN) throw new Error(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`);
+  return exclusive(storage, (inner) => enableHeld(args, inner));
+}
+
+async function enableHeld(args: { deviceKey: string; password: string; email?: string }, storage: EncryptionStorage): Promise<{ recoveryCode: string; dataKey: string }> {
   const { deviceKey, password, email } = args;
-  if (Array.from(password).length < ENCRYPTED_LOCK_MIN) throw new Error(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`);
   if (lockMode(storage) === "encrypted") throw new Error("已经加密过了");
   const before = await readAll(deviceKey, storage); // if this fails nothing has been touched
   const raw = rawCopy(storage);
@@ -130,6 +143,11 @@ export async function enableAccountEncryption(args: { deviceKey: string; passwor
 // After an interrupted change: each store is read with K, or else with the device key and written again under K.
 export async function finishAccountMigration(deviceKey: string, dataKey: string, storage: EncryptionStorage = localStorage): Promise<void> {
   if (encryptedPhase(storage) === "ready") return;
+  return exclusive(storage, (inner) => finishHeld(deviceKey, dataKey, inner));
+}
+
+async function finishHeld(deviceKey: string, dataKey: string, storage: EncryptionStorage): Promise<void> {
+  if (encryptedPhase(storage) === "ready") return;
   const items = await readWithFallback(() => openSecretItemsStore(dataKey, storage).list(), () => openSecretItemsStore(deviceKey, storage).list());
   const totp = await readWithFallback(() => openTotpStore(dataKey, storage).list(), () => openTotpStore(deviceKey, storage).list());
   // The icon cache never throws (an unreadable cache is just empty), so "nothing under K" is what falls back to the device key.
@@ -147,15 +165,19 @@ async function readWithFallback<T>(first: () => Promise<T>, second: () => Promis
 export async function disableAccountEncryption(args: { deviceKey: string; password: string }, storage: EncryptionStorage = localStorage): Promise<void> {
   const dataKey = await unlockEncrypted(args.password, storage);
   if (dataKey === null) throw new Error("现在的密码不对");
-  await finishAccountMigration(args.deviceKey, dataKey, storage);
+  return exclusive(storage, (inner) => disableHeld(args.deviceKey, dataKey, inner));
+}
+
+async function disableHeld(deviceKey: string, dataKey: string, storage: EncryptionStorage): Promise<void> {
+  await finishHeld(deviceKey, dataKey, storage);
   const data = await readAll(dataKey, storage);
   const raw = rawCopy(storage);
   // Until the lock is removed, an interrupted disable resumes the existing migration back to K.
   // Keep both wrapped keys intact; no old upgrade backup or new storage format is needed.
   markEncryptedMigrating(storage);
   try {
-    await writeAll(args.deviceKey, data, storage);
-    if (JSON.stringify(await readAll(args.deviceKey, storage)) !== JSON.stringify(data)) throw new Error("核对不一致");
+    await writeAll(deviceKey, data, storage);
+    if (JSON.stringify(await readAll(deviceKey, storage)) !== JSON.stringify(data)) throw new Error("核对不一致");
     storage.removeItem(ACCOUNT_LOCK_KEY);
   } catch (error) {
     restoreRaw(raw, storage);
