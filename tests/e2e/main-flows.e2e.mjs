@@ -388,8 +388,13 @@ test("a 话术 typed by hand stays in the list when a product is picked (D-101)"
   await expect(page.locator(".native-row", { hasText: "自己写的话术" })).toHaveCount(1);
   // 公司 / 我的 sit left of 选择; the sample sheet has no company 话术, so 公司 empties the list and 我的 keeps the row.
   const source = page.locator(".source-filter");
+  const selectButton = page.locator(".section-head .select-toggle", { hasText: /^选择$/ });
+  const before = [await selectButton.boundingBox(), await page.locator(".product-filter").boundingBox()];
   await source.getByRole("button", { name: "公司" }).click();
   await expect(page.locator(".native-row")).toHaveCount(0);
+  // An empty filter result must not move the buttons: 选择 stays, greyed out, and so does 全部产品.
+  await expect(selectButton).toBeDisabled();
+  expect([await selectButton.boundingBox(), await page.locator(".product-filter").boundingBox()]).toEqual(before);
   await source.getByRole("button", { name: "我的" }).click();
   await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".native-row", { hasText: "自己写的话术" })).toHaveCount(1);
