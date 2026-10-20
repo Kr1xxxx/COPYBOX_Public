@@ -13,10 +13,17 @@ import { adminEmails } from "./admin.mjs";
 import { isFreeMailDomain, normalizeDomain } from "./free-mail.mjs";
 
 const hour = 60 * 60 * 1000;
+const day = 24 * hour;
 const codeLifetime = 10 * 60 * 1000;
 const sessionLifetime = 90 * 24 * hour;
 const maxCodeAttempts = 5;
-const codesPerEmailPerHour = 5;
+// Codes per email an hour: 5 from any one IP, 20 in all (D-100), so someone asking for a colleague's email from their
+// own IP cannot use up the colleague's codes, while the inbox is still not flooded.
+const codesPerEmailAndIpPerHour = 5;
+const codesPerEmailPerHour = 20;
+// Mails a day to emails that are not activated, all together (D-100): random addresses cannot use up the mail quota
+// (Resend's free plan sends 100 a day) that staff and activated customers need.
+const notActivatedMailsPerDay = 50;
 const requestsPerIpPerHour = 20;
 // Sign-in tries per IP an hour: room for 20 codes plus typos, too few to keep killing someone's code (D-094).
 const verifiesPerIpPerHour = 30;
@@ -173,9 +180,9 @@ async function requestCount(db, key, now) {
   return row && row.window_start > now - hour ? row.count : 0;
 }
 
-// Counts one request against `key`; answers the hour's count so far (truthy), or 0 when its limit is already reached.
+// Counts one request against `key`; answers the window's count so far (truthy), or 0 when its limit is already reached.
 // Counting and reading are one statement, so a burst of parallel requests cannot all see "under the limit" (D-094).
-export async function allowRequest(db, key, limit, now) {
+export async function allowRequest(db, key, limit, now, windowMs = hour) {
   const row = await db
     .prepare(
       `INSERT INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)
@@ -184,7 +191,7 @@ export async function allowRequest(db, key, limit, now) {
          window_start = CASE WHEN window_start > ?2 - ?3 THEN window_start ELSE ?2 END
        RETURNING count`,
     )
-    .bind(key, now, hour)
+    .bind(key, now, windowMs)
     .first();
   return row.count <= limit ? row.count : 0;
 }
@@ -203,7 +210,8 @@ export async function consumeCode(db, key, code, now) {
 }
 
 async function sweep(db, now) {
-  await db.prepare("DELETE FROM rate_limits WHERE window_start <= ?").bind(now - hour).run();
+  // Daily counters live a day; an hourly one older than an hour just restarts at 1 when next counted.
+  await db.prepare("DELETE FROM rate_limits WHERE window_start <= ?").bind(now - day).run();
   await db.prepare("DELETE FROM login_codes WHERE expires_at <= ?").bind(now).run();
   await db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now).run();
   try {
@@ -441,7 +449,9 @@ async function requestCode(request, env, now) {
     const token = parsed.body?.turnstile;
     if (typeof token !== "string" || !token || !(await verifyTurnstile(env, token, ip))) return fail(400, "captcha");
   }
+  if (!(await allowRequest(db, `email-ip:${email}:${ip}`, codesPerEmailAndIpPerHour, now))) return fail(429, "rate_limited");
   if (!(await allowRequest(db, `email:${email}`, codesPerEmailPerHour, now))) return fail(429, "rate_limited");
+  if (!(await isActivated(env, email)) && !(await allowRequest(db, "mails:not-activated", notActivatedMailsPerDay, now, day))) return fail(429, "rate_limited");
   await sweep(db, now);
   const code = randomCode();
   await db

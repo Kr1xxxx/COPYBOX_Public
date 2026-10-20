@@ -111,7 +111,8 @@ are `{ "error": <code>, "message": <plain Chinese> }`.
 
 `/api/vault` and `/api/library` answer `403 not_activated` for an email that is neither in a bound company domain nor activated by a code (D-086). A missing, unknown or expired token is `401 unauthorized`; a token ended by a newer sign-in is `401 device_limit` (D1
 `ended_sessions` remembers it until it would have expired). Limits: a code lives 10 minutes and dies after 5 wrong
-tries; at most 5 codes per email, 20 code requests and 30 sign-in tries per IP (`CF-Connecting-IP`) each hour;
+tries; at most 5 codes per email from one IP and 20 per email in all, 20 code requests and 30 sign-in tries per IP
+(`CF-Connecting-IP`) each hour; emails that are not activated get at most 50 mails a day together (D-100);
 sessions last 90 days. Counters and tries are counted in the same statement that checks them, so a burst of parallel
 requests cannot slip past a limit (D-094). Any uncaught D1/KV error answers `500 storage_error` JSON.
 
