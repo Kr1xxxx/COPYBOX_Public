@@ -75,7 +75,7 @@ export function useAccountEntries(deviceKey: string, legacySecrets: LegacySecret
       for (const account of totps) add({ id: account.id, tab: "totp", title: accountTitle(account), hint: account.name && account.issuer ? account.name : "验证码", site: detectSite({ issuer: account.issuer, name: account.name }), copy: { label: "复制验证码", text: () => generateTotp(account, Date.now()) } }, account);
       for (const secret of legacySecrets) {
         const tab = classifySecret(secret.label, secret.secret);
-        add({ id: secret.id, tab, legacy: true, title: secret.label || "（没有标题）", hint: "来自「其他」", site: knownSiteOrOther(detectSite({ apiKey: tab === "apikey" ? secret.secret : undefined, name: secret.label })) }, secret);
+        add({ id: secret.id, tab, legacy: true, title: secret.label || "（没有标题）", hint: "来自「其他」", site: knownSiteOrOther(detectSite({ apiKey: tab === "apikey" ? secret.secret : undefined, name: secret.label })), copy: { label: "复制", text: async () => secret.secret } }, secret);
       }
       setError("");
       setLoaded({ base: list, marks });
