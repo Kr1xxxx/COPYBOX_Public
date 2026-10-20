@@ -148,13 +148,18 @@ function fakeServer() {
   return { state, api: createCloudApi(transport) };
 }
 
-function computer(items) {
-  const here = { items, folders: [], sharedSeen: [], base: { snippets: {}, accounts: {} } };
+function computer(items, accounts = null) {
+  const here = { items, folders: [], sharedSeen: [], accounts, locked: false, base: { snippets: {}, accounts: {} } };
   return {
     here,
     async sync(api) {
       const result = await syncOnce({
-        api, token: "t", base: here.base, accounts: null,
+        api, token: "t", base: here.base,
+        accounts: here.accounts && !here.locked ? async (remote, base) => {
+          const merged = mergeAccounts(here.accounts, remote, base, win);
+          here.accounts = merged.items;
+          return merged;
+        } : null,
         snippets: async (remote, base) => {
           const merged = mergeSnippets(side(here.items, here.folders, here.sharedSeen), remote, base);
           here.items = merged.items; here.folders = merged.folders; here.sharedSeen = merged.sharedSeen;
@@ -184,6 +189,55 @@ test("two computers end up with the same 话术, and a sync with nothing new upl
   await pc2.sync(api);
   await pc1.sync(api);
   assert.deepEqual(pc1.here.items.map((item) => item.id), ["b"]);
+});
+
+test("a lost or emptied cloud copy is a first sync again: nothing here is deleted, the cloud is refilled (D-093)", async () => {
+  const { state, api } = fakeServer();
+  const many = Array.from({ length: 15 }, (_, n) => snippet(`s${n}`, `S${n}`));
+  const pc1 = computer(many);
+  await pc1.sync(api);
+  // The server's row is gone (restored, wiped): it answers "no copy" even though pc1's base remembers every entry.
+  state.data = null; state.version = 0;
+  const lost = await pc1.sync(api);
+  assert.equal(pc1.here.items.length, 15);
+  assert.deepEqual(lost.counts, { added: 0, updated: 0, removed: 0 });
+  assert.equal(state.data.snippets.length, 15);
+  // A fresh computer syncs first after the loss and uploads an empty copy; pc1 still keeps everything.
+  state.data = null; state.version = 0;
+  const pc2 = computer([]);
+  await pc2.sync(api);
+  assert.deepEqual(state.data.snippets, []);
+  await pc1.sync(api);
+  assert.equal(pc1.here.items.length, 15);
+  await pc2.sync(api);
+  assert.equal(pc2.here.items.length, 15);
+});
+
+test("a lost cloud copy refilled by a computer with its 账号 page locked does not delete 账号 elsewhere (D-093)", async () => {
+  const { state, api } = fakeServer();
+  const logins = Array.from({ length: 15 }, (_, n) => login(`l${n}`, `pw${n}`));
+  const pc1 = computer([snippet("a", "A")], logins);
+  const pc2 = computer([], []);
+  await pc1.sync(api);
+  await pc2.sync(api);
+  assert.equal(pc2.here.accounts.length, 15);
+  // The row is lost; pc2 syncs first with its 账号 page locked, so the new cloud copy has 话术 but no 账号.
+  state.data = null; state.version = 0;
+  pc2.here.locked = true;
+  await pc2.sync(api);
+  assert.deepEqual(state.data.accounts, []);
+  const result = await pc1.sync(api);
+  assert.equal(result.counts.removed, 0);
+  assert.equal(pc1.here.accounts.length, 15);
+  assert.equal(state.data.accounts.length, 15);
+  // Unlocked again, pc2 still remembers its old 账号 base, so a later deletion on pc1 still reaches it.
+  pc2.here.locked = false;
+  await pc2.sync(api);
+  assert.equal(pc2.here.accounts.length, 15);
+  pc1.here.accounts = pc1.here.accounts.filter((item) => item.id !== "l0");
+  await pc1.sync(api);
+  await pc2.sync(api);
+  assert.equal(pc2.here.accounts.length, 14);
 });
 
 test("when another computer uploads in between, the second round keeps both computers' edits", async () => {
