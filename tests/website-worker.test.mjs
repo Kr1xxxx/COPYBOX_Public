@@ -41,6 +41,12 @@ function fakeEnv(entries = files) {
         const value = opts?.type === "stream" ? new Blob([file.bytes]).stream() : file.bytes.toString();
         return { value, metadata: file.metadata };
       },
+      async get(key, opts) {
+        reads.push(key);
+        const file = store.get(key);
+        if (!file) return null;
+        return opts?.type === "json" ? JSON.parse(file.bytes.toString()) : file.bytes.toString();
+      },
       async list({ prefix }) {
         return { keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })) };
       },
@@ -286,46 +292,77 @@ test("worker: domain bindings (domains/<domain> → 同步码) are never served 
   assert.ok(!env.reads.some((key) => key.startsWith("domains")), env.reads.join(", "));
 });
 
-// Staff installers behind the company password (D-080): the password is checked in the Worker, the file is only
-// streamed after a match, and the page's own source never names the file's address.
+// Staff installers behind the company password (D-080): the password is verified in the Worker, which answers with
+// a cookie; the page and the files are only served verified with that cookie, and the page's own source never names
+// the files' address.
 const staffFiles = {
   ...files,
-  "staff/index.html": '<form method="post" action="/staff/download">',
+  "staff/index.html": '<body><form method="post" action="/staff/verify"></form><span id="staff-version"></span></body>',
   "download/private-t0k3n/Copyboxx-Setup.exe": "MZ staff installer",
   "download/private-t0k3n/Copyboxx-macOS-arm64.zip": "PK staff mac",
+  "download/private-t0k3n/latest.json": '{"version":"2.0.34"}',
 };
 
-function staffPost(body, env) {
-  return get("/staff/download", { method: "POST", body: new URLSearchParams(body), headers: { "CF-Connecting-IP": "1.2.3.4" } }, env);
+function staffVerifyPost(password, env) {
+  return get("/staff/verify", { method: "POST", body: new URLSearchParams({ password }), headers: { "CF-Connecting-IP": "1.2.3.4" } }, env);
 }
 
-test("worker: /staff/download sends the file only after the right password", async () => {
+test("worker: /staff/verify sets a cookie for the right password; page and files are only served with it", async () => {
   const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "open sesame" };
-  const win = await staffPost({ password: "open sesame", file: "win" }, env);
+  const ok = await staffVerifyPost("open sesame", env);
+  assert.equal(ok.status, 303);
+  assert.equal(ok.headers.get("Location"), "/staff/#ok");
+  const cookie = ok.headers.get("Set-Cookie");
+  assert.match(cookie, /^staff=[0-9a-f]{64}; Path=\/staff; Max-Age=43200; HttpOnly; Secure; SameSite=Lax$/);
+  assert.ok(!cookie.includes("open sesame"));
+  const Cookie = cookie.split(";")[0];
+
+  const plain = await get("/staff/", {}, env);
+  assert.equal(plain.status, 200);
+  assert.ok(!(await plain.text()).includes("staff-verified"));
+  const verified = await get("/staff/", { headers: { Cookie: `theme=dark; ${Cookie}` } }, env);
+  assert.equal(verified.status, 200);
+  assert.equal(verified.headers.get("Cache-Control"), "no-store");
+  const html = await verified.text();
+  assert.ok(html.includes('<body class="staff-verified">'), html);
+  assert.ok(html.includes('id="staff-version">2.0.34<'), html);
+
+  const win = await get("/staff/file/win", { headers: { Cookie } }, env);
   assert.equal(win.status, 200);
   assert.equal(win.headers.get("Content-Disposition"), 'attachment; filename="Copyboxx-Setup.exe"');
   assert.equal(win.headers.get("Cache-Control"), "no-store");
   assert.equal(await win.text(), "MZ staff installer");
-  const mac = await staffPost({ password: "open sesame", file: "mac" }, env);
+  const mac = await get("/staff/file/mac", { headers: { Cookie } }, env);
   assert.equal(mac.headers.get("Content-Disposition"), 'attachment; filename="Copyboxx-macOS-arm64.zip"');
   assert.equal(await mac.text(), "PK staff mac");
+  assert.equal((await get("/staff/file/linux", { headers: { Cookie } }, env)).status, 404);
+
+  for (const bad of [undefined, "staff=", `staff=${"0".repeat(64)}`, Cookie.slice(0, -1), "staff=open sesame"]) {
+    const refused = await get("/staff/file/win", bad ? { headers: { Cookie: bad } } : {}, env);
+    assert.equal(refused.status, 303, bad);
+    assert.equal(refused.headers.get("Location"), "/staff/");
+  }
 
   for (const password of ["open sesam", "open sesame ", "", "OPEN SESAME"]) {
-    const wrong = await staffPost({ password, file: "win" }, env);
+    const wrong = await staffVerifyPost(password, env);
     assert.equal(wrong.status, 303, password);
     assert.equal(wrong.headers.get("Location"), "/staff/#wrong");
+    assert.equal(wrong.headers.get("Set-Cookie"), null);
     assert.equal(await wrong.text(), "");
   }
-  assert.equal((await staffPost({ password: "open sesame", file: "linux" }, env)).status, 400);
-  assert.equal((await get("/staff/download", {}, env)).status, 405);
+  assert.equal((await get("/staff/verify", {}, env)).status, 405);
+  assert.equal((await get("/staff/verify", { method: "POST", body: "{}", headers: { "Content-Type": "application/json" } }, env)).status, 400);
+  assert.equal((await get("/staff/download", { method: "POST", body: new URLSearchParams({ password: "open sesame", file: "win" }) }, env)).status, 405);
   // The private files stay reachable only by their unlisted address or through the gate: never listed on the site.
-  assert.equal((await get("/staff/", {}, env)).status, 200);
+  assert.equal((await get("/download/private-t0k3n/Copyboxx-Setup.exe", {}, env)).status, 200);
 });
 
-test("worker: /staff/download without the secret, without the file, and over the hourly limit", async () => {
-  assert.equal((await staffPost({ password: "x", file: "win" }, fakeEnv(staffFiles))).status, 503);
+test("worker: /staff/verify without the secret, without the file, and over the hourly limit", async () => {
+  assert.equal((await staffVerifyPost("x", fakeEnv(staffFiles))).status, 503);
+  assert.equal((await get("/staff/file/win", { headers: { Cookie: `staff=${"a".repeat(64)}` } }, fakeEnv(staffFiles))).status, 303);
   const missing = { ...fakeEnv(files), STAFF_PASSWORD: "pw" };
-  assert.equal((await staffPost({ password: "pw", file: "win" }, missing)).status, 404);
+  const cookie = (await staffVerifyPost("pw", missing)).headers.get("Set-Cookie").split(";")[0];
+  assert.equal((await get("/staff/file/win", { headers: { Cookie: cookie } }, missing)).status, 404);
 
   // A D1 stand-in that counts: the 21st try in the hour is refused before the password is looked at.
   const rows = new Map();
@@ -341,7 +378,7 @@ test("worker: /staff/download without the secret, without the file, and over the
     }),
   };
   const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "pw", DB: db };
-  for (let i = 0; i < 20; i += 1) assert.equal((await staffPost({ password: "bad", file: "win" }, env)).status, 303);
-  const limited = await staffPost({ password: "pw", file: "win" }, env);
+  for (let i = 0; i < 20; i += 1) assert.equal((await staffVerifyPost("bad", env)).status, 303);
+  const limited = await staffVerifyPost("pw", env);
   assert.equal(limited.headers.get("Location"), "/staff/#limit");
 });
