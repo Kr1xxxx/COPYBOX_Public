@@ -236,12 +236,15 @@ pub async fn check_update(app: AppHandle, state: tauri::State<'_, Updates>) -> R
     }
     let current = app.package_info().version.to_string();
     let fetched = async {
-        let client = reqwest::Client::builder().timeout(CHECK_TIMEOUT).build().ok()?;
-        let response = client.get(&url).header("cache-control", "no-store").send().await.ok()?;
-        if !response.status().is_success() {
-            return None;
+        // System proxy first, then direct (cloud.rs).
+        for client in crate::cloud::clients(|builder| builder.timeout(CHECK_TIMEOUT)) {
+            let Ok(response) = client.get(&url).header("cache-control", "no-store").send().await else { continue };
+            if !response.status().is_success() {
+                return None;
+            }
+            return serde_json::from_str::<serde_json::Value>(&response.text().await.ok()?).ok();
         }
-        serde_json::from_str::<serde_json::Value>(&response.text().await.ok()?).ok()
+        None
     }
     .await;
     let Some(manifest) = fetched else { return Ok(UpdateInfo::status("error")) };

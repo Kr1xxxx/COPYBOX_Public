@@ -20,7 +20,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
 tokio = { version = "1", features = ["net", "io-util", "time", "sync"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# system-proxy: the Mac / Windows system proxy (登录同步, updates, AI); site icons and the shared library opt out.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "system-proxy"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }

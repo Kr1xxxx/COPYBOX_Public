@@ -11,9 +11,10 @@ const BASE: &str = "https://copyboxx.com";
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// The page refuses to upload more than 5 MB; a little room for the JSON around it.
 const MAX_BYTES: usize = 6 * 1024 * 1024;
-const PATHS: [(&str, &str); 7] = [
+const PATHS: [(&str, &str); 8] = [
     ("POST", "/api/auth/code"),
     ("POST", "/api/auth/verify"),
+    ("POST", "/api/activate"),
     ("GET", "/api/vault"),
     ("PUT", "/api/vault"),
     ("GET", "/api/library"),
@@ -39,6 +40,31 @@ pub fn is_allowed(method: &str, path: &str) -> bool {
     PATHS.iter().any(|(m, p)| *m == method && *p == path)
 }
 
+/// "network: <why>" with the whole cause chain (dns, connect, timeout, certificate), so the login page can say
+/// what failed instead of only "cannot reach the server".
+fn describe(error: reqwest::Error) -> String {
+    let mut text = format!("network: {error}");
+    let mut source = std::error::Error::source(&error);
+    while let Some(cause) = source {
+        text.push_str(&format!(": {cause}"));
+        source = cause.source();
+    }
+    text
+}
+
+/// Two ways to the server, tried in this order: through the computer's system proxy (the same route as the browser;
+/// without a proxy this is already a direct connection), then directly, so a proxy that cannot reach copyboxx.com
+/// does not lock anyone out (owner, 2026-10-20).
+pub(crate) fn clients(configure: impl Fn(reqwest::ClientBuilder) -> reqwest::ClientBuilder) -> Vec<reqwest::Client> {
+    [false, true]
+        .into_iter()
+        .filter_map(|direct| {
+            let builder = configure(reqwest::Client::builder());
+            (if direct { builder.no_proxy() } else { builder }).build().ok()
+        })
+        .collect()
+}
+
 fn is_token(value: &str) -> bool {
     !value.is_empty() && value.len() <= 512 && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
@@ -55,28 +81,33 @@ pub async fn cloud_request(request: CloudRequest) -> Result<CloudResponse, Strin
     if body.as_ref().is_some_and(|bytes| bytes.len() > MAX_BYTES) {
         return Err("too large".into());
     }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(TIMEOUT)
-        .build()
-        .map_err(|_| "network".to_string())?;
     let method = reqwest::Method::from_bytes(request.method.as_bytes()).map_err(|_| "invalid".to_string())?;
-    let mut builder = client.request(method, format!("{BASE}{}", request.path)).header("accept", "application/json");
-    if let Some(token) = request.token.as_deref() {
-        if !is_token(token) {
-            return Err("invalid".into());
+    if request.token.as_deref().is_some_and(|token| !is_token(token)) {
+        return Err("invalid".into());
+    }
+    let mut failure = "network".to_string();
+    for client in clients(|builder| builder.redirect(reqwest::redirect::Policy::none()).timeout(TIMEOUT)) {
+        let mut builder = client.request(method.clone(), format!("{BASE}{}", request.path)).header("accept", "application/json");
+        if let Some(token) = request.token.as_deref() {
+            builder = builder.header("authorization", format!("Bearer {token}"));
         }
-        builder = builder.header("authorization", format!("Bearer {token}"));
+        if let Some(bytes) = &body {
+            builder = builder.header("content-type", "application/json").body(bytes.clone());
+        }
+        // shortcut: a request that reached the server but timed out on the way back is sent again directly (a second
+        // 验证码 email at worst); upgrade to a per-attempt connect timeout if that ever shows up.
+        match builder.send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                let Some(bytes) = read_capped(response, MAX_BYTES).await.map_err(describe)? else {
+                    return Err("too large".into());
+                };
+                return Ok(CloudResponse { status, text: String::from_utf8_lossy(&bytes).into_owned() });
+            }
+            Err(error) => failure = describe(error),
+        }
     }
-    if let Some(bytes) = body {
-        builder = builder.header("content-type", "application/json").body(bytes);
-    }
-    let response = builder.send().await.map_err(|_| "network".to_string())?;
-    let status = response.status().as_u16();
-    let Some(bytes) = read_capped(response, MAX_BYTES).await.map_err(|_| "network".to_string())? else {
-        return Err("too large".into());
-    };
-    Ok(CloudResponse { status, text: String::from_utf8_lossy(&bytes).into_owned() })
+    Err(failure)
 }
 
 #[cfg(test)]
@@ -89,9 +120,15 @@ mod tests {
         assert!(is_allowed("PUT", "/api/vault"));
         assert!(is_allowed("DELETE", "/api/account"));
         assert!(is_allowed("GET", "/api/library"));
+        assert!(is_allowed("POST", "/api/activate"));
         for (method, path) in [("GET", "/api/account"), ("POST", "/api/vault/../x"), ("GET", "https://evil.example/api/vault"), ("GET", "//evil.example/api/vault"), ("PATCH", "/api/vault"), ("PUT", "/api/library"), ("GET", "/api/library/../vault"), ("GET", "")] {
             assert!(!is_allowed(method, path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn the_server_is_tried_through_the_proxy_and_then_directly() {
+        assert_eq!(clients(|builder| builder.timeout(TIMEOUT)).len(), 2);
     }
 
     #[test]
