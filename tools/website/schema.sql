@@ -34,8 +34,9 @@ CREATE TABLE IF NOT EXISTS ended_sessions (
   expires_at INTEGER
 );
 
--- Hourly counters, e.g. "ip:<address>" (20 code requests), "email:<address>" (5 codes), "verify-ip:<address>" (30 sign-in
--- tries); bumped and read in one statement (D-094).
+-- Counters, e.g. hourly "ip:<address>" (20 code requests), "email-ip:<email>:<address>" (5 codes), "email:<address>"
+-- (20 codes), "verify-ip:<address>" (30 sign-in tries) and daily "mails:not-activated" (50); bumped and read in one
+-- statement (D-094, D-100).
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,
   window_start INTEGER,

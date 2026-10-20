@@ -207,25 +207,49 @@ test("api: a new email and a registered one get the same answer; malformed email
   assert.equal((await call(env, "POST", "/api/auth/code", { raw: "{oops" })).status, 400);
 });
 
-test("api: at most 5 codes per email and 20 requests per IP each hour", async (t) => {
+test("api: at most 5 codes per email from one IP, 20 per email in all, and 20 requests per IP each hour (D-100)", async (t) => {
   const env = fakeEnv();
   const sent = stubMail(t);
   for (let i = 0; i < 5; i += 1) {
-    assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: `198.51.100.${i}` })).status, 200);
+    assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "198.51.100.1" })).status, 200);
   }
-  const limited = await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "198.51.100.99" });
+  const limited = await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "198.51.100.1" });
   assert.equal(limited.status, 429);
   const limitedBody = await limited.json();
   assert.equal(limitedBody.error, "rate_limited");
   assert.match(limitedBody.message, /频繁/);
   assert.equal(sent.length, 5);
-  const nextHour = await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, now: clock + 60 * 60 * 1000 + 1 });
+  // Someone else asking for this email does not lock its owner out: the owner's own IP still gets codes.
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "198.51.100.2" })).status, 200);
+  for (let i = 3; i < 17; i += 1) {
+    assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: `198.51.100.${i}` })).status, 200);
+  }
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "198.51.100.50" })).status, 429, "20 codes an hour per email in all");
+  const nextHour = await call(env, "POST", "/api/auth/code", { body: { email: "a@example.com" }, ip: "198.51.100.1", now: clock + 60 * 60 * 1000 + 1 });
   assert.equal(nextHour.status, 200, "the limit resets after an hour");
 
   for (let i = 0; i < 20; i += 1) {
     assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: `p${i}@example.com` }, ip: "192.0.2.7" })).status, 200);
   }
   assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "p99@example.com" }, ip: "192.0.2.7" })).status, 429);
+});
+
+test("api: emails that are not activated get at most 50 mails a day in all; activated ones are never held back (D-100)", async (t) => {
+  const env = fakeEnv();
+  const sent = stubMail(t);
+  activateEmail(env, "staff@example.com");
+  for (let i = 0; i < 50; i += 1) {
+    assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: `r${i}@example.com` }, ip: `198.51.100.${i}` })).status, 200);
+  }
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "r99@example.com" }, ip: "192.0.2.50" })).status, 429);
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "staff@example.com" }, ip: "192.0.2.51" })).status, 200);
+  assert.equal(sent.length, 51);
+  const later = clock + 2 * 60 * 60 * 1000;
+  // An allowed request later the same day sweeps old counters; the daily one must survive that.
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "staff@example.com" }, ip: "192.0.2.53", now: later })).status, 200);
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "r99@example.com" }, ip: "192.0.2.52", now: later })).status, 429, "still the same day");
+  const tomorrow = clock + 24 * 60 * 60 * 1000 + 1;
+  assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "r99@example.com" }, ip: "192.0.2.52", now: tomorrow })).status, 200);
 });
 
 test("api: a burst of parallel requests cannot get past the hourly limits (D-094)", async (t) => {
