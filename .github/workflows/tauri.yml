@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Owner 2026-10-20: on main this runs only every 5th preview version (scripts/ci-due.mjs); by hand it always runs.
+  # Owner 2026-10-20: on main this runs only when VERSION crosses a 0.05 step (scripts/ci-due.mjs, D-090); by hand it always runs.
   due:
     name: every 5th version
     runs-on: ubuntu-latest
@@ -30,6 +30,7 @@ jobs:
         run: node scripts/ci-due.mjs
         env:
           EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
 
   build:
     needs: due
