@@ -215,14 +215,16 @@ test("rejects unsupported extensions, damaged files and oversized files", async 
   await assert.rejects(parseSnippetWorkbook(new ArrayBuffer(21 * 1024 * 1024), "大.xlsx"), /表格文件太大/);
 });
 
-test("matches structured product groups without hiding legacy snippets in the default filter", () => {
+test("matches structured product groups and never hides snippets that have no product (D-101)", () => {
   const structured = normalizeSnippetRow(baseRow, 2).item;
   const legacy = { id: "legacy", label: "旧话术", secret: "hello", note: "", color: "#fff", kind: "snippet", createdAt: 1, updatedAt: 1 };
   assert.equal(matchesSnippetProduct(structured, "包装/Logo"), true);
   assert.equal(matchesSnippetProduct(structured, "物流/清关"), false);
   assert.equal(matchesSnippetProduct(structured, "全部产品"), true);
   assert.equal(matchesSnippetProduct(legacy, "全部产品"), true);
-  assert.equal(matchesSnippetProduct(legacy, "睫毛"), false);
+  assert.equal(matchesSnippetProduct(legacy, "睫毛"), true);
+  const handTyped = { ...legacy, snippetMeta: { ...structured.snippetMeta, productGroups: [], rawProduct: "" } };
+  assert.equal(matchesSnippetProduct(handTyped, "镊子"), true);
 });
 
 test("requires placeholder values before copy; the old 发送前确认 / 发送前核实 ticks no longer matter", () => {
