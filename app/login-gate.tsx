@@ -1,16 +1,16 @@
 "use client";
 
-// The login page (D-085): the app opens only after an email-code sign-in. Email + 人机验证 → code → (an email outside
-// the company domain) activation code. Shown by page.tsx instead of the app while nobody is signed in on this computer.
+// The login page (D-085): the app opens only after an email-code sign-in. Email → code → (an email outside the company
+// domain) activation code. 人机验证 only when the server asks for it, i.e. after frequent code requests (D-087). Shown by page.tsx instead of the app while nobody is signed in on this computer.
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { maskEmail } from "./account-lock";
 import { BrandWordmark } from "./brand-wordmark";
-import { looksLikeEmail, normalizeEmail } from "./cloud-client";
+import { CloudError, looksLikeEmail, normalizeEmail } from "./cloud-client";
 import { DEMO_ACTIVATION, DEMO_CODE } from "./cloud-demo";
 import { errorText, type CloudSync } from "./cloud-sync-ui";
 import type { ThemeChoice } from "./preferences";
 
-// Cloudflare Turnstile (人机验证) before a code is sent. The site key is public; the server checks the token.
+// Cloudflare Turnstile (人机验证), shown once the server answered `captcha`. The site key is public; the server checks the token.
 export const TURNSTILE_SITE_KEY = "0x4AAAAAAFbunVqZ_GEl5V7v";
 const TURNSTILE_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 const RESEND_AFTER_S = 60;
@@ -77,8 +77,10 @@ export function LoginGate({ cloud, theme }: { cloud: CloudSync; theme: ThemeChoi
   const [wait, setWait] = useState(0);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  // Set once the server refused a code request with `captcha`; from then on the widget stays for this login.
+  const [needCaptcha, setNeedCaptcha] = useState(false);
   const captchaBox = useRef<HTMLDivElement>(null);
-  const captcha = useTurnstile(!cloud.demo && step === "email", theme, captchaBox);
+  const captcha = useTurnstile(needCaptcha && step === "email", theme, captchaBox);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, [step]);
@@ -90,14 +92,19 @@ export function LoginGate({ cloud, theme }: { cloud: CloudSync; theme: ThemeChoi
 
   async function send() {
     if (!looksLikeEmail(email)) { setError("邮箱格式不对，请检查一下"); return; }
-    if (!cloud.demo && !captcha.token) { setError(captcha.failed ? "人机验证没有加载出来，请检查网络后重试" : "请先完成人机验证"); return; }
+    if (needCaptcha && !captcha.token) { setError(captcha.failed ? "人机验证没有加载出来，请检查网络后重试" : "请先完成人机验证"); return; }
     setWorking(true); setError("");
     try {
       await cloud.sendCode(email, captcha.token);
       setStep("code");
       setCode("");
       setWait(RESEND_AFTER_S);
-    } catch (failure) { setError(errorText(failure)); captcha.reset(); }
+    } catch (failure) {
+      setError(errorText(failure));
+      captcha.reset();
+      // Asked too often: the widget appears on the email step (also when resending from the code step).
+      if (failure instanceof CloudError && failure.code === "captcha") { setNeedCaptcha(true); setStep("email"); }
+    }
     setWorking(false);
   }
 
@@ -134,7 +141,7 @@ export function LoginGate({ cloud, theme }: { cloud: CloudSync; theme: ThemeChoi
           <label htmlFor="login-email">邮箱</label>
           <input ref={inputRef} id="login-email" type="email" autoComplete="email" spellCheck={false} placeholder="填你的工作邮箱" value={email}
             onChange={(event) => { setEmail(event.target.value); setError(""); }} />
-          {!cloud.demo && <div className="login-captcha">
+          {needCaptcha && <div className="login-captcha">
             <div ref={captchaBox} />
             {captcha.failed && <small>人机验证没有加载出来。<button type="button" className="login-link" onClick={captcha.retry}>重新加载</button></small>}
           </div>}
