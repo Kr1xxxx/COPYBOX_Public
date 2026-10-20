@@ -219,6 +219,13 @@ test("the server's answers turn into plain messages: too big, not available yet,
   await assert.rejects(api.getVault("t"), { code: "signed_out" });
 });
 
+test("when the shell cannot reach the server, the message carries the shell's reason (cloud.rs)", async () => {
+  const failing = createCloudApi(async () => { throw new Error("network: error sending request: dns error: no such host"); });
+  await assert.rejects(failing.sendCode("a@example.com"), { code: "network", message: "连不上服务器，请检查网络后再试（error sending request: dns error: no such host）" });
+  const bare = createCloudApi(async () => { throw new Error("network"); });
+  await assert.rejects(bare.sendCode("a@example.com"), { code: "network", message: "连不上服务器，请检查网络后再试" });
+});
+
 test("at most 3 computers: a new sign-in hears which ones signed out, an ended one hears why (D-069)", async () => {
   const answers = {
     "POST /api/auth/verify": { status: 200, text: JSON.stringify({ token: "new", email: "a@example.com", signedOut: ["Windows 电脑", 7] }) },

@@ -11,9 +11,10 @@ const BASE: &str = "https://copyboxx.com";
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// The page refuses to upload more than 5 MB; a little room for the JSON around it.
 const MAX_BYTES: usize = 6 * 1024 * 1024;
-const PATHS: [(&str, &str); 7] = [
+const PATHS: [(&str, &str); 8] = [
     ("POST", "/api/auth/code"),
     ("POST", "/api/auth/verify"),
+    ("POST", "/api/activate"),
     ("GET", "/api/vault"),
     ("PUT", "/api/vault"),
     ("GET", "/api/library"),
@@ -37,6 +38,18 @@ pub struct CloudResponse {
 
 pub fn is_allowed(method: &str, path: &str) -> bool {
     PATHS.iter().any(|(m, p)| *m == method && *p == path)
+}
+
+/// "network: <why>" with the whole cause chain (dns, connect, timeout, certificate), so the login page can say
+/// what failed instead of only "cannot reach the server".
+fn describe(error: reqwest::Error) -> String {
+    let mut text = format!("network: {error}");
+    let mut source = std::error::Error::source(&error);
+    while let Some(cause) = source {
+        text.push_str(&format!(": {cause}"));
+        source = cause.source();
+    }
+    text
 }
 
 fn is_token(value: &str) -> bool {
@@ -71,9 +84,9 @@ pub async fn cloud_request(request: CloudRequest) -> Result<CloudResponse, Strin
     if let Some(bytes) = body {
         builder = builder.header("content-type", "application/json").body(bytes);
     }
-    let response = builder.send().await.map_err(|_| "network".to_string())?;
+    let response = builder.send().await.map_err(describe)?;
     let status = response.status().as_u16();
-    let Some(bytes) = read_capped(response, MAX_BYTES).await.map_err(|_| "network".to_string())? else {
+    let Some(bytes) = read_capped(response, MAX_BYTES).await.map_err(describe)? else {
         return Err("too large".into());
     };
     Ok(CloudResponse { status, text: String::from_utf8_lossy(&bytes).into_owned() })
@@ -89,6 +102,7 @@ mod tests {
         assert!(is_allowed("PUT", "/api/vault"));
         assert!(is_allowed("DELETE", "/api/account"));
         assert!(is_allowed("GET", "/api/library"));
+        assert!(is_allowed("POST", "/api/activate"));
         for (method, path) in [("GET", "/api/account"), ("POST", "/api/vault/../x"), ("GET", "https://evil.example/api/vault"), ("GET", "//evil.example/api/vault"), ("PATCH", "/api/vault"), ("PUT", "/api/library"), ("GET", "/api/library/../vault"), ("GET", "")] {
             assert!(!is_allowed(method, path), "{method} {path}");
         }

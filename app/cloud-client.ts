@@ -50,6 +50,13 @@ const MESSAGES: Record<CloudErrorCode, string> = {
   server: "服务器出了点问题，请稍后再试",
 };
 
+// The shell says why it could not reach the server ("network: …", cloud.rs); that reason goes after the plain message,
+// so a screenshot of the login page shows what failed (no developer tools in a real install).
+function networkMessage(failure: unknown) {
+  const reason = failure instanceof Error ? failure.message.replace(/^network:\s*/, "").trim() : "";
+  return reason && reason !== "network" ? `${MESSAGES.network}（${reason}）` : MESSAGES.network;
+}
+
 function parse(text: string): Record<string, unknown> {
   try {
     const value = JSON.parse(text) as unknown;
@@ -59,7 +66,7 @@ function parse(text: string): Record<string, unknown> {
 
 async function call(transport: CloudTransport, request: CloudRequest): Promise<Record<string, unknown>> {
   let response: CloudResponse;
-  try { response = await transport(request); } catch { throw new CloudError("network", MESSAGES.network); }
+  try { response = await transport(request); } catch (failure) { throw new CloudError("network", networkMessage(failure)); }
   const body = parse(response.text);
   if (response.status >= 200 && response.status < 300) return body;
   const code = typeof body.error === "string" ? body.error : "";
