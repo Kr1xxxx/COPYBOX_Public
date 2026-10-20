@@ -1,7 +1,7 @@
 # Login page: say why the server could not be reached; system proxy; /api/activate
 
 - Date: 2026-10-20 · Thread/agent: 【修复】内部版登录「连不上服务器」
-- What changed: `cloud.rs` returns `network: <cause chain>` (dns, connect, timeout, certificate) instead of a bare
+- What changed: `cloud.rs` returns "network: …" with the whole cause chain (dns, connect, timeout, certificate) instead of a bare
   `network`, and the login page shows that reason in brackets after 「连不上服务器，请检查网络后再试」, so a screenshot
   of a real install says what failed. `POST /api/activate` is now on the shell's allow-list (the 激活码 step always
   said 「连不上服务器」 in a real install). reqwest gets the `system-proxy` feature: 登录同步, updates, AI and TinyPNG
