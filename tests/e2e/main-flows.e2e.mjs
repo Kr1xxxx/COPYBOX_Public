@@ -710,3 +710,13 @@ test("the 发送前确认 and 发送前核实 ticks are gone and copying does no
   await expect(row.locator(".copy-warning")).toHaveCount(0);
   await expect(row).not.toContainText("发送前核实");
 });
+
+test("a 话术 saved without a title is named after the first line of its content", async ({ page }) => {
+  await page.getByRole("button", { name: /新增/ }).first().click();
+  const editor = page.locator(".inline-editor");
+  await expect(editor.locator("input").first()).toHaveAttribute("placeholder", "可不填，默认用第一行");
+  await expect(editor.locator(".editor-save").first()).toBeDisabled();
+  await editor.getByRole("textbox", { name: "话术内容" }).fill("\nThanks for waiting, your parcel ships today\nSecond line");
+  await editor.locator(".editor-save").first().click();
+  await expect(page.locator(".native-row .row-title strong", { hasText: "Thanks for waiting" })).toHaveText("Thanks for waiting,");
+});
