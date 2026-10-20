@@ -87,3 +87,16 @@ test("shared 话术 export round-trips through the 话术 document import, fill-
   assert.equal(buildSnippetDocImportPreview(doc, preview.items, () => "id", 0).duplicateCount, 3);
   assert.equal(snippetShareText(items.slice(0, 1)), "新询盘｜通用开场\nHi 名字 👋\nPrice is $金额.\n");
 });
+
+test("blank lines and lines that look like headings, notes or dividers survive export and import (D-091)", async () => {
+  const { buildSnippetDocImportPreview, parseSnippetDocument, snippetShareDocument } = await import("../app/snippet-doc.ts");
+  const secret = "Hi [名字]\n\n## Step 1\n**Bold line**\n> quoted\n---\n# tag\n\\ back\n\n\nBye";
+  const doc = snippetShareDocument([{ label: "测试", secret, folder: "开场" }]);
+  assert.doesNotMatch(doc, /^## Step 1$/m);
+  const [item] = buildSnippetDocImportPreview(doc, [], () => "id", 0).items;
+  assert.equal(item.secret, secret);
+  assert.equal(item.label, "测试");
+  // Leading and trailing blank lines are still dropped; blocks with no **title** still split on a blank line.
+  const parsed = parseSnippetDocument("## 01 A\n### 1.1 B\n**T**\n\nOne\n\nTwo\n\n\n### 1.2 C\nFirst\n\nSecond\n");
+  assert.deepEqual(parsed.items.map((entry) => entry.secret), ["One\n\nTwo", "First", "Second"]);
+});
