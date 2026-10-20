@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import worker, {
   cacheControlFor,
   candidateKeys,
   contentTypeFor,
   httpsRedirect,
+  staffVerify,
   syncKeyFor,
 } from "../tools/website/worker.mjs";
 
@@ -362,6 +365,15 @@ test("worker: /staff/verify sets a cookie for the right password; page and files
   assert.equal((await get("/download/private-t0k3n/Copyboxx-Setup.exe", {}, env)).status, 200);
 });
 
+test("worker: a /staff/ cookie stops working a day after it was made, even if copied (D-094)", async () => {
+  const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "open sesame" };
+  const made = (at) => staffVerify(new Request("https://copyboxx.com/staff/verify", { method: "POST", body: new URLSearchParams({ password: "open sesame" }) }), env, at);
+  const old = (await made(Date.now() - 25 * 60 * 60 * 1000)).headers.get("Set-Cookie").split(";")[0];
+  assert.equal((await get("/staff/file/win", { headers: { Cookie: old } }, env)).status, 303);
+  const recent = (await made(Date.now() - 11 * 60 * 60 * 1000)).headers.get("Set-Cookie").split(";")[0];
+  assert.equal((await get("/staff/file/win", { headers: { Cookie: recent } }, env)).status, 200);
+});
+
 test("worker: /staff/verify without the secret, without the file, and over the hourly limit", async () => {
   assert.equal((await staffVerifyPost("x", fakeEnv(staffFiles))).status, 503);
   assert.equal((await get("/staff/file/win", { headers: { Cookie: `staff=${"a".repeat(64)}` } }, fakeEnv(staffFiles))).status, 303);
@@ -369,19 +381,10 @@ test("worker: /staff/verify without the secret, without the file, and over the h
   const cookie = (await staffVerifyPost("pw", missing)).headers.get("Set-Cookie").split(";")[0];
   assert.equal((await get("/staff/file/win", { headers: { Cookie: cookie } }, missing)).status, 404);
 
-  // A D1 stand-in that counts: the 21st try in the hour is refused before the password is looked at.
-  const rows = new Map();
-  const db = {
-    prepare: (sql) => ({
-      bind: (...args) => ({
-        first: async () => rows.get(args[0]) ?? null,
-        run: async () => {
-          if (sql.startsWith("INSERT")) rows.set(args[0], { window_start: args[1], count: 1 });
-          else rows.get(args[0]).count += 1;
-        },
-      }),
-    }),
-  };
+  // A D1 stand-in on SQLite with the real schema: the 21st try in the hour is refused before the password is looked at.
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(readFileSync("tools/website/schema.sql", "utf8"));
+  const db = { prepare: (sql) => ({ bind: (...args) => ({ first: async () => sqlite.prepare(sql).get(...args) ?? null }) }) };
   const env = { ...fakeEnv(staffFiles), STAFF_PASSWORD: "pw", DB: db };
   for (let i = 0; i < 20; i += 1) assert.equal((await staffVerifyPost("bad", env)).status, 303);
   const limited = await staffVerifyPost("pw", env);

@@ -12,7 +12,7 @@ The design (tokens, layouts, page contents) is `docs/specs/website-design.md`.
 | `/contact/` | The inquiry form (D-092; the public installer is no longer on the site, owner 2026-10-20): name, email, company, message, a Cloudflare Turnstile widget (the login widget's site key) and 「发送」, which stays disabled until the widget passes. `POST /contact/send` (form fields plus `cf-turnstile-response`) checks the token with Cloudflare (`TURNSTILE_SECRET`), then mails the inquiry through Resend to every address in `ADMIN_EMAILS` with the visitor's address as reply-to, and goes back to `/contact/#sent`; problems go to `#bad` (missing field or bad email), `#captcha` (no or refused token), `#limit` (the 6th inquiry from one IP in an hour, via `rate_limits`) or `#failed` (Resend refused). Without `TURNSTILE_SECRET`, `RESEND_API_KEY` or `ADMIN_EMAILS` it answers 503. `/download/` and `/download` answer 308 to `/contact/`; `/download/Copyboxx-Setup.exe` and `/download/latest.json` are gone (404), so public 1.83 installs no longer find an update |
 | `/help/` | 使用说明: a short overview, one section (two or three sentences) per part of the app, with an in-page list at the top and the FAQ at `#faq` |
 | `/privacy/` | 隐私说明 |
-| `/staff/` | 内部版下载 (D-080): a password field and a 「验证」 button; `noindex`, not in the nav or sitemap. `POST /staff/verify` (`password`) checks the password against the Worker secret `STAFF_PASSWORD` (set it in the dashboard; never in the repo): right → 303 `/staff/#ok` with the cookie `staff` (a hash of the password, 12 h, HttpOnly), wrong → 303 `/staff/#wrong`, the 21st try from one IP in an hour → `/staff/#limit`, no secret 503, `GET` 405. With the cookie, `GET /staff/` is served marked verified (download buttons, version from the staff build's `latest.json`) and `GET /staff/file/win` \| `mac` streams the newest staff build from `download/private-<token>/` (uploaded by the packaging thread); without it they go back to `/staff/` |
+| `/staff/` | 内部版下载 (D-080): a password field and a 「验证」 button; `noindex`, not in the nav or sitemap. `POST /staff/verify` (`password`) checks the password against the Worker secret `STAFF_PASSWORD` (set it in the dashboard; never in the repo): right → 303 `/staff/#ok` with the cookie `staff` (a hash of the password and the 12-hour slot, so a copied cookie stops working after 12–24 h; HttpOnly), wrong → 303 `/staff/#wrong`, the 21st try from one IP in an hour → `/staff/#limit`, no secret 503, `GET` 405. With the cookie, `GET /staff/` is served marked verified (download buttons, version from the staff build's `latest.json`) and `GET /staff/file/win` \| `mac` streams the newest staff build from `download/private-<token>/` (uploaded by the packaging thread); without it they go back to `/staff/` |
 | `/assets/site.<hash>.css` | The stylesheet; its name carries the first 8 hex of its sha256, so a changed file gets a new name |
 | `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/og-image.png` | Icons and the share card, copied from `icons/` |
 | `/images/*.png` | App screenshots (`app-win-light.png`, `app-win-dark.png`), copied from `images/` |
@@ -98,7 +98,7 @@ are `{ "error": <code>, "message": <plain Chinese> }`.
 
 | Request | Answer |
 | --- | --- |
-| `POST /api/auth/code` `{email, turnstile?}` | `200 {ok:true}` for any well-formed email, registered or not (creates the user on first use; mails the code through Resend). `400 bad_email`, `429 rate_limited`, `503 unavailable` (no `RESEND_API_KEY`), `502 mail_failed`. While the secret `TURNSTILE_SECRET` is set (D-086), the 4th request from one email or one IP within an hour (D-087) must carry `turnstile`, a token the app's Turnstile widget produced, checked with Cloudflare; otherwise `400 captcha`. The first 3 need no token |
+| `POST /api/auth/code` `{email, turnstile?}` | `200 {ok:true}` for any well-formed email, registered or not (mails the code through Resend; the user row is only created by a right code, D-094). `400 bad_email`, `429 rate_limited`, `503 unavailable` (no `RESEND_API_KEY`), `502 mail_failed`. While the secret `TURNSTILE_SECRET` is set (D-086), the 4th request from one email or one IP within an hour (D-087) must carry `turnstile`, a token the app's Turnstile widget produced, checked with Cloudflare; otherwise `400 captcha`. The first 3 need no token |
 | `POST /api/auth/verify` `{email, code, device?}` | `200 {token, email, signedOut, activated}` (`activated`: the email's domain is a bound company domain, or it redeemed an activation code, D-086); `device` (e.g. "Windows 电脑") is trimmed, cut to 40 characters and kept on the session. At most 3 computers per account (D-069): a 4th sign-in ends the oldest sessions, and `signedOut` lists their device names (`[]` when none). Wrong, expired, used-up or unknown: always `401 bad_code` |
 | `POST /api/auth/logout` (Bearer) | `200 {ok:true}`; ends only that session |
 | `GET /api/vault` (Bearer) | `200 {version, updatedAt, data}` (`data` is the JSON object last uploaded), or `{version:0, updatedAt:null, data:null}` |
@@ -110,7 +110,9 @@ are `{ "error": <code>, "message": <plain Chinese> }`.
 
 `/api/vault` and `/api/library` answer `403 not_activated` for an email that is neither in a bound company domain nor activated by a code (D-086). A missing, unknown or expired token is `401 unauthorized`; a token ended by a newer sign-in is `401 device_limit` (D1
 `ended_sessions` remembers it until it would have expired). Limits: a code lives 10 minutes and dies after 5 wrong
-tries; at most 5 codes per email and 20 code requests per IP (`CF-Connecting-IP`) each hour; sessions last 90 days.
+tries; at most 5 codes per email, 20 code requests and 30 sign-in tries per IP (`CF-Connecting-IP`) each hour;
+sessions last 90 days. Counters and tries are counted in the same statement that checks them, so a burst of parallel
+requests cannot slip past a limit (D-094). Any uncaught D1/KV error answers `500 storage_error` JSON.
 
 Storage: D1 `copyboxx-users` (tables in `schema.sql`; emails trimmed and lower-cased, at most 120 characters; codes
 and tokens only as SHA-256). The blob, one per user under the key `vaults/<user id>.json`, goes to the R2 bucket bound
@@ -166,11 +168,11 @@ npm run website:deploy                                     # node tools/website/
 `/admin/` lists who registered, when they last signed in and synced, which computers are signed in and how big their
 cloud copy is, with 「注册 N 人 · 登录中 M 台」 (M = signed-in computers across all accounts) at the top (`admin.mjs`, routed after `/api/`). Read-only: it never decrypts a vault and has no buttons that change
 user data. "Last sign-in" is the newest app session's expiry minus 90 days (sessions keep no start time). People who
-only asked for a code show 「还没登录过」.
+signed in once but have no live session show 「还没登录过」; an email that only asked for a code is not listed (D-094).
 
 - Sign-in: a 6-digit code mailed through Resend, only to addresses in the Worker secret `ADMIN_EMAILS`
   (comma-separated; set it in the dashboard or with the secrets API, never in the repo). Other addresses get the same
-  "sent" answer and no mail. Admin codes live in `login_codes` under `admin:<email>`, so an app code never opens the
+  "sent" answer and no mail. Admin codes live in `login_codes` under `admin <email>` (the space keeps the app's `/api/auth/code` from overwriting it, D-094), so an app code never opens the
   page and an admin code never creates an app user.
 - Session: cookie `__Host-cbx_admin` (HttpOnly, Secure, SameSite=Strict, 12 hours); its SHA-256 in D1 `admin_sessions`.
   Removing an address from `ADMIN_EMAILS` ends its sessions at the next request.

@@ -124,6 +124,29 @@ test("admin: only ADMIN_EMAILS get a code; others get the same answer and no mai
   assert.equal(wrongDoor.status, 401);
 });
 
+test("admin: the app's code request for \"admin:<owner>\" cannot cancel the owner's admin code (D-094)", async (t) => {
+  const sent = stubMail(t);
+  const env = fakeEnv();
+  await admin(env, "POST", "/admin/api/code", { body: { email: "owner@example.com" } });
+  const code = codeOf(sent.at(-1));
+  await app(env, "POST", "/api/auth/code", { body: { email: "admin:owner@example.com" } });
+  assert.equal((await admin(env, "POST", "/admin/api/verify", { body: { email: "owner@example.com", code } })).status, 200);
+});
+
+test("admin: at most 10 sign-in tries per IP each hour", async (t) => {
+  stubMail(t);
+  const env = fakeEnv();
+  for (let i = 0; i < 10; i += 1) assert.equal((await admin(env, "POST", "/admin/api/verify", { body: { email: "owner@example.com", code: "000000" } })).status, 401);
+  assert.equal((await admin(env, "POST", "/admin/api/verify", { body: { email: "owner@example.com", code: "000000" } })).status, 429);
+});
+
+test("admin: a database error answers JSON storage_error (D-094)", async () => {
+  const env = fakeEnv({ DB: { prepare: () => { throw new Error("D1 down"); } } });
+  const response = await admin(env, "POST", "/admin/api/verify", { body: { email: "owner@example.com", code: "123456" } });
+  assert.equal(response.status, 500);
+  assert.equal((await response.json()).error, "storage_error");
+});
+
 test("admin: wrong codes count, five kill the code, an expired code fails", async (t) => {
   const sent = stubMail(t);
   const env = fakeEnv();
@@ -141,7 +164,7 @@ test("admin: the user list shows sign-in, sync, devices and size, never content"
   const sent = stubMail(t);
   const env = fakeEnv();
   assert.equal((await admin(env, "GET", "/admin/api/users")).status, 401);
-  // One staff member signs in on two computers and uploads; another only asked for a code.
+  // One staff member signs in on two computers and uploads; another only asked for a code, so is not listed (D-094).
   await app(env, "POST", "/api/auth/code", { body: { email: "staff@example.com" } });
   const first = await (await app(env, "POST", "/api/auth/verify", { body: { email: "staff@example.com", code: codeOf(sent.at(-1)), device: "Windows 电脑" } })).json();
   await app(env, "POST", "/api/auth/code", { body: { email: "staff@example.com" }, now: clock + day });
@@ -158,11 +181,8 @@ test("admin: the user list shows sign-in, sync, devices and size, never content"
   assert.doesNotMatch(text, /hunter2|客户密码/);
   const { admin: who, users } = JSON.parse(text);
   assert.equal(who, "owner@example.com");
-  assert.deepEqual(users.map((user) => user.email), ["typo@example.com", "staff@example.com"]);
-  const [typo, staff] = users;
-  assert.equal(typo.lastSignInAt, null);
-  assert.equal(typo.devices, 0);
-  assert.equal(typo.activated, null);
+  assert.deepEqual(users.map((user) => user.email), ["staff@example.com"]);
+  const [staff] = users;
   assert.equal(staff.activated, "code");
   assert.equal(staff.createdAt, clock);
   assert.equal(staff.lastSignInAt, clock + day);

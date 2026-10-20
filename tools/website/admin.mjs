@@ -5,14 +5,13 @@
 // and no mail. The admin session is an HttpOnly, SameSite=Strict cookie for 12 hours; its SHA-256 lives in D1
 // admin_sessions. Without DB, RESEND_API_KEY or ADMIN_EMAILS every /admin/api/* answers 503.
 
-import { allowRequest, codeHash, bytesToBase64Url, changes, emailDomain, json, normalizeEmail, randomActivationCode, randomCode, readJson, sameText, sendCodeMail, sha256Hex } from "./api.mjs";
+import { allowRequest, codeHash, bytesToBase64Url, emailDomain, json, normalizeEmail, randomActivationCode, randomCode, readJson, sendCodeMail, sha256Hex, consumeCode } from "./api.mjs";
 
 const hour = 60 * 60 * 1000;
 const codeLifetime = 10 * 60 * 1000;
 const adminSessionLifetime = 12 * hour;
 // Must match sessionLifetime in api.mjs: the app's sessions keep only their expiry, so sign-in time = expiry - 90 days.
 const appSessionLifetime = 90 * 24 * hour;
-const maxCodeAttempts = 5;
 const cookieName = "__Host-cbx_admin";
 
 const messages = {
@@ -26,7 +25,14 @@ const messages = {
   bad_request: "请求格式不对",
   not_found: "找不到这个页面",
   method_not_allowed: "不支持这个操作",
+  storage_error: "数据读写失败，请稍后再试",
 };
+
+// Admin codes share login_codes with the app's; the space keeps this key from ever passing normalizeEmail, so the app's
+// /api/auth/code cannot overwrite (and so cancel) the owner's admin code (D-094).
+function codeKey(email) {
+  return `admin ${email}`;
+}
 
 function fail(status, code, headers = {}) {
   return json({ error: code, message: messages[code] }, status, headers);
@@ -93,7 +99,7 @@ async function requestCode(request, env, now) {
   // An address that is not an admin gets the same answer, so the page never tells which address is the owner's.
   if (!adminEmails(env).includes(email)) return json({ ok: true });
   if (!(await allowRequest(db, `admin-email:${email}`, 5, now))) return fail(429, "rate_limited");
-  const key = `admin:${email}`;
+  const key = codeKey(email);
   const code = randomCode();
   await db
     .prepare("INSERT OR REPLACE INTO login_codes (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)")
@@ -108,25 +114,13 @@ async function requestCode(request, env, now) {
 
 async function verifyCode(request, env, now) {
   const db = env.DB;
+  if (!(await allowRequest(db, `admin-verify-ip:${request.headers.get("CF-Connecting-IP") || "unknown"}`, 10, now))) return fail(429, "rate_limited");
   const parsed = await readJson(request, 4096);
   const email = normalizeEmail(parsed.body?.email);
   const code = typeof parsed.body?.code === "string" ? parsed.body.code.trim() : "";
   const wrong = () => fail(401, "bad_code");
   if (!email || !/^\d{6}$/.test(code) || !adminEmails(env).includes(email)) return wrong();
-  const key = `admin:${email}`;
-  const row = await db.prepare("SELECT code_hash, expires_at, attempts FROM login_codes WHERE email = ?").bind(key).first();
-  if (!row) return wrong();
-  if (row.expires_at <= now || row.attempts >= maxCodeAttempts) {
-    await db.prepare("DELETE FROM login_codes WHERE email = ?").bind(key).run();
-    return wrong();
-  }
-  if (!sameText(await codeHash(key, code), row.code_hash)) {
-    if (row.attempts + 1 >= maxCodeAttempts) await db.prepare("DELETE FROM login_codes WHERE email = ?").bind(key).run();
-    else await db.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ?").bind(key).run();
-    return wrong();
-  }
-  const removed = await db.prepare("DELETE FROM login_codes WHERE email = ? AND code_hash = ?").bind(key, row.code_hash).run();
-  if (changes(removed) !== 1) return wrong();
+  if (!(await consumeCode(db, codeKey(email), code, now))) return wrong();
   await db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?").bind(now).run();
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   await db
@@ -212,7 +206,16 @@ const routes = {
 };
 
 // Answers every request under /admin. `now` is for tests.
+// A D1 or KV error that escapes answers JSON the page can show, not Cloudflare's error page (D-094).
 export async function handleAdmin(request, env, now = Date.now()) {
+  try {
+    return await routeAdmin(request, env, now);
+  } catch {
+    return fail(500, "storage_error");
+  }
+}
+
+async function routeAdmin(request, env, now) {
   const url = new URL(request.url);
   const read = request.method === "GET" || request.method === "HEAD";
   if (url.pathname === "/admin") return new Response(null, { status: 308, headers: { Location: "/admin/", "Cache-Control": "no-cache" } });
