@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fingerprint, mergeAccounts, mergeSnippets, readCloudDoc, syncPolicy, threeWayMerge, tooManyRemovals, withSecretsFrom, withoutSecrets } from "../app/cloud-sync-core.ts";
-import { createCloudApi } from "../app/cloud-client.ts";
+import { createCloudApi, readLastEmail, writeLastEmail } from "../app/cloud-client.ts";
 import { syncOnce } from "../app/cloud-sync.ts";
 
 const snippet = (id, text, extra = {}) => ({ id, label: id, secret: text, note: "", color: "", kind: "snippet", createdAt: 1, updatedAt: 1, ...extra });
@@ -333,4 +333,14 @@ test("login page (D-085): the server's refusals turn into plain messages: 人机
   await assert.rejects(api.sendCode("a@example.com", "x"), { code: "captcha", message: "请先完成人机验证" });
   await assert.rejects(api.activate("t", "0000"), { code: "bad_activation", message: "激活码不对或已经用过" });
   await assert.rejects(api.getVault("t"), { code: "not_activated", message: /还没激活/ });
+});
+
+test("the login page remembers the email last signed in here (D-099)", () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+  assert.equal(readLastEmail(storage), "");
+  writeLastEmail("me@example.com", storage);
+  assert.equal(readLastEmail(storage), "me@example.com");
+  writeLastEmail("", storage);
+  assert.equal(readLastEmail(storage), "");
 });

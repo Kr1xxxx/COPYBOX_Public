@@ -150,7 +150,7 @@ test("api: request a code, then sign in with it", async (t) => {
   assert.equal(count(env, "login_codes"), 0, "the code is used up");
   const session = env.DB.sqlite.prepare("SELECT * FROM sessions").get();
   assert.equal(session.token_hash, createHash("sha256").update(token).digest("hex"));
-  assert.equal(session.expires_at, clock + 90 * day);
+  assert.equal(session.expires_at, clock + 365 * day);
   assert.equal(session.device, "Mac 电脑");
   assert.equal(env.DB.sqlite.prepare("SELECT email FROM users").get().email, "staff@example.com");
 
@@ -392,7 +392,7 @@ test("api: missing, wrong or expired sign-in is 401", async (t) => {
   assert.equal((await call(env, "POST", "/api/auth/logout")).status, 401);
   assert.equal((await call(env, "DELETE", "/api/account")).status, 401);
   const token = await signIn(env, sent);
-  const expired = await call(env, "GET", "/api/vault", { token, now: clock + 90 * day + 1 });
+  const expired = await call(env, "GET", "/api/vault", { token, now: clock + 365 * day + 1 });
   assert.equal(expired.status, 401);
   const answer = await expired.json();
   assert.equal(answer.error, "unauthorized");
@@ -447,8 +447,8 @@ test("api: at most 3 computers per account; a 4th sign-in ends the oldest and sa
   assert.deepEqual(sixth.signedOut, ["一台电脑"]);
 
   // Once the old token would have expired anyway, it is forgotten and answers like any unknown token.
-  await call(env, "POST", "/api/auth/code", { body: { email: "other@example.com" }, now: clock + 91 * day });
-  assert.equal(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM ended_sessions WHERE expires_at <= ?").get(clock + 91 * day).n, 0);
+  await call(env, "POST", "/api/auth/code", { body: { email: "other@example.com" }, now: clock + 366 * day });
+  assert.equal(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM ended_sessions WHERE expires_at <= ?").get(clock + 366 * day).n, 0);
   assert.equal((await (await call(env, "GET", "/api/vault", { token: first.token, now: clock + 91 * day })).json()).error, "unauthorized");
 });
 

@@ -15,7 +15,8 @@ import { isFreeMailDomain, normalizeDomain } from "./free-mail.mjs";
 const hour = 60 * 60 * 1000;
 const day = 24 * hour;
 const codeLifetime = 10 * 60 * 1000;
-const sessionLifetime = 90 * 24 * hour;
+// One sign-in lasts a year on a computer (D-099); updating the app keeps it.
+export const sessionLifetime = 365 * 24 * hour;
 const maxCodeAttempts = 5;
 // Codes per email an hour: 5 from any one IP, 20 in all (D-100), so someone asking for a colleague's email from their
 // own IP cannot use up the colleague's codes, while the inbox is still not flooded.

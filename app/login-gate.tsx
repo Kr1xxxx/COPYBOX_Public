@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { maskEmail } from "./account-lock";
 import { BrandWordmark } from "./brand-wordmark";
-import { CloudError, looksLikeEmail, normalizeEmail } from "./cloud-client";
+import { CloudError, looksLikeEmail, normalizeEmail, readLastEmail } from "./cloud-client";
 import { DEMO_ACTIVATION, DEMO_CODE } from "./cloud-demo";
 import { errorText, type CloudSync } from "./cloud-sync-ui";
 import type { ThemeChoice } from "./preferences";
@@ -71,7 +71,8 @@ type Step = "email" | "code" | "activate";
 
 export function LoginGate({ cloud, theme }: { cloud: CloudSync; theme: ThemeChoice }) {
   const [step, setStep] = useState<Step>("email");
-  const [email, setEmail] = useState("");
+  const [lastEmail] = useState(() => readLastEmail());
+  const [email, setEmail] = useState(lastEmail);
   const [code, setCode] = useState("");
   const [activation, setActivation] = useState("");
   const [wait, setWait] = useState(0);
@@ -137,10 +138,11 @@ export function LoginGate({ cloud, theme }: { cloud: CloudSync; theme: ThemeChoi
         <BrandWordmark className="login-wordmark" />
         {step === "email" && <>
           <h1 id="login-title">登录后开始使用</h1>
-          <p>用邮箱收验证码登录，不用设密码。登录过的电脑，没有网络也能照常用。</p>
+          <p>用邮箱收验证码登录，不用设密码。登录一次，这台电脑一年内不用再登录，升级也不用；没有网络也能照常用。</p>
           <label htmlFor="login-email">邮箱</label>
           <input ref={inputRef} id="login-email" type="email" autoComplete="email" spellCheck={false} placeholder="填你的工作邮箱" value={email}
             onChange={(event) => { setEmail(event.target.value); setError(""); }} />
+          {lastEmail && normalizeEmail(email) === lastEmail && <small className="login-last-email">上次在这台电脑登录用的是这个邮箱</small>}
           {needCaptcha && <div className="login-captcha">
             <div ref={captchaBox} />
             {captcha.failed && <small>人机验证没有加载出来。<button type="button" className="login-link" onClick={captcha.retry}>重新加载</button></small>}

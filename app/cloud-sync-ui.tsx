@@ -4,7 +4,7 @@
 // person to their other computers. Settings home → 账号与同步 shows who is signed in. Only where the server can be
 // reached (cloud-client.ts); the preview uses a pretend server.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { CloudError, MAX_DEVICES, clearSessionToken, cloudTransport, createCloudApi, deviceName, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeSessionToken, type CloudAccount } from "./cloud-client";
+import { CloudError, MAX_DEVICES, clearSessionToken, cloudTransport, createCloudApi, deviceName, normalizeEmail, readCloudAccount, readSessionToken, writeCloudAccount, writeLastEmail, writeSessionToken, type CloudAccount } from "./cloud-client";
 import { describeCounts } from "./cloud-sync-core";
 import { domainLibraryLine } from "./domain-library";
 import { clearSyncBase, readSyncBase, syncOnce, writeSyncBase, type SyncSteps } from "./cloud-sync";
@@ -145,6 +145,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     clearSyncBase();
     const next: CloudAccount = { email: normalizeEmail(result.email) };
     writeCloudAccount(next);
+    writeLastEmail(next.email);
     accountRef.current = next;
     setAccount(next);
     setError("");
@@ -172,6 +173,7 @@ export function useCloudSync({ ready, platform, mergers, changeSignal, onIncomin
     if (!api.current || !session) { await forget(); return; }
     await api.current.deleteAccount(session);
     await forget();
+    writeLastEmail("");
     setError("");
     setNotice("");
   }
