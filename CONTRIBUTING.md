@@ -19,10 +19,10 @@ For company developers and AI agents. Read `AGENTS.md` first.
 
 - Target `main` and fill in the template: what changed, how it was verified, what was not verified, what the
   owner needs to decide.
-- CI runs three checks: lint + tests, browser end-to-end tests, and a handoff check (fails if `app/`,
-  `src-tauri/` or `package.json` changed without a new note in `docs/log/`). All three must be green.
-- CI also runs `merge policy` (`scripts/classify-pr.mjs`): small PRs merge themselves when everything is green;
-  big ones get the `needs-owner` label. Label new/removed features and layout changes `major` yourself.
+- CI no longer runs on pull requests (owner, 2026-10-20). On main, lint + tests, browser end-to-end tests, the
+  Tauri build and the Windows smoke test run every 5th preview version (`scripts/ci-due.mjs`), or by hand. Run lint,
+  typecheck and unit tests locally before merging. The handoff check and `merge policy` jobs are kept but do not run.
+  Label new/removed features and layout changes `major` yourself.
 - Who merges what is in AGENTS.md "Merging" (D-041): green PRs are merged by the agent, high-risk ones only after
   the owner says 合并. Never push to `main`.
 

@@ -2,22 +2,35 @@ name: Windows smoke test
 
 # Builds the Windows installer, installs it on a GitHub Windows machine and drives the real app with made-up data:
 # install, start, import, copy to the real clipboard, restart and hard kill keep the data. Screenshots, logs and
-# the result table are uploaded as an artifact. It only runs by hand, or when Tauri code or this test changes,
-# so ordinary pull requests are not slowed down. It never publishes anything.
+# the result table are uploaded as an artifact. It runs by hand, or on main every 5th preview version (owner
+# 2026-10-20). It never publishes anything.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "src-tauri/**"
-      - "tests/windows-smoke/**"
-      - ".github/workflows/windows-smoke.yml"
+  push:
+    branches: [main]
 
 concurrency:
   group: windows-smoke-${{ github.ref }}
-  cancel-in-progress: true
+  # A later merge must not stop the 5th-version run on main.
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
+  # Owner 2026-10-20: on main this runs only every 5th preview version (scripts/ci-due.mjs); by hand it always runs.
+  due:
+    name: every 5th version
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.due.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: due
+        run: node scripts/ci-due.mjs
+        env:
+          EVENT: ${{ github.event_name }}
+
   smoke:
+    needs: due
+    if: needs.due.outputs.run == 'true'
     name: Windows smoke
     runs-on: windows-latest
     timeout-minutes: 40

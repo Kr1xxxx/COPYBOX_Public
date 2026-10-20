@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -11,8 +11,23 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Owner 2026-10-20: on main this runs only every 5th preview version (scripts/ci-due.mjs); by hand it always runs.
+  due:
+    name: every 5th version
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.due.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: due
+        run: node scripts/ci-due.mjs
+        env:
+          EVENT: ${{ github.event_name }}
+
   check:
     name: lint + tests
+    needs: due
+    if: needs.due.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +43,8 @@ jobs:
   # The browser tests are split over four machines that run at the same time; together they still run every test.
   e2e-shard:
     name: browser end-to-end (${{ matrix.shard }}/4)
+    needs: due
+    if: needs.due.outputs.run == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,8 +75,8 @@ jobs:
   # One check with the old name, green only when every part passed.
   e2e:
     name: browser end-to-end
-    if: always()
-    needs: [e2e-shard]
+    if: always() && needs.due.outputs.run == 'true'
+    needs: [due, e2e-shard]
     runs-on: ubuntu-latest
     steps:
       - if: needs.e2e-shard.result != 'success'
@@ -68,6 +85,7 @@ jobs:
           exit 1
       - run: echo "All four parts passed."
 
+  # Not run since 2026-10-20 (CI no longer runs on pull requests); kept so PR runs can be switched back on.
   handoff:
     name: handoff updated
     if: github.event_name == 'pull_request'

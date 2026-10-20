@@ -90,8 +90,8 @@ npm run tauri:build      # installer: NSIS on Windows, .app on a Mac → src-tau
 1. Add **one new file** `docs/log/YYYY-MM-DD-short-name.md` (template: `docs/log/README.md`). Do not edit
    `docs/HANDOFF.md`, `docs/handoff-log.md` or the table in `docs/DECISIONS.md` (see "Parallel PRs").
 2. A new decision is a new file `docs/decisions/D-NNN-short-name.md`; update `docs/features.json` for what you verified.
-3. Commit in small steps, push your branch, open a PR using the template. CI fails if `app/`, `src-tauri/` or
-   `package.json` changed but no new `docs/log/` note with a `- What changed:` line was added.
+3. Commit in small steps, push your branch, open a PR using the template. Add a new `docs/log/` note with a
+   `- What changed:` line whenever `app/`, `src-tauri/` or `package.json` changed (CI no longer checks this, see below).
 4. Report to the owner **in Chinese**, in four parts: 做了什么 (what was done) / 没做好的地方 (what is not done well)
    / 需要你做的 (what the owner needs to do) / 建议下一步 (recommended next step). Finish everything that can be
    finished instead of leaving it as a caveat.
@@ -102,8 +102,7 @@ Files that every PR used to edit made parallel PRs conflict. The rule now: **a P
 
 - `tools/preview/VERSION` and `tools/preview/changelog.json` belong to the preview publisher (the main Claude session)
   alone. Feature PRs never bump the version or edit the changelog; write the "User-visible change" line in your
-  `docs/log/` note and the publisher turns it into a changelog entry. CI fails a PR that edits these files unless it
-  carries the label `preview-publisher` (only the publisher adds it; GitHub cannot stop another agent from adding it, so this is an agreed rule, not a lock).
+  `docs/log/` note and the publisher turns it into a changelog entry.
 - Handoff notes: one new file per PR in `docs/log/`. Decisions: one new file per decision in `docs/decisions/`.
   `docs/HANDOFF.md`, `docs/handoff-log.md` and the `docs/DECISIONS.md` table are not edited by feature PRs.
 - `docs/HANDOFF.md` (status) and `docs/ROADMAP.md` are updated only by the coordinator.
@@ -122,6 +121,8 @@ The owner never uses the GitHub website; all work goes through agents.
   releasing to staff, or anything irreversible. Ask in plain Chinese and say what the risk is.
 - If permissions block a merge, say it is a permission block and ask the owner to reply 「合并 N」; never work around it.
 - Never skip, disable or loosen a test, or change the CI gates, to get green.
+- CI does not run on PRs (owner, 2026-10-20): on main it runs every 5th preview version (2.40, 2.45, …,
+  `scripts/ci-due.mjs`); run lint, typecheck and unit tests locally before every merge, and start CI by hand when needed.
 - New or removed features and layout changes: add the `major` label yourself when you open the PR.
 - Tell the owner in Chinese which PRs merged and which wait for him.
 
