@@ -140,7 +140,7 @@ test("api: request a code, then sign in with it", async (t) => {
   assert.equal(stored[0].code_hash, createHash("sha256").update(`staff@example.com:${code}`).digest("hex"));
   assert.equal(stored[0].expires_at, clock + 10 * 60 * 1000);
   assert.equal(stored[0].attempts, 0);
-  assert.equal(env.DB.sqlite.prepare("SELECT email FROM users").get().email, "staff@example.com");
+  assert.equal(count(env, "users"), 0, "asking for a code creates no user; signing in does (D-094)");
 
   const verified = await call(env, "POST", "/api/auth/verify", { body: { email: "STAFF@example.com", code, device: "  Mac 电脑  " } });
   assert.equal(verified.status, 200);
@@ -152,6 +152,7 @@ test("api: request a code, then sign in with it", async (t) => {
   assert.equal(session.token_hash, createHash("sha256").update(token).digest("hex"));
   assert.equal(session.expires_at, clock + 90 * day);
   assert.equal(session.device, "Mac 电脑");
+  assert.equal(env.DB.sqlite.prepare("SELECT email FROM users").get().email, "staff@example.com");
 
   const again = await call(env, "POST", "/api/auth/verify", { body: { email: "staff@example.com", code } });
   assert.equal(again.status, 401, "a code signs in only once");
@@ -199,7 +200,7 @@ test("api: a new email and a registered one get the same answer; malformed email
   const second = await call(env, "POST", "/api/auth/code", { body: { email: "new@example.com" } });
   assert.equal(first.status, second.status);
   assert.deepEqual(await first.json(), await second.json());
-  assert.equal(count(env, "users"), 1);
+  assert.equal(count(env, "users"), 0);
   const bad = await call(env, "POST", "/api/auth/code", { body: { email: "not an email" } });
   assert.equal(bad.status, 400);
   assert.equal((await bad.json()).error, "bad_email");
@@ -225,6 +226,41 @@ test("api: at most 5 codes per email and 20 requests per IP each hour", async (t
     assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: `p${i}@example.com` }, ip: "192.0.2.7" })).status, 200);
   }
   assert.equal((await call(env, "POST", "/api/auth/code", { body: { email: "p99@example.com" }, ip: "192.0.2.7" })).status, 429);
+});
+
+test("api: a burst of parallel requests cannot get past the hourly limits (D-094)", async (t) => {
+  const env = fakeEnv();
+  const sent = stubMail(t);
+  const burst = await Promise.all(
+    Array.from({ length: 30 }, (_, i) => call(env, "POST", "/api/auth/code", { body: { email: `b${i}@example.com` }, ip: "192.0.2.8" })),
+  );
+  assert.equal(burst.filter((response) => response.status === 200).length, 20);
+  assert.equal(sent.length, 20);
+
+  // Parallel guesses: only 5 are ever compared, so the right code sent 10th in the burst is refused.
+  await call(env, "POST", "/api/auth/code", { body: { email: "c@example.com" } });
+  const code = codeFrom(sent.at(-1));
+  const wrongCode = code === "000000" ? "111111" : "000000";
+  const guesses = await Promise.all(
+    [...Array(9).fill(wrongCode), code].map((guess, i) => call(env, "POST", "/api/auth/verify", { body: { email: "c@example.com", code: guess }, ip: `198.51.100.${i}` })),
+  );
+  assert.deepEqual(
+    guesses.map((response) => response.status),
+    Array(10).fill(401),
+  );
+  assert.equal(count(env, "sessions"), 0);
+});
+
+test("api: at most 30 sign-in tries per IP each hour, so one sender cannot keep killing someone's code (D-094)", async (t) => {
+  const env = fakeEnv();
+  const sent = stubMail(t);
+  for (let i = 0; i < 30; i += 1) {
+    assert.equal((await call(env, "POST", "/api/auth/verify", { body: { email: "victim@example.com", code: "000000" }, ip: "192.0.2.9" })).status, 401);
+  }
+  await call(env, "POST", "/api/auth/code", { body: { email: "victim@example.com" } });
+  assert.equal((await call(env, "POST", "/api/auth/verify", { body: { email: "victim@example.com", code: "000000" }, ip: "192.0.2.9" })).status, 429);
+  const own = await call(env, "POST", "/api/auth/verify", { body: { email: "victim@example.com", code: codeFrom(sent.at(-1)) } });
+  assert.equal(own.status, 200, "the refused guess did not use up a try of the real code");
 });
 
 test("api: no Resend key means 503; a failed send is reported and leaves no code", async (t) => {
@@ -431,6 +467,13 @@ test("api: without the D1 binding every /api path answers 503", async (t) => {
     }
   }
   assert.equal(sent.length, 0);
+});
+
+test("api: a database error answers JSON storage_error, not Cloudflare's error page (D-094)", async () => {
+  const env = fakeEnv({ DB: { prepare: () => { throw new Error("D1 down"); } } });
+  const response = await call(env, "POST", "/api/auth/verify", { body: { email: "a@example.com", code: "123456" } });
+  assert.equal(response.status, 500);
+  assert.equal((await response.json()).error, "storage_error");
 });
 
 test("api: unknown paths are a JSON 404, wrong methods a 405", async () => {

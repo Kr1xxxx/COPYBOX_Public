@@ -17,6 +17,8 @@ const sessionLifetime = 90 * 24 * hour;
 const maxCodeAttempts = 5;
 const codesPerEmailPerHour = 5;
 const requestsPerIpPerHour = 20;
+// Sign-in tries per IP an hour: room for 20 codes plus typos, too few to keep killing someone's code (D-094).
+const verifiesPerIpPerHour = 30;
 // Code requests per email or per IP an hour before 人机验证 is demanded (D-087): the 4th one needs a token.
 const freeRequestsPerHour = 3;
 const maxVaultBody = 5 * 1024 * 1024;
@@ -171,15 +173,32 @@ async function requestCount(db, key, now) {
 }
 
 // Counts one request against `key`; answers the hour's count so far (truthy), or 0 when its limit is already reached.
+// Counting and reading are one statement, so a burst of parallel requests cannot all see "under the limit" (D-094).
 export async function allowRequest(db, key, limit, now) {
-  const count = await requestCount(db, key, now);
-  if (count === 0) {
-    await db.prepare("INSERT OR REPLACE INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)").bind(key, now).run();
-    return 1;
-  }
-  if (count >= limit) return 0;
-  await db.prepare("UPDATE rate_limits SET count = count + 1 WHERE key = ?").bind(key).run();
-  return count + 1;
+  const row = await db
+    .prepare(
+      `INSERT INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)
+       ON CONFLICT (key) DO UPDATE SET
+         count = CASE WHEN window_start > ?2 - ?3 THEN count + 1 ELSE 1 END,
+         window_start = CASE WHEN window_start > ?2 - ?3 THEN window_start ELSE ?2 END
+       RETURNING count`,
+    )
+    .bind(key, now, hour)
+    .first();
+  return row.count <= limit ? row.count : 0;
+}
+
+// Uses one try of the live code stored under `key` (an email, or the admin page's own key) and answers true when
+// `code` is it. The try is counted before comparing, in one statement, so parallel guesses never get past 5 (D-094);
+// a used-up or expired code stays refused until a new one replaces it or sweep() removes it. Only the request that
+// deletes the code gets true, so one code never signs in twice.
+export async function consumeCode(db, key, code, now) {
+  const row = await db
+    .prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ? AND expires_at > ? AND attempts < ? RETURNING code_hash")
+    .bind(key, now, maxCodeAttempts)
+    .first();
+  if (!row || !sameText(await codeHash(key, code), row.code_hash)) return false;
+  return changes(await db.prepare("DELETE FROM login_codes WHERE email = ? AND code_hash = ?").bind(key, row.code_hash).run()) === 1;
 }
 
 async function sweep(db, now) {
@@ -423,7 +442,6 @@ async function requestCode(request, env, now) {
   }
   if (!(await allowRequest(db, `email:${email}`, codesPerEmailPerHour, now))) return fail(429, "rate_limited");
   await sweep(db, now);
-  await ensureUser(db, email, now);
   const code = randomCode();
   await db
     .prepare("INSERT OR REPLACE INTO login_codes (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)")
@@ -438,26 +456,15 @@ async function requestCode(request, env, now) {
 
 async function verifyCode(request, env, now) {
   const db = env.DB;
+  // Counted per IP, so one sender cannot keep killing a colleague's fresh code with wrong guesses (D-094).
+  if (!(await allowRequest(db, `verify-ip:${request.headers.get("CF-Connecting-IP") || "unknown"}`, verifiesPerIpPerHour, now))) return fail(429, "rate_limited");
   const parsed = await readJson(request, maxSmallBody);
   if (parsed.status === 413) return fail(413, "too_large");
   const email = normalizeEmail(parsed.body?.email);
   const code = typeof parsed.body?.code === "string" ? parsed.body.code.trim() : "";
   const wrong = () => fail(401, "bad_code");
   if (!email || !/^\d{6}$/.test(code)) return wrong();
-  const row = await db.prepare("SELECT code_hash, expires_at, attempts FROM login_codes WHERE email = ?").bind(email).first();
-  if (!row) return wrong();
-  if (row.expires_at <= now || row.attempts >= maxCodeAttempts) {
-    await db.prepare("DELETE FROM login_codes WHERE email = ?").bind(email).run();
-    return wrong();
-  }
-  if (!sameText(await codeHash(email, code), row.code_hash)) {
-    if (row.attempts + 1 >= maxCodeAttempts) await db.prepare("DELETE FROM login_codes WHERE email = ?").bind(email).run();
-    else await db.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ?").bind(email).run();
-    return wrong();
-  }
-  // Only the request that deletes the code gets a session, so one code never signs in twice.
-  const removed = await db.prepare("DELETE FROM login_codes WHERE email = ? AND code_hash = ?").bind(email, row.code_hash).run();
-  if (changes(removed) !== 1) return wrong();
+  if (!(await consumeCode(db, email, code, now))) return wrong();
   const user = await ensureUser(db, email, now);
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await sha256Hex(token);
@@ -578,8 +585,17 @@ const routes = {
 };
 const needsActivation = new Set(["getVault", "putVault", "getLibrary"]);
 
-// Answers every request under /api/. `now` is for tests.
+// Answers every request under /api/. `now` is for tests. A D1 or KV error that escapes still answers JSON the app
+// understands, not Cloudflare's error page (D-094).
 export async function handleApi(request, env, now = Date.now()) {
+  try {
+    return await routeApi(request, env, now);
+  } catch {
+    return fail(500, "storage_error");
+  }
+}
+
+async function routeApi(request, env, now) {
   const url = new URL(request.url);
   const known = Object.hasOwn(routes, url.pathname) ? routes[url.pathname] : null;
   if (!known) return fail(404, "not_found");

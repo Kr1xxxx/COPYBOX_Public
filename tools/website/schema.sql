@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_sync_at INTEGER
 );
 
--- One live code per email: SHA-256 of "<email>:<code>", 10 minutes, dead after 5 wrong tries.
+-- One live code per email (or "admin <email>" for /admin): SHA-256 of "<key>:<code>", 10 minutes, dead after 5 tries.
 CREATE TABLE IF NOT EXISTS login_codes (
   email TEXT PRIMARY KEY,
   code_hash TEXT,
@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS ended_sessions (
   expires_at INTEGER
 );
 
--- Hourly counters: "ip:<address>" (20 code requests) and "email:<address>" (5 codes).
+-- Hourly counters, e.g. "ip:<address>" (20 code requests), "email:<address>" (5 codes), "verify-ip:<address>" (30 sign-in
+-- tries); bumped and read in one statement (D-094).
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,
   window_start INTEGER,

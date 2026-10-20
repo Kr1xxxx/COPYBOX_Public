@@ -160,20 +160,24 @@ async function syncResponse(request, env, pathname) {
 // thread; the token is only in the staff app's update check). The /staff/ page first posts the company password to
 // /staff/verify; it is compared with the secret STAFF_PASSWORD (both hashed, so the compare is constant-time and leaks
 // no length), at most 20 tries per IP and hour through the API's rate_limits table. A match sets the cookie `staff`
-// (a hash of the password, so changing the password signs everyone out) and goes back to /staff/#ok, which the
+// (a hash of the password and the current 12-hour slot, so changing the password signs everyone out and a copied
+// cookie stops working within a day, D-094) and goes back to /staff/#ok, which the
 // Worker then serves marked verified with the download buttons; a wrong password goes back to #wrong, too many
 // tries to #limit. /staff/file/win|mac stream a file only with the cookie.
 const staffFiles = { win: "Copyboxx-Setup.exe", mac: "Copyboxx-macOS-arm64.zip" };
 const staffCookieLife = 12 * 60 * 60;
 
-function staffToken(env) {
-  return sha256Hex(`staff-cookie:${env.STAFF_PASSWORD}`);
+function staffToken(env, slot) {
+  return sha256Hex(`staff-cookie:${env.STAFF_PASSWORD}:${slot}`);
 }
 
-async function staffVerified(request, env) {
+// The cookie is accepted in the slot it was made in and the next one, so it lasts 12 to 24 hours.
+async function staffVerified(request, env, now = Date.now()) {
   if (!env.STAFF_PASSWORD) return false;
   const match = /(?:^|;\s*)staff=([0-9a-f]{64})(?:;|$)/.exec(request.headers.get("Cookie") ?? "");
-  return match != null && sameText(match[1], await staffToken(env));
+  if (!match) return false;
+  const slot = Math.floor(now / (staffCookieLife * 1000));
+  return sameText(match[1], await staffToken(env, slot)) || sameText(match[1], await staffToken(env, slot - 1));
 }
 
 async function staffKey(env, name) {
@@ -190,7 +194,7 @@ export async function staffVerify(request, env, now = Date.now()) {
   if (env.DB && !(await allowRequest(env.DB, `staff:${ip}`, 20, now))) return staffBack("limit");
   if (!sameText(await sha256Hex(password), await sha256Hex(env.STAFF_PASSWORD))) return staffBack("wrong");
   const response = staffBack("ok");
-  response.headers.set("Set-Cookie", `staff=${await staffToken(env)}; Path=/staff; Max-Age=${staffCookieLife}; HttpOnly; Secure; SameSite=Lax`);
+  response.headers.set("Set-Cookie", `staff=${await staffToken(env, Math.floor(now / (staffCookieLife * 1000)))}; Path=/staff; Max-Age=${staffCookieLife}; HttpOnly; Secure; SameSite=Lax`);
   return response;
 }
 
