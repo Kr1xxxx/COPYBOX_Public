@@ -63,6 +63,8 @@ export type ClipboxDesktop = {
   cloudRequest?: (request: { method: "GET" | "POST" | "PUT" | "DELETE"; path: string; body?: unknown; token?: string }) => Promise<{ status: number; text: string }>;
   // Only the web preview (and tests) set this: 登录同步 then talks to a pretend server in the page (cloud-demo.ts).
   cloudDemo?: boolean;
+  // Only the web preview sets this: the app opens without the login page (D-098); 登录同步 can still be tried in 设置.
+  skipLogin?: boolean;
   // The site's own small icon as a data: URL, or "" when it has none.
   fetchSiteIcon?: (host: string) => Promise<string>;
   relaunch: () => void;

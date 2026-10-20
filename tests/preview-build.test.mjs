@@ -37,6 +37,7 @@ test("withDesktopShim inserts the shim right after <head> for both platforms", (
   const win = withDesktopShim(html, "win32");
   assert.ok(win.startsWith("<html><head><script>"));
   assert.ok(win.includes('platform: "win32"'));
+  assert.ok(win.includes("skipLogin: true"), "the preview opens without the login page (D-098)");
   assert.ok(win.includes('add("desktop-app", "platform-win32")'));
   assert.ok(win.includes("</script><meta charset=utf-8>"));
   const mac = withDesktopShim(html, "darwin");

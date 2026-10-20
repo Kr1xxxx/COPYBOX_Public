@@ -26,8 +26,9 @@ test("the page may only load its own files, plus Cloudflare's 人机验证 widge
 
 test("the Tauri bridge offers every method the page expects from window.clipboxDesktop", () => {
   const type = read("app/desktop-bridge.ts").match(/export type ClipboxDesktop = \{([\s\S]*?)\n\};/)[1];
-  const wanted = [...type.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1])// platform, testTools and cloudDemo are plain values, not methods; the real bridge never sets testTools or cloudDemo (web preview only).
-    .filter((name) => name !== "platform" && name !== "testTools" && name !== "cloudDemo");
+  const wanted = [...type.matchAll(/^\s{2}(\w+)\??:/gm)].map((match) => match[1])// platform, testTools, cloudDemo and skipLogin are plain values, not methods; the real bridge never sets the last three (web preview only).
+    .filter((name) => !["platform", "testTools", "cloudDemo", "skipLogin"].includes(name));
+  assert.ok(!/skipLogin/.test(read("src-tauri/bridge.js")), "the desktop app must keep its login page (D-085)");
   assert.ok(wanted.length > 20);
   const bridge = read("src-tauri/bridge.js");
   const missing = wanted.filter((name) => !new RegExp(`^\\s{4}${name}: function`, "m").test(bridge));
