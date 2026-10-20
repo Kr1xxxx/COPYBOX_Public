@@ -23,7 +23,7 @@ async function seeded(storage = memory()) {
 test("encrypting moves the data to a key only the password or recovery code can open, and keeps a backup", async () => {
   const storage = await seeded();
   const before = storage.raw.get(SECRET_ITEMS_KEY);
-  const { recoveryCode, dataKey } = await enableAccountEncryption({ deviceKey: DEVICE, password: "correct horse", email: "me@x.test" }, storage);
+  const { recoveryCode, dataKey } = await enableAccountEncryption({ deviceKey: DEVICE, password: "correct horse" }, storage);
   assert.equal(lockMode(storage), "encrypted");
   assert.equal(encryptedPhase(storage), "ready");
   assert.match(recoveryCode, /^[A-Z2-9]{4}(-[A-Z2-9]{4}){4}$/);

@@ -3,10 +3,6 @@
 type DetectorLike = { detect(image: ImageBitmap): Promise<{ rawValue: string }[]> };
 type DetectorCtor = new (options: { formats: string[] }) => DetectorLike;
 
-export function canScanQr(): boolean {
-  return typeof (globalThis as { BarcodeDetector?: unknown }).BarcodeDetector === "function";
-}
-
 export async function scanQrFromBlob(blob: Blob): Promise<string> {
   const Detector = (globalThis as { BarcodeDetector?: DetectorCtor }).BarcodeDetector;
   if (!Detector) throw new Error("这里不能识别二维码图片，请粘贴密钥或 otpauth:// 链接");

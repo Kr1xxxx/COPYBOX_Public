@@ -39,10 +39,6 @@ export function planClearSamples(totp: SampleItem[], items: SampleItem[], onlyKi
   return { removeTotp, removeItems, keptEdited };
 }
 
-export function isMarkOfSample(target: string) {
-  return target.slice(target.indexOf(":") + 1).startsWith(PREFIX);
-}
-
 // A restore only adds the samples whose ids are missing; whatever is there stays exactly as it is.
 export function planRestoreSamples(totp: SampleItem[], items: SampleItem[], now: number, hiddenKinds: string[] = []) {
   const samples = sampleVaultData(now, hiddenKinds);

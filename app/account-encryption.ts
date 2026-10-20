@@ -109,13 +109,13 @@ function readPremigration(storage: EncryptionStorage): PremigrationRecord | null
 
 // Turn the password into real encryption (or upgrade the old door-only password). Returns the recovery code, shown once.
 // Anything that goes wrong puts the stores and the old lock record back exactly as they were.
-export async function enableAccountEncryption(args: { deviceKey: string; password: string; email?: string }, storage: EncryptionStorage = localStorage): Promise<{ recoveryCode: string; dataKey: string }> {
+export async function enableAccountEncryption(args: { deviceKey: string; password: string }, storage: EncryptionStorage = localStorage): Promise<{ recoveryCode: string; dataKey: string }> {
   if (Array.from(args.password).length < ENCRYPTED_LOCK_MIN) throw new Error(`密码至少 ${ENCRYPTED_LOCK_MIN} 位`);
   return exclusive(storage, (inner) => enableHeld(args, inner));
 }
 
-async function enableHeld(args: { deviceKey: string; password: string; email?: string }, storage: EncryptionStorage): Promise<{ recoveryCode: string; dataKey: string }> {
-  const { deviceKey, password, email } = args;
+async function enableHeld(args: { deviceKey: string; password: string }, storage: EncryptionStorage): Promise<{ recoveryCode: string; dataKey: string }> {
+  const { deviceKey, password } = args;
   if (lockMode(storage) === "encrypted") throw new Error("已经加密过了");
   const before = await readAll(deviceKey, storage); // if this fails nothing has been touched
   const raw = rawCopy(storage);
@@ -125,7 +125,7 @@ async function enableHeld(args: { deviceKey: string; password: string; email?: s
   const dataKey = newDataKey();
   const recoveryCode = newRecoveryCode();
   try {
-    await writeEncryptedLock({ dataKey, password, recoveryCode, email, phase: "migrating" }, storage);
+    await writeEncryptedLock({ dataKey, password, recoveryCode, phase: "migrating" }, storage);
     await writeAll(dataKey, before, storage);
     const after = await readAll(dataKey, storage);
     if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error("加密后核对不一致");
