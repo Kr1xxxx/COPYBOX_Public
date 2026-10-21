@@ -4,7 +4,7 @@ import { ArcToast } from "./arc/arc-toast";
 import { useToast } from "./use-toast";
 import { buildCardMoveMap, countItemsByFolder, RECENT_LIMIT, undoItemSave, type ItemSaveRecord } from "./clipbox-core";
 import { copyTextWithExpiry } from "./clipboard";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildCategoryColorMap, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from "./category-colors";
 import {
   canReorderCards,
@@ -174,6 +174,8 @@ type PendingImport = { envelope?: VaultEnvelope; legacyData?: VaultData; scope?:
 const NO_LEGACY_SECRETS: LegacySecret[] = [];
 const NO_FOLDERS: string[] = [];
 const DETAIL_CLOSE_MS = 220;
+// Rows drawn at once when a list is switched to: more than a tall window shows (52 px rows).
+const FIRST_SCREEN_ROWS = 30;
 // 登录同步: one sync that would delete most of what is here is refused (cloud-sync-core.ts tooManyRemovals).
 const CLOUD_TOO_MANY_REMOVALS = "云端的内容比这台电脑少了很多，为了安全这次没有同步，这台电脑上的内容没有变化";
 const CLOUD_NOTHING_TO_WRITE = new Error("nothing to write");
@@ -572,11 +574,17 @@ export default function Home() {
   // Worked out once per list, not per row: with 1,000+ snippets the per-row search made every render slow.
   const cardMoves = useMemo(() => buildCardMoveMap(filtered), [filtered]);
   const folderCounts = useMemo(() => countItemsByFolder(activeKindItems), [activeKindItems]);
+  // A list just switched to (another section or folder) draws its first screen at once and the rest right after, so
+  // coming back to 140+ 话术 does not hold up the click.
+  const listKey = `${imageView ? "image" : activeKind}:${activeFolder}`;
+  const [wholeListKey, setWholeListKey] = useState(listKey);
+  useEffect(() => { if (wholeListKey !== listKey) startTransition(() => setWholeListKey(listKey)); }, [wholeListKey, listKey]);
+  const listRows = wholeListKey === listKey ? filtered : filtered.slice(0, FIRST_SCREEN_ROWS);
   // Opening an old entry from the 账号 list leads to the 「其他」 list with that entry selected.
   useEffect(() => {
     if (!pendingLegacyOpen.current || vaultCat !== "other") return;
     const index = filtered.findIndex((item) => item.id === pendingLegacyOpen.current);
-    if (index < 0) return;
+    if (index < 0 || index >= listRows.length) return;
     pendingLegacyOpen.current = "";
     selectRow(index);
   });
@@ -1394,7 +1402,8 @@ export default function Home() {
     const id = pendingSavedEdit.current;
     if (!id) return;
     const index = filtered.findIndex((item) => item.id === id);
-    if (index < 0) return;
+    // Wait until the row is drawn (listRows), so it can be scrolled to.
+    if (index < 0 || index >= listRows.length) return;
     pendingSavedEdit.current = "";
     selectRow(index);
     openEditor(filtered[index]);
@@ -1948,9 +1957,12 @@ export default function Home() {
     }
   }
 
+  // A list just switched to (another section or folder) starts at the top, even when its remembered open card is further down.
+  const scrolledList = useRef("");
   useEffect(() => {
+    if (scrolledList.current !== listKey) { scrolledList.current = listKey; return; }
     document.querySelector(`[data-row-index="${safeSelected}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [safeSelected, windowMode, activeFolder, activeKind]);
+  }, [safeSelected, windowMode, listKey]);
 
   // 导出账号表格: a plain CSV on this device only (the settings row warns first that anyone with the file can read it).
   async function exportAccountSheet() {
@@ -2269,7 +2281,7 @@ export default function Home() {
   const legacyList = (
             <div key={`${activeKind}:${activeFolder}`} className={`native-list list-switch ${bulkMode ? "bulk" : ""}`} onAnimationEnd={onRowAnimationEnd}>
               {modalOpen && !editing && activeFolder !== "trash" && <article className={`native-row selected editing new-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"}`}>{editorNode}</article>}
-              {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? filtered.map((item, index) => (
+              {filtered.length === 0 ? (modalOpen && !editing ? null : emptyState) : activeFolder === "trash" ? listRows.map((item, index) => (
                 <article key={item.id} data-row-index={index} className={`native-row trash-row ${activeKind === "snippet" ? "snippet-row" : "secret-row"} ${safeSelected === index ? "selected" : ""}`}>
                   <span className="trash-row-icon" aria-hidden="true"><Icon name="trash" /></span>
                   <div className="row-main trash-row-main">
@@ -2278,7 +2290,7 @@ export default function Home() {
                   <button type="button" className="trash-restore" onClick={() => void restoreItem(item)} aria-label={`恢复 ${item.label}`}>恢复</button>
                   <button type="button" className="trash-permanent" onClick={() => setDeleteRequest({ item, permanent: true })} aria-label={`永久删除 ${item.label}`}>永久删除</button>
                 </article>
-              )) : filtered.map((item, index) => {
+              )) : listRows.map((item, index) => {
                 const isSnippet = activeKind === "snippet";
                 if (modalOpen && editing?.id === item.id) {
                   return <article key={item.id} data-row-index={index} className={`native-row selected editing ${isSnippet ? "snippet-row" : "secret-row"}`}>{editorNode}</article>;
@@ -2391,7 +2403,7 @@ export default function Home() {
           {imageView && <ImageSection ref={imageSectionRef} library={imageLibrary} query={query} compact view="grid" paused={backgroundInert} selecting={false} onSelectingChange={setImageSelecting} onToast={flashToast} onTrashed={offerImageUndo} onCounts={setImageCounts} />}
           {!imageView && lockedHere && <div className="native-list mini-list"><div className="native-empty"><strong>账号页已上锁</strong><span>回到完整窗口，输入密码后再用</span></div></div>}
           {!imageView && !lockedHere && <div key={`mini:${activeKind}:${activeFolder}`} className="native-list mini-list list-switch" onAnimationEnd={onRowAnimationEnd}>
-            {filtered.length === 0 ? emptyState : filtered.map((item, index) => {
+            {filtered.length === 0 ? emptyState : listRows.map((item, index) => {
               const isSelected = safeSelected === index;
               if (activeKind === "snippet") {
                 if (modalOpen && editing?.id === item.id) return <article key={item.id} data-row-index={index} className="native-row selected editing snippet-row mini-editing">{editorNode}</article>;
