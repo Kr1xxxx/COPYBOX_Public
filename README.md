@@ -13,7 +13,7 @@ New developers and AI agents: read [`AGENTS.md`](AGENTS.md), then [`docs/HANDOFF
 The workflow is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Claude sessions: ponytail starts at `full` and `.claude/settings.json` is not changed (Claude cannot edit it).
-Switch to `/ponytail lite` at the start of a code task and run `/ponytail-review` before merging.
+Switch to `/ponytail lite` at the start of a code task and run `/ponytail-review` before merging. If this setup changes, update this note in README and AGENTS.md.
 
 ## Run locally
 
