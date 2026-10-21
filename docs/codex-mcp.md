@@ -35,6 +35,9 @@ Copyboxx 自带一个本机接口（MCP）。Codex、Claude Code、Cursor 这类
 - 通道：Mac/Linux 是 `~/Library/Application Support/Clipbox/automation.sock`；Windows 是命名管道
   `\\.\pipe\copyboxx-automation-<用户名>`（`src-tauri/src/automation.rs`）。
 
+`update_snippet` 和批量版一样需要 `expectedUpdatedAt`（用 `get_snippet` 刚读到的 `updatedAt`）：期间话术被改过就返回
+`CONFLICT`，不会覆盖新内容。它按一项的 `update_snippets` 执行，结果在 `items` 里。
+
 ## 批量整理话术
 
 先用 `list_snippet_folders` 查询可用目录，再用 `get_snippets` 读取 1–100 个不同编号的完整内容。
@@ -85,8 +88,8 @@ Copyboxx 自带一个本机接口（MCP）。Codex、Claude Code、Cursor 这类
 检查每一项的 `status`，不能只看工具是否返回成功。文件读取/路径/大小检查在导入前完成；单个文件的读取、解码或
 保存失败只影响该项，已成功的图片保留。请求结构不合法（例如超出 10 项或包含未知字段）则整批拒绝。
 重复图片按有效图片的实际字节识别并返回原记录，不改原标题或目录。
-更新前逐项核对版本；这不构成图片 UI 与接口之间的数据库事务。若一项同时改标题和目录，后一步失败可能保留前一步，
-错误结果的 `appliedFields` 会说明已完成的字段。重新列出图片后再重试。图片任务不会阻塞话术保存；同一时间的其他图片请求
+每项更新在图片的写入队列里核对版本，并一次保存标题和目录：要么都改好，要么都不改。核对后、保存前界面改过同一张图片，
+也会返回 `CONFLICT`，不会覆盖。重新列出图片后再重试。图片任务不会阻塞话术保存；同一时间的其他图片请求
 会返回 `IMAGE_BUSY`，完成后再重试。导入等待上限为 60 秒；超时也应先查询结果，不要假定操作没有执行。
 
 没有新增图片删除工具，没有新增账号读取能力，原有秘密授权流程保持不变。

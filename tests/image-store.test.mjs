@@ -657,3 +657,17 @@ test("回收站: deleting a folder also clears the folder of trashed images, so 
   const restored = await store.restore(image.id);
   assert.equal(restored.folder, undefined);
 });
+
+test("update changes title and folder in one write only while the version still matches", async () => {
+  const factory = fakeIndexedDB();
+  const store = await openImageStore("device-key-1", { indexedDB: factory, now: () => 5000, createId: () => "img-1" });
+  await store.createFolder("产品");
+  const image = await store.add(pngBlob(), "旧名");
+  assert.equal(await store.update(image.id, { title: "过期" }, image.updatedAt - 1), null);
+  const updated = await store.update(image.id, { title: "新名", folder: "产品" }, image.updatedAt);
+  assert.deepEqual([updated.title, updated.folder], ["新名", "产品"]);
+  assert.ok(updated.updatedAt > image.updatedAt, "a version is never reused, even within the same millisecond");
+  assert.equal(await store.update(image.id, { folder: null }, image.updatedAt), null, "the old version no longer matches");
+  const moved = await store.update(image.id, { folder: null }, updated.updatedAt);
+  assert.deepEqual([moved.title, moved.folder], ["新名", undefined]);
+});

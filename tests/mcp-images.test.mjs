@@ -10,8 +10,7 @@ async function harness() {
   let serial = 0, time = 1000;
   const store = await openImageStore("synthetic-test-key", { indexedDB: memoryIndexedDB(), now: () => ++time, createId: () => `image-${++serial}` });
   const library = {
-    addImage: (...args) => store.add(...args), rename: (...args) => store.rename(...args),
-    moveImage: async (...args) => { await store.moveImage(...args); return true; },
+    addImage: (...args) => store.add(...args), updateImage: (...args) => store.update(...args),
     createFolder: async (name) => { await store.createFolder(name); return name; },
     renameFolder: async (from, to) => { await store.renameFolder(from, to); return to; },
   };
@@ -64,17 +63,22 @@ test("MCP image edits check fresh versions per entry and preserve successful ent
   assert.equal((await store.list()).find((x) => x.id === b.id).title, "B");
 });
 
-test("MCP rejects bad targets/fields before edits, and reports applied fields on a partial item failure", async () => {
+test("MCP rejects bad targets/fields before edits, and saves title and folder together or not at all", async () => {
   const { run, store, library } = await harness();
   await store.createFolder("Products");
   const a = await store.add(new Blob([bytes], { type: "image/png" }), "A");
   await assert.rejects(run({ action: "image-update-many", updates: [{ id: a.id, expectedUpdatedAt: a.updatedAt, title: "Changed" }, { id: a.id, expectedUpdatedAt: a.updatedAt, title: "Again" }] }));
   assert.equal((await store.list())[0].title, "A");
-  library.moveImage = async () => false;
+  const update = library.updateImage;
+  library.updateImage = async () => { throw new Error("synthetic write failure"); };
+  const failed = await run({ action: "image-update-many", updates: [{ id: a.id, expectedUpdatedAt: a.updatedAt, title: "Changed", folder: "Products" }] });
+  assert.equal(failed.results[0].status, "error");
+  assert.deepEqual([(await store.list())[0].title, (await store.list())[0].folder], ["A", undefined]);
+  library.updateImage = update;
   const out = await run({ action: "image-update-many", updates: [{ id: a.id, expectedUpdatedAt: a.updatedAt, title: "Changed", folder: "Products" }] });
-  assert.equal(out.results[0].status, "error");
-  assert.deepEqual(out.results[0].appliedFields, ["title"]);
-  assert.equal((await store.list())[0].title, "Changed");
+  assert.equal(out.results[0].status, "updated");
+  assert.deepEqual([out.results[0].item.title, out.results[0].item.folder], ["Changed", "Products"]);
+  assert.ok(out.results[0].item.updatedAt > a.updatedAt);
 });
 
 test("MCP rechecks the image after async folder lookup and preserves a newer UI edit", async () => {
@@ -85,7 +89,17 @@ test("MCP rechecks the image after async folder lookup and preserves a newer UI 
   store.listFolders = async () => { await store.rename(image.id, "Newer UI title"); return listFolders(); };
   const out = await run({ action: "image-update-many", updates: [{ id: image.id, expectedUpdatedAt: image.updatedAt, title: "Stale title", folder: "Products" }] });
   assert.equal(out.results[0].error.code, "CONFLICT");
-  assert.deepEqual(out.results[0].appliedFields, []);
+  assert.equal((await store.list())[0].title, "Newer UI title");
+});
+
+test("a UI edit queued between the MCP version check and its save makes the MCP update a conflict", async () => {
+  const { run, store } = await harness();
+  const image = await store.add(new Blob([bytes], { type: "image/png" }), "Original");
+  const mcp = run({ action: "image-update-many", updates: [{ id: image.id, expectedUpdatedAt: image.updatedAt, title: "Stale title" }] });
+  const ui = store.rename(image.id, "Newer UI title");
+  const [out] = await Promise.all([mcp, ui]);
+  assert.equal(out.results[0].status, "error");
+  assert.equal(out.results[0].error.code, "CONFLICT");
   assert.equal((await store.list())[0].title, "Newer UI title");
 });
 

@@ -40,6 +40,8 @@ export type ImageLibrary = {
   // Throws the store's short Chinese message when the image is refused.
   addImage: (file: Blob, title: string, folder: string | null) => Promise<ImageMeta>;
   rename: (id: string, title: string) => Promise<ImageMeta>;
+  // No toast; null when the image changed since `expectedUpdatedAt` (MCP edits).
+  updateImage: ImageStore["update"];
   // Permanent. Normal deleting is `trash`; this is for the 回收站 and the automatic cleanup.
   remove: (id: string) => Promise<void>;
   trash: (id: string) => Promise<boolean>;
@@ -189,6 +191,12 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
+  async function updateImage(id: string, changes: { title?: string; folder?: string | null }, expectedUpdatedAt: number) {
+    const updated = await (await loadStore(deviceKey)).update(id, changes, expectedUpdatedAt);
+    if (updated) setImages((current) => current?.map((meta) => meta.id === updated.id ? updated : meta) ?? current);
+    return updated;
+  }
+
   async function createFolder(name: string, onError = toast) {
     try {
       const next = await (await loadStore(deviceKey)).createFolder(name);
@@ -266,5 +274,5 @@ export function useImageLibrary(deviceKey: string, enabled: boolean, onToast: (m
     }
   }
 
-  return { ready, loadError, retry, images, trashed, folders, filter, setFilter: setRawFilter, addImage, rename, remove, trash, restore, purgeExpired, getBlob, getThumb, markUsed, moveImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, setFolderShortName, deleteFolder };
+  return { ready, loadError, retry, images, trashed, folders, filter, setFilter: setRawFilter, addImage, rename, remove, trash, restore, purgeExpired, getBlob, getThumb, markUsed, moveImage, updateImage, togglePinned, reorderFolder, createFolder, renameFolder, setFolderColor, setFolderShortName, deleteFolder };
 }

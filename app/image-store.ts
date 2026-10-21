@@ -56,6 +56,8 @@ export type ImageStore = {
   getThumb(id: string): Promise<Blob>;
   markUsed(id: string): Promise<void>;
   moveImage(id: string, folder: string | null): Promise<ImageMeta>;
+  // Title and/or folder in one write, only while the image still has `expectedUpdatedAt`; null when it changed since.
+  update(id: string, changes: { title?: string; folder?: string | null }, expectedUpdatedAt: number): Promise<ImageMeta | null>;
   setPinned(id: string, pinned: boolean): Promise<ImageMeta>;
   listFolders(): Promise<ImageFolder[]>;
   createFolder(name: string): Promise<ImageFolder[]>;
@@ -85,7 +87,7 @@ type SettingsRecord = { id: typeof SETTINGS_ID; salt: string };
 
 // Writes still under way (encrypting or committing), so quitting and restoring a backup can wait for them.
 const pendingWrites = new Set<Promise<void>>();
-const WRITE_METHODS = ["add", "rename", "remove", "trash", "restore", "markUsed", "moveImage", "setPinned", "createFolder", "renameFolder", "reorderFolders", "setFolderColor", "setFolderShortName", "deleteFolder"] as const satisfies readonly (keyof ImageStore)[];
+const WRITE_METHODS = ["add", "rename", "remove", "trash", "restore", "markUsed", "moveImage", "update", "setPinned", "createFolder", "renameFolder", "reorderFolders", "setFolderColor", "setFolderShortName", "deleteFolder"] as const satisfies readonly (keyof ImageStore)[];
 
 function trackWrites(store: ImageStore, factory: IDBFactory): ImageStore {
   // Separate connections to the same database must share the read/modify/write queue.
@@ -505,6 +507,17 @@ export async function openImageStore(deviceKey: string, options: ImageStoreOptio
       if (!folderName) delete moved.folder;
       await writeMeta(moved);
       return moved;
+    },
+
+    async update(id, changes, expectedUpdatedAt) {
+      const meta = await readMeta(id);
+      if (meta.updatedAt !== expectedUpdatedAt || meta.deletedAt !== undefined) return null;
+      const folderName = changes.folder === undefined ? meta.folder : await folderNameFor(changes.folder);
+      // Always moves updatedAt forward, so an edit in the same millisecond still fails the next version check.
+      const next: ImageMeta = { ...meta, title: changes.title === undefined ? meta.title : normalizeImageTitle(changes.title, meta.title), folder: folderName, updatedAt: Math.max(now(), meta.updatedAt + 1) };
+      if (!folderName) delete next.folder;
+      await writeMeta(next);
+      return next;
     },
 
     async setPinned(id, pinned) {

@@ -68,8 +68,8 @@ const TOOLS: &[ToolSpec] = &[
         name: "update_snippet",
         action: "update",
         title: "Update a snippet",
-        description: "Change fields of an existing snippet; fields left out stay as they are.",
-        fields: &[NUMBER, ("title", "New title", false), ("content", "New reply text", false), ("summary", "New summary", false), ("folder", FOLDER_CHOICE, false), ("chineseText", "New Chinese text", false)],
+        description: "Change fields of an existing snippet; fields left out stay as they are. Requires the snippet's current updatedAt (from get_snippet) as expectedUpdatedAt; a newer edit makes it fail with CONFLICT. Returns the snippet in items.",
+        fields: &[],
         read_only: false,
         destructive: false,
     },
@@ -134,10 +134,13 @@ fn extended_schema(action: &str) -> Option<Value> {
             numbers["uniqueItems"] = json!(true);
             object_schema(json!({"numbers":numbers}), &["numbers"])
         }
-        "update-many" => object_schema(json!({"updates":batch_schema(object_schema(json!({
-            "number":text, "expectedUpdatedAt":timestamp, "title":text, "content":text,
-            "summary":text, "folder":text, "chineseText":text
-        }), &["number", "expectedUpdatedAt"]), 100)}), &["updates"]),
+        "update" | "update-many" => {
+            let snippet = object_schema(json!({
+                "number":text, "expectedUpdatedAt":timestamp, "title":text, "content":text,
+                "summary":text, "folder":text, "chineseText":text
+            }), &["number", "expectedUpdatedAt"]);
+            if action == "update" { snippet } else { object_schema(json!({"updates":batch_schema(snippet, 100)}), &["updates"]) }
+        }
         "image-list" => object_schema(json!({
             "folder":text, "query":text,
             "offset":{"type":"integer", "minimum":0, "maximum":9007199254740991_u64},
@@ -231,6 +234,10 @@ fn command_for(name: &str, arguments: &Value) -> Result<Value, String> {
     if let Some(schema) = extended_schema(tool.action) {
         let input = Value::Object(given.clone());
         validate_input(&input, &schema, name)?;
+        // update_snippet is a one-entry update_snippets, so it gets the same version check instead of overwriting.
+        if tool.action == "update" {
+            return Ok(json!({"action":"update-many", "updates":[input]}));
+        }
         let mut command = given.clone();
         command.insert("action".into(), json!(tool.action));
         return Ok(Value::Object(command));
@@ -540,6 +547,8 @@ mod tests {
             extra["injected"] = json!(true);
             assert!(command_for(name, &extra).is_err(), "{name}");
         }
+        let single = json!({"number":"CB-0001","expectedUpdatedAt":5,"content":"New"});
+        assert_eq!(command_for("update_snippet", &single).unwrap(), json!({"action":"update-many","updates":[single]}));
         // File-level path validity is reported per file by native preparation.
         assert_eq!(command_for("import_images", &json!({"files":[{"path":"relative.png"}]})).unwrap(),
             json!({"action":"image-import","files":[{"path":"relative.png"}]}));
@@ -552,6 +561,8 @@ mod tests {
             ("get_snippets", json!({"numbers":["CB-0001","CB-0001"]})),
             ("get_snippets", json!({"numbers":[1]})),
             ("get_snippets", json!({"numbers": (0..101).map(|n| n.to_string()).collect::<Vec<_>>()})),
+            ("update_snippet", json!({"number":"CB-0001","title":"New"})),
+            ("update_snippet", json!({"number":"CB-0001","expectedUpdatedAt":1,"secret":"x"})),
             ("update_snippets", json!({"updates":[{"number":"CB-0001","title":"New"}]})),
             ("update_snippets", json!({"updates":[{"number":"CB-0001","expectedUpdatedAt":-1}]})),
             ("update_snippets", json!({"updates":[{"number":"CB-0001","expectedUpdatedAt":1.5}]})),

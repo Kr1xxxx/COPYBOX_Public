@@ -6,7 +6,7 @@ import { batch, distinct, hasAction, integer, mcpError, record, text } from "./m
 
 const ACTIONS = ["image-list", "image-import", "image-thumbnail", "image-update-many", "image-folders", "image-folder-create", "image-folder-rename"];
 export const isMcpImageCommand = (value: unknown) => hasAction(value, ACTIONS);
-type Library = Pick<ImageLibrary, "addImage" | "rename" | "moveImage" | "createFolder" | "renameFolder">;
+type Library = Pick<ImageLibrary, "addImage" | "updateImage" | "createFolder" | "renameFolder">;
 type Dependencies = {
   store: Pick<ImageStore, "list" | "listFolders" | "getBlob">;
   library: Library;
@@ -142,26 +142,20 @@ export async function runMcpImageCommand(input: unknown, deps: Dependencies) {
       const id = text(update.id, "图片编号");
       const expected = integer(update.expectedUpdatedAt, "内容版本");
       if (update.title === undefined && update.folder === undefined) mcpError("INVALID_ARGUMENT", "请提供要修改的标题或目录");
-      if (update.title !== undefined) text(update.title, "图片标题");
       if (update.folder !== undefined && update.folder !== null) text(update.folder, "目录");
-      return { id, expected, title: update.title, folder: update.folder };
+      return { id, expected, title: update.title === undefined ? undefined : text(update.title, "图片标题"), folder: update.folder };
     });
     distinct(updates.map((update) => update.id));
     const results = [];
     for (const update of updates) {
-      const appliedFields: string[] = [];
       try {
-        const before = await current(store, update.id);
-        if (before.updatedAt !== update.expected) mcpError("CONFLICT", "图片已改变，请重新读取后修改");
-        const folder = update.folder === undefined ? undefined : await folderValue(store, update.folder);
         if ((await current(store, update.id)).updatedAt !== update.expected) mcpError("CONFLICT", "图片已改变，请重新读取后修改");
-        if (update.title !== undefined) { await library.rename(update.id, text(update.title, "图片标题")); appliedFields.push("title"); }
-        if (folder !== undefined) {
-          if (!await library.moveImage(update.id, folder)) mcpError("IMAGE_FAILED", "移动图片失败");
-          appliedFields.push("folder");
-        }
-        results.push({ id: update.id, status: "updated", item: await current(store, update.id) });
-      } catch (error) { results.push({ id: update.id, status: "error", appliedFields, error: failure(error) }); }
+        const folder = update.folder === undefined ? undefined : await folderValue(store, update.folder);
+        // The store checks the version again inside its write queue, so a UI edit in between is never overwritten.
+        const item = await library.updateImage(update.id, { title: update.title, folder }, update.expected);
+        if (!item) mcpError("CONFLICT", "图片已改变，请重新读取后修改");
+        results.push({ id: update.id, status: "updated", item });
+      } catch (error) { results.push({ id: update.id, status: "error", error: failure(error) }); }
     }
     return { action, results };
   }
