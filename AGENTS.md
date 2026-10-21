@@ -20,6 +20,9 @@ Stack: Tauri 2 (`src-tauri/`, Rust; D-029) + React 19 + vinext 1.0 beta (Next-st
 3. Run `npm test` and `npm run test:e2e` so you know the starting point is green. If it is not, fix that first
    or record it in the handoff.
 4. Mark your task "In progress" on the task board. Work on one task at a time.
+5. Ponytail starts at `full` and `.claude/settings.json` is deliberately not changed (Claude cannot edit it). For code
+   tasks run `/ponytail lite` first, and `/ponytail-review` on your diff before merging. If this setup changes,
+   update this note in README and AGENTS.md.
 
 ## Commands
 
@@ -121,6 +124,7 @@ The owner never uses the GitHub website; all work goes through agents.
   releasing to staff, or anything irreversible. Ask in plain Chinese and say what the risk is.
 - If permissions block a merge, say it is a permission block and ask the owner to reply 「合并 N」; never work around it.
 - Never skip, disable or loosen a test, or change the CI gates, to get green.
+- Before merging, run `/ponytail-review` on your diff and fix what it finds.
 - CI does not run on PRs (owner, 2026-10-20): on main it runs when VERSION reaches or jumps past a 0.05 step (2.40, 2.45, …, D-090,
   `scripts/ci-due.mjs`); run lint, typecheck and unit tests locally before every merge, and start CI by hand when needed.
 - New or removed features and layout changes: add the `major` label yourself when you open the PR.
