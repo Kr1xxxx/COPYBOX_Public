@@ -20,6 +20,8 @@ Stack: Tauri 2 (`src-tauri/`, Rust; D-029) + React 19 + vinext 1.0 beta (Next-st
 3. Run `npm test` and `npm run test:e2e` so you know the starting point is green. If it is not, fix that first
    or record it in the handoff.
 4. Mark your task "In progress" on the task board. Work on one task at a time.
+5. Ponytail starts at `full` and `.claude/settings.json` is deliberately not changed (Claude cannot edit it). For code
+   tasks run `/ponytail lite` first, and `/ponytail-review` on your diff before merging.
 
 ## Commands
 
