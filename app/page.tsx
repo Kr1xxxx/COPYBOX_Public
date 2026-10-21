@@ -2552,7 +2552,7 @@ export default function Home() {
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="source-filter" role="group" aria-label="话术来源">
                 {([["company", "公司"], ["mine", "我的"]] as const).map(([value, label]) => <button type="button" key={value} className={sourceFilter === value ? "active" : ""} aria-pressed={sourceFilter === value} onClick={() => { setSourceFilter((current) => current === value ? "" : value); setSelected(0); }}>{label}</button>)}
               </div>}
-              {!imageView && activeFolder !== "trash" && filtered.length > 0 && !modalOpen && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
+              {!imageView && activeFolder !== "trash" && activeKindItems.length > 0 && !accountVeiled && <button type="button" className={`ghost-button select-toggle ${bulkMode ? "active" : ""}`} aria-pressed={bulkMode} disabled={!bulkMode && (filtered.length === 0 || modalOpen)} onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}>{bulkMode ? "取消选择" : "选择"}</button>}
               {!imageView && activeKind === "snippet" && activeFolder !== "trash" && activeKindItems.length > 0 && <div className="product-filter-wrap">
                 <button type="button" className={productFilter !== "全部产品" ? "product-filter active" : "product-filter"} onClick={() => setProductMenuOpen((value) => !value)} aria-expanded={productMenuOpen}>{productFilter}<Icon name="chevron" /></button>
                 <AnimatePresence>{productMenuOpen && <ArcMenu className="product-filter-menu">
@@ -2560,7 +2560,7 @@ export default function Home() {
                 </ArcMenu>}</AnimatePresence>
               </div>}
               {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && !imageSelecting && imageCounts.open && !modalOpen && <button type="button" className="ghost-button select-toggle collapse-cards" aria-label="收起展开的图片" onClick={() => imageSectionRef.current?.collapse()}>收起</button>}
-              {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && imageCounts.shown > 0 && !modalOpen && <button type="button" className={`ghost-button select-toggle ${imageSelecting ? "active" : ""}`} aria-pressed={imageSelecting} onClick={() => setImageSelecting((value) => !value)}>{imageSelecting ? "取消选择" : "选择"}</button>}
+              {imageView && imageLibrary.filter !== IMAGE_FILTER_TRASH && imageCounts.total > 0 && <button type="button" className={`ghost-button select-toggle ${imageSelecting ? "active" : ""}`} aria-pressed={imageSelecting} disabled={!imageSelecting && (imageCounts.shown === 0 || modalOpen)} onClick={() => setImageSelecting((value) => !value)}>{imageSelecting ? "取消选择" : "选择"}</button>}
               {imageView && <ImageViewSwitch view={imageViewMode} onChange={setImageViewMode} />}
             </div>}
             {/* While searching, how and where to search get their own row, so the head never runs out of room (D-106). */}
