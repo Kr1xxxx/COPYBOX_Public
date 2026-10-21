@@ -118,7 +118,7 @@ The owner never uses the GitHub website; all work goes through agents.
 
 - Open PRs without asking. When every check on the latest commit is green and there is no conflict, merge it yourself
   (`gh api -X PUT repos/Kr1xxxx/Clipbox/pulls/<n>/merge -f merge_method=merge -f sha=<head sha>`), whatever its size
-  or files (`src-tauri/`, `package.json`, CI and this file included). The `needs-owner` label from CI is not a stop.
+  or files (`src-tauri/`, `package.json`, CI and this file included).
 - Wait for the owner to write 合并 only for **high-risk** PRs: anything that could lose, corrupt or lock user data
   (storage or encryption format, storage keys, migrations, the save / restore / key path, deleting user data),
   releasing to staff, or anything irreversible. Ask in plain Chinese and say what the risk is.
