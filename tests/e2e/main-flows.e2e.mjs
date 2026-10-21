@@ -397,6 +397,43 @@ test("a 话术 typed by hand stays in the list when a product is picked (D-101)"
   await expect(source.getByRole("button", { name: "我的" })).toHaveAttribute("aria-pressed", "false");
 });
 
+test("the mini window keeps 公司 / 我的 behind a filter icon in the search box (D-106)", async ({ page }) => {
+  await page.getByRole("button", { name: "迷你模式" }).click();
+  await page.setViewportSize({ width: 360, height: 440 });
+  await expect(page.locator(".mini-top .mini-tab")).toHaveText(["全部", "收藏", "最近"]);
+  const filter = page.locator(".mini-search .mini-source-button");
+  await expect(filter).toHaveAttribute("aria-label", "话术来源");
+  // The sample sheet has no company 话术: 公司 empties the list, 全部 shows everything again.
+  await filter.click();
+  await page.getByRole("menuitem", { name: "公司" }).click();
+  await expect(page.locator(".mini-row")).toHaveCount(0);
+  await expect(filter).toHaveAttribute("aria-label", "话术来源：公司");
+  await filter.click();
+  await page.getByRole("menuitem", { name: "全部" }).click();
+  await expect(page.locator(".mini-row").first()).toBeVisible();
+  await filter.click();
+  await page.getByRole("menuitem", { name: "我的" }).click();
+  await expect(filter).toHaveAttribute("aria-label", "话术来源：我的");
+  await expect(page.locator(".mini-row").first()).toBeVisible();
+  // An outside click closes the menu.
+  await filter.click();
+  await expect(page.getByRole("menuitem", { name: "公司" })).toBeVisible();
+  await page.locator(".mini-list").click({ position: { x: 4, y: 4 } });
+  await expect(page.getByRole("menuitem", { name: "公司" })).toHaveCount(0);
+});
+
+test("while searching, 中文拼音 / 英文单词 sit in their own row and stay on one line (D-106)", async ({ page }) => {
+  await page.locator(".search-box input, input[placeholder]").first().fill("hello");
+  const modes = page.locator(".search-options").getByRole("group", { name: "搜索方式" });
+  await expect(modes).toBeVisible();
+  for (const name of ["中文拼音", "英文单词"]) {
+    const button = modes.getByRole("button", { name });
+    const box = await button.boundingBox();
+    expect(box.height, `${name} stays on one line`).toBeLessThan(30);
+  }
+  await expect(page.locator(".section-head .scope-switch")).toHaveCount(0);
+});
+
 test("the 全部产品 filter and the row menu close on an outside click and on Esc", async ({ page }) => {
   const filter = page.locator(".product-filter");
   const menu = page.locator(".product-filter-menu");

@@ -149,7 +149,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .kind-switch button:hover { color: var(--ink); }
 .kind-switch button.active { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(31,30,28,.1), 0 0 0 .5px rgba(31,30,28,.06); }
 .kind-switch.compact { height: 26px; border-radius: 7px; }
-.kind-switch.compact button { padding: 0 10px; border-radius: 5px; font-size: 12px; }
+.kind-switch.compact button { padding: 0 8px; border-radius: 5px; font-size: 12px; }
 .nav-list { margin-top: 12px; display: flex; flex-direction: column; gap: 1px; }
 .nav-item { position: relative; width: 100%; height: 28px; padding: 0 8px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; transition: background .14s, color .14s; }
 .nav-item:hover { background: var(--hover); }
@@ -247,6 +247,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .toolbar .icon-button.pin-on-top.active { background: var(--accent-tint); color: var(--accent); }
 .toolbar .icon-button.pin-on-top.active:hover { background: var(--accent-soft); color: var(--accent); }
 .section-head { position: relative; z-index: 3; height: 40px; flex: 0 0 auto; padding: 0 12px 4px 18px; display: flex; align-items: center; gap: 8px; }
+.search-options { flex: 0 0 auto; padding: 0 12px 6px 18px; display: flex; align-items: center; gap: 8px; }
+.scope-switch button { white-space: nowrap; }
 .section-head h1 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-serif); font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--ink); }
 .section-count { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .product-filter-wrap { position: relative; flex: 0 0 auto; }
@@ -380,34 +382,45 @@ button { -webkit-tap-highlight-color: transparent; }
 .status-bar > span.spacer { display: block; }
 
 /* Mini window */
-.mini-top { height: 42px; flex: 0 0 auto; padding: 0 8px 0 10px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 8px; background: var(--sidebar); }
+.mini-top { height: 42px; flex: 0 0 auto; padding: 0 8px 0 10px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 4px; background: var(--sidebar); }
 .mini-top .traffic-lights { justify-self: start; }
 .desktop-app:not(.platform-darwin) .mini-top .traffic-lights { width: 0; }
 /* The switch and 全部/收藏/最近 sit together in the middle; a long row scrolls inside its own space. */
-.mini-top-center { min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.mini-top .icon-button { justify-self: end; width: 28px; height: 28px; color: var(--ink-2); }
+.mini-top-center { min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* 全部 / 收藏 / 最近 fit, so no fade at their edges. */
+.mini-top .mini-tabs { -webkit-mask-image: none; mask-image: none; }
+.mini-top-actions { justify-self: end; display: flex; gap: 2px; }
+.mini-top .icon-button { width: 28px; height: 28px; color: var(--ink-2); }
 .mini-top .kind-switch { flex: 0 0 auto; }
 /* Folder tabs: one row that scrolls sideways (drag, wheel, trackpad); the 话术/图片 switch beside it stays put. */
-.mini-tabs { position: relative; flex: 0 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x; cursor: grab; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); }
+.mini-tabs { position: relative; flex: 0 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: 2px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x; cursor: grab; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); }
 .mini-tabs::-webkit-scrollbar { display: none; }
 .mini-tabs.dragging { cursor: grabbing; }
 .mini-tabs.dragging .mini-tab { pointer-events: none; }
-.mini-tab { flex: 0 0 auto; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-3); font-size: 12px; font-weight: 500; white-space: nowrap; cursor: inherit; transition: background-color .16s, color .16s, transform .12s ease; }
-.mini-tab:hover { color: var(--ink); background: var(--hover); }
+/* Plain text tabs, no boxes (Krix 2026-10-20, D-106): the picked one is accent text with a short underline. */
+.mini-tab { position: relative; flex: 0 0 auto; height: 26px; padding: 0 7px; border: 0; border-radius: 0; background: transparent; color: var(--ink-3); font-size: 12px; font-weight: 500; white-space: nowrap; cursor: inherit; transition: color .16s, transform .12s ease; }
+.mini-tab:hover { color: var(--ink); }
 .mini-tab:active { transform: scale(.97); }
-.mini-tab.active { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.mini-tab.active { color: var(--accent); font-weight: 600; }
+.mini-tab.active::after { content: ""; position: absolute; left: 7px; right: 7px; bottom: 1px; height: 2px; border-radius: 2px; background: var(--accent); }
 .mini-tab.placeholder { visibility: hidden; pointer-events: none; }
 .mini-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (prefers-reduced-motion: reduce) { .mini-tab { transition: none; } .mini-tab:active { transform: none; } }
 .mini-search { flex: 0 0 auto; padding: 4px 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
 .mini-search .native-search { height: 34px; padding-right: 0; border-radius: 8px; }
-/* Folder row under the search box (takes the place of the old 最常用 chips): the same tabs, drawn as bordered chips. */
-.mini-folders { flex: 0 0 auto; height: 36px; padding: 0 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
+/* 公司 / 我的 behind a filter icon at the right end of the search box (D-106); filled like the full window's while one is picked. */
+.mini-source { margin-left: auto; margin-right: 3px; }
+.mini-source-button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); cursor: pointer; }
+.mini-source-button:hover { background: var(--hover); color: var(--ink); }
+.mini-source-button.active, .mini-source-button.active:hover { background: var(--accent); color: #fff; }
+.mini-source-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mini-source .product-filter-menu { top: 32px; right: -3px; width: 128px; }
+/* Folder row under the search box (takes the place of the old 最常用 chips): the same text tabs. */
+.mini-folders { flex: 0 0 auto; height: 34px; padding: 0 10px 8px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
 .mini-search:has(+ .mini-folders) { border-bottom: 0; }
 .mini-tabs.chips { height: 28px; padding-inline: 8px; margin-inline: -8px; }
-.mini-tabs.chips .mini-tab { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--ink-2); }
-.mini-tabs.chips .mini-tab:hover { background: var(--hover); }
-.mini-tabs.chips .mini-tab.active { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); }
+/* Six folders show without sliding (Krix 2026-10-20); more scroll sideways. */
+.mini-tabs.chips .mini-tab { height: 28px; min-width: calc((100% - 10px) / 6); }
 .mini-list { padding: 6px 6px 8px; gap: 1px; }
 .mini-row .row-main { min-height: 46px; padding: 0 10px 0 12px; gap: 10px; border-radius: 9px; }
 .mini-row .row-copy small { font-size: 12px; }

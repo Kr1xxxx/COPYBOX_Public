@@ -29,6 +29,8 @@
     backupImageRead: function (name) { return invoke("backup_image_read", { name: name }).then(function (buffer) { return new Uint8Array(buffer); }); },
     backupImagePrune: function (keep) { return invoke("backup_image_prune", { keep: keep }).then(noop); },
     didCopy: function () { fireAndForget("did_copy"); },
+    // Windows mini window has no title bar (D-106): its ✕ asks for a normal close, which follows 关闭按钮 in Settings.
+    closeWindow: function () { invoke("plugin:window|close").catch(noop); },
     setCloseBehavior: function (behavior) { fireAndForget("set_close_behavior", { behavior: behavior }); },
     // Windows 贴边 (D-079): the mini window sticks to a screen edge and folds away while the mouse is elsewhere.
     setMiniEdgeSnap: function (on) { fireAndForget("set_mini_edge_snap", { on: Boolean(on) }); },
