@@ -22,6 +22,7 @@ import { TipsImportRow } from "./tips-import";
 import { AutoLockRow } from "./account-auto-lock-ui";
 import type { AutoLockSeconds } from "./account-auto-lock";
 import { AutomationTrustRows, automationCardShown, useTrustedCallers } from "./automation-trust-ui";
+import { CHECK_UPDATE_EVENT, type UpdateCheckOutcome } from "./update-notice";
 
 // The groups of the left column. Each section below carries the id of the group it belongs to.
 const SETTINGS_TABS = [["look", "概览"], ["folders", "目录"], ["data", "数据"], ["security", "安全"], ["usage", "使用排行"], ["window", "窗口"], ["ai", "AI"], ["about", "关于"]] as const;
@@ -33,6 +34,15 @@ function backupAgeLabel(at: number) {
   const clock = new Date(at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   return `上次导出 ${clock}${days >= 1 ? `（${days} 天前）` : ""}`;
 }
+
+const UPDATE_CHECK_TEXT = {
+  idle: "现在就看看有没有新版本",
+  checking: "正在检查…",
+  current: "已是最新版本",
+  error: "没能连上，稍后再试",
+  disabled: "这个版本不检查更新",
+  available: "发现新版本，关掉设置后在窗口上方更新",
+};
 
 export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest, onClearTest, version, buildTime, isDesktop, refreshing, itemCount, trashCount, miniEdgeSnap, onMiniEdgeSnap, pasteBack, onPasteBack, pasteBackRepeat, onPasteBackRepeat, folderGroups, onFolderAdd, onFolderRename, onFolderDelete, onFolderColor, onFolderShortName, onFolderMove, onFolderReorder, closeBehavior, onCloseBehavior, trashDays, onTrashDays, onEmptyTrash, theme, onTheme, lastBackupAt, onOpenDataFolder, onClose, onExport, onExportSecret, onExportAccountSheet, onImportAccountSheet, accountLock, slideUnlock, autoLock, accountLocked, onImport, onImportSheet, onReload, onMini, onShowGuide, onOpenAccount, syncCode, sharedLibrary, usageItems, onShowItem }: {
   // 导入测试内容 / 清除测试内容: the page adds or removes the marked test entries; the preview says how many of each kind would go.
@@ -102,6 +112,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
   const [confirmClearTest, setConfirmClearTest] = useState<TestContentPreview | null>(null);
   const [confirmSheet, setConfirmSheet] = useState(false);
   const [versionCopied, setVersionCopied] = useState(false);
+  const [updateCheck, setUpdateCheck] = useState<"idle" | "checking" | UpdateCheckOutcome>("idle");
   const [dataMove, setDataMove] = useState<"export" | "import" | null>(null);
   const [openedAt] = useState(() => Date.now());
   const builtAt = formatBuildTime(buildTime);
@@ -138,6 +149,11 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
   };
   // Read on every render of the home page, so a sync done on the 数据 page shows up when coming back.
   const updatedOn = formatTaipeiDate(buildTime);
+  // 检查更新 (D-108): the banner does the check; a newer version shows there, so the settings close to let it be seen.
+  const checkUpdateNow = () => {
+    setUpdateCheck("checking");
+    window.dispatchEvent(new CustomEvent(CHECK_UPDATE_EVENT, { detail: (outcome: UpdateCheckOutcome) => { setUpdateCheck(outcome); if (outcome === "available") requestClose(); } }));
+  };
   const row = (title: string, hint: string, action: () => void, label: string, disabled = false) => (
     <div className="settings-row"><div><strong>{title}</strong><small>{hint}</small></div><button type="button" className="secondary-button" onClick={action} disabled={disabled}>{label}</button></div>
   );
@@ -289,6 +305,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
           <section className="settings-card" data-solo="" aria-labelledby="set-about" hidden={hideSection("about", "set-about")}><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong>Copyboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Copyboxx ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
+            {window.clipboxDesktop?.checkUpdate && <div className="settings-row"><div><strong>检查更新</strong><small>{UPDATE_CHECK_TEXT[updateCheck]}</small></div><button type="button" className="secondary-button" onClick={checkUpdateNow} disabled={updateCheck === "checking"}>检查更新</button></div>}
             {row("使用说明", "第一次打开时的几步介绍：话术、图片、账号和迷你窗口", onShowGuide, "再看一遍")}
             {/* The MiSans licence asks the app to say it uses MiSans (app/fonts/MiSans-License.pdf). */}
             <div className="settings-row static"><div><strong>字体</strong><small>设置和弹窗使用 MiSans（小米）、Poppins 和 Lora 字体</small></div></div>
