@@ -121,6 +121,7 @@ The owner never uses the GitHub website; all work goes through agents.
   releasing to staff, or anything irreversible. Ask in plain Chinese and say what the risk is.
 - If permissions block a merge, say it is a permission block and ask the owner to reply 「合并 N」; never work around it.
 - Never skip, disable or loosen a test, or change the CI gates, to get green.
+- Before merging, run `/ponytail-review` on your diff and fix what it finds.
 - CI does not run on PRs (owner, 2026-10-20): on main it runs when VERSION reaches or jumps past a 0.05 step (2.40, 2.45, …, D-090,
   `scripts/ci-due.mjs`); run lint, typecheck and unit tests locally before every merge, and start CI by hand when needed.
 - New or removed features and layout changes: add the `major` label yourself when you open the PR.
