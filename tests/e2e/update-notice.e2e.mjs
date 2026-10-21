@@ -181,3 +181,15 @@ test("检查更新 says so when the check fails, and keeps a banner that is show
   await settings.getByRole("button", { name: "关闭设置" }).click();
   await expect(page.locator(".update-banner")).toContainText("有新版本 0.2.25");
 });
+
+test("检查更新 brings 下载 back after the browser hint was shown", async ({ page }) => {
+  await withUpdate(page, { ...available, installable: false }, "win32");
+  await seedSnippets(page);
+  const banner = page.locator(".update-banner");
+  await banner.getByRole("button", { name: "下载" }).click();
+  await expect(banner).toContainText("正在浏览器里下载新版本");
+  const settings = await openAbout(page);
+  await settings.getByRole("button", { name: "检查更新" }).click();
+  await expect(settings).toHaveCount(0);
+  await expect(banner.getByRole("button", { name: "下载" })).toBeVisible();
+});

@@ -63,6 +63,8 @@ export function UpdateNotice() {
         if (!(reply && result.status === "error")) {
           setUpdate(result.status === "available" ? { version: result.version, notes: result.notes, installable: result.installable !== false } : null);
           setClosedFor("");
+          // After 下载 the banner shows the manual-install hint; a check by hand brings the buttons back.
+          if (reply && result.status === "available") setPhase((current) => (current.kind === "opened" ? { kind: "idle" } : current));
         }
         reply?.(result.status);
       })

@@ -305,7 +305,7 @@ export function SettingsDialog({ testTools = false, onPreviewTest, onImportTest,
           <section className="settings-card" data-solo="" aria-labelledby="set-about" hidden={hideSection("about", "set-about")}><h3 id="set-about">关于</h3>
             <div className="settings-row"><div><strong>Copyboxx {version ? `v${version}` : "开发版本"}</strong><small>{itemCount} 条内容 · 回收站 {trashCount} 条 · 数据仅保存在本机</small></div>
               <button type="button" className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(`Copyboxx ${version || "dev"}${builtAt ? ` · ${builtAt}` : ""} · ${navigator.userAgent}`).then(() => setVersionCopied(true)).catch(() => undefined); }}>{versionCopied ? "已复制" : "复制版本信息"}</button></div>
-            {window.clipboxDesktop?.checkUpdate && <div className="settings-row"><div><strong>检查更新</strong><small>{UPDATE_CHECK_TEXT[updateCheck]}</small></div><button type="button" className="secondary-button" onClick={checkUpdateNow} disabled={updateCheck === "checking"}>检查更新</button></div>}
+            {window.clipboxDesktop?.checkUpdate && <div className="settings-row"><div><strong>检查更新</strong><small aria-live="polite">{UPDATE_CHECK_TEXT[updateCheck]}</small></div><button type="button" className="secondary-button" onClick={checkUpdateNow} disabled={updateCheck === "checking"}>检查更新</button></div>}
             {row("使用说明", "第一次打开时的几步介绍：话术、图片、账号和迷你窗口", onShowGuide, "再看一遍")}
             {/* The MiSans licence asks the app to say it uses MiSans (app/fonts/MiSans-License.pdf). */}
             <div className="settings-row static"><div><strong>字体</strong><small>设置和弹窗使用 MiSans（小米）、Poppins 和 Lora 字体</small></div></div>
