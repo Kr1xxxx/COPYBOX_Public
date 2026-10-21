@@ -6,6 +6,10 @@ import "./desktop-bridge";
 const OLD_DISMISSED_KEY = "clipbox.update-dismissed";
 const RECHECK_MS = 24 * 60 * 60 * 1000;
 
+// 设置里的「检查更新」 (D-108) asks the banner to check now; `detail` is called with how it went.
+export const CHECK_UPDATE_EVENT = "clipbox:check-update";
+export type UpdateCheckOutcome = "available" | "current" | "error" | "disabled";
+
 type Phase =
   | { kind: "idle" }
   | { kind: "downloading"; received: number; total: number }
@@ -52,16 +56,24 @@ export function UpdateNotice() {
     if (!desktop?.checkUpdate) return;
     try { localStorage.removeItem(OLD_DISMISSED_KEY); } catch { /* optional */ }
     let cancelled = false;
-    const run = () => desktop.checkUpdate?.()
+    const run = (reply?: (outcome: UpdateCheckOutcome) => void) => desktop.checkUpdate?.()
       .then((result) => {
         if (cancelled) return;
-        setUpdate(result.status === "available" ? { version: result.version, notes: result.notes, installable: result.installable !== false } : null);
-        setClosedFor("");
+        // A failed check by hand leaves a banner already showing as it is.
+        if (!(reply && result.status === "error")) {
+          setUpdate(result.status === "available" ? { version: result.version, notes: result.notes, installable: result.installable !== false } : null);
+          setClosedFor("");
+          // After 下载 the banner shows the manual-install hint; a check by hand brings the buttons back.
+          if (reply && result.status === "available") setPhase((current) => (current.kind === "opened" ? { kind: "idle" } : current));
+        }
+        reply?.(result.status);
       })
-      .catch(() => undefined);
+      .catch(() => reply?.("error"));
     void run();
-    const timer = window.setInterval(run, RECHECK_MS);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    const timer = window.setInterval(() => void run(), RECHECK_MS);
+    const onManual = (event: Event) => void run((event as CustomEvent<(outcome: UpdateCheckOutcome) => void>).detail);
+    window.addEventListener(CHECK_UPDATE_EVENT, onManual);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener(CHECK_UPDATE_EVENT, onManual); };
   }, []);
 
   useEffect(() => {

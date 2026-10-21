@@ -139,3 +139,57 @@ test("a version the shell cannot install itself keeps 下载", async ({ page }) 
   await banner.getByRole("button", { name: "下载" }).click();
   expect(await page.evaluate(() => window.__opened)).toBe(1);
 });
+
+// D-108: 设置 › 关于 › 检查更新 checks right now, on both platforms.
+async function openAbout(page) {
+  await page.getByRole("button", { name: /设置/ }).first().click();
+  const settings = page.getByRole("dialog", { name: "设置" });
+  await settings.getByRole("tab", { name: "关于" }).click();
+  return settings;
+}
+
+for (const platform of ["win32", "darwin"]) test(`检查更新 says the app is up to date (${platform})`, async ({ page }) => {
+  await withUpdate(page, { status: "current" }, platform);
+  await seedSnippets(page);
+  const settings = await openAbout(page);
+  await settings.getByRole("button", { name: "检查更新" }).click();
+  await expect(settings).toContainText("已是最新版本");
+  await expect(page.locator(".update-banner")).toHaveCount(0);
+});
+
+test("检查更新 finds a newer version, closes the settings and shows the banner again after 稍后", async ({ page }) => {
+  await withUpdate(page, available, "darwin", { install: true });
+  await seedSnippets(page);
+  const banner = page.locator(".update-banner");
+  await banner.getByRole("button", { name: "稍后" }).click();
+  await expect(banner).toHaveCount(0);
+  const settings = await openAbout(page);
+  await settings.getByRole("button", { name: "检查更新" }).click();
+  await expect(settings).toHaveCount(0);
+  await expect(banner).toContainText("有新版本 0.2.25");
+  await expect(banner.getByRole("button", { name: "立即更新" })).toBeVisible();
+});
+
+test("检查更新 says so when the check fails, and keeps a banner that is showing", async ({ page }) => {
+  await withUpdate(page, available, "win32", { install: true });
+  await seedSnippets(page);
+  await expect(page.locator(".update-banner")).toContainText("有新版本 0.2.25");
+  await page.evaluate(() => { window.clipboxDesktop.checkUpdate = async () => ({ status: "error" }); });
+  const settings = await openAbout(page);
+  await settings.getByRole("button", { name: "检查更新" }).click();
+  await expect(settings).toContainText("没能连上，稍后再试");
+  await settings.getByRole("button", { name: "关闭设置" }).click();
+  await expect(page.locator(".update-banner")).toContainText("有新版本 0.2.25");
+});
+
+test("检查更新 brings 下载 back after the browser hint was shown", async ({ page }) => {
+  await withUpdate(page, { ...available, installable: false }, "win32");
+  await seedSnippets(page);
+  const banner = page.locator(".update-banner");
+  await banner.getByRole("button", { name: "下载" }).click();
+  await expect(banner).toContainText("正在浏览器里下载新版本");
+  const settings = await openAbout(page);
+  await settings.getByRole("button", { name: "检查更新" }).click();
+  await expect(settings).toHaveCount(0);
+  await expect(banner.getByRole("button", { name: "下载" })).toBeVisible();
+});
