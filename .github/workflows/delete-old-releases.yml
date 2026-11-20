@@ -1,0 +1,27 @@
+name: Delete old test releases (one-off)
+
+# Krix 2026-11-20 「公开仓库的全删了」: this repo is frozen and public; delete every test release (installers) and its
+# tag. Runs once on a push to this branch only; never on main.
+on:
+  push:
+    branches: [claude/project-thread-ympaqu]
+
+permissions:
+  contents: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Delete all releases and their tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          tags=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName --jq '.[].tagName')
+          n=0
+          for tag in $tags; do gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag; echo "deleted: $tag"; n=$((n+1)); done
+          left=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName --jq 'length')
+          echo "deleted $n releases, $left left" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$left" = 0 ]
